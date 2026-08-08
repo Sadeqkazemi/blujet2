@@ -75,8 +75,23 @@ export const CabinClass = {
   ECONOMY: 'ECONOMY',
   COMFORT: 'COMFORT',
   BUSINESS: 'BUSINESS',
+  FIRST: 'FIRST',
 } as const;
 export type CabinClass = (typeof CabinClass)[keyof typeof CabinClass];
+
+export const AircraftStatus = {
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+export type AircraftStatus =
+  (typeof AircraftStatus)[keyof typeof AircraftStatus];
+
+export const AircraftSeatSide = {
+  LEFT: 'LEFT',
+  RIGHT: 'RIGHT',
+} as const;
+export type AircraftSeatSide =
+  (typeof AircraftSeatSide)[keyof typeof AircraftSeatSide];
 
 /** Flight definition / revision workflow (frontend: PENDING_CEO ≡ PENDING_APPROVAL). */
 export const FlightDefinitionStatus = {
@@ -135,9 +150,17 @@ export const LedgerEntryType = {
   REFUND: 'REFUND',
   SETTLEMENT: 'SETTLEMENT',
   COMMISSION: 'COMMISSION',
+  COMMITMENT: 'COMMITMENT',
 } as const;
 export type LedgerEntryType =
   (typeof LedgerEntryType)[keyof typeof LedgerEntryType];
+
+export const CommitmentStatus = {
+  ACTIVE: 'ACTIVE',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type CommitmentStatus =
+  (typeof CommitmentStatus)[keyof typeof CommitmentStatus];
 
 export const AgencyTier = {
   NORMAL: 'NORMAL',
@@ -510,3 +533,17 @@ export const SiteContentBlockKey = {
 } as const;
 export type SiteContentBlockKey =
   (typeof SiteContentBlockKey)[keyof typeof SiteContentBlockKey];
+
+/** Which of the sidebar's separate unread badges a notification counts
+ * against — GET /notifications/unread-count breaks its total down by
+ * these exact keys. SYSTEM covers events with no more specific home
+ * (e.g. ACCESS_REVOKED). */
+export const NotificationCategory = {
+  CARTABLE: 'CARTABLE',
+  MESSAGE: 'MESSAGE',
+  REQUEST: 'REQUEST',
+  APPROVAL: 'APPROVAL',
+  SYSTEM: 'SYSTEM',
+} as const;
+export type NotificationCategory =
+  (typeof NotificationCategory)[keyof typeof NotificationCategory];

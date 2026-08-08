@@ -344,7 +344,9 @@ describe('Reservation (e2e)', () => {
 
     const booking = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ pnr: issued.body.data.pnr });
+      .createQueryBuilder('b')
+      .where('b.pnr = :pnr', { pnr: issued.body.data.pnr })
+      .getOneOrFail();
     expect(booking.status).toBe('TICKETED');
     const ledger = await dataSource
       .getRepository(LedgerEntry)

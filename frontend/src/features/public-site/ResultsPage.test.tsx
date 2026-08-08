@@ -28,6 +28,7 @@ const RESULT: SearchFlightResult = {
   destCode: 'MHD',
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
+  publishStatus: 'PUBLISHED',
   cabins: [
     { cabin: 'ECONOMY', priceIrr: '380000000', seatsLeft: 10 },
     { cabin: 'BUSINESS', priceIrr: '680000000', seatsLeft: 0 },

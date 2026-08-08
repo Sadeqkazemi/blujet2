@@ -28,9 +28,11 @@ import {
 } from '../../../database/enums';
 import { normalizeFlightNo } from '../flight-definition.util';
 
+const CABIN_CLASSES = Object.values(CabinClass);
+
 export class CabinCapacityDto {
-  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
+  @ApiProperty({ enum: CABIN_CLASSES })
+  @IsIn(CABIN_CLASSES)
   cabin!: CabinClass;
 
   @ApiPropertyOptional({
@@ -90,12 +92,12 @@ export class ChargeRuleDto {
   percentageBasisPoints?: number | null;
 
   @ApiPropertyOptional({
-    enum: ['ECONOMY', 'COMFORT', 'BUSINESS', null],
+    enum: [...CABIN_CLASSES, null],
     nullable: true,
     description: 'null = همه کابین‌ها',
   })
   @IsOptional()
-  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS', null])
+  @IsIn([...CABIN_CLASSES, null])
   cabin?: CabinClass | null;
 
   @ApiPropertyOptional({ description: 'alias effectiveFrom (frontend)' })

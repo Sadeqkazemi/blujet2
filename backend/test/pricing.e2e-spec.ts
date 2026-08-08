@@ -17,7 +17,7 @@ import {
   type PriceSuggestionProvider,
   type PriceSuggestionResult,
 } from '../src/modules/ai/price-suggestion.provider';
-import { loginAs, stepUpFor } from './helpers/login.helper';
+import { loginAs } from './helpers/login.helper';
 
 /** Deterministic in-test stand-in for the ml-service — set `nextResult` to
  * null to simulate the service being down (graceful-degradation tests). */
@@ -91,8 +91,11 @@ describe('Pricing (e2e)', () => {
     competitorPriceIrr = 40_000_000n,
   ) {
     await dataSource
-      .getRepository(FarePricingProposal)
-      .update({ id: proposalId }, { competitorPriceIrr });
+      .createQueryBuilder()
+      .update(FarePricingProposal)
+      .set({ competitorPriceIrr })
+      .where('id = :id', { id: proposalId })
+      .execute();
   }
 
   it('Commercial proposes a price for a scheduled flight; re-PUT while PENDING edits it', async () => {
@@ -149,7 +152,62 @@ describe('Pricing (e2e)', () => {
     expect(invalid.status).toBe(400);
   });
 
-  it('CEO registers with source=PROPOSED; proposal locks; further edits/registers → 409', async () => {
+  it('CEO registers with source=PROPOSED without step-up/OTP; RBAC + audit log + idempotency are preserved; further edits → 409', async () => {
+    const instance = await createScheduledInstance();
+    const commercial = await loginAs(app, 'comm');
+    const created = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 38_500_000 });
+    const proposalId = created.body.data.id as string;
+
+    // No stepUpChallengeId/stepUpCode anywhere in this body — step-up is
+    // no longer part of the CEO price/flight-definition approval contract.
+    const ceo = await loginAs(app, 'ceo');
+    const registered = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'PROPOSED' });
+    expect(registered.status).toBe(200);
+    expect(registered.body.data.status).toBe('REGISTERED');
+    expect(registered.body.data.registeredPriceIrr).toBe('38500000');
+    expect(registered.body.data.approvedBy.role).toBe('CEO');
+
+    // RBAC still gates the endpoint (no step-up needed to be *rejected* either).
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${created.body.data.id}/register`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ source: 'PROPOSED' });
+    expect(forbidden.status).toBe(403);
+
+    // Audit log still records the approval.
+    const audit = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.category = :category', { category: 'PRICING' })
+      .andWhere('a.entityId = :entityId', { entityId: proposalId })
+      .andWhere("a.action = 'تأیید قیمت پیشنهادی بازرگانی'")
+      .getOne();
+    expect(audit).not.toBeNull();
+    expect(audit!.actorRole).toBe('CEO');
+
+    const reEdit = await request(app.getHttpServer())
+      .put(`/pricing/flights/${instance.id}/proposal`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`)
+      .send({ proposedPriceIrr: 40_000_000 });
+    expect(reEdit.status).toBe(409);
+
+    const reRegister = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/register`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`)
+      .send({ source: 'PROPOSED' });
+    // Re-register is idempotent (same REGISTERED row); commercial re-edit stays 409.
+    expect(reRegister.status).toBe(200);
+    expect(reRegister.body.data.status).toBe('REGISTERED');
+    expect(reRegister.body.data.registeredPriceIrr).toBe('38500000');
+  });
+
+  it('PATCH .../approve is a canonical alias for register — same result, still no step-up', async () => {
     const instance = await createScheduledInstance();
     const commercial = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
@@ -159,41 +217,19 @@ describe('Pricing (e2e)', () => {
     const proposalId = created.body.data.id as string;
 
     const ceo = await loginAs(app, 'ceo');
-    const stepUp1 = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
-    const registered = await request(app.getHttpServer())
-      .patch(`/pricing/proposals/${proposalId}/register`)
+    const approved = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/approve`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED', ...stepUp1 });
-    expect(registered.status).toBe(200);
-    expect(registered.body.data.status).toBe('REGISTERED');
-    expect(registered.body.data.registeredPriceIrr).toBe('38500000');
-    expect(registered.body.data.approvedBy.role).toBe('CEO');
+      .send({ source: 'PROPOSED' });
+    expect(approved.status).toBe(200);
+    expect(approved.body.data.status).toBe('REGISTERED');
+    expect(approved.body.data.registeredPriceIrr).toBe('38500000');
 
-    const reEdit = await request(app.getHttpServer())
-      .put(`/pricing/flights/${instance.id}/proposal`)
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/approve`)
       .set('Authorization', `Bearer ${commercial.accessToken}`)
-      .send({ proposedPriceIrr: 40_000_000 });
-    expect(reEdit.status).toBe(409);
-
-    const stepUp2 = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
-    const reRegister = await request(app.getHttpServer())
-      .patch(`/pricing/proposals/${proposalId}/register`)
-      .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED', ...stepUp2 });
-    // Re-register is idempotent (same REGISTERED row); commercial re-edit stays 409.
-    expect(reRegister.status).toBe(200);
-    expect(reRegister.body.data.status).toBe('REGISTERED');
-    expect(reRegister.body.data.registeredPriceIrr).toBe('38500000');
+      .send({ source: 'PROPOSED' });
+    expect(forbidden.status).toBe(403);
   });
 
   it('register with source=AI without a stored suggestion → 409 with a clear message', async () => {
@@ -205,16 +241,10 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 38_500_000 });
 
     const ceo = await loginAs(app, 'ceo');
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const res = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${created.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI', ...stepUp });
+      .send({ source: 'AI' });
     expect(res.status).toBe(409);
     expect(res.body.error.message).toContain('هوش مصنوعی');
   });
@@ -270,16 +300,10 @@ describe('Pricing (e2e)', () => {
     expect(stored.proposedPriceIrr).toBe(38_500_000n);
     expect(stored.registeredPriceIrr).toBeNull();
 
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI', ...stepUp });
+      .send({ source: 'AI' });
     expect(registered.status).toBe(200);
     expect(registered.body.data.registeredPriceIrr).toBe('39200000');
   });
@@ -328,16 +352,10 @@ describe('Pricing (e2e)', () => {
       .getOneOrFail();
     expect(stored.aiSuggestion).toBeNull();
 
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI', ...stepUp });
+      .send({ source: 'AI' });
     expect(registered.status).toBe(409);
     expect(registered.body.error.message).toContain('هوش مصنوعی');
   });
@@ -371,16 +389,10 @@ describe('Pricing (e2e)', () => {
       .post('/pricing/proposals/ai-analysis')
       .set('Authorization', `Bearer ${ceo.accessToken}`);
 
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'AI', ...stepUp });
+      .send({ source: 'AI' });
     expect(registered.status).toBe(409);
     expect(registered.body.error.message).toContain('نرخ قانونی');
 
@@ -409,16 +421,10 @@ describe('Pricing (e2e)', () => {
     expect(analysis.status).toBe(201);
     expect(analysis.body.data.available).toBe(false);
 
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${created.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED', ...stepUp });
+      .send({ source: 'PROPOSED' });
     expect(registered.status).toBe(200);
   });
 
@@ -431,8 +437,11 @@ describe('Pricing (e2e)', () => {
       .send({ proposedPriceIrr: 38_500_000 });
 
     await dataSource
-      .getRepository(FarePricingProposal)
-      .update({ status: 'PENDING' }, { competitorPriceIrr: null });
+      .createQueryBuilder()
+      .update(FarePricingProposal)
+      .set({ competitorPriceIrr: null })
+      .where('status = :status', { status: 'PENDING' })
+      .execute();
 
     const ceo = await loginAs(app, 'ceo');
     const analysis = await request(app.getHttpServer())
@@ -460,16 +469,10 @@ describe('Pricing (e2e)', () => {
     expect(legal.status).toBe(200);
     expect(legal.body.data.legalRateIrr).toBe('45000000');
 
-    const stepUp = await stepUpFor(
-      app,
-      ceo.accessToken!,
-      'ceo',
-      'PRICE_CAPACITY_CHANGE',
-    );
     const registered = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/register`)
       .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send({ source: 'PROPOSED', ...stepUp });
+      .send({ source: 'PROPOSED' });
     expect(registered.status).toBe(200);
 
     const lockedLegalRate = await request(app.getHttpServer())

@@ -118,6 +118,35 @@ export function deleteAllotment(instanceId: string, allotmentId: string) {
   );
 }
 
+/** Unified charter + agency commitments (PR #126 contract). */
+export function fetchCommitments(instanceId: string) {
+  return apiGet<import("../types/commitments").CommitmentRow[]>(
+    `/flights/${instanceId}/commitments`,
+  );
+}
+
+export function fetchCommitmentsSummary(instanceId: string) {
+  return apiGet<import("../types/commitments").CommitmentsSummary>(
+    `/flights/${instanceId}/commitments/summary`,
+  );
+}
+
+export function createCommitment(
+  instanceId: string,
+  dto: import("../types/commitments").CreateCommitmentPayload,
+) {
+  return apiPost<import("../types/commitments").CommitmentRow>(
+    `/flights/${instanceId}/commitments`,
+    dto,
+  );
+}
+
+export function deleteCommitment(instanceId: string, commitmentId: string) {
+  return apiDelete<import("../types/commitments").CommitmentRow>(
+    `/flights/${instanceId}/commitments/${commitmentId}`,
+  );
+}
+
 export function fetchFareRules(instanceId: string) {
   return apiGet<FareRuleRow[]>(`/flights/${instanceId}/fare-rules`);
 }

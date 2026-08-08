@@ -37,6 +37,10 @@ import {
   primaryCabin,
   sortFlights,
 } from './results/results-utils';
+import {
+  filterSellableSearchFlights,
+  onSearchResultsInvalidate,
+} from '../../lib/search-cache';
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
 
@@ -80,6 +84,7 @@ export default function ResultsPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchNonce, setSearchNonce] = useState(0);
   const [editOpen, setEditOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -129,7 +134,7 @@ export default function ResultsPage() {
 
     searchFlights(origin, dest, date)
       .then((found) => {
-        if (!cancelled) setResults(found);
+        if (!cancelled) setResults(filterSellableSearchFlights(found));
       })
       .catch(() => {
         if (!cancelled) {
@@ -145,7 +150,9 @@ export default function ResultsPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [origin, dest, date, copy.searchError]);
+  }, [origin, dest, date, copy.searchError, searchNonce]);
+
+  useEffect(() => onSearchResultsInvalidate(() => setSearchNonce((n) => n + 1)), []);
 
   const airportMap = useMemo(() => new Map(airports.map((a) => [a.code, a])), [airports]);
   const cityName = (code: string) =>

@@ -8,7 +8,7 @@ export type NormalizedChargeRuleInput = {
   calculationMode: 'FIXED' | 'PERCENTAGE';
   fixedAmountIrr: bigint | null;
   percentageBasisPoints: number | null;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | null;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST' | null;
   effectiveFrom: Date | null;
   effectiveTo: Date | null;
   isActive: boolean;

@@ -61,6 +61,16 @@ const PROVINCES = [
 
 const LANG_OPTIONS = ['انگلیسی', 'عربی', 'فرانسوی', 'آلمانی', 'ترکی استانبولی', 'اسپانیایی', 'روسی', 'چینی'];
 const LEVEL_OPTIONS = ['مبتدی', 'متوسط', 'پیشرفته', 'زبان مادری'];
+const DEGREE_OPTIONS = [
+  'زیر دیپلم',
+  'دیپلم',
+  'کاردانی',
+  'کارشناسی',
+  'کارشناسی ارشد',
+  'دکتری',
+];
+/** Jalali years for work experience pickers (recent ~50 years). */
+const WORK_YEAR_OPTIONS = Array.from({ length: 50 }, (_, i) => String(1404 - i));
 
 const EMPTY_EDU: EducationEntry = { major: '', degree: '', courses: '', otherCourses: '' };
 const EMPTY_WORK: WorkEntry = { company: '', position: '', fromYear: '', toYear: '', reason: '' };
@@ -103,6 +113,8 @@ const STR: Record<
     addEducation: string;
     eduMajor: string;
     eduDegree: string;
+    eduDegreePick: string;
+    fileRemove: string;
     eduCourses: string;
     eduOther: string;
     work: string;
@@ -167,6 +179,7 @@ const STR: Record<
     addEducation: 'افزودن سابقه تحصیلی',
     eduMajor: 'رشته تحصیلی',
     eduDegree: 'مقطع تحصیلی',
+    eduDegreePick: 'انتخاب تحصیلات',
     eduCourses: 'دوره ها و گواهی‌نامه ها',
     eduOther: 'دوره های آموزشی غیر مرتبط',
     work: 'تجربه کاری / سوابق',
@@ -186,6 +199,7 @@ const STR: Record<
     filePickLabel: 'فایل مورد نظر را انتخاب کنید',
     filePickedHint: 'لطفاً فایل با پسوند PDF و حجم حداکثر ۳ مگابایت بارگذاری کنید',
     fileChoose: 'انتخاب فایل',
+    fileRemove: 'حذف فایل',
     submit: 'ارسال درخواست',
     submitting: 'در حال ارسال…',
     sentTitle: 'درخواست شما با موفقیت ثبت شد',
@@ -231,6 +245,7 @@ const STR: Record<
     addEducation: 'Add education',
     eduMajor: 'Field of study',
     eduDegree: 'Degree',
+    eduDegreePick: 'Select education level',
     eduCourses: 'Courses and certificates',
     eduOther: 'Unrelated courses',
     work: 'Work experience',
@@ -250,6 +265,7 @@ const STR: Record<
     filePickLabel: 'Choose a file',
     filePickedHint: 'PDF only, max 3 MB',
     fileChoose: 'Browse',
+    fileRemove: 'Remove file',
     submit: 'Submit application',
     submitting: 'Submitting…',
     sentTitle: 'Your application was submitted successfully',
@@ -294,6 +310,7 @@ const STR: Record<
     addEducation: 'إضافة مؤهل',
     eduMajor: 'التخصص',
     eduDegree: 'المرحلة',
+    eduDegreePick: 'اختر التحصيل الدراسي',
     eduCourses: 'الدورات والشهادات',
     eduOther: 'دورات غير مرتبطة',
     work: 'الخبرات العملية',
@@ -313,6 +330,7 @@ const STR: Record<
     filePickLabel: 'اختر الملف',
     filePickedHint: 'PDF فقط، بحد أقصى ٣ ميغابايت',
     fileChoose: 'اختيار ملف',
+    fileRemove: 'حذف الملف',
     submit: 'إرسال الطلب',
     submitting: 'جارٍ الإرسال…',
     sentTitle: 'تم إرسال طلبك بنجاح',
@@ -551,6 +569,7 @@ export default function CareersApplyPage() {
         <style>{CAREERS_APPLY_CSS}</style>
         <div
           className="careers-apply-root careers-apply-pad"
+          data-testid="careers-apply-not-found"
           style={{ maxWidth: 640, margin: '60px auto', textAlign: 'center' }}
         >
           <p style={{ fontSize: 14, color: '#5a6678' }}>{t.notFound}</p>
@@ -559,10 +578,25 @@ export default function CareersApplyPage() {
     );
   }
 
-  const img = job ? jobPostingImageUrl(job.imageUrl, job.imageFileId) : null;
-  const jobMeta = job
-    ? `${job.dept} · ${job.city} · ${JOB_TYPE_LABEL[job.type]}`
-    : '…';
+  if (!job) {
+    return (
+      <PublicPageShell>
+        <style>{CAREERS_APPLY_CSS}</style>
+        <div
+          className="careers-apply-root careers-apply-pad"
+          data-testid="careers-apply-loading"
+          style={{ maxWidth: 640, margin: '60px auto', textAlign: 'center' }}
+        >
+          <p style={{ fontSize: 14, color: '#5a6678' }}>
+            {locale === 'en' ? 'Loading…' : locale === 'ar' ? 'جارٍ التحميل…' : 'در حال بارگذاری…'}
+          </p>
+        </div>
+      </PublicPageShell>
+    );
+  }
+
+  const img = jobPostingImageUrl(job.imageUrl, job.imageFileId);
+  const jobMeta = `${job.dept} · ${job.city} · ${JOB_TYPE_LABEL[job.type]}`;
 
   return (
     <PublicPageShell>
@@ -690,14 +724,14 @@ export default function CareersApplyPage() {
                     wordBreak: 'break-word',
                   }}
                 >
-                  {job?.title ?? '…'}
+                  {job.title}
                 </h1>
                 <div style={{ fontSize: 12.5, color: '#7a8794', marginTop: 4 }}>{jobMeta}</div>
               </div>
             </div>
           </section>
 
-          {job && (job.generalReqs.length > 0 || job.specialReqs.length > 0) && (
+          {((job.generalReqs?.length ?? 0) > 0 || (job.specialReqs?.length ?? 0) > 0) && (
             <section
               className="careers-apply-pad careers-reqs"
               style={{
@@ -705,7 +739,7 @@ export default function CareersApplyPage() {
                 margin: '30px auto 0',
               }}
             >
-              {job.generalReqs.length > 0 && (
+              {(job.generalReqs?.length ?? 0) > 0 && (
                 <div>
                   <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 12px' }}>{t.generalReqs}</h3>
                   <ul
@@ -720,13 +754,13 @@ export default function CareersApplyPage() {
                       lineHeight: 1.7,
                     }}
                   >
-                    {job.generalReqs.map((r, i) => (
+                    {(job.generalReqs ?? []).map((r, i) => (
                       <li key={i}>{r}</li>
                     ))}
                   </ul>
                 </div>
               )}
-              {job.specialReqs.length > 0 && (
+              {(job.specialReqs?.length ?? 0) > 0 && (
                 <div>
                   <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 12px' }}>{t.specialReqs}</h3>
                   <ul
@@ -741,7 +775,7 @@ export default function CareersApplyPage() {
                       lineHeight: 1.7,
                     }}
                   >
-                    {job.specialReqs.map((r, i) => (
+                    {(job.specialReqs ?? []).map((r, i) => (
                       <li key={i}>{r}</li>
                     ))}
                   </ul>
@@ -917,16 +951,24 @@ export default function CareersApplyPage() {
                       setEduEntries(next);
                     }}
                   />
-                  <input
+                  <select
+                    data-testid={`edu-degree-${idx}`}
                     style={inputStyle}
-                    placeholder={t.eduDegree}
+                    aria-label={t.eduDegree}
                     value={e.degree ?? ''}
                     onChange={(ev) => {
                       const next = [...eduEntries];
                       next[idx] = { ...next[idx], degree: ev.target.value };
                       setEduEntries(next);
                     }}
-                  />
+                  >
+                    <option value="">{t.eduDegreePick}</option>
+                    {DEGREE_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <input
                   style={{ ...inputStyle, marginBottom: 11 }}
@@ -997,26 +1039,42 @@ export default function CareersApplyPage() {
                       setWorkEntries(next);
                     }}
                   />
-                  <input
+                  <select
+                    data-testid={`work-from-${idx}`}
                     style={inputStyle}
-                    placeholder={t.workFrom}
+                    aria-label={t.workFrom}
                     value={w.fromYear ?? ''}
                     onChange={(ev) => {
                       const next = [...workEntries];
                       next[idx] = { ...next[idx], fromYear: ev.target.value };
                       setWorkEntries(next);
                     }}
-                  />
-                  <input
+                  >
+                    <option value="">{t.workFrom}</option>
+                    {WORK_YEAR_OPTIONS.map((y) => (
+                      <option key={`from-${y}`} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid={`work-to-${idx}`}
                     style={inputStyle}
-                    placeholder={t.workTo}
+                    aria-label={t.workTo}
                     value={w.toYear ?? ''}
                     onChange={(ev) => {
                       const next = [...workEntries];
                       next[idx] = { ...next[idx], toYear: ev.target.value };
                       setWorkEntries(next);
                     }}
-                  />
+                  >
+                    <option value="">{t.workTo}</option>
+                    {WORK_YEAR_OPTIONS.map((y) => (
+                      <option key={`to-${y}`} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <input
                   style={inputStyle}
@@ -1177,6 +1235,46 @@ export default function CareersApplyPage() {
                 onChange={(e) => onResumeChange(e.target.files?.[0] ?? null)}
               />
             </div>
+            {resume ? (
+              <div
+                data-testid="apply-resume-selected"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  margin: '-10px 0 18px',
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: '1px solid #e2e7ee',
+                  background: '#f7fafc',
+                  fontSize: 12.5,
+                }}
+              >
+                <span style={{ color: '#1668c4', fontWeight: 700, wordBreak: 'break-word' }}>
+                  {resume.name}
+                </span>
+                <button
+                  type="button"
+                  data-testid="apply-resume-remove"
+                  onClick={() => {
+                    onResumeChange(null);
+                    if (fileRef.current) fileRef.current.value = '';
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#d64545',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    flexShrink: 0,
+                  }}
+                >
+                  {t.fileRemove}
+                </button>
+              </div>
+            ) : null}
             {resumeError && (
               <p style={{ margin: '-14px 0 18px', fontSize: 11.5, color: '#d64545' }}>{resumeError}</p>
             )}

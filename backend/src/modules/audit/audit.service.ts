@@ -1,13 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  FindOptionsWhere,
-  ILike,
-  In,
-  MoreThanOrEqual,
-  Not,
-  Repository,
-} from 'typeorm';
+import { MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import type { AuditCategory, Role } from '../../database/enums';
 import type { JsonValue } from '../../database/json-types';
@@ -24,12 +17,58 @@ export interface RecordAuditEntryInput {
   requestId?: string;
 }
 
+/** Shared filter shape accepted by every audit listing endpoint — see
+ * docs/API.md "Audit & Logs" and AuditLogQueryDto. */
+export interface AuditLogFilters {
+  actor?: string;
+  action?: string;
+  resource?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+}
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 100;
+
 @Injectable()
 export class AuditService {
   constructor(
     @InjectRepository(AuditLog)
     private readonly auditRepo: Repository<AuditLog>,
   ) {}
+
+  /** actor/action/resource/dateFrom/dateTo — applied identically across
+   * managerReports, systemLogs and ceoSystemEvents (alias must be `a`). */
+  private applyCommonFilters(
+    qb: SelectQueryBuilder<AuditLog>,
+    filters: AuditLogFilters,
+  ) {
+    if (filters.actor) {
+      qb.andWhere('a.actorId = :actor', { actor: filters.actor });
+    }
+    if (filters.action) {
+      qb.andWhere('a.action ILIKE :action', { action: `%${filters.action}%` });
+    }
+    if (filters.resource) {
+      qb.andWhere('a.entityType = :resource', { resource: filters.resource });
+    }
+    if (filters.dateFrom) {
+      qb.andWhere('a.createdAt >= :dateFrom', { dateFrom: filters.dateFrom });
+    }
+    if (filters.dateTo) {
+      qb.andWhere('a.createdAt <= :dateTo', { dateTo: filters.dateTo });
+    }
+  }
+
+  private paginate(qb: SelectQueryBuilder<AuditLog>, filters: AuditLogFilters) {
+    const page = filters.page && filters.page > 0 ? filters.page : DEFAULT_PAGE;
+    const limit =
+      filters.limit && filters.limit > 0 ? filters.limit : DEFAULT_LIMIT;
+    qb.skip((page - 1) * limit).take(limit);
+    return { page, limit };
+  }
 
   async record(input: RecordAuditEntryInput) {
     return this.auditRepo.save(
@@ -50,49 +89,69 @@ export class AuditService {
    */
   async managerReports(
     viewerRole: Role,
-    filters: { category?: AuditCategory; actorRole?: Role; q?: string },
+    filters: AuditLogFilters & {
+      category?: AuditCategory;
+      actorRole?: Role;
+      q?: string;
+    },
   ) {
     const excludedForCeo: Role[] = ['CEO', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
 
-    const base: FindOptionsWhere<AuditLog> = {};
-    if (viewerRole === 'CEO') base.actorRole = Not(In(excludedForCeo));
-    if (filters.category) base.category = filters.category;
-    if (filters.actorRole) base.actorRole = filters.actorRole;
+    const qb = this.auditRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.actor', 'actor')
+      .addSelect(['actor.id', 'actor.fullName']);
 
-    const where: FindOptionsWhere<AuditLog> | FindOptionsWhere<AuditLog>[] =
-      filters.q
-        ? [
-            { ...base, action: ILike(`%${filters.q}%`) },
-            { ...base, detail: ILike(`%${filters.q}%`) },
-            { ...base, actor: { fullName: ILike(`%${filters.q}%`) } },
-          ]
-        : base;
+    if (viewerRole === 'CEO') {
+      qb.andWhere('a.actorRole NOT IN (:...excludedForCeo)', {
+        excludedForCeo,
+      });
+    }
+    if (filters.category) {
+      qb.andWhere('a.category = :category', { category: filters.category });
+    }
+    if (filters.actorRole) {
+      qb.andWhere('a.actorRole = :actorRole', { actorRole: filters.actorRole });
+    }
+    this.applyCommonFilters(qb, filters);
+    if (filters.q) {
+      qb.andWhere(
+        '(a.action ILIKE :q OR a.detail ILIKE :q OR actor.fullName ILIKE :q)',
+        { q: `%${filters.q}%` },
+      );
+    }
 
-    const rows = await this.auditRepo.find({
-      where,
-      order: { createdAt: 'DESC' },
-      take: 100,
-      relations: { actor: true },
-    });
+    qb.orderBy('a.createdAt', 'DESC');
+    const { page, limit } = this.paginate(qb, filters);
+
+    const [rows, total] = await qb.getManyAndCount();
 
     // CEO design card shows manager display name + role label.
-    return rows.map(({ actor, ...r }) => ({
-      ...r,
-      actorName: actor.fullName,
-    }));
+    return {
+      items: rows.map(({ actor, ...r }) => ({
+        ...r,
+        actorName: actor.fullName,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   /** IT Manager's "لاگ و رویدادها" — system-category + account-management entries. */
-  async systemLogs() {
-    const rows = await this.auditRepo.find({
-      where: [{ category: 'SYSTEM' }, { category: 'ACCOUNT' }],
-      order: { createdAt: 'DESC' },
-      take: 100,
-      relations: { actor: true },
-      select: {
-        actor: { fullName: true, dept: true, role: true },
-      },
-    });
+  async systemLogs(filters: AuditLogFilters = {}) {
+    const qb = this.auditRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.actor', 'actor')
+      .addSelect(['actor.id', 'actor.fullName', 'actor.dept', 'actor.role'])
+      .where('a.category IN (:...categories)', {
+        categories: ['SYSTEM', 'ACCOUNT'],
+      });
+    this.applyCommonFilters(qb, filters);
+    qb.orderBy('a.createdAt', 'DESC');
+    const { page, limit } = this.paginate(qb, filters);
+
+    const [rows, total] = await qb.getManyAndCount();
 
     const unitLabel = (dept: string | null | undefined, role: Role) => {
       if (dept === 'commercial') return 'بازرگانی';
@@ -108,17 +167,22 @@ export class AuditService {
       return 'info';
     };
 
-    return rows.map((r) => ({
-      id: r.id,
-      actorRole: r.actorRole,
-      category: r.category,
-      action: r.action,
-      detail: r.detail,
-      createdAt: r.createdAt,
-      actorName: r.actor.fullName,
-      unit: unitLabel(r.actor.dept, r.actor.role),
-      level: levelOf(r.category),
-    }));
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        actorRole: r.actorRole,
+        category: r.category,
+        action: r.action,
+        detail: r.detail,
+        createdAt: r.createdAt,
+        actorName: r.actor.fullName,
+        unit: unitLabel(r.actor.dept, r.actor.role),
+        level: levelOf(r.category),
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   /** Lightweight count for the IT sidebar badge on «لاگ و رویدادها». */
@@ -135,28 +199,36 @@ export class AuditService {
   /** CEO's «لاگ‌ها و رویدادهای سامانه» — real rows across every actor
    * (unlike managerReports' exclusions). The level chip is a presentational
    * mapping only: SECURITY→WARN, financial categories→OK, else INFO. */
-  async ceoSystemEvents() {
-    const rows = await this.auditRepo.find({
-      order: { createdAt: 'DESC' },
-      take: 100,
-      relations: { actor: true },
-      select: { actor: { fullName: true } },
-    });
+  async ceoSystemEvents(filters: AuditLogFilters = {}) {
+    const qb = this.auditRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.actor', 'actor')
+      .addSelect(['actor.id', 'actor.fullName']);
+    this.applyCommonFilters(qb, filters);
+    qb.orderBy('a.createdAt', 'DESC');
+    const { page, limit } = this.paginate(qb, filters);
+
+    const [rows, total] = await qb.getManyAndCount();
 
     const OK_CATEGORIES = new Set(['FINANCE', 'REFUND', 'PRICING', 'AGENCY']);
-    return rows.map((r) => ({
-      id: r.id,
-      at: r.createdAt.toISOString(),
-      user: r.actor?.fullName ?? '—',
-      actorRole: r.actorRole,
-      action: r.action,
-      detail: r.detail,
-      level:
-        r.category === 'SECURITY'
-          ? 'WARN'
-          : OK_CATEGORIES.has(r.category)
-            ? 'OK'
-            : 'INFO',
-    }));
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        at: r.createdAt.toISOString(),
+        user: r.actor?.fullName ?? '—',
+        actorRole: r.actorRole,
+        action: r.action,
+        detail: r.detail,
+        level:
+          r.category === 'SECURITY'
+            ? 'WARN'
+            : OK_CATEGORIES.has(r.category)
+              ? 'OK'
+              : 'INFO',
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 }

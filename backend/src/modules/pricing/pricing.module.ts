@@ -9,6 +9,7 @@ import { PricingService } from './pricing.service';
 import { AiModule } from '../ai/ai.module';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
 import { FlightsModule } from '../flights/flights.module';
 import { BookingEngineModule } from '../booking-engine/booking-engine.module';
@@ -24,6 +25,7 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
     AiModule,
     PanelsModule,
     AuditModule,
+    NotificationsModule,
     AuthModule,
     FlightsModule,
     BookingEngineModule,

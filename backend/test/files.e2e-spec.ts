@@ -1,8 +1,13 @@
 import { INestApplication } from '@nestjs/common';
+import * as fs from 'node:fs';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { User } from '../src/database/entities/user.entity';
+import { StoredFile } from '../src/database/entities/stored-file.entity';
+import { JobPosting } from '../src/database/entities/job-posting.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
+import { JobType } from '../src/database/enums';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -128,5 +133,152 @@ describe('Files (e2e)', () => {
         attachmentIds: [fileId],
       });
     expect(res.status).toBe(400);
+  });
+
+  // ── DELETE /files/:id (career attachment delete, task #32) ─────────────
+
+  it('owner can delete their own file; it is then gone from disk, the DB, and the read endpoint 404s', async () => {
+    const senior = await loginAs(app, 'senior');
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'to-delete.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+    const storedBefore = await dataSource
+      .getRepository(StoredFile)
+      .findOneByOrFail({ id: fileId });
+    expect(fs.existsSync(storedBefore.path)).toBe(true);
+
+    const del = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(del.status).toBe(200);
+    expect(del.body.data.id).toBe(fileId);
+
+    expect(fs.existsSync(storedBefore.path)).toBe(false);
+    expect(
+      await dataSource.getRepository(StoredFile).findOneBy({ id: fileId }),
+    ).toBeNull();
+
+    const readAfter = await request(app.getHttpServer())
+      .get(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(readAfter.status).toBe(404);
+
+    const auditRow = await dataSource
+      .getRepository(AuditLog)
+      .createQueryBuilder('a')
+      .where('a.entityType = :t', { t: 'StoredFile' })
+      .andWhere('a.entityId = :id', { id: fileId })
+      .getOne();
+    expect(auditRow).not.toBeNull();
+  });
+
+  it('a non-owner cannot delete a file (403); deleting an unknown id 404s; a second delete of the same id 404s (safe, idempotent end-state)', async () => {
+    const senior = await loginAs(app, 'senior');
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'protected.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+
+    const ceo = await loginAs(app, 'ceo');
+    const forbidden = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${ceo.accessToken}`);
+    expect(forbidden.status).toBe(403);
+    expect(
+      await dataSource.getRepository(StoredFile).findOneBy({ id: fileId }),
+    ).not.toBeNull();
+
+    const unknown = await request(app.getHttpServer())
+      .delete('/files/00000000-0000-0000-0000-000000000000')
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(unknown.status).toBe(404);
+
+    const first = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(first.status).toBe(200);
+
+    const second = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(second.status).toBe(404);
+  });
+
+  it('deleting a file already missing from disk (manually removed) still deletes the DB record safely, no crash', async () => {
+    const senior = await loginAs(app, 'senior');
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'vanish.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+    const stored = await dataSource
+      .getRepository(StoredFile)
+      .findOneByOrFail({ id: fileId });
+    fs.rmSync(stored.path);
+
+    const del = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${senior.accessToken}`);
+    expect(del.status).toBe(200);
+    expect(
+      await dataSource.getRepository(StoredFile).findOneBy({ id: fileId }),
+    ).toBeNull();
+  });
+
+  it('deleting a job-posting cover image clears JobPosting.imageFileId (ON DELETE SET NULL)', async () => {
+    const admin = await loginAs(app, 'site.admin');
+    const uploaded = await request(app.getHttpServer())
+      .post('/files')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .attach('file', PNG_BYTES, {
+        filename: 'cover.png',
+        contentType: 'image/png',
+      });
+    const fileId = uploaded.body.data.id as string;
+
+    const jobPostingRepo = dataSource.getRepository(JobPosting);
+    const posting = await jobPostingRepo.save(
+      jobPostingRepo.create({
+        title: 'آگهی با تصویر',
+        dept: 'IT',
+        city: 'تهران',
+        type: JobType.FULL_TIME,
+        generalReqs: [],
+        specialReqs: [],
+        active: true,
+        imageFileId: fileId,
+        updatedAt: new Date(),
+      }),
+    );
+
+    const del = await request(app.getHttpServer())
+      .delete(`/files/${fileId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+    expect(del.status).toBe(200);
+
+    const updatedPosting = await jobPostingRepo.findOneByOrFail({
+      id: posting.id,
+    });
+    expect(updatedPosting.imageFileId).toBeNull();
+
+    const detail = await request(app.getHttpServer()).get(
+      `/careers/jobs/${posting.id}`,
+    );
+    expect(detail.body.data.imageFileId).toBeNull();
+    expect(detail.body.data.imageUrl).toBeNull();
+
+    await jobPostingRepo.delete({ id: posting.id });
   });
 });

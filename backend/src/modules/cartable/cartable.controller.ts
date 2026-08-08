@@ -50,6 +50,15 @@ export class CartableController {
     return { success: true, data };
   }
 
+  @Get('unread-count')
+  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @RequiresPermission('ct_list')
+  @ApiOperation({ summary: 'شمارندهٔ موارد دیده‌نشدهٔ کارتابل من' })
+  async unreadCount(@CurrentUser() actor: AuthenticatedUser) {
+    const data = await this.cartable.unreadCount(actor);
+    return { success: true, data };
+  }
+
   @Get('manager-recipients')
   @Roles('EMPLOYEE')
   @RequiresPermission('ct_process')
@@ -97,6 +106,24 @@ export class CartableController {
   @ApiOperation({ summary: 'وضعیت آخرین درخواست مجوز کاربر' })
   async getChairPermission(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.cartable.getChairPermission(actor);
+    return { success: true, data };
+  }
+
+  // :id must be declared after every literal-segment GET above — Nest
+  // matches routes in declaration order, and a wildcard segment here would
+  // otherwise swallow 'unread-count', 'manager-recipients', etc.
+  @Get(':id')
+  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @RequiresPermission('ct_list')
+  @ApiOperation({
+    summary:
+      'جزئیات یک مورد کارتابل + تاریخچه — اولین مشاهده آن را «خوانده‌شده» می‌کند',
+  })
+  async getById(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.cartable.getById(actor, id);
     return { success: true, data };
   }
 

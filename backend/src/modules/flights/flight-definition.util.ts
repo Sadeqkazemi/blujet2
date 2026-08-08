@@ -69,14 +69,10 @@ export function normalizeCabinCapacities(
   let sum = 0;
   const out: NormalizedCabinCapacity[] = [];
   for (const row of rows) {
-    if (
-      row.cabin !== CabinClass.ECONOMY &&
-      row.cabin !== CabinClass.COMFORT &&
-      row.cabin !== CabinClass.BUSINESS
-    ) {
+    if (!Object.values(CabinClass).includes(row.cabin)) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
-        message: 'کابین نامعتبر است (فقط ECONOMY، COMFORT، BUSINESS).',
+        message: 'کابین نامعتبر است (فقط ECONOMY، COMFORT، BUSINESS، FIRST).',
       });
     }
     if (seen.has(row.cabin)) {

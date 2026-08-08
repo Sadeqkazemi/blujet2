@@ -160,7 +160,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
       (
         await dataSource
           .getRepository(Booking)
-          .findOneByOrFail({ pnr: issued.body.data.pnr })
+          .createQueryBuilder('b')
+          .where('b.pnr = :pnr', { pnr: issued.body.data.pnr })
+          .getOneOrFail()
       ).id,
     );
     const pnr = issued.body.data.pnr as string;
@@ -200,7 +202,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
       (
         await dataSource
           .getRepository(Booking)
-          .findOneByOrFail({ pnr: issued.body.data.pnr })
+          .createQueryBuilder('b')
+          .where('b.pnr = :pnr', { pnr: issued.body.data.pnr })
+          .getOneOrFail()
       ).id,
     );
 
@@ -275,7 +279,9 @@ describe('Phase 13 Part E — PNR lifecycle + payment reconciliation', () => {
 
     const stillHeld = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: bookingId });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: bookingId })
+      .getOneOrFail();
     expect(stillHeld.status).toBe('HELD');
 
     const reconciliation = await dataSource

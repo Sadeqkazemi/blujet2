@@ -4,7 +4,7 @@ import {
   fetchCeoPricing,
   fetchCommercialPricing,
   fetchPendingApprovalsCount,
-  registerProposal,
+  approveProposal,
   rejectProposal,
   runAiAnalysis,
   setLegalRate,
@@ -20,12 +20,15 @@ import {
 } from "../../lib/fa-format";
 import { dayjs, formatJalaliDate } from "../../lib/jalali";
 import { cabinLabel, formatDurationFa } from "../../lib/flight-definition";
-import { useStepUp } from "../../hooks/useStepUp";
 import Modal from "../../components/Modal";
+import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 import MoneyInput from "../../components/MoneyInput";
 import { moneyInputToRialString } from "../../lib/money-input";
 import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
+import { usePanelNotify } from "../../hooks/usePanelNotify";
+import { ApiRequestError } from "../../api/envelope";
+import { invalidateSearchResultsCache } from "../../lib/search-cache";
 import type {
   CeoPricingResult,
   CommercialFlightRow,
@@ -121,7 +124,13 @@ function CeoPricing() {
   const [factorsOpen, setFactorsOpen] = useState<Record<string, boolean>>({});
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  const stepUp = useStepUp("PRICE_CAPACITY_CHANGE");
+  const [confirmRegister, setConfirmRegister] = useState<{
+    id: string;
+    source: "PROPOSED" | "AI";
+  } | null>(null);
+  const [confirmReject, setConfirmReject] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const { notify } = usePanelNotify();
 
   const cityByCode = useMemo(
     () => new Map(airports.map((a) => [a.code, a.cityFa])),
@@ -181,16 +190,33 @@ function CeoPricing() {
     }
   }
 
-  async function onRegister(p: PricingProposal, source: "PROPOSED" | "AI") {
+  function onRegister(p: PricingProposal, source: "PROPOSED" | "AI") {
+    setError(null);
+    setConfirmRegister({ id: p.id, source });
+  }
+
+  async function confirmRegisterAction() {
+    if (!confirmRegister) return;
+    setActionBusy(true);
     setError(null);
     try {
-      const fields = await stepUp.confirm();
-      await registerProposal(p.id, source, fields);
+      await approveProposal(confirmRegister.id, confirmRegister.source);
+      setConfirmRegister(null);
       setNotice("قیمت پرواز تأیید و ثبت شد ✓");
+      notify("قیمت پرواز تأیید و ثبت شد ✓", "success");
+      invalidateSearchResultsCache();
       await load();
     } catch (e) {
-      if (e instanceof Error && e.message === "CANCELLED") return;
-      setError(e instanceof Error ? e.message : "خطا در ثبت قیمت.");
+      const msg =
+        e instanceof ApiRequestError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "خطا در ثبت قیمت.";
+      setError(msg);
+      notify(msg, "error");
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -210,25 +236,40 @@ function CeoPricing() {
     }
   }
 
-  async function onReject(p: PricingProposal) {
+  function onReject(_p: PricingProposal) {
     if (!rejectReason.trim()) {
       setError("دلیل رد درخواست را وارد کنید.");
       return;
     }
     setError(null);
+    setConfirmReject(true);
+  }
+
+  async function confirmRejectAction() {
+    if (!rejectingId || !rejectReason.trim()) return;
+    setActionBusy(true);
+    setError(null);
     try {
-      const fields = await stepUp.confirm();
-      await rejectProposal(p.id, {
+      await rejectProposal(rejectingId, {
         rejectionReason: rejectReason.trim(),
-        ...fields,
       });
+      setConfirmReject(false);
       setRejectingId(null);
       setRejectReason("");
       setNotice("درخواست قیمت‌گذاری رد شد ✓");
+      notify("درخواست قیمت‌گذاری رد شد ✓", "success");
       await load();
     } catch (e) {
-      if (e instanceof Error && e.message === "CANCELLED") return;
-      setError(e instanceof Error ? e.message : "خطا در رد درخواست.");
+      const msg =
+        e instanceof ApiRequestError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "خطا در رد درخواست.";
+      setError(msg);
+      notify(msg, "error");
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -802,7 +843,34 @@ function CeoPricing() {
           />
         </section>
       )}
-      {stepUp.modal}
+      <ConfirmActionDialog
+        open={confirmRegister != null}
+        title="تأیید قیمت پرواز"
+        message="آیا از تأیید و ثبت نهایی این پیشنهاد قیمت مطمئن هستید؟"
+        confirmLabel="تأیید نهایی"
+        cancelLabel="انصراف"
+        busy={actionBusy}
+        busyLabel="در حال ثبت…"
+        onCancel={() => setConfirmRegister(null)}
+        onConfirm={confirmRegisterAction}
+        variant="dark"
+        tone="primary"
+        testId="ceo-register-confirm"
+      />
+      <ConfirmActionDialog
+        open={confirmReject}
+        title="رد پیشنهاد قیمت"
+        message="آیا از رد این پیشنهاد قیمت مطمئن هستید؟"
+        confirmLabel="رد درخواست"
+        cancelLabel="انصراف"
+        busy={actionBusy}
+        busyLabel="در حال رد…"
+        onCancel={() => setConfirmReject(false)}
+        onConfirm={confirmRejectAction}
+        variant="dark"
+        tone="danger"
+        testId="ceo-reject-confirm"
+      />
     </div>
   );
 }

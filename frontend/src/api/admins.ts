@@ -39,8 +39,25 @@ export function changeOwnPassword(currentPassword: string, newPassword: string) 
   return apiPost<{ changed: boolean }>('/auth/change-password', { currentPassword, newPassword });
 }
 
-export function fetchSystemEvents() {
-  return apiGet<SystemEventRow[]>('/audit/system-events');
+export function fetchSystemEvents(query: {
+  actor?: string;
+  action?: string;
+  resource?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  limit?: number;
+} = {}) {
+  const params = new URLSearchParams();
+  if (query.actor) params.set('actor', query.actor);
+  if (query.action) params.set('action', query.action);
+  if (query.resource) params.set('resource', query.resource);
+  if (query.dateFrom) params.set('dateFrom', query.dateFrom);
+  if (query.dateTo) params.set('dateTo', query.dateTo);
+  if (query.page != null) params.set('page', String(query.page));
+  if (query.limit != null) params.set('limit', String(query.limit));
+  const qs = params.toString();
+  return apiGet<SystemEventRow[]>(`/audit/system-events${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchSettings() {

@@ -12,7 +12,7 @@ import {
   updateCareersSettings,
   updatePosting,
 } from '../../api/careers';
-import { uploadFile } from '../../api/files';
+import { deleteFile, uploadFile } from '../../api/files';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
@@ -143,14 +143,27 @@ export default function CareersAdminPage() {
       city: p.city,
       type: p.type,
       description: p.description,
-      generalReqs: p.generalReqs,
-      specialReqs: p.specialReqs,
+      generalReqs: p.generalReqs ?? [],
+      specialReqs: p.specialReqs ?? [],
       imageFileId: p.imageFileId,
     });
-    setGeneralReqsText(p.generalReqs.join('\n'));
-    setSpecialReqsText(p.specialReqs.join('\n'));
+    setGeneralReqsText((p.generalReqs ?? []).join('\n'));
+    setSpecialReqsText((p.specialReqs ?? []).join('\n'));
     setImagePreview(jobPostingImageUrl(p.imageUrl, p.imageFileId));
     setTab('create');
+  }
+
+  async function onRemoveImage() {
+    const fileId = form.imageFileId;
+    setForm((f) => ({ ...f, imageFileId: null }));
+    setImagePreview(null);
+    if (fileId) {
+      try {
+        await deleteFile(fileId);
+      } catch {
+        // 404 on repeat delete is fine — local form already cleared.
+      }
+    }
   }
 
   async function onPickImage(file: File | null) {
@@ -368,10 +381,8 @@ export default function CareersAdminPage() {
               {imagePreview && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm((f) => ({ ...f, imageFileId: null }));
-                    setImagePreview(null);
-                  }}
+                  data-testid="careers-remove-image"
+                  onClick={() => void onRemoveImage()}
                   className="mt-2 text-[11px] font-bold text-[#f87171]"
                 >
                   حذف تصویر

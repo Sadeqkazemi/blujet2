@@ -40,6 +40,8 @@ import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { assertSellableForSale } from '../flights/definition-sellability';
 import { calculateActiveCharges } from '../flights/charge-rules';
+import { serializeCabinCapacities } from '../flights/flight-definition.util';
+import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
 import type { Irr } from '../../common/money';
 import type { CabinClass } from '../../database/enums';
@@ -62,6 +64,8 @@ const HOLD_TTL_MS = 10 * 60 * 1000;
 
 function cabinLabelFa(cabin: CabinClass): string {
   switch (cabin) {
+    case 'FIRST':
+      return 'درجه یک';
     case 'BUSINESS':
       return 'بیزینس';
     case 'COMFORT':
@@ -409,6 +413,41 @@ export class BookingService {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: `صندلی ${conflict} هم‌اکنون در دسترس نیست.`,
+        });
+      }
+
+      // Charter/agency seat commitments aren't tied to specific seat codes,
+      // so the per-seat conflict check above can't see them — a cabin's
+      // committed capacity must be checked explicitly, otherwise SYSTEM
+      // (public/online) sale could consume a seat already promised to a
+      // charter or agency deal (CLAUDE.md: "فروش آنلاین فقط از ظرفیت
+      // غیرمتعهد انجام شود").
+      const cabinSeatCount = [...seatsByCode.values()].filter(
+        (s) => s.cabin === dto.cabin,
+      ).length;
+      const configuredCabinCapacity = serializeCabinCapacities(
+        instance.cabinCapacities,
+      ).find((row) => row.cabin === dto.cabin)?.seats;
+      const cabinCapacity =
+        configuredCabinCapacity == null
+          ? cabinSeatCount
+          : Math.min(configuredCabinCapacity, cabinSeatCount);
+      const takenInCabin = [...taken].filter(
+        (code) => seatsByCode.get(code)?.cabin === dto.cabin,
+      ).length;
+      const committedInCabin = await sumActiveCommittedSeats(
+        tx,
+        instance.id,
+        dto.cabin,
+      );
+      const availableInCabin = Math.max(
+        0,
+        cabinCapacity - takenInCabin - committedInCabin,
+      );
+      if (dto.passengers.length > availableInCabin) {
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message: `ظرفیت غیرمتعهد کابین ${cabinLabelFa(dto.cabin)} برای این پرواز تکمیل شده است.`,
         });
       }
 

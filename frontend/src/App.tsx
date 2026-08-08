@@ -1,12 +1,17 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { LocaleProvider } from './hooks/useLocale';
+import { PanelNotifyProvider } from './hooks/usePanelNotify';
 import ProtectedRoute from './components/ProtectedRoute';
 import AgencyProtectedRoute from './components/AgencyProtectedRoute';
 import PanelShell from './components/PanelShell';
 import ComingSoonPage from './components/ComingSoonPage';
 import DashboardRouter from './components/DashboardRouter';
 import TabGate from './components/TabGate';
+import AccessRevokedListener from './components/AccessRevokedListener';
+import AircraftListPage from './features/aircraft/AircraftListPage';
+import AircraftFormPage from './features/aircraft/AircraftFormPage';
+import AircraftDetailPage from './features/aircraft/AircraftDetailPage';
 import LoginPage from './features/auth/LoginPage';
 import TwoFactorPage from './features/auth/TwoFactorPage';
 import ForcePasswordChangePage from './features/auth/ForcePasswordChangePage';
@@ -84,6 +89,8 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <LocaleProvider>
+        <PanelNotifyProvider>
+        <AccessRevokedListener />
         <SandboxImpersonationBanner />
         <Routes>
           <Route path="/" element={<HomeSearchPage />} />
@@ -178,6 +185,12 @@ export default function App() {
               <Route path="flights" element={<TabGate tabKey="flights" />}>
                 <Route index element={<FlightsPage />} />
               </Route>
+              <Route path="aircraft" element={<TabGate tabKey="aircraft" />}>
+                <Route index element={<AircraftListPage />} />
+                <Route path="new" element={<AircraftFormPage />} />
+                <Route path=":id" element={<AircraftDetailPage />} />
+                <Route path=":id/edit" element={<AircraftFormPage />} />
+              </Route>
               <Route path="flightops" element={<TabGate tabKey="flightops" />}>
                 <Route index element={<FlightOpsPage />} />
               </Route>
@@ -233,6 +246,7 @@ export default function App() {
 
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </PanelNotifyProvider>
         </LocaleProvider>
       </AuthProvider>
     </BrowserRouter>

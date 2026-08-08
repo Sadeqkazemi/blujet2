@@ -117,4 +117,24 @@ describe('CareersApplyPage', () => {
     ).toBeInTheDocument();
     expect(apply).not.toHaveBeenCalled();
   });
+
+  it('allows removing a selected resume and picking another file', async () => {
+    vi.spyOn(careersApi, 'fetchJobDetail').mockResolvedValue(JOB);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+
+    await screen.findByText('کارشناس پشتیبانی مسافران');
+    expect(screen.getByTestId('edu-degree-0')).toHaveDisplayValue('انتخاب تحصیلات');
+
+    const pdf = new File(['%PDF'], 'cv.pdf', { type: 'application/pdf' });
+    await userEvent.upload(screen.getByTestId('apply-resume'), pdf);
+    expect(await screen.findByTestId('apply-resume-selected')).toHaveTextContent('cv.pdf');
+
+    await userEvent.click(screen.getByTestId('apply-resume-remove'));
+    expect(screen.queryByTestId('apply-resume-selected')).not.toBeInTheDocument();
+
+    const pdf2 = new File(['%PDF-1'], 'cv2.pdf', { type: 'application/pdf' });
+    await userEvent.upload(screen.getByTestId('apply-resume'), pdf2);
+    expect(await screen.findByTestId('apply-resume-selected')).toHaveTextContent('cv2.pdf');
+  });
 });

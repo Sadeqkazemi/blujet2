@@ -20,8 +20,9 @@ export interface JobSummary {
 }
 
 export interface JobDetail extends JobSummary {
-  generalReqs: string[];
-  specialReqs: string[];
+  /** Contract: always arrays; tolerate null at the edge. */
+  generalReqs: string[] | null;
+  specialReqs: string[] | null;
 }
 
 export interface JobPosting extends JobDetail {

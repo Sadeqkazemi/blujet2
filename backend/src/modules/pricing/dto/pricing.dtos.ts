@@ -54,16 +54,6 @@ export class RegisterProposalDto {
   })
   @IsIn(['PROPOSED', 'AI'])
   source: 'PROPOSED' | 'AI';
-
-  @ApiProperty({
-    description: 'از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)',
-  })
-  @IsString()
-  stepUpChallengeId: string;
-
-  @ApiProperty({ example: '482913' })
-  @IsString()
-  stepUpCode: string;
 }
 
 export class RejectProposalDto {
@@ -73,14 +63,4 @@ export class RejectProposalDto {
   })
   @IsString()
   rejectionReason: string;
-
-  @ApiProperty({
-    description: 'از POST /auth/step-up/request (scope: PRICE_CAPACITY_CHANGE)',
-  })
-  @IsString()
-  stepUpChallengeId: string;
-
-  @ApiProperty({ example: '482913' })
-  @IsString()
-  stepUpCode: string;
 }

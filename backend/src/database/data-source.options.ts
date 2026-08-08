@@ -1,5 +1,6 @@
 import type { DataSourceOptions } from 'typeorm';
 import { AgencyAllotment } from './entities/agency-allotment.entity';
+import { AgencySeatCommitment } from './entities/agency-seat-commitment.entity';
 import { AgencyApiKey } from './entities/agency-api-key.entity';
 import { AgencyCreditLine } from './entities/agency-credit-line.entity';
 import { AgencyCreditRequest } from './entities/agency-credit-request.entity';
@@ -11,6 +12,9 @@ import { AgencyProfile } from './entities/agency-profile.entity';
 import { AgencyRequestOtp } from './entities/agency-request-otp.entity';
 import { AgencyWebserviceRequest } from './entities/agency-webservice-request.entity';
 import { AiUsageLog } from './entities/ai-usage-log.entity';
+import { AircraftCabin } from './entities/aircraft-cabin.entity';
+import { AircraftDefinition } from './entities/aircraft-definition.entity';
+import { AircraftSeat } from './entities/aircraft-seat.entity';
 import { AircraftSeatMap } from './entities/aircraft-seat-map.entity';
 import { Airport } from './entities/airport.entity';
 import { AuditLog } from './entities/audit-log.entity';
@@ -18,6 +22,7 @@ import { BackupRecord } from './entities/backup-record.entity';
 import { BlogPost } from './entities/blog-post.entity';
 import { Booking } from './entities/booking.entity';
 import { CabinFare } from './entities/cabin-fare.entity';
+import { CharterCommitment } from './entities/charter-commitment.entity';
 import { CareersSettings } from './entities/careers-settings.entity';
 import { CartableTask } from './entities/cartable-task.entity';
 import { ChairReportPermission } from './entities/chair-report-permission.entity';
@@ -43,6 +48,7 @@ import { ManagerMessage } from './entities/manager-message.entity';
 import { ManagerReferral } from './entities/manager-referral.entity';
 import { ManagerReferralRecipient } from './entities/manager-referral-recipient.entity';
 import { ManagerReferralReport } from './entities/manager-referral-report.entity';
+import { Notification } from './entities/notification.entity';
 import { PanelAccessFlag } from './entities/panel-access-flag.entity';
 import { Passenger } from './entities/passenger.entity';
 import { PasswordResetEvent } from './entities/password-reset-event.entity';
@@ -93,6 +99,7 @@ export const dataSourceOptions: DataSourceOptions = {
   logging: false,
   entities: [
     AgencyAllotment,
+    AgencySeatCommitment,
     AgencyApiKey,
     AgencyCreditLine,
     AgencyCreditRequest,
@@ -104,6 +111,9 @@ export const dataSourceOptions: DataSourceOptions = {
     AgencyRequestOtp,
     AgencyWebserviceRequest,
     AiUsageLog,
+    AircraftCabin,
+    AircraftDefinition,
+    AircraftSeat,
     AircraftSeatMap,
     Airport,
     AuditLog,
@@ -111,6 +121,7 @@ export const dataSourceOptions: DataSourceOptions = {
     BlogPost,
     Booking,
     CabinFare,
+    CharterCommitment,
     CareersSettings,
     CartableTask,
     ChairReportPermission,
@@ -136,6 +147,7 @@ export const dataSourceOptions: DataSourceOptions = {
     ManagerReferral,
     ManagerReferralRecipient,
     ManagerReferralReport,
+    Notification,
     PanelAccessFlag,
     Passenger,
     PasswordResetEvent,

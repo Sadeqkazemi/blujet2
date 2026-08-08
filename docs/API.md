@@ -3192,3 +3192,216 @@ tokens; already-issued preview tokens expire within 15 minutes.
 - Failure codes: 404 missing allotment/flight, 403 ownership or temporary UAT
   read-only account, 409 released/exhausted/seat conflict/insufficient credit,
   and 400 invalid cabin/passenger/national ID.
+
+## Phase 69 — Aircraft catalog, charter/agency seat commitments, CEO approval simplification
+
+Branch: `agent/commercial-operations-backend`. Backend/migrations/tests/docs
+only — no frontend, workflow, or deploy changes.
+
+### FIRST cabin class
+
+- `CabinClass` gains `FIRST` alongside `ECONOMY|COMFORT|BUSINESS` everywhere
+  a cabin enum is validated (flight definitions, fare rules, bookings, price
+  locks, saved flights, agency allotment bookings, search). `AircraftSeatMap`
+  gains an optional `firstRowStart/End` + `firstColsLeft/Right` band, same
+  shape as the pre-existing `COMFORT` band — nullable, no existing aircraft
+  affected (MD-80 unchanged).
+
+### `backend/src/modules/flights/` — Aircraft definition catalog (new)
+
+Normalized aircraft catalog derived from (and kept in sync with) the
+existing `AircraftSeatMap` band-description model, so every pre-existing
+search/booking/seatmap code path keeps working unmodified for both new and
+existing aircraft.
+
+- `GET /flights/aircraft` — `SENIOR_MANAGER|COMMERCIAL_MANAGER|EMPLOYEE`
+  (`fl_view`). Lists all `AircraftDefinition` rows with their `AircraftCabin`
+  capacities.
+- `GET /flights/aircraft/:id` — same roles/permission. Full detail including
+  every generated `AircraftSeat` row.
+- `POST /flights/aircraft` — `fl_manage`. Body: `code` (unique), `model`,
+  `title`, `status?`, `totalCapacity`, and business/comfort/first/economy
+  `rowStart/rowEnd/colsLeft/colsRight` (mirrors `AircraftSeatMap`'s shape) +
+  optional `excludedSeatCodes`. Validates the derived per-cabin seat counts
+  sum to `totalCapacity`, at least one cabin has seats, and no duplicate
+  seat labels. On success, transactionally creates `AircraftDefinition` +
+  `AircraftCabin` rows + `AircraftSeat` rows, **and** upserts a matching
+  legacy `AircraftSeatMap` row (keyed by `code`) so the new aircraft is
+  immediately bookable through the existing search/reservation/booking
+  code — no other module needed changes. 400 on validation failure, 409 on
+  duplicate `code`.
+- `PUT /flights/aircraft/:id` — `fl_manage`. Same body/validation; bumps
+  `version`, replaces the cabin/seat rows, and updates the linked
+  `AircraftSeatMap` row. Existing aircraft (e.g. the seeded `Airbus A320` /
+  `MD-80`) are untouched unless explicitly edited through this endpoint.
+
+### `backend/src/modules/flights/` — Charter / agency seat commitments (new)
+
+A capacity/financial-declaration layer, additive alongside the pre-existing
+`AgencyAllotment` (which continues to drive actual per-ticket agency-channel
+booking unchanged). A commitment reserves seats out of a cabin's
+`cabinCapacities` so online (SYSTEM-channel) sale can never consume them.
+
+- `GET /flights/:instanceId/commitments` — `fl_view`. Lists ACTIVE +
+  CANCELLED `charter` and `agency` commitments for the instance; `agency`
+  rows are enriched with `agencyName`/`agencyLicenseNo`.
+- `GET /flights/:instanceId/commitments/summary` — `fl_view`. Per-cabin
+  `{ cabin, totalCapacity, charterCommitted, agencyCommitted, sold,
+  availableOnline }` plus an instance-wide aggregate row.
+  `availableOnline = totalCapacity - charterCommitted - agencyCommitted -
+  sold`, floored at 0.
+- `POST /flights/:instanceId/commitments/charter` — `fl_manage`. Body:
+  `{ cabin, seats, amountIrr, periodStart?, periodEnd?, idempotencyKey? }`.
+  Row-locks the flight instance; rejects with 400 if the cabin isn't
+  configured or the period falls outside `[now, departureAt]`; rejects with
+  409 if `existing committed + seats` would exceed the cabin's configured
+  capacity **or** its physical seat-map ceiling. Creates a `CharterCommitment`
+  row, a `LedgerEntry` (`type: COMMITMENT`), and an audit-log entry.
+  `idempotencyKey` replay returns the original row (no duplicate).
+- `POST /flights/:instanceId/commitments/agency` — `fl_manage`. Same as
+  charter plus a required `agencyId` (an `AgencyProfile.userId`); 404 if the
+  agency doesn't exist.
+- `DELETE /flights/:instanceId/commitments/charter/:id` and
+  `.../agency/:id` — `fl_manage`. Idempotent cancel (re-cancelling an
+  already-CANCELLED commitment returns the same 200 result, no error);
+  writes an audit-log entry only on the transition that actually cancels it.
+
+**Online-availability enforcement (hard backend rule, not cosmetic):**
+`SearchService.seatsLeftForCabin` now subtracts each cabin's sum of ACTIVE
+charter + agency commitments (`commitment-capacity.util.ts`'s
+`sumActiveCommittedSeats`) from the physical/configured seat count shown in
+`GET /search/flights` and the 1-stop connection builder. `BookingService
+.createBooking` performs the same subtraction inside its row-locked
+transaction and rejects a SYSTEM-channel booking with
+`409 { code: "POOL_EXHAUSTED" }` if it would consume committed capacity —
+independent of, and in addition to, the pre-existing whole-flight
+`publicPoolLimit` check.
+
+### `backend/src/modules/pricing/` — CEO approval without step-up/OTP
+
+- `PATCH /pricing/proposals/:id/register` and `.../reject` no longer accept
+  or require `stepUpChallengeId`/`stepUpCode` — CEO approval/rejection of a
+  flight-definition pricing proposal is a same-session action gated only by
+  `@Roles('CEO')` + the existing JWT/RBAC guard stack. `RegisterProposalDto`
+  / `RejectProposalDto` had the two step-up fields removed; `reject` still
+  requires a non-empty `rejectionReason`.
+
+### `backend/src/modules/flights/flight-definition.service.ts` — search-cache fix
+
+- Approving a CEO revision (`PENDING_REVISION → APPROVED`) that changes the
+  flight's `departureAt` and/or route now busts **both** the old and the new
+  `search:flights:{origin}:{dest}:{date}` Redis cache keys
+  (`SearchService.invalidateForRouteDate`, new). Previously only the
+  post-update key was invalidated, so a moved flight could keep appearing
+  under its old date in `GET /search/flights` for up to the 5-minute cache
+  TTL.
+
+### Migrations
+
+- `1786521600000-AircraftDefinitionCatalog` — `FIRST` cabin enum value;
+  `AircraftStatus`/`AircraftSeatSide` enums; `aircraft_seat_maps` FIRST band
+  columns + `aircraftDefinitionId`; `flight_instances.aircraftDefinitionId`;
+  new tables `aircraft_definitions`/`aircraft_cabins`/`aircraft_seats`;
+  backfills one `AircraftDefinition` (+ cabins + seats) per pre-existing
+  `aircraft_seat_maps` row (never invents data — MD-80's band values are
+  read, never written); best-effort links existing `flight_instances` to the
+  backfilled catalog by aircraft-type code match.
+- `1786608000000-CharterAgencySeatCommitments` — `COMMITMENT` ledger-entry
+  enum value; `CommitmentStatus` enum; `charter_commitments` and
+  `agency_seat_commitments` tables.
+- Both migrations are additive/reversible (`down()` implemented) and do not
+  rewrite existing `flight_instances`/`agency_allotments`/`aircraft_seat_maps`
+  data. `aircraftDefinitionId`/`createdById`/`updatedById`/`agencyId` and
+  similar back-reference columns on the five new entities are intentionally
+  **plain columns with no DB-level FK constraint** — mirrors the codebase's
+  established TS2589 type-recursion-avoidance convention (no ORM relation
+  metadata for these columns) and keeps `schema-parity.e2e-spec.ts` green,
+  which derives its expected schema purely from entity relation metadata.
+
+## Phase 70 — API contract completion for frontend PR #126
+
+Branch: `agent/commercial-operations-backend` (continuation of Phase 69, no
+new branch). Backend/migrations/tests/docs only — no frontend, workflow, or
+deploy changes; not merged/deployed by this phase.
+
+**Full endpoint-by-endpoint contract (paths, DTOs, enums, error codes,
+sample payloads) lives in `docs/api-contract-pr126.md` — read that file
+first when wiring up the frontend.** Summary of what changed:
+
+- **Aircraft**: canonical `/flights/aircraft-definitions*` routes added
+  alongside the existing `/flights/aircraft*` (same handlers, both work);
+  detail response now embeds the full `seatMap`. MD-80 unchanged.
+- **Commitments**: unified `GET/POST /flights/:instanceId/commitments` +
+  `DELETE .../commitments/:id` (was split charter/agency endpoints);
+  `contractPriceIrr`/`startDate`/`releaseAt` field renames (migration
+  `RenameCommitmentFields`); new `GET .../commitments/summary` capacity
+  breakdown; fixed a real overbooking bug where already-sold seats weren't
+  counted against commitment capacity.
+- **CEO approve/reject**: confirmed and permanently alias-locked — no
+  step-up/OTP on `PATCH /pricing/proposals/:id/{register,approve,reject}`;
+  new `.../approve` canonical alias for `.../register`.
+- **Search/publish status**: `definitionStatus`/`publishStatus` added to
+  every search result row and to `GET /flights/:id/definition`;
+  `publishStatus` is a pure derived mapping (`toPublishStatus()`), the DB
+  enum itself was not renamed. Verified end-to-end (THR→MHD): create →
+  propose → CEO approve → publish → search → visible with the right
+  status, cache invalidated for both old/new route+date keys.
+- **Notifications**: new module and table (migration `Notifications`) —
+  `GET /notifications`, `GET /notifications/unread-count`,
+  `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`;
+  idempotent via `dedupeKey`; wired into commitments, pricing, access
+  revocation, cartable transfer, and agency-request create/refer.
+- **Access revocation**: `JwtAuthGuard` now re-checks live `User.isActive`
+  (+ `AgencyProfile.suspendedAt` for role `AGENCY`) on every authenticated
+  request, not just at login — an already-issued access token stops
+  working on its very next use after a block/suspend, returning
+  `403 { code: "ACCESS_REVOKED" }`. Refresh tokens are also revoked
+  immediately. Covered for manager/employee/agency block-suspend paths.
+- **Audit logs**: `GET /audit/manager-reports`, `/audit/logs`,
+  `/audit/system-events` gained pagination (`page`/`limit`) and
+  `actor`/`action`/`resource`/`dateFrom`/`dateTo` filters, returned via a
+  new `meta: {total,page,limit}` sibling field — `data`'s existing array
+  shape is unchanged (fully backward compatible).
+- **Cartable/referrals**: `POST /agencies/requests` (public submission) now
+  creates a cartable task + notification for every active SITE_ADMIN, not
+  just on manual referral; new `GET /cartable/:id` (detail + history,
+  marks read) and `GET /cartable/unread-count`; migration
+  `CartableTaskReadAt` adds the `readAt` column; `PATCH
+  /agencies/requests/:id/{refer,reject}` are now transaction+lock
+  concurrency-safe (previously a plain read-then-write race) and `refer`
+  now also notifies the target.
+- **Careers**: `generalReqs`/`specialReqs` are now guaranteed real arrays
+  (never `null`) in both `GET /careers/jobs/:id` and
+  `GET /careers/postings`; new general-purpose `DELETE /files/:id`
+  (owner-only, safe/idempotent, used for job-posting cover images among
+  other attachment types — deleting one clears
+  `JobPosting.imageFileId` via `ON DELETE SET NULL`).
+- **Sandbox active-flight purge**: new local/CI-only maintenance script
+  (`backend/src/database/sandbox-active-flight-purge.ts`, `npm run
+  data:purge:sandbox-flights[:execute]`) — deletes a specific flight (by
+  `flightNo`) or all flights and every dependent row (instances, bookings,
+  passengers, seat locks, cabin fares/fare rules, commitments, allotments,
+  survey rows) in the correct FK-safe order inside one transaction. Refuses
+  to run outside a non-production sandbox (`NODE_ENV≠production` +
+  `AUTH_SANDBOX_ENABLED=true` — the inverse gate of the existing
+  production-only `uat-demo-data-purge`/`uat-flight-catalog-cleanup`
+  scripts), requires a real actor + confirmation phrase to execute, always
+  reports counts before deleting (dry-run is the default), never deletes
+  the immutable ledger/wallet/club-points rows (only detaches them via
+  `ON DELETE SET NULL`, matching CLAUDE.md's ledger-immutability rule), and
+  writes both an `AuditLog` row and a sentinel JSON file on every real
+  execution. **Not run against any real database in this phase** — only
+  exercised via its own e2e tests against disposable, test-created fixture
+  flights.
+
+### Migrations
+
+- `1786694400000-RenameCommitmentFields` — renames
+  `periodStart→startDate`, `periodEnd→releaseAt`, `amountIrr→contractPriceIrr`
+  on `charter_commitments`/`agency_seat_commitments`.
+- `1786780800000-Notifications` — `NotificationCategory` enum;
+  `notifications` table.
+- `1786867200000-CartableTaskReadAt` — adds `cartable_tasks.readAt`.
+- All three are additive/reversible (`down()` implemented), rewrite no
+  existing row data, and follow the same plain-column/no-DB-FK convention
+  as Phase 69 where applicable.

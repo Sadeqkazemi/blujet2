@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchManagerReports } from '../../api/audit';
+import { fetchManagerReportsPaged } from '../../api/audit';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
@@ -85,8 +85,14 @@ export default function ManagerReportsPage() {
   useEffect(() => {
     let cancelled = false;
     const timer = setTimeout(() => {
-      fetchManagerReports({ actorRole: actorRole ?? undefined, q: q.trim() || undefined })
-        .then((data) => {
+      fetchManagerReportsPaged({
+        actorRole: actorRole ?? undefined,
+        q: q.trim() || undefined,
+        dateFrom: dayIso ?? undefined,
+        page: 1,
+        limit: 100,
+      })
+        .then(({ data }) => {
           if (!cancelled) {
             setRows(data);
             setError(null);
@@ -100,7 +106,7 @@ export default function ManagerReportsPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [actorRole, q]);
+  }, [actorRole, q, dayIso]);
 
   const filtered = useMemo(() => {
     if (!rows) return [];

@@ -10,6 +10,7 @@ import { ChairReportPermission } from '../src/database/entities/chair-report-per
 import { ManagerReferral } from '../src/database/entities/manager-referral.entity';
 import { ManagerReferralReport } from '../src/database/entities/manager-referral-report.entity';
 import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
+import { Notification } from '../src/database/entities/notification.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -105,6 +106,84 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .get('/cartable')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(403);
+  });
+
+  // ── Detail + unread state ────────────────────────────────────────────
+
+  it('GET /cartable/:id returns the task, marks it read (idempotently), and is 404 for someone else’s task', async () => {
+    const ceoId = await userId('ceo');
+    const task = await createFreshTask(ceoId);
+    const { accessToken } = await loginAs(app, 'ceo');
+
+    const first = await request(app.getHttpServer())
+      .get(`/cartable/${task.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(first.status).toBe(200);
+    expect(first.body.data.id).toBe(task.id);
+    expect(first.body.data.readAt).not.toBeNull();
+    expect(first.body.data).toHaveProperty('history');
+    expect(Array.isArray(first.body.data.history)).toBe(true);
+
+    // Repeat view doesn't move readAt forward — mark-read is idempotent.
+    const readAtFirst = first.body.data.readAt;
+    const second = await request(app.getHttpServer())
+      .get(`/cartable/${task.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(second.body.data.readAt).toBe(readAtFirst);
+
+    const foreignTask = await createFreshTask(await userId('finance'));
+    const foreign = await request(app.getHttpServer())
+      .get(`/cartable/${foreignTask.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(foreign.status).toBe(404);
+  });
+
+  it('GET /cartable/:id includes audit history after a resolution', async () => {
+    const ceoId = await userId('ceo');
+    const task = await createFreshTask(ceoId);
+    const { accessToken } = await loginAs(app, 'ceo');
+
+    await request(app.getHttpServer())
+      .patch(`/cartable/${task.id}/approve`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ note: 'تأیید برای تاریخچه' });
+
+    const detail = await request(app.getHttpServer())
+      .get(`/cartable/${task.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.status).toBe('APPROVED');
+    const history = detail.body.data.history as { detail: string }[];
+    expect(history.length).toBeGreaterThan(0);
+    expect(history.some((h) => h.detail.includes('تأیید برای تاریخچه'))).toBe(
+      true,
+    );
+  });
+
+  it('GET /cartable/unread-count only counts never-viewed tasks; viewing one via detail drops the count', async () => {
+    const ceoId = await userId('ceo');
+    const { accessToken } = await loginAs(app, 'ceo');
+
+    const before = await request(app.getHttpServer())
+      .get('/cartable/unread-count')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(before.status).toBe(200);
+    const baseline = before.body.data.count as number;
+
+    const task = await createFreshTask(ceoId);
+    const afterCreate = await request(app.getHttpServer())
+      .get('/cartable/unread-count')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(afterCreate.body.data.count).toBe(baseline + 1);
+
+    await request(app.getHttpServer())
+      .get(`/cartable/${task.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    const afterView = await request(app.getHttpServer())
+      .get('/cartable/unread-count')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(afterView.body.data.count).toBe(baseline);
   });
 
   // ── Review actions ───────────────────────────────────────────────────
@@ -751,5 +830,99 @@ describe('Cartable + referrals + messages (e2e)', () => {
     });
     expect(task).not.toBeNull();
     expect(task!.category).toBe('AGENCY');
+  });
+
+  it('referring an agency membership request also notifies the referred-to manager', async () => {
+    const commId = await userId('comm');
+    const agencyMembershipRequestRepo = dataSource.getRepository(
+      AgencyMembershipRequest,
+    );
+    const reqRow = await agencyMembershipRequestRepo.save(
+      agencyMembershipRequestRepo.create({
+        applicantName: `متقاضی اعلان ${crypto.randomUUID().slice(0, 6)}`,
+        managerName: 'م',
+        licenseNo: `AG-NT-${crypto.randomUUID().slice(0, 8)}`,
+        city: 'تهران',
+        phone: `+9893${crypto.randomUUID().replace(/\D/g, '').slice(0, 8)}`,
+        email: `${crypto.randomUUID().slice(0, 8)}@x.example`,
+        status: 'PENDING',
+      }),
+    );
+
+    const senior = await loginAs(app, 'senior');
+    const refer = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/refer`)
+      .set('Authorization', `Bearer ${senior.accessToken}`)
+      .send({ referredToId: commId, note: 'بررسی شود' });
+    expect(refer.status).toBe(200);
+
+    const notification = await dataSource
+      .getRepository(Notification)
+      .createQueryBuilder('n')
+      .where('n.recipientId = :id', { id: commId })
+      .andWhere("n.action = 'REFERRED'")
+      .andWhere('n.entityId = :entityId', { entityId: reqRow.id })
+      .getOne();
+    expect(notification).not.toBeNull();
+  });
+
+  it('a finance-approve racing a reject after commercial approval: exactly one wins, never both (no lost update)', async () => {
+    // PENDING/REFERRED are both "decidable", so e.g. refer-then-reject can
+    // legitimately both succeed in sequence — that's intentional, not a
+    // race bug. The one genuinely mutually-exclusive pair is the terminal
+    // finance-approval stage (→ APPROVED, creates a real Agency User) vs.
+    // reject (→ REJECTED): at most one of those two may ever win.
+    const agencyMembershipRequestRepo = dataSource.getRepository(
+      AgencyMembershipRequest,
+    );
+    const phone = `+9893${crypto.randomUUID().replace(/\D/g, '').slice(0, 8)}`;
+    const reqRow = await agencyMembershipRequestRepo.save(
+      agencyMembershipRequestRepo.create({
+        applicantName: `متقاضی همزمان ${crypto.randomUUID().slice(0, 6)}`,
+        managerName: 'م',
+        licenseNo: `AG-CC-${crypto.randomUUID().slice(0, 8)}`,
+        city: 'تهران',
+        phone,
+        email: `${crypto.randomUUID().slice(0, 8)}@x.example`,
+        status: 'PENDING',
+      }),
+    );
+
+    const commercial = await loginAs(app, 'comm');
+    const commApprove = await request(app.getHttpServer())
+      .patch(`/agencies/requests/${reqRow.id}/approve`)
+      .set('Authorization', `Bearer ${commercial.accessToken}`);
+    expect(commApprove.status).toBe(200);
+
+    const finance = await loginAs(app, 'finance');
+    const senior = await loginAs(app, 'senior');
+    const [financeApprove, rejectRes] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/agencies/requests/${reqRow.id}/approve`)
+        .set('Authorization', `Bearer ${finance.accessToken}`),
+      request(app.getHttpServer())
+        .patch(`/agencies/requests/${reqRow.id}/reject`)
+        .set('Authorization', `Bearer ${senior.accessToken}`)
+        .send({ reviewNote: 'رد همزمان' }),
+    ]);
+    const statuses = [financeApprove.status, rejectRes.status].sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const finalRequest = await agencyMembershipRequestRepo
+      .createQueryBuilder('r')
+      .where('r.id = :id', { id: reqRow.id })
+      .getOneOrFail();
+    const agencyUser = await dataSource
+      .getRepository(User)
+      .findOneBy({ phone });
+
+    if (financeApprove.status === 200) {
+      expect(finalRequest.status).toBe('APPROVED');
+      expect(agencyUser).not.toBeNull();
+      expect(agencyUser!.role).toBe('AGENCY');
+    } else {
+      expect(finalRequest.status).toBe('REJECTED');
+      expect(agencyUser).toBeNull();
+    }
   });
 });

@@ -15,6 +15,20 @@ export interface SearchCabinOption {
   seatsLeft: number;
 }
 
+/** Derived presentation status from backend toPublishStatus(). */
+export type SearchFlightPublishStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'PUBLISHED'
+  | 'REJECTED';
+
+export type SearchFlightDefinitionStatus =
+  | 'DRAFT'
+  | 'PENDING_CEO'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PENDING_REVISION';
+
 export interface SearchFlightResult {
   flightInstanceId: string;
   flightNo: string;
@@ -24,6 +38,8 @@ export interface SearchFlightResult {
   departureAt: string;
   arrivalAt: string;
   cabins: SearchCabinOption[];
+  definitionStatus?: SearchFlightDefinitionStatus | string;
+  publishStatus?: SearchFlightPublishStatus | string;
   connection?: {
     via: string;
     legs: {

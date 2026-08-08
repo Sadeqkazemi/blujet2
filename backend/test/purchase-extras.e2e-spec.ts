@@ -282,7 +282,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
 
     const booking = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: bookingId });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: bookingId })
+      .getOneOrFail();
     expect(booking.status).toBe('HELD');
   });
 

@@ -37,24 +37,25 @@ export function setLegalRate(id: string, legalRateIrr: string | number) {
   });
 }
 
-export function registerProposal(
-  id: string,
-  source: "PROPOSED" | "AI",
-  stepUp: { stepUpChallengeId: string; stepUpCode: string },
-) {
+/** CEO register — no OTP/step-up (contract confirmed). */
+export function registerProposal(id: string, source: "PROPOSED" | "AI") {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/register`, {
     source,
-    ...stepUp,
   });
 }
 
-/** Expected: PATCH /pricing/proposals/:id/reject — CEO rejection with required reason + step-up. */
+/** Canonical alias for register — identical body/behavior. */
+export function approveProposal(id: string, source: "PROPOSED" | "AI") {
+  return apiPatch<PricingProposal>(`/pricing/proposals/${id}/approve`, {
+    source,
+  });
+}
+
+/** CEO reject — reason only; no OTP/step-up (contract confirmed). */
 export function rejectProposal(
   id: string,
   dto: {
     rejectionReason: string;
-    stepUpChallengeId: string;
-    stepUpCode: string;
   },
 ) {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/reject`, dto);

@@ -15,6 +15,10 @@ import {
 import { dataSourceOptions } from './data-source.options';
 import { encryptPii, hashPii } from '../common/pii-crypto';
 import {
+  enumerateSeats,
+  countSeatsByCabin,
+} from '../modules/reservation/seat-layout';
+import {
   EXTERNAL_SERVICE_SEED,
   INTERNAL_SERVICE_SEED,
   PERMISSION_CATALOG,
@@ -57,6 +61,9 @@ import { AgencyMembershipRequest } from './entities/agency-membership-request.en
 import { AgencyMessage } from './entities/agency-message.entity';
 import { AgencyProfile } from './entities/agency-profile.entity';
 import { AircraftSeatMap } from './entities/aircraft-seat-map.entity';
+import { AircraftDefinition } from './entities/aircraft-definition.entity';
+import { AircraftCabin } from './entities/aircraft-cabin.entity';
+import { AircraftSeat } from './entities/aircraft-seat.entity';
 import { Airport } from './entities/airport.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { BlogPost } from './entities/blog-post.entity';
@@ -124,6 +131,87 @@ async function upsertBy<T extends object>(
   return repo.save(repo.create(create));
 }
 
+/** Backfills AircraftDefinition/AircraftCabin/AircraftSeat from an
+ * already-seeded AircraftSeatMap row's own band description — mirrors
+ * migration 1786521600000's production backfill, needed here too because
+ * migrations run once (before this seed ever creates the A320/MD-80 rows
+ * on a fresh DB), so the new catalog would otherwise stay empty in dev. */
+async function seedAircraftCatalog(
+  repos: {
+    aircraftSeatMapRepo: Repository<AircraftSeatMap>;
+    aircraftDefinitionRepo: Repository<AircraftDefinition>;
+    aircraftCabinRepo: Repository<AircraftCabin>;
+    aircraftSeatRepo: Repository<AircraftSeat>;
+  },
+  seatMap: AircraftSeatMap,
+): Promise<void> {
+  const seats = enumerateSeats(seatMap);
+  if (seats.length === 0) return;
+  const counts = countSeatsByCabin(seatMap);
+  const totalCapacity = seats.length;
+  const now = new Date();
+
+  const aircraft = await upsertBy(
+    repos.aircraftDefinitionRepo,
+    { code: seatMap.aircraftType },
+    {
+      code: seatMap.aircraftType,
+      model: seatMap.aircraftType,
+      title: seatMap.aircraftType,
+      totalCapacity,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    { totalCapacity, updatedAt: now },
+  );
+
+  await repos.aircraftCabinRepo.delete({ aircraftDefinitionId: aircraft.id });
+  const cabinEntries = (
+    Object.entries(counts) as [keyof typeof counts, number][]
+  ).filter(([, count]) => count > 0);
+  await repos.aircraftCabinRepo.save(
+    cabinEntries.map(([cabinType, capacity]) =>
+      repos.aircraftCabinRepo.create({
+        aircraftDefinitionId: aircraft.id,
+        cabinType,
+        capacity,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    ),
+  );
+
+  await repos.aircraftSeatRepo.delete({ aircraftDefinitionId: aircraft.id });
+  await repos.aircraftSeatRepo.save(
+    seats.map((seat) => {
+      const column = seat.seatCode.slice(String(seat.row).length);
+      const colsLeft =
+        seat.cabin === 'BUSINESS'
+          ? seatMap.businessColsLeft
+          : seat.cabin === 'COMFORT'
+            ? seatMap.comfortColsLeft
+            : seatMap.economyColsLeft;
+      return repos.aircraftSeatRepo.create({
+        aircraftDefinitionId: aircraft.id,
+        row: seat.row,
+        column,
+        label: seat.seatCode,
+        cabinType: seat.cabin,
+        side: (colsLeft ?? []).includes(column) ? 'LEFT' : 'RIGHT',
+        isBlocked: false,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }),
+  );
+
+  await repos.aircraftSeatMapRepo.update(
+    { id: seatMap.id },
+    { aircraftDefinitionId: aircraft.id },
+  );
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
@@ -178,6 +266,9 @@ async function main() {
   const refundPenaltyRuleRepo = dataSource.getRepository(RefundPenaltyRule);
   const refundRequestRepo = dataSource.getRepository(RefundRequest);
   const aircraftSeatMapRepo = dataSource.getRepository(AircraftSeatMap);
+  const aircraftDefinitionRepo = dataSource.getRepository(AircraftDefinition);
+  const aircraftCabinRepo = dataSource.getRepository(AircraftCabin);
+  const aircraftSeatRepo = dataSource.getRepository(AircraftSeat);
   const passengerRepo = dataSource.getRepository(Passenger);
   const seatLockRepo = dataSource.getRepository(SeatLock);
   const permissionRepo = dataSource.getRepository(Permission);
@@ -1678,7 +1769,7 @@ async function main() {
   // ─── Phase 9: Reservation system (seat lock / PNR) ─────────────────────
   const chairUser = staffByUsername.get('chair')!;
 
-  await upsertBy(
+  const a320SeatMap = await upsertBy(
     aircraftSeatMapRepo,
     { aircraftType: 'Airbus A320' },
     {
@@ -1703,7 +1794,7 @@ async function main() {
   // Public checkout seat map — design-reference-v2/MD-80-seatmap.pdf
   // First Class 3–6: A B | E F; Economy 7–32: A B | D E F;
   // rear exit/galley omits 28A/B, 29A/B, 30A/B → 140 seats.
-  await upsertBy(
+  const md80SeatMap = await upsertBy(
     aircraftSeatMapRepo,
     { aircraftType: 'MD-80' },
     {
@@ -1732,6 +1823,18 @@ async function main() {
       updatedAt: new Date(),
     },
   );
+
+  // Phase: normalized aircraft catalog (AircraftDefinition/Cabin/Seat),
+  // backfilled from the two seat maps above — same derivation the
+  // production migration performs for pre-existing rows.
+  const aircraftCatalogRepos = {
+    aircraftSeatMapRepo,
+    aircraftDefinitionRepo,
+    aircraftCabinRepo,
+    aircraftSeatRepo,
+  };
+  await seedAircraftCatalog(aircraftCatalogRepos, a320SeatMap);
+  await seedAircraftCatalog(aircraftCatalogRepos, md80SeatMap);
 
   const demoInstance = await flightInstanceRepo.findOne({
     where: { flightId: flight.id, status: FlightInstanceStatus.SCHEDULED },

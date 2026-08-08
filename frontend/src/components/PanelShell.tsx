@@ -2,13 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav, fetchEmployeeContext } from '../api/panels';
-import { fetchCartable, fetchMyReferrals, fetchReferrals } from '../api/cartable';
+import {
+  fetchCartable,
+  fetchCartableUnreadCount,
+  fetchMyReferrals,
+  fetchReferrals,
+} from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing, fetchPendingApprovalsCount } from '../api/pricing';
+import {
+  fetchNotifications,
+  fetchNotificationsUnreadCount,
+  markNotificationRead,
+} from '../api/notifications';
 import { fetchSupportTickets } from '../api/support-tickets';
 import { fetchCustomersIncompleteCount } from '../api/customers';
+import type { NotificationRow } from '../types/notifications';
 import { faDigits } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
@@ -20,6 +31,7 @@ import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
 import ConfirmActionDialog from './ConfirmActionDialog';
+import { usePanelNotify } from '../hooks/usePanelNotify';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -63,10 +75,21 @@ function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
   }));
 }
 
+function notificationTarget(n: NotificationRow): string {
+  const type = (n.entityType ?? '').toUpperCase();
+  if (n.category === 'CARTABLE' || type.includes('CARTABLE')) return '/panel/cartable';
+  if (n.category === 'APPROVAL' || type.includes('PRICING')) return '/panel/pricing';
+  if (n.category === 'REQUEST' || type.includes('AGENCY')) return '/panel/agencies';
+  if (type.includes('REFERRAL')) return '/panel/referrals';
+  if (type.includes('REFUND')) return '/panel/refund';
+  return '/panel';
+}
+
 export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { notify } = usePanelNotify();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
@@ -103,9 +126,26 @@ export default function PanelShell() {
 
   const visibleNav = useMemo(() => {
     if (nav === null) return null;
-    if (user?.isSuperAdmin) return nav;
-    if (user?.role !== 'SITE_ADMIN') return nav;
-    return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    let items = nav;
+    if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
+      items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    }
+    // Frontend-only commercial menu — backend panel-nav has no aircraft key yet.
+    if (
+      (user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'SENIOR_MANAGER') &&
+      !items.some((i) => i.key === 'aircraft')
+    ) {
+      const flightsIdx = items.findIndex((i) => i.key === 'flights');
+      const aircraftItem: PanelNavItem = {
+        key: 'aircraft',
+        labelFa: 'تعریف هواپیما',
+        implemented: true,
+      };
+      items = [...items];
+      if (flightsIdx >= 0) items.splice(flightsIdx + 1, 0, aircraftItem);
+      else items.push(aircraftItem);
+    }
+    return items;
   }, [nav, user?.role, user?.isSuperAdmin]);
 
   const navKeys = useMemo(() => new Set(visibleNav?.map((item) => item.key) ?? []), [visibleNav]);
@@ -117,27 +157,68 @@ export default function PanelShell() {
     const nextNotifications: PanelNotificationItem[] = [];
     const tasks: Promise<void>[] = [];
 
+    tasks.push(
+      Promise.all([
+        fetchNotificationsUnreadCount().catch(() => null),
+        fetchNotifications({ unreadOnly: true, limit: 8 }).catch(
+          () => [] as NotificationRow[],
+        ),
+      ]).then(([counts, rows]) => {
+        if (counts && counts.total > 0) {
+          nextNotifications.push(
+            ...rows.map((n) => ({
+              key: `notif-${n.id}`,
+              title: n.title,
+              sublabel: n.body,
+              to: notificationTarget(n),
+              tone: 'warning' as const,
+              onOpen: () => {
+                void markNotificationRead(n.id).catch(() => undefined);
+              },
+            })),
+          );
+        }
+        if (counts && counts.CARTABLE > 0 && navKeys.has('cartable')) {
+          next.cartable = {
+            count: counts.CARTABLE,
+            className: 'bg-danger text-white',
+          };
+        }
+        if (counts && counts.APPROVAL > 0 && navKeys.has('pricing') && user?.role === 'CEO') {
+          next.pricing = {
+            count: counts.APPROVAL,
+            className: 'bg-[#a78bfa] text-white',
+          };
+        }
+      }),
+    );
+
     if (navKeys.has('cartable')) {
       tasks.push(
-        fetchCartable()
-          .then((r) => {
-            if (r.totalOpen > 0) {
-              next.cartable = {
-                count: r.totalOpen,
-                className: 'bg-danger text-white',
-              };
-              for (const t of r.tasks.slice(0, 5)) {
-                nextNotifications.push({
-                  key: `cartable-${t.id}`,
-                  title: t.title,
-                  sublabel: t.senderLabelFa ?? t.sender?.fullName ?? undefined,
-                  to: '/panel/cartable',
-                  tone: 'danger',
-                });
-              }
+        Promise.all([
+          fetchCartableUnreadCount().catch(() => null),
+          fetchCartable().catch(() => null),
+        ]).then(([unread, list]) => {
+          const count = unread?.count ?? list?.totalOpen ?? 0;
+          if (count > 0 && !next.cartable) {
+            next.cartable = {
+              count,
+              className: 'bg-danger text-white',
+            };
+          }
+          if (list) {
+            for (const t of list.tasks.slice(0, 5)) {
+              if (nextNotifications.some((n) => n.key === `cartable-${t.id}`)) continue;
+              nextNotifications.push({
+                key: `cartable-${t.id}`,
+                title: t.title,
+                sublabel: t.senderLabelFa ?? t.sender?.fullName ?? undefined,
+                to: '/panel/cartable',
+                tone: 'danger',
+              });
             }
-          })
-          .catch(() => undefined),
+          }
+        }),
       );
     }
 
@@ -333,15 +414,21 @@ export default function PanelShell() {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
     });
-  }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
+    // Recompute when the active panel tab changes so badges refresh after
+    // reading/acting on cartable, referrals, tickets, etc.
+  }, [visibleNav, navKeys, user?.role, lowSalesAlerts, location.pathname]);
 
   async function onSignOut() {
     setLogoutBusy(true);
     try {
       await signOut();
+      notify('با موفقیت از پنل خارج شدید.', 'success');
       navigate('/login', { replace: true });
+    } catch {
+      notify('خروج با خطا مواجه شد.', 'error');
     } finally {
       setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
     }
   }
 
