@@ -191,9 +191,9 @@ describe('HomeSearchPage', () => {
     expect(screen.getByTestId('home-dest')).toHaveTextContent('مشهد');
   });
 
-  it('shows the responsive price calendar after origin/dest are chosen', async () => {
+  it('shows real fares inside the mobile departure-date calendar only', async () => {
     mockLocale('fa');
-    mockDesktop();
+    mockMobile();
     mockHomeApis();
     renderPage();
     await screen.findByTestId('home-origin');
@@ -203,11 +203,13 @@ describe('HomeSearchPage', () => {
     await pickAirport('home-origin', 'THR');
     await pickAirport('home-dest', 'MHD');
 
-    expect(screen.getByTestId('home-price-calendar-wrap')).toBeInTheDocument();
+    expect(screen.queryByTestId('home-price-calendar-wrap')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('home-date'));
     await waitFor(() => {
-      expect(screen.getByTestId('price-calendar-strip')).toBeInTheDocument();
+      expect(screen.getByTestId('home-date-price-2026-08-01')).toBeInTheDocument();
     });
     expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalled();
+    expect(screen.getByTestId('home-date-confirm')).toBeInTheDocument();
   });
 
   it('does not invent airports while the airports API is pending', async () => {
@@ -251,6 +253,7 @@ describe('HomeSearchPage', () => {
 
   it('renders translated marketing sections and Latin-digit toman prices in English', async () => {
     mockLocale('en');
+    mockDesktop();
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
       ...CMS_HOME,
@@ -274,6 +277,7 @@ describe('HomeSearchPage', () => {
 
   it('renders Arabic marketing sections with Eastern Arabic-Indic digits', async () => {
     mockLocale('ar');
+    mockDesktop();
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
       ...CMS_HOME,
