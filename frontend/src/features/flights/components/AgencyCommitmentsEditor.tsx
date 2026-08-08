@@ -6,7 +6,11 @@ import { faDigits, latinDigits } from '../../../lib/fa-format';
 import { moneyInputToRialString, formatTomanGrouped } from '../../../lib/money-input';
 import { irrToTomanInput } from '../../../lib/fa-format';
 import { CABIN_OPTIONS, type CabinKind } from '../../../lib/flight-definition';
-import type { AllotmentRow } from '../../../types/flights';
+import type {
+  CommitmentCabin,
+  CommitmentRow,
+  CreateCommitmentPayload,
+} from '../../../types/commitments';
 
 const inputClass =
   'w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none';
@@ -20,41 +24,40 @@ export interface AgencyCommitmentDraft {
   amountToman: string;
   startDate: string | null;
   endDate: string | null;
-  status: 'ACTIVE' | 'INACTIVE';
-  /** Persisted allotment id when loaded from API. */
-  allotmentId?: string;
+  status: 'ACTIVE' | 'CANCELLED';
+  /** Persisted commitment id when loaded from API. */
+  commitmentId?: string;
 }
 
-export function allotmentToDraft(row: AllotmentRow): AgencyCommitmentDraft {
+export function commitmentToDraft(row: CommitmentRow): AgencyCommitmentDraft {
   return {
     tempId: row.id,
-    allotmentId: row.id,
-    agencyId: row.agencyId,
-    agencyName: row.agencyName,
-    seats: String(row.seatsAllocated),
-    cabin: 'ECONOMY',
+    commitmentId: row.id,
+    agencyId: row.agencyId ?? '',
+    agencyName: row.agencyName ?? '',
+    seats: String(row.seats),
+    cabin: (row.cabin === 'FIRST' ? 'ECONOMY' : row.cabin) as CabinKind,
     amountToman: row.contractPriceIrr
       ? formatTomanGrouped(irrToTomanInput(row.contractPriceIrr))
       : '',
-    startDate: null,
+    startDate: row.startDate,
     endDate: row.releaseAt,
-    status: row.active ? 'ACTIVE' : 'INACTIVE',
+    status: row.status === 'CANCELLED' ? 'CANCELLED' : 'ACTIVE',
   };
 }
 
-export function draftToCreatePayload(d: AgencyCommitmentDraft) {
+export function draftToCreatePayload(d: AgencyCommitmentDraft): CreateCommitmentPayload {
   const seats = Number(latinDigits(d.seats)) || 0;
   const price = moneyInputToRialString(d.amountToman);
+  const cabin = d.cabin as CommitmentCabin;
   return {
     agencyId: d.agencyId,
-    seatsAllocated: seats,
-    type: (d.endDate ? 'SOFT' : 'HARD') as 'SOFT' | 'HARD',
-    releaseAt: d.endDate ?? undefined,
+    cabin,
+    seats,
     contractPriceIrr: price ?? undefined,
-    // cabin + startDate are UI fields — backend allotment DTO does not accept them yet.
-    cabin: d.cabin,
-    startDate: d.startDate,
-    status: d.status,
+    startDate: d.startDate ?? undefined,
+    releaseAt: d.endDate ?? undefined,
+    endDate: d.endDate ?? undefined,
   };
 }
 
@@ -77,11 +80,14 @@ export default function AgencyCommitmentsEditor({
   charterSeats,
   value,
   onChange,
+  availableOnline,
 }: {
   capacity: number;
   charterSeats: number;
   value: AgencyCommitmentDraft[];
   onChange: (rows: AgencyCommitmentDraft[]) => void;
+  /** Optional server summary override for online sellable seats. */
+  availableOnline?: number;
 }) {
   const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([]);
   const [form, setForm] = useState<AgencyCommitmentDraft>(emptyDraft());
@@ -102,12 +108,17 @@ export default function AgencyCommitmentsEditor({
 
   const committedSeats = useMemo(
     () =>
-      value.reduce((sum, r) => sum + (Number(latinDigits(r.seats)) || 0), 0) +
+      value
+        .filter((r) => r.status !== 'CANCELLED')
+        .reduce((sum, r) => sum + (Number(latinDigits(r.seats)) || 0), 0) +
       charterSeats,
     [value, charterSeats],
   );
 
-  const onlineSellable = Math.max(0, capacity - committedSeats);
+  const onlineSellable =
+    availableOnline != null
+      ? availableOnline
+      : Math.max(0, capacity - committedSeats);
   const overCapacity = capacity > 0 && committedSeats > capacity;
 
   function addRow() {
@@ -137,6 +148,7 @@ export default function AgencyCommitmentsEditor({
         tempId: `ac-${Date.now()}`,
         agencyName,
         seats: String(seats),
+        status: 'ACTIVE',
       },
     ]);
     setForm(emptyDraft());
@@ -174,7 +186,11 @@ export default function AgencyCommitmentsEditor({
       </div>
 
       {overCapacity ? (
-        <p role="alert" className="mb-3 text-[11.5px] font-semibold text-[#f87171]" data-testid="commitments-over-capacity">
+        <p
+          role="alert"
+          className="mb-3 text-[11.5px] font-semibold text-[#f87171]"
+          data-testid="commitments-over-capacity"
+        >
           مجموع تعهدات از ظرفیت پرواز بیشتر است.
         </p>
       ) : null}
@@ -279,26 +295,6 @@ export default function AgencyCommitmentsEditor({
                 />
               </div>
             </div>
-            <div>
-              <label className="mb-1 block text-[10.5px] text-[#9fb0c7]" htmlFor="ac-status">
-                وضعیت
-              </label>
-              <select
-                id="ac-status"
-                data-testid="ac-status"
-                value={form.status}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    status: e.target.value as 'ACTIVE' | 'INACTIVE',
-                  }))
-                }
-                className={inputClass}
-              >
-                <option value="ACTIVE">فعال</option>
-                <option value="INACTIVE">غیرفعال</option>
-              </select>
-            </div>
           </div>
           <button
             type="button"
@@ -333,7 +329,7 @@ export default function AgencyCommitmentsEditor({
                       <div className="mt-0.5 text-[#9fb0c7]">
                         {faDigits(Number(latinDigits(row.seats)) || 0)} صندلی ·{' '}
                         {CABIN_OPTIONS.find((c) => c.value === row.cabin)?.label ?? row.cabin} ·{' '}
-                        {row.status === 'ACTIVE' ? 'فعال' : 'غیرفعال'}
+                        {row.status === 'ACTIVE' ? 'فعال' : 'لغو شده'}
                       </div>
                     </div>
                     <button

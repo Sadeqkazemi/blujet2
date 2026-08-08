@@ -1,4 +1,4 @@
-import { apiGetBlob, apiPostForm } from './http';
+import { apiDelete, apiGetBlob, apiPostForm } from './http';
 
 export interface UploadedFile {
   id: string;
@@ -10,6 +10,11 @@ export function uploadFile(file: File) {
   const form = new FormData();
   form.append('file', file);
   return apiPostForm<UploadedFile>('/files', form);
+}
+
+/** Owner-only delete — staff roles. Idempotent end-state (repeat → 404). */
+export function deleteFile(id: string) {
+  return apiDelete<{ id: string }>(`/files/${id}`);
 }
 
 /** Downloads a file the caller may read (owner, or a participant of the

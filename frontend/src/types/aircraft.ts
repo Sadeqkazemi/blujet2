@@ -1,78 +1,103 @@
-import type { CabinKind } from '../lib/flight-definition';
-
-/** Standard cabin kinds for aircraft definition UI. */
-export type AircraftCabinKind =
-  | 'ECONOMY'
-  | 'PREMIUM_ECONOMY'
-  | 'COMFORT'
-  | 'BUSINESS'
-  | 'FIRST';
+/** Contract: docs/api-contract-pr126.md — aircraft definitions */
 
 export type AircraftStatus = 'ACTIVE' | 'INACTIVE';
 
+/** Backend CabinType — no PREMIUM_ECONOMY. */
+export type AircraftCabinType = 'FIRST' | 'BUSINESS' | 'COMFORT' | 'ECONOMY';
+
+export type AircraftSeatSide = 'LEFT' | 'RIGHT';
+
 export interface AircraftCabinCapacity {
-  cabin: AircraftCabinKind;
-  enabled: boolean;
-  seats: number;
+  cabinType: AircraftCabinType;
+  capacity: number;
 }
 
-export interface AircraftSeatMapDraft {
-  /** Inclusive row range. */
-  rowStart: number;
-  rowEnd: number;
-  /** Letters on the left of the aisle, e.g. A,B */
+export interface AircraftSeat {
+  row: number;
+  column: string;
+  label: string;
+  cabinType: AircraftCabinType;
+  side: AircraftSeatSide;
+  isBlocked: boolean;
+}
+
+export interface AircraftCabinLayoutBand {
   colsLeft: string[];
-  /** Letters on the right of the aisle, e.g. C,D,E */
   colsRight: string[];
-  cabin: AircraftCabinKind;
-  /** Seat codes that exist structurally but are blocked (exit, galley, …). */
-  disabledSeatCodes: string[];
+  aisleAfterIndex: number;
 }
 
-export interface AircraftDefinition {
-  id: string;
-  name: string;
-  code: string;
-  status: AircraftStatus;
-  totalSeats: number;
-  cabins: AircraftCabinCapacity[];
-  seatMap: AircraftSeatMapDraft[];
-  /** When true, UI must not mutate the hard-coded MD-80 public checkout map. */
-  lockedSeatMap?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+export interface AircraftSeatMap {
+  aircraftDefinitionId: string;
+  cabinLayout: Partial<Record<AircraftCabinType, AircraftCabinLayoutBand | null>>;
+  excludedSeatCodes: string[];
+  seats: AircraftSeat[];
 }
 
 export interface AircraftDefinitionListItem {
   id: string;
-  name: string;
   code: string;
+  model: string;
+  title: string;
   status: AircraftStatus;
-  totalSeats: number;
-  cabinSummary: string;
-}
-
-export interface UpsertAircraftDefinitionPayload {
-  name: string;
-  code: string;
-  status: AircraftStatus;
-  totalSeats: number;
+  totalCapacity: number;
+  version: number;
   cabins: AircraftCabinCapacity[];
-  seatMap: AircraftSeatMapDraft[];
 }
 
-/** Maps aircraft cabin kinds onto flight CabinKind where backend allows. */
-export function toFlightCabinKind(cabin: AircraftCabinKind): CabinKind | null {
+export interface AircraftDefinition extends AircraftDefinitionListItem {
+  seats: AircraftSeat[];
+  seatMap: AircraftSeatMap;
+}
+
+/** POST/PUT/PATCH body — flat seat-map bands (contract UpsertAircraftDto). */
+export interface UpsertAircraftDefinitionPayload {
+  code: string;
+  model: string;
+  title: string;
+  totalCapacity: number;
+  businessRowStart?: number | null;
+  businessRowEnd?: number | null;
+  businessColsLeft?: string[] | null;
+  businessColsRight?: string[] | null;
+  comfortRowStart?: number | null;
+  comfortRowEnd?: number | null;
+  comfortColsLeft?: string[] | null;
+  comfortColsRight?: string[] | null;
+  firstRowStart?: number | null;
+  firstRowEnd?: number | null;
+  firstColsLeft?: string[] | null;
+  firstColsRight?: string[] | null;
+  economyRowStart?: number | null;
+  economyRowEnd?: number | null;
+  economyColsLeft?: string[] | null;
+  economyColsRight?: string[] | null;
+  excludedSeatCodes?: string[];
+}
+
+/** UI draft band used by the seat-map editor before mapping to Upsert DTO. */
+export interface AircraftSeatMapBandDraft {
+  cabinType: AircraftCabinType;
+  enabled: boolean;
+  rowStart: number;
+  rowEnd: number;
+  colsLeft: string[];
+  colsRight: string[];
+}
+
+export const AIRCRAFT_CABIN_OPTIONS: { value: AircraftCabinType; label: string }[] = [
+  { value: 'FIRST', label: 'فرست' },
+  { value: 'BUSINESS', label: 'بیزنس' },
+  { value: 'COMFORT', label: 'کامفورت' },
+  { value: 'ECONOMY', label: 'اکونومی' },
+];
+
+/** Map aircraft cabin onto flight CabinKind (COMFORT stays COMFORT; FIRST has no flight cabin). */
+export function toFlightCabinKind(
+  cabin: AircraftCabinType,
+): 'ECONOMY' | 'COMFORT' | 'BUSINESS' | null {
   if (cabin === 'ECONOMY') return 'ECONOMY';
   if (cabin === 'BUSINESS') return 'BUSINESS';
-  if (cabin === 'COMFORT' || cabin === 'PREMIUM_ECONOMY') return 'COMFORT';
+  if (cabin === 'COMFORT') return 'COMFORT';
   return null;
 }
-
-export const AIRCRAFT_CABIN_OPTIONS: { value: AircraftCabinKind; label: string }[] = [
-  { value: 'ECONOMY', label: 'اکونومی' },
-  { value: 'PREMIUM_ECONOMY', label: 'پریمیوم اکونومی / کامفورت' },
-  { value: 'COMFORT', label: 'کامفورت' },
-  { value: 'BUSINESS', label: 'بیزنس' },
-  { value: 'FIRST', label: 'فرست' },
-];

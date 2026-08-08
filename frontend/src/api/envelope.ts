@@ -3,10 +3,22 @@ export interface ApiError {
   message: string;
 }
 
+export interface ApiListMeta {
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface ApiEnvelope<T> {
   success: boolean;
   data?: T;
   error?: ApiError;
+  meta?: ApiListMeta;
+}
+
+export interface ApiPagedResult<T> {
+  data: T;
+  meta: ApiListMeta;
 }
 
 export class ApiRequestError extends Error {

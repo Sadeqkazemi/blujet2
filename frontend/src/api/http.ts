@@ -1,4 +1,4 @@
-import type { ApiEnvelope } from './envelope';
+import type { ApiEnvelope, ApiListMeta, ApiPagedResult } from './envelope';
 import { ApiRequestError } from './envelope';
 import { getAccessToken, setAccessToken } from './token-store';
 import {
@@ -71,14 +71,14 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
 function throwApiError(status: number, code: string, message: string): never {
   const err = new ApiRequestError(code, message, status);
   const hadSession = Boolean(getAccessToken());
-  // Only revoke the whole session for explicit disable / failed refresh /
-  // access-revoked codes — not every ordinary 403 on a single resource.
+  // Contract: ACCESS_REVOKED arrives as HTTP 403 with that error code on
+  // any authenticated request after block/suspend. Also revoke after a
+  // failed refresh (401 ACCESS_REVOKED).
   if (
     hadSession &&
-    (code === 'ACCESS_REVOKED' ||
-      isAccessRevokedError({ status, code, message }) ||
-      message.includes('غیرفعال شده') ||
-      message.includes('موقتاً غیرفعال'))
+    ((status === 403 && code === 'ACCESS_REVOKED') ||
+      (status === 401 && code === 'ACCESS_REVOKED') ||
+      isAccessRevokedError({ status, code, message }))
   ) {
     emitAccessRevoked({
       message: ACCESS_REVOKED_MESSAGE,
@@ -124,8 +124,55 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
   return body.data;
 }
 
+/** Like apiRequest but keeps pagination `meta` from the envelope. */
+export async function apiRequestPaged<T>(
+  path: string,
+  init: RequestInit = {},
+  retry = true,
+): Promise<ApiPagedResult<T>> {
+  const res = await doFetch(path, init);
+
+  if (res.status === 401 && retry && getAccessToken()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) return apiRequestPaged<T>(path, init, false);
+    setAccessToken(null);
+    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
+  }
+
+  const raw = await res.text();
+  let body: ApiEnvelope<T>;
+  try {
+    body = JSON.parse(raw) as ApiEnvelope<T>;
+  } catch {
+    throwApiError(
+      res.status,
+      'BAD_GATEWAY',
+      res.status === 502
+        ? 'سرور در دسترس نیست. لطفاً چند لحظه بعد دوباره تلاش کنید.'
+        : 'خطا در ارتباط با سرور',
+    );
+  }
+  if (!body.success || body.data == null) {
+    const rawMessage = body.error?.message;
+    const message = Array.isArray(rawMessage)
+      ? rawMessage.join(' ')
+      : (rawMessage ?? 'خطای ناشناخته');
+    throwApiError(res.status, body.error?.code ?? 'UNKNOWN', message);
+  }
+  const meta: ApiListMeta = body.meta ?? {
+    total: Array.isArray(body.data) ? body.data.length : 0,
+    page: 1,
+    limit: Array.isArray(body.data) ? body.data.length : 0,
+  };
+  return { data: body.data, meta };
+}
+
 export function apiGet<T>(path: string): Promise<T> {
   return apiRequest<T>(path, { method: 'GET' });
+}
+
+export function apiGetPaged<T>(path: string): Promise<ApiPagedResult<T>> {
+  return apiRequestPaged<T>(path, { method: 'GET' });
 }
 
 /** For endpoints that return a raw file body (not the {success,data} JSON

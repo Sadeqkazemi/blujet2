@@ -4,7 +4,7 @@ import {
   fetchCeoPricing,
   fetchCommercialPricing,
   fetchPendingApprovalsCount,
-  registerProposal,
+  approveProposal,
   rejectProposal,
   runAiAnalysis,
   setLegalRate,
@@ -200,7 +200,7 @@ function CeoPricing() {
     setActionBusy(true);
     setError(null);
     try {
-      await registerProposal(confirmRegister.id, confirmRegister.source);
+      await approveProposal(confirmRegister.id, confirmRegister.source);
       setConfirmRegister(null);
       setNotice("قیمت پرواز تأیید و ثبت شد ✓");
       notify("قیمت پرواز تأیید و ثبت شد ✓", "success");

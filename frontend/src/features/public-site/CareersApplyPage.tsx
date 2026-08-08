@@ -731,7 +731,7 @@ export default function CareersApplyPage() {
             </div>
           </section>
 
-          {(job.generalReqs.length > 0 || job.specialReqs.length > 0) && (
+          {((job.generalReqs?.length ?? 0) > 0 || (job.specialReqs?.length ?? 0) > 0) && (
             <section
               className="careers-apply-pad careers-reqs"
               style={{
@@ -739,7 +739,7 @@ export default function CareersApplyPage() {
                 margin: '30px auto 0',
               }}
             >
-              {job.generalReqs.length > 0 && (
+              {(job.generalReqs?.length ?? 0) > 0 && (
                 <div>
                   <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 12px' }}>{t.generalReqs}</h3>
                   <ul
@@ -754,13 +754,13 @@ export default function CareersApplyPage() {
                       lineHeight: 1.7,
                     }}
                   >
-                    {job.generalReqs.map((r, i) => (
+                    {(job.generalReqs ?? []).map((r, i) => (
                       <li key={i}>{r}</li>
                     ))}
                   </ul>
                 </div>
               )}
-              {job.specialReqs.length > 0 && (
+              {(job.specialReqs?.length ?? 0) > 0 && (
                 <div>
                   <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 12px' }}>{t.specialReqs}</h3>
                   <ul
@@ -775,7 +775,7 @@ export default function CareersApplyPage() {
                       lineHeight: 1.7,
                     }}
                   >
-                    {job.specialReqs.map((r, i) => (
+                    {(job.specialReqs ?? []).map((r, i) => (
                       <li key={i}>{r}</li>
                     ))}
                   </ul>

@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import {
   approveCartableTask,
   fetchCartable,
+  fetchCartableTask,
   fetchChairPermission,
   fetchStaffDirectory,
   rejectCartableTask,
@@ -173,11 +174,17 @@ export default function CartablePage() {
       .catch(() => setStaff([]));
   }, []);
 
-  function openReview(task: CartableTask) {
+  async function openReview(task: CartableTask) {
     setReviewTask(task);
     setNote('');
     setTransferTo('');
     setReviewError(null);
+    try {
+      const detail = await fetchCartableTask(task.id);
+      setReviewTask(detail);
+    } catch {
+      // List row is enough to decide; detail marks readAt when available.
+    }
   }
 
   async function onDecide(action: 'approve' | 'reject' | 'transfer') {

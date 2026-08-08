@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  createAllotment,
+  createCommitment,
   createFareRule,
   createFlight,
   fetchAircraftTypes,
   fetchAirports,
-  fetchAllotments,
+  fetchCommitments,
+  fetchCommitmentsSummary,
   fetchFlightDefinition,
   planFlight,
   updateFlightDefinition,
 } from "../../api/flights";
-import { fetchAircraftTypeDetail } from "../../api/aircraft";
+import {
+  fetchAircraftDefinition,
+  fetchAircraftDefinitions,
+} from "../../api/aircraft";
 import { upsertProposal } from "../../api/pricing";
 import { ApiRequestError } from "../../api/envelope";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
@@ -56,7 +60,7 @@ import ChargeRulesEditor from "./components/ChargeRulesEditor";
 import DurationFields from "./components/DurationFields";
 import FlightNumberInput from "./components/FlightNumberInput";
 import AgencyCommitmentsEditor, {
-  allotmentToDraft,
+  commitmentToDraft,
   draftToCreatePayload,
   type AgencyCommitmentDraft,
 } from "./components/AgencyCommitmentsEditor";
@@ -223,6 +227,9 @@ export default function AddFlightPage({
   const [agencyCommitments, setAgencyCommitments] = useState<
     AgencyCommitmentDraft[]
   >([]);
+  const [commitmentsAvailableOnline, setCommitmentsAvailableOnline] = useState<
+    number | undefined
+  >(undefined);
   const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
   const [fares, setFares] = useState<DraftFare[]>([]);
@@ -323,9 +330,22 @@ export default function AddFlightPage({
         if (def.basePriceIrr) {
           setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
-        return fetchAllotments(flightId)
-          .then((rows) => setAgencyCommitments(rows.map(allotmentToDraft)))
-          .catch(() => setAgencyCommitments([]));
+        return Promise.all([
+          fetchCommitments(flightId),
+          fetchCommitmentsSummary(flightId).catch(() => null),
+        ])
+          .then(([rows, summary]) => {
+            setAgencyCommitments(
+              rows
+                .filter((r) => r.type === "AGENCY" && r.status === "ACTIVE")
+                .map(commitmentToDraft),
+            );
+            setCommitmentsAvailableOnline(summary?.availableOnline);
+          })
+          .catch(() => {
+            setAgencyCommitments([]);
+            setCommitmentsAvailableOnline(undefined);
+          });
       })
       .catch((e) => {
         setError(
@@ -342,23 +362,30 @@ export default function AddFlightPage({
   async function applyAircraftDefinition(type: string) {
     setAircraft(type);
     try {
-      const detail = await fetchAircraftTypeDetail(type);
-      const enabled = detail.cabins.filter((c) => c.enabled && c.seats > 0);
+      const list = await fetchAircraftDefinitions();
+      const match = list.find(
+        (d) =>
+          d.model === type ||
+          d.code === type ||
+          d.title === type ||
+          d.model.toLowerCase() === type.toLowerCase(),
+      );
+      if (!match) throw new Error("NO_DEFINITION");
+      const detail = await fetchAircraftDefinition(match.id);
       const rows: CabinCapacityRow[] = [];
-      for (const c of enabled) {
-        const mapped = toFlightCabinKind(c.cabin);
+      for (const c of detail.cabins) {
+        if (c.capacity <= 0) continue;
+        const mapped = toFlightCabinKind(c.cabinType);
         if (!mapped) continue;
         if (rows.some((r) => r.cabin === mapped)) continue;
         rows.push({
           key: `cab-${mapped}`,
           cabin: mapped,
-          seats: String(c.seats),
+          seats: String(c.capacity),
         });
       }
       if (rows.length > 0) setCabinRows(rows);
     } catch {
-      // Detail endpoint may be missing — keep current cabin rows; capacity
-      // from the list dropdown is still available via aircraftTypes.
       const match = aircraftTypes.find((a) => a.aircraftType === type);
       if (match && match.capacity > 0) {
         setCabinRows([
@@ -630,14 +657,9 @@ export default function AddFlightPage({
           agencySeats: agencySeatsSum,
         });
         for (const draft of agencyCommitments) {
+          if (!draft.agencyId) continue;
           const body = draftToCreatePayload(draft);
-          await createAllotment(created.id, {
-            agencyId: body.agencyId,
-            seatsAllocated: body.seatsAllocated,
-            type: body.type,
-            releaseAt: body.releaseAt,
-            contractPriceIrr: body.contractPriceIrr,
-          });
+          await createCommitment(created.id, body);
         }
       }
 
@@ -906,6 +928,7 @@ export default function AddFlightPage({
                   charterSeats={Number(latinDigits(charter)) || 0}
                   value={agencyCommitments}
                   onChange={setAgencyCommitments}
+                  availableOnline={commitmentsAvailableOnline}
                 />
               </div>
             </section>

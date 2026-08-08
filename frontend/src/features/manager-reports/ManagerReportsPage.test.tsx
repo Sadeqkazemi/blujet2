@@ -37,7 +37,10 @@ function mockRole(role: Role) {
 describe('ManagerReportsPage', () => {
   it('CEO dark layout: KPIs, unit chips, and filters by finance unit', async () => {
     mockRole('CEO');
-    const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReports').mockResolvedValue(ROWS);
+    const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReportsPaged').mockResolvedValue({
+      data: ROWS,
+      meta: { total: ROWS.length, page: 1, limit: 100 },
+    });
 
     render(<ManagerReportsPage />);
     expect(await screen.findByText('گزارش عملکرد مدیران')).toBeInTheDocument();
@@ -49,23 +52,31 @@ describe('ManagerReportsPage', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'مالی' }));
     await waitFor(() =>
-      expect(fetchSpy).toHaveBeenLastCalledWith({ actorRole: 'FINANCE_MANAGER', q: undefined }),
+      expect(fetchSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ actorRole: 'FINANCE_MANAGER', page: 1, limit: 100 }),
+      ),
     );
   });
 
   it('unit chip بازرگانی maps to COMMERCIAL_MANAGER filter', async () => {
     mockRole('BOARD_CHAIR');
-    const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReports').mockResolvedValue(ROWS);
+    const fetchSpy = vi.spyOn(auditApi, 'fetchManagerReportsPaged').mockResolvedValue({
+      data: ROWS,
+      meta: { total: ROWS.length, page: 1, limit: 100 },
+    });
     render(<ManagerReportsPage />);
     expect(await screen.findByText('تسویه فاکتور آژانس')).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'بازرگانی' }));
     await waitFor(() =>
-      expect(fetchSpy).toHaveBeenLastCalledWith({
-        actorRole: 'COMMERCIAL_MANAGER',
-        q: undefined,
-      }),
+      expect(fetchSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          actorRole: 'COMMERCIAL_MANAGER',
+          page: 1,
+          limit: 100,
+        }),
+      ),
     );
   });
 });

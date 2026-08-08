@@ -11,47 +11,91 @@ import type { AircraftDefinition, AircraftDefinitionListItem } from '../../types
 const LIST: AircraftDefinitionListItem[] = [
   {
     id: 'ac1',
-    name: 'مک‌دانل داگلاس MD-80',
     code: 'MD-80',
+    model: 'MD-80',
+    title: 'مک‌دانل داگلاس MD-80',
     status: 'ACTIVE',
-    totalSeats: 140,
-    cabinSummary: 'اکونومی ۱۲۰ · بیزنس ۲۰',
+    totalCapacity: 140,
+    version: 1,
+    cabins: [
+      { cabinType: 'ECONOMY', capacity: 120 },
+      { cabinType: 'BUSINESS', capacity: 20 },
+    ],
   },
   {
     id: 'ac2',
-    name: 'ایرباس A320',
     code: 'A320',
+    model: 'Airbus A320',
+    title: 'ایرباس A320',
     status: 'INACTIVE',
-    totalSeats: 180,
-    cabinSummary: 'اکونومی ۱۵۰ · بیزنس ۳۰',
+    totalCapacity: 180,
+    version: 2,
+    cabins: [
+      { cabinType: 'ECONOMY', capacity: 150 },
+      { cabinType: 'BUSINESS', capacity: 30 },
+    ],
   },
+];
+
+function seat(
+  row: number,
+  column: string,
+  cabinType: 'BUSINESS' | 'ECONOMY',
+  side: 'LEFT' | 'RIGHT',
+) {
+  return {
+    row,
+    column,
+    label: `${row}${column}`,
+    cabinType,
+    side,
+    isBlocked: false as const,
+  };
+}
+
+/** Compact map: business 1×3 + economy 1×6 = 9 seats (matches totalCapacity). */
+const DETAIL_SEATS = [
+  seat(1, 'A', 'BUSINESS', 'LEFT'),
+  seat(1, 'C', 'BUSINESS', 'RIGHT'),
+  seat(1, 'D', 'BUSINESS', 'RIGHT'),
+  seat(3, 'A', 'ECONOMY', 'LEFT'),
+  seat(3, 'B', 'ECONOMY', 'LEFT'),
+  seat(3, 'C', 'ECONOMY', 'LEFT'),
+  seat(3, 'D', 'ECONOMY', 'RIGHT'),
+  seat(3, 'E', 'ECONOMY', 'RIGHT'),
+  seat(3, 'F', 'ECONOMY', 'RIGHT'),
 ];
 
 const DETAIL: AircraftDefinition = {
   id: 'ac2',
-  name: 'ایرباس A320',
   code: 'A320',
+  model: 'Airbus A320',
+  title: 'ایرباس A320',
   status: 'INACTIVE',
-  totalSeats: 180,
+  totalCapacity: 9,
+  version: 2,
   cabins: [
-    { cabin: 'ECONOMY', enabled: true, seats: 150 },
-    { cabin: 'PREMIUM_ECONOMY', enabled: false, seats: 0 },
-    { cabin: 'COMFORT', enabled: false, seats: 0 },
-    { cabin: 'BUSINESS', enabled: true, seats: 30 },
-    { cabin: 'FIRST', enabled: false, seats: 0 },
+    { cabinType: 'ECONOMY', capacity: 6 },
+    { cabinType: 'BUSINESS', capacity: 3 },
   ],
-  seatMap: [
-    {
-      rowStart: 1,
-      rowEnd: 2,
-      colsLeft: ['A', 'B'],
-      colsRight: ['C', 'D', 'E'],
-      cabin: 'BUSINESS',
-      disabledSeatCodes: [],
+  seats: DETAIL_SEATS,
+  seatMap: {
+    aircraftDefinitionId: 'ac2',
+    cabinLayout: {
+      BUSINESS: {
+        colsLeft: ['A'],
+        colsRight: ['C', 'D'],
+        aisleAfterIndex: 1,
+      },
+      ECONOMY: {
+        colsLeft: ['A', 'B', 'C'],
+        colsRight: ['D', 'E', 'F'],
+        aisleAfterIndex: 3,
+      },
     },
-  ],
-  createdAt: '2026-07-01T00:00:00.000Z',
-  updatedAt: '2026-07-02T00:00:00.000Z',
+    excludedSeatCodes: [],
+    seats: DETAIL_SEATS,
+  },
 };
 
 describe('AircraftListPage', () => {
@@ -145,10 +189,11 @@ describe('AircraftDetailPage', () => {
     vi.spyOn(aircraftApi, 'fetchAircraftDefinition').mockResolvedValue({
       ...DETAIL,
       id: 'ac1',
-      name: 'مک‌دانل داگلاس MD-80',
       code: 'MD-80',
-      lockedSeatMap: true,
-      seatMap: [],
+      model: 'MD-80',
+      title: 'مک‌دانل داگلاس MD-80',
+      seatMap: { ...DETAIL.seatMap, seats: [] },
+      seats: [],
     });
 
     render(
@@ -204,6 +249,7 @@ describe('AircraftFormPage', () => {
 
     await user.type(screen.getByTestId('aircraft-name'), 'بوئینگ ۷۳۷');
     await user.type(screen.getByTestId('aircraft-code'), 'B737');
+    await user.type(screen.getByTestId('aircraft-model'), 'Boeing 737');
     await user.clear(screen.getByTestId('aircraft-total-seats'));
     await user.type(screen.getByTestId('aircraft-total-seats'), '100');
 
@@ -221,7 +267,7 @@ describe('AircraftFormPage', () => {
     vi.spyOn(aircraftApi, 'fetchAircraftDefinition').mockResolvedValue(DETAIL);
     const updateSpy = vi.spyOn(aircraftApi, 'updateAircraftDefinition').mockResolvedValue({
       ...DETAIL,
-      name: 'ایرباس A320neo',
+      title: 'ایرباس A320neo',
     });
 
     render(

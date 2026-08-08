@@ -24,6 +24,16 @@ export function fetchCartable(query: { category?: CartableCategory; date?: strin
   return apiGet<CartableListResult>(`/cartable${qs ? `?${qs}` : ''}`);
 }
 
+export function fetchCartableUnreadCount() {
+  return apiGet<{ count: number }>('/cartable/unread-count');
+}
+
+export function fetchCartableTask(id: string) {
+  return apiGet<CartableTask & { history: unknown[]; readAt: string | null }>(
+    `/cartable/${id}`,
+  );
+}
+
 export function approveCartableTask(id: string, note: string) {
   return apiPatch<CartableTask>(`/cartable/${id}/approve`, { note });
 }

@@ -34,7 +34,7 @@ export default function CeoLogsPage() {
   async function load() {
     setError(null);
     try {
-      setRows(await fetchSystemEvents());
+      setRows(await fetchSystemEvents({ page: 1, limit: 100 }));
     } catch {
       setError('خطا در دریافت لاگ‌ها.');
     }

@@ -1,4 +1,4 @@
-/** Lightweight search-results invalidation signal (no parallel cache layer). */
+/** Search-results invalidation + publishStatus filter (PR #126 contract). */
 
 export const SEARCH_RESULTS_INVALIDATE_EVENT = 'blujet:search-results-invalidate';
 
@@ -14,15 +14,17 @@ export function onSearchResultsInvalidate(handler: () => void): () => void {
   return () => window.removeEventListener(SEARCH_RESULTS_INVALIDATE_EVENT, listener);
 }
 
-const SELLABLE = new Set(['PUBLISHED', 'APPROVED', 'PENDING_REVISION', 'SCHEDULED']);
-
-/** Drop unpublished / CEO-pending rows if the API includes a status field. */
+/**
+ * Backend search only returns sellable rows, but if publishStatus is present
+ * keep only PUBLISHED. Rows without status pass through (legacy payloads).
+ */
 export function filterSellableSearchFlights<
   T extends { definitionStatus?: string; publishStatus?: string },
 >(rows: T[]): T[] {
   return rows.filter((row) => {
     const status = row.publishStatus ?? row.definitionStatus;
     if (!status) return true;
-    return SELLABLE.has(String(status).toUpperCase());
+    const upper = String(status).toUpperCase();
+    return upper === 'PUBLISHED' || upper === 'APPROVED';
   });
 }

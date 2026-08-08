@@ -209,14 +209,14 @@ describe("PricingPage", () => {
     expect(screen.queryByText("قیمت‌های ثبت‌شده")).not.toBeInTheDocument();
   });
 
-  it("CEO approving proposed price confirms then calls registerProposal without OTP", async () => {
+  it("CEO approving proposed price confirms then calls approveProposal without OTP", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
     vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
       pendingApprovalsCount: 2,
     });
     const register = vi
-      .spyOn(pricingApi, "registerProposal")
+      .spyOn(pricingApi, "approveProposal")
       .mockResolvedValue(REGISTERED);
 
     const { default: userEvent } = await import("@testing-library/user-event");
@@ -306,7 +306,7 @@ describe("PricingPage", () => {
       pendingApprovalsCount: 2,
     });
     const register = vi
-      .spyOn(pricingApi, "registerProposal")
+      .spyOn(pricingApi, "approveProposal")
       .mockResolvedValue(REGISTERED);
 
     const { default: userEvent } = await import("@testing-library/user-event");

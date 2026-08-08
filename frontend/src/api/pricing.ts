@@ -37,14 +37,21 @@ export function setLegalRate(id: string, legalRateIrr: string | number) {
   });
 }
 
-/** CEO register — no OTP/step-up on the client; backend may still require it. */
+/** CEO register — no OTP/step-up (contract confirmed). */
 export function registerProposal(id: string, source: "PROPOSED" | "AI") {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/register`, {
     source,
   });
 }
 
-/** CEO reject — reason only; no OTP/step-up on the client. */
+/** Canonical alias for register — identical body/behavior. */
+export function approveProposal(id: string, source: "PROPOSED" | "AI") {
+  return apiPatch<PricingProposal>(`/pricing/proposals/${id}/approve`, {
+    source,
+  });
+}
+
+/** CEO reject — reason only; no OTP/step-up (contract confirmed). */
 export function rejectProposal(
   id: string,
   dto: {

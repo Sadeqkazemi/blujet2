@@ -8,6 +8,8 @@ export interface PanelNotificationItem {
   sublabel?: string;
   to: string;
   tone: 'danger' | 'purple' | 'warning';
+  /** Optional side-effect when the user opens the item (e.g. mark notification read). */
+  onOpen?: () => void;
 }
 
 const TONE_DOT: Record<PanelNotificationItem['tone'], string> = {
@@ -16,11 +18,7 @@ const TONE_DOT: Record<PanelNotificationItem['tone'], string> = {
   warning: 'bg-[#f59e0b]',
 };
 
-/** Every item here comes from data the shell already fetches for the nav
- * badges (cartable tasks, refund queue, staff/referral counts) — there is
- * no separate notifications table, this is a read-only view over the same
- * live sources, so the bell can never show something the sidebar badges
- * don't already back with a real count. */
+/** Header bell: domain badge sources plus GET /notifications when available. */
 export default function PanelNotificationBell({ items }: { items: PanelNotificationItem[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -68,6 +66,7 @@ export default function PanelNotificationBell({ items }: { items: PanelNotificat
                     type="button"
                     onClick={() => {
                       setOpen(false);
+                      item.onOpen?.();
                       navigate(item.to);
                     }}
                     className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-start text-xs transition hover:bg-white/5"

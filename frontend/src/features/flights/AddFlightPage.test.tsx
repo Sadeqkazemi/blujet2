@@ -17,7 +17,15 @@ describe("AddFlightPage", () => {
       { aircraftType: "Airbus A320", capacity: 180 },
       { aircraftType: "Boeing 737", capacity: 150 },
     ]);
-    vi.spyOn(flightsApi, "fetchAllotments").mockResolvedValue([]);
+    vi.spyOn(flightsApi, "fetchCommitments").mockResolvedValue([]);
+    vi.spyOn(flightsApi, "fetchCommitmentsSummary").mockResolvedValue({
+      cabins: [],
+      totalCapacity: 0,
+      charterCommitted: 0,
+      agencyCommitted: 0,
+      sold: 0,
+      availableOnline: 0,
+    });
     vi.spyOn(agenciesApi, "fetchAgencies").mockResolvedValue({
       agencies: [],
       kpis: {
@@ -127,20 +135,40 @@ describe("AddFlightPage", () => {
   });
 
   it("loads cabin capacities when an aircraft type is selected", async () => {
-    vi.spyOn(aircraftApi, "fetchAircraftTypeDetail").mockResolvedValue({
+    vi.spyOn(aircraftApi, "fetchAircraftDefinitions").mockResolvedValue([
+      {
+        id: "ac-737",
+        code: "B737",
+        model: "Boeing 737",
+        title: "بوئینگ ۷۳۷",
+        status: "ACTIVE",
+        totalCapacity: 150,
+        version: 1,
+        cabins: [
+          { cabinType: "ECONOMY", capacity: 132 },
+          { cabinType: "BUSINESS", capacity: 18 },
+        ],
+      },
+    ]);
+    vi.spyOn(aircraftApi, "fetchAircraftDefinition").mockResolvedValue({
       id: "ac-737",
-      name: "Boeing 737",
       code: "B737",
+      model: "Boeing 737",
+      title: "بوئینگ ۷۳۷",
       status: "ACTIVE",
-      totalSeats: 150,
+      totalCapacity: 150,
+      version: 1,
       cabins: [
-        { cabin: "ECONOMY", enabled: true, seats: 132 },
-        { cabin: "BUSINESS", enabled: true, seats: 18 },
-        { cabin: "COMFORT", enabled: false, seats: 0 },
-        { cabin: "FIRST", enabled: false, seats: 0 },
-        { cabin: "PREMIUM_ECONOMY", enabled: false, seats: 0 },
+        { cabinType: "ECONOMY", capacity: 132 },
+        { cabinType: "BUSINESS", capacity: 18 },
       ],
-      seatMap: [],
+      seats: [],
+      seatMap: {
+        aircraftDefinitionId: "ac-737",
+        cabinLayout: {},
+        excludedSeatCodes: [],
+        seats: [],
+      },
     });
 
     render(<AddFlightPage onClose={vi.fn()} onSuccess={vi.fn()} />);

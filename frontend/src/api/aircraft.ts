@@ -2,14 +2,11 @@ import { apiGet, apiPatch, apiPost, apiRequest } from './http';
 import type {
   AircraftDefinition,
   AircraftDefinitionListItem,
+  AircraftSeatMap,
   UpsertAircraftDefinitionPayload,
 } from '../types/aircraft';
 
-/**
- * Expected aircraft-definition admin API (not all routes exist yet).
- * Existing today: GET /flights/aircraft-types → { aircraftType, capacity }[]
- * Missing: CRUD detail/seat-map write endpoints — UI calls these and surfaces errors.
- */
+/** Canonical aircraft-definition admin API (PR #126 contract). */
 
 export function fetchAircraftDefinitions() {
   return apiGet<AircraftDefinitionListItem[]>('/flights/aircraft-definitions');
@@ -17,6 +14,10 @@ export function fetchAircraftDefinitions() {
 
 export function fetchAircraftDefinition(id: string) {
   return apiGet<AircraftDefinition>(`/flights/aircraft-definitions/${id}`);
+}
+
+export function fetchAircraftSeatMap(id: string) {
+  return apiGet<AircraftSeatMap>(`/flights/aircraft-definitions/${id}/seat-map`);
 }
 
 export function createAircraftDefinition(payload: UpsertAircraftDefinitionPayload) {
@@ -33,15 +34,9 @@ export function updateAircraftDefinition(
   });
 }
 
-export function patchAircraftDefinitionStatus(id: string, status: 'ACTIVE' | 'INACTIVE') {
-  return apiPatch<AircraftDefinition>(`/flights/aircraft-definitions/${id}/status`, {
-    status,
-  });
-}
-
-/** Cabin + seat-map detail for an aircraft type code (used by Add Flight). */
-export function fetchAircraftTypeDetail(aircraftType: string) {
-  return apiGet<AircraftDefinition>(
-    `/flights/aircraft-types/${encodeURIComponent(aircraftType)}`,
-  );
+export function patchAircraftDefinition(
+  id: string,
+  payload: Partial<UpsertAircraftDefinitionPayload>,
+) {
+  return apiPatch<AircraftDefinition>(`/flights/aircraft-definitions/${id}`, payload);
 }

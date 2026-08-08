@@ -18,7 +18,7 @@ export default function LogsPage() {
   const logsPager = usePagination(logs ?? []);
 
   useEffect(() => {
-    fetchSystemLogs()
+    fetchSystemLogs({ page: 1, limit: 100 })
       .then(setLogs)
       .catch(() => setError('خطا در دریافت لاگ‌ها.'));
   }, []);

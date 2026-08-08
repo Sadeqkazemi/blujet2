@@ -1,155 +1,135 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAircraftDefinitions } from '../../api/aircraft';
+import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
-import type { AircraftDefinitionListItem, AircraftStatus } from '../../types/aircraft';
+import { AIRCRAFT_CABIN_OPTIONS, type AircraftDefinitionListItem } from '../../types/aircraft';
 
-const cardClass = 'overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]';
-
-function statusBadge(status: AircraftStatus): { label: string; className: string } {
-  if (status === 'ACTIVE') {
-    return {
-      label: 'فعال',
-      className: 'bg-[rgba(52,211,153,.12)] text-[#34d399]',
-    };
-  }
-  return {
-    label: 'غیرفعال',
-    className: 'bg-[rgba(248,113,113,.12)] text-[#f87171]',
-  };
+function cabinSummary(row: AircraftDefinitionListItem): string {
+  if (!row.cabins?.length) return '—';
+  return row.cabins
+    .map((c) => {
+      const label =
+        AIRCRAFT_CABIN_OPTIONS.find((o) => o.value === c.cabinType)?.label ?? c.cabinType;
+      return `${label}: ${faDigits(c.capacity)}`;
+    })
+    .join(' · ');
 }
 
 export default function AircraftListPage() {
-  const [items, setItems] = useState<AircraftDefinitionListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<AircraftDefinitionListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchAircraftDefinitions();
-      setItems(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در دریافت فهرست هواپیماها.');
-      setItems([]);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    fetchAircraftDefinitions()
+      .then(setRows)
+      .catch((e) =>
+        setError(
+          e instanceof ApiRequestError
+            ? e.message
+            : e instanceof Error
+              ? e.message
+              : 'خطا در دریافت فهرست هواپیماها.',
+        ),
+      );
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
   return (
-    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="px-[21px] pb-[34px] pt-[18px]" data-testid="aircraft-list-page">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="m-0 text-[20.5px] font-black text-white">تعریف هواپیما</h1>
+          <h1 className="text-[20.5px] font-black text-white">تعریف هواپیما</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-            مدیریت انواع هواپیما، ظرفیت کابین‌ها و نقشه صندلی برای پروازها
+            مدل، ظرفیت کابین و نقشه صندلی — MD-80 قفل است
           </p>
         </div>
         <Link
           to="/panel/aircraft/new"
-          className="inline-flex h-11 items-center rounded-[10px] bg-[#1668c4] px-5 text-[13px] font-bold text-white hover:bg-[#1a75d8]"
+          className="rounded-[10px] bg-[#1668c4] px-3.5 py-2.5 text-[12px] font-extrabold text-white"
         >
           + تعریف هواپیمای جدید
         </Link>
       </div>
 
-      {loading && (
-        <p className="py-8 text-center text-sm text-[#6b7b94]" data-testid="aircraft-list-loading">
-          در حال بارگذاری…
-        </p>
-      )}
-
-      {!loading && error && (
-        <div className="rounded-[12px] bg-[rgba(248,113,113,.12)] p-4 text-sm text-[#f87171]" data-testid="aircraft-list-error">
-          <p className="m-0">{error}</p>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="mt-3 rounded-lg border border-[#28344c] px-3 py-1.5 text-[11px] font-bold text-[#9fb0c7]"
-          >
-            تلاش مجدد
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && items.length === 0 && (
-        <div
-          className={`${cardClass} px-6 py-12 text-center`}
-          data-testid="aircraft-list-empty"
+      {error ? (
+        <p
+          role="alert"
+          data-testid="aircraft-list-error"
+          className="rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]"
         >
-          <p className="m-0 text-sm text-[#6b7b94]">اطلاعاتی یافت نشد.</p>
-          <Link
-            to="/panel/aircraft/new"
-            className="mt-4 inline-flex text-[13px] font-bold text-[#60a5fa] hover:underline"
-          >
-            اولین هواپیما را تعریف کنید
-          </Link>
-        </div>
-      )}
+          {error}
+        </p>
+      ) : null}
 
-      {!loading && !error && items.length > 0 && (
-        <div className={cardClass} data-testid="aircraft-list-table">
-          <table className="w-full border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-[#1f2a3d] text-[11px] text-[#6b7b94]">
-                <th className="px-4 py-3 text-start font-bold">نام / کد</th>
-                <th className="px-4 py-3 text-start font-bold">وضعیت</th>
-                <th className="px-4 py-3 text-start font-bold">ظرفیت</th>
-                <th className="px-4 py-3 text-start font-bold">خلاصه کابین</th>
-                <th className="px-4 py-3 text-start font-bold">عملیات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => {
-                const badge = statusBadge(item.status);
-                return (
-                  <tr
-                    key={item.id}
-                    className="border-b border-[#1f2a3d] last:border-b-0 hover:bg-[#0f1726]/50"
-                    data-testid={`aircraft-row-${item.id}`}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-bold text-white">{item.name}</div>
-                      <div className="font-num mt-0.5 text-[11px] text-[#6b7b94]" dir="ltr">
-                        {item.code}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-md px-2 py-1 text-[11px] font-bold ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td className="font-num px-4 py-3 text-[#e7ecf3]">{faDigits(item.totalSeats)}</td>
-                    <td className="px-4 py-3 text-[#9fb0c7]">{item.cabinSummary || '—'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          to={`/panel/aircraft/${item.id}`}
-                          className="rounded-lg border border-[#28344c] px-3 py-1.5 text-[11px] font-bold text-[#9fb0c7] hover:border-[#3b82f6] hover:text-white"
-                        >
-                          مشاهده
-                        </Link>
-                        <Link
-                          to={`/panel/aircraft/${item.id}/edit`}
-                          className="rounded-lg border border-[#28344c] px-3 py-1.5 text-[11px] font-bold text-[#60a5fa] hover:border-[#3b82f6]"
-                        >
-                          ویرایش
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <div
+        data-testid="aircraft-list-table"
+        className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]"
+      >
+        <div className="grid grid-cols-[1fr_1fr_0.7fr_0.7fr_1.4fr_auto] gap-2 bg-[#18223a] px-3 py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
+          <span>کد</span>
+          <span>مدل / عنوان</span>
+          <span>وضعیت</span>
+          <span>ظرفیت</span>
+          <span>کابین‌ها</span>
+          <span />
         </div>
-      )}
+        {rows === null && !error ? (
+          <p
+            data-testid="aircraft-list-loading"
+            className="border-t border-[#1f2a3d] py-8 text-center text-xs text-[#6b7b94]"
+          >
+            در حال بارگذاری…
+          </p>
+        ) : null}
+        {rows && rows.length === 0 ? (
+          <p
+            data-testid="aircraft-list-empty"
+            className="border-t border-[#1f2a3d] py-8 text-center text-xs text-[#6b7b94]"
+          >
+            اطلاعاتی یافت نشد
+          </p>
+        ) : null}
+        {rows?.map((row) => (
+          <div
+            key={row.id}
+            data-testid="aircraft-list-row"
+            className="grid grid-cols-[1fr_1fr_0.7fr_0.7fr_1.4fr_auto] items-center gap-2 border-t border-[#1f2a3d] px-3 py-3 text-[12px]"
+          >
+            <span className="font-num font-bold text-white" dir="ltr">
+              {row.code}
+            </span>
+            <span className="text-[#e7ecf3]">
+              {row.title || row.model}
+              <span className="mt-0.5 block text-[10.5px] text-[#6b7b94]">{row.model}</span>
+            </span>
+            <span
+              className={
+                row.status === 'ACTIVE'
+                  ? 'text-[#34d399]'
+                  : 'text-[#f87171]'
+              }
+            >
+              {row.status === 'ACTIVE' ? 'فعال' : 'غیرفعال'}
+            </span>
+            <span className="font-num text-[#cdd6e3]">{faDigits(row.totalCapacity)}</span>
+            <span className="text-[11px] text-[#9fb0c7]">{cabinSummary(row)}</span>
+            <div className="flex gap-2">
+              <Link
+                to={`/panel/aircraft/${row.id}`}
+                className="text-[11px] font-bold text-[#60a5fa]"
+              >
+                مشاهده
+              </Link>
+              <Link
+                to={`/panel/aircraft/${row.id}/edit`}
+                className="text-[11px] font-bold text-[#c7d2e3]"
+              >
+                ویرایش
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
