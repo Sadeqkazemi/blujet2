@@ -5,6 +5,11 @@ import { Flight } from '../../database/entities/flight.entity';
 import { Route } from '../../database/entities/route.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { AircraftDefinition } from '../../database/entities/aircraft-definition.entity';
+import { AircraftCabin } from '../../database/entities/aircraft-cabin.entity';
+import { AircraftSeat } from '../../database/entities/aircraft-seat.entity';
+import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
+import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
 import { Schedule } from '../../database/entities/schedule.entity';
 import { FareRule } from '../../database/entities/fare-rule.entity';
 import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
@@ -17,6 +22,8 @@ import { FlightChargeRule } from '../../database/entities/flight-charge-rule.ent
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
+import { AircraftService } from './aircraft.service';
+import { CommitmentsService } from './commitments.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
 import { AiModule } from '../ai/ai.module';
@@ -30,6 +37,11 @@ import { AuthModule } from '../auth/auth.module';
       Route,
       Airport,
       AircraftSeatMap,
+      AircraftDefinition,
+      AircraftCabin,
+      AircraftSeat,
+      CharterCommitment,
+      AgencySeatCommitment,
       Schedule,
       FareRule,
       AgencyAllotment,
@@ -46,7 +58,12 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [FlightsController],
-  providers: [FlightsService, FlightDefinitionService],
+  providers: [
+    FlightsService,
+    FlightDefinitionService,
+    AircraftService,
+    CommitmentsService,
+  ],
   exports: [FlightDefinitionService],
 })
 export class FlightsModule {}

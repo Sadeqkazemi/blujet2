@@ -323,8 +323,11 @@ describe('Flightops (e2e)', () => {
 
     const cancelled = await createInstance(72);
     await dataSource
-      .getRepository(FlightInstance)
-      .update({ id: cancelled.id }, { status: 'CANCELLED' });
+      .createQueryBuilder()
+      .update(FlightInstance)
+      .set({ status: 'CANCELLED' })
+      .where('id = :id', { id: cancelled.id })
+      .execute();
     const cancelledRes = await request(app.getHttpServer())
       .get(`/flightops/${cancelled.id}`)
       .set('Authorization', auth(accessToken));

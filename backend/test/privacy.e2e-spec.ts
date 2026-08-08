@@ -190,7 +190,9 @@ describe('Privacy / GDPR export & delete (e2e)', () => {
 
     const booking = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: bookingId });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: bookingId })
+      .getOneOrFail();
     expect(booking.contactPhone).toBeNull();
     // The booking row itself (financial record) survives — never hard-deleted.
     expect(booking.priceIrr).toBeGreaterThan(0);

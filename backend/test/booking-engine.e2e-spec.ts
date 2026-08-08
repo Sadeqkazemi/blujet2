@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { DataSource, In } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { dataSourceOptions } from '../src/database/data-source.options';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
 import { Booking } from '../src/database/entities/booking.entity';
@@ -240,7 +240,9 @@ describe('Booking engine (e2e)', () => {
     await repo.update({ id: extra.id }, { priceIrr: 9_000_000n });
     const stored = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: createRes.body.data.id });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: createRes.body.data.id })
+      .getOneOrFail();
     expect(stored.extrasSnapshot[0]?.unitPriceIrr).toBe('4500000');
   });
 
@@ -373,11 +375,11 @@ describe('Booking engine (e2e)', () => {
     const bookingId = createRes.body.data.id;
 
     await dataSource
-      .getRepository(Booking)
-      .update(
-        { id: bookingId },
-        { holdExpiresAt: new Date(Date.now() - 1000) },
-      );
+      .createQueryBuilder()
+      .update(Booking)
+      .set({ holdExpiresAt: new Date(Date.now() - 1000) })
+      .where('id = :id', { id: bookingId })
+      .execute();
 
     const payRes = await request(app.getHttpServer())
       .post(`/bookings/${bookingId}/pay`)
@@ -387,7 +389,9 @@ describe('Booking engine (e2e)', () => {
 
     const updated = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: bookingId });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: bookingId })
+      .getOneOrFail();
     expect(updated.status).toBe('EXPIRED');
 
     const seatmapRes = await request(app.getHttpServer()).get(
@@ -494,10 +498,14 @@ describe('Booking engine (e2e)', () => {
     const statuses = [resA.status, resB.status].sort();
     expect(statuses).toEqual([201, 409]);
 
-    const activeBookings = await dataSource.getRepository(Booking).countBy({
-      flightInstanceId: instance.id,
-      status: In(['HELD', 'PAID', 'TICKETED']),
-    });
+    const activeBookings = await dataSource
+      .getRepository(Booking)
+      .createQueryBuilder('b')
+      .where('b.flightInstanceId = :id', { id: instance.id })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: ['HELD', 'PAID', 'TICKETED'],
+      })
+      .getCount();
     expect(activeBookings).toBe(1);
   });
 });

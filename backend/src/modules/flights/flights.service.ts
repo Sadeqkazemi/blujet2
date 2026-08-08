@@ -1031,6 +1031,8 @@ export class FlightsService {
 
   private cabinLabelFa(cabin: CabinClass): string {
     switch (cabin) {
+      case 'FIRST':
+        return 'درجه یک';
       case 'BUSINESS':
         return 'بیزینس';
       case 'COMFORT':

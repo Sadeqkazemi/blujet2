@@ -11,7 +11,7 @@ import { Booking } from '../src/database/entities/booking.entity';
 import { FlightChargeRule } from '../src/database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
-import { loginAs, loginAsCustomer, stepUpFor } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 
 describe('Flight definition + charge rules + CEO approval (e2e)', () => {
   let app: INestApplication<App>;
@@ -110,7 +110,9 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(create.body.data.approvalStatus).toBe('PENDING_CEO');
     const proposals = await dataSource
       .getRepository(FarePricingProposal)
-      .findBy({ flightInstanceId: create.body.data.id });
+      .createQueryBuilder('p')
+      .where('p.flightInstanceId = :id', { id: create.body.data.id })
+      .getMany();
     expect(proposals).toHaveLength(1);
     expect(proposals[0]).toMatchObject({
       status: 'PENDING',
@@ -184,11 +186,10 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(proposal.status).toBe(200);
 
     const { accessToken: ceo } = await loginAs(app, 'ceo');
-    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const reg = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ source: 'PROPOSED', ...stepUp });
+      .send({ source: 'PROPOSED' });
     expect(reg.status).toBe(200);
     expect(reg.body.data.status).toBe('REGISTERED');
 
@@ -222,6 +223,103 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(live.definitionStatus).toBe('PENDING_REVISION');
   });
 
+  it('approving a revision that moves departureAt invalidates BOTH the old and new search-cache dates', async () => {
+    const { accessToken: comm } = await loginAs(app, 'comm');
+    const created = await request(app.getHttpServer())
+      .post('/flights')
+      .set('Authorization', `Bearer ${comm}`)
+      .send(payload());
+    expect(created.status).toBe(201);
+    const id = created.body.data.id as string;
+    const oldDate = String(created.body.data.departureAt).slice(0, 10);
+
+    const proposal = await request(app.getHttpServer())
+      .put(`/pricing/flights/${id}/proposal`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ proposedPriceIrr: '39000000' });
+    const { accessToken: ceo } = await loginAs(app, 'ceo');
+    const reg1 = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
+      .set('Authorization', `Bearer ${ceo}`)
+      .send({ source: 'PROPOSED' });
+    expect(reg1.status).toBe(200);
+
+    // Prime the search cache for the flight's original date, exactly as a
+    // customer browsing نتایج پرواز would before the revision below.
+    const primed = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date: oldDate });
+    expect(primed.status).toBe(200);
+    expect(
+      (primed.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === id,
+      ),
+    ).toBe(true);
+
+    // Revise the flight to a different departure date (a "dangerous"
+    // change on an already-APPROVED flight → PENDING_REVISION; live
+    // inventory, and therefore the primed cache entry above, must stay
+    // exactly as-is until the CEO re-approves).
+    const newDeparture = new Date(Date.now() + 20 * 24 * 3_600_000);
+    const newDate = newDeparture.toISOString().slice(0, 10);
+    const revised = await request(app.getHttpServer())
+      .put(`/flights/${id}/definition`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send(
+        payload({
+          flightNo: created.body.data.flightNo,
+          departureAt: newDeparture.toISOString(),
+        }),
+      );
+    expect(revised.status).toBe(200);
+    expect(revised.body.data.approvalStatus).toBe('PENDING_REVISION');
+
+    const stillOldDate = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date: oldDate });
+    expect(
+      (stillOldDate.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === id,
+      ),
+    ).toBe(true);
+
+    // CEO approves the revision (reopens the same proposal).
+    const revisionProposal = await dataSource
+      .getRepository(FarePricingProposal)
+      .createQueryBuilder('p')
+      .where('p.flightInstanceId = :id', { id })
+      .getOneOrFail();
+    const reg2 = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${revisionProposal.id}/register`)
+      .set('Authorization', `Bearer ${ceo}`)
+      .send({ source: 'PROPOSED' });
+    expect(reg2.status).toBe(200);
+    expect(reg2.body.data.flightInstance.departureAt.slice(0, 10)).toBe(
+      newDate,
+    );
+
+    // Regression: the OLD date's cache entry must be busted too — not just
+    // the new one — or the moved flight keeps appearing on its stale
+    // former date until the 5-minute search-cache TTL expires.
+    const oldDateAfter = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date: oldDate });
+    expect(
+      (oldDateAfter.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === id,
+      ),
+    ).toBe(false);
+
+    const newDateAfter = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date: newDate });
+    expect(
+      (newDateAfter.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === id,
+      ),
+    ).toBe(true);
+  });
+
   it('pending-count is 0 on empty pending set and increments with PENDING proposals', async () => {
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     // Clear is not allowed — just assert endpoint shape; count is non-negative.
@@ -244,7 +342,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(after.body.data.pendingApprovalsCount).toBe(before + 1);
   });
 
-  it('CEO reject requires reason + step-up; unauthorized roles are 403; register is idempotent', async () => {
+  it('CEO reject requires a reason but no step-up/OTP; unauthorized roles are 403; register is idempotent', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .post('/flights')
@@ -261,48 +359,35 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     const forbidden = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/reject`)
       .set('Authorization', `Bearer ${finance}`)
-      .send({
-        rejectionReason: 'nope',
-        stepUpChallengeId: 'x',
-        stepUpCode: '123456',
-      });
+      .send({ rejectionReason: 'nope' });
     expect(forbidden.status).toBe(403);
 
     const { accessToken: ceo } = await loginAs(app, 'ceo');
-    const noStepUp = await request(app.getHttpServer())
+    const missingReason = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposalId}/reject`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ rejectionReason: 'نرخ نامناسب' });
-    expect(noStepUp.status).toBe(400);
+      .send({ rejectionReason: '   ' });
+    expect(missingReason.status).toBe(400);
 
-    // Fresh proposal for reject path
-    const created2 = await request(app.getHttpServer())
-      .post('/flights')
-      .set('Authorization', `Bearer ${comm}`)
-      .send(payload());
-    const p2 = await request(app.getHttpServer())
-      .put(`/pricing/flights/${created2.body.data.id}/proposal`)
-      .set('Authorization', `Bearer ${comm}`)
-      .send({ proposedPriceIrr: '39100000' });
-    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
-    const rejected = await request(app.getHttpServer())
-      .patch(`/pricing/proposals/${p2.body.data.id}/reject`)
+    // No stepUpChallengeId/stepUpCode required — a bare reason is enough.
+    const rejectedNoStepUp = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposalId}/reject`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ rejectionReason: '  نرخ نامناسب  ', ...stepUp });
-    expect(rejected.status).toBe(200);
-    expect(rejected.body.data.status).toBe('REJECTED');
-    expect(rejected.body.data.rejectionReason).toBe('نرخ نامناسب');
+      .send({ rejectionReason: '  نرخ نامناسب  ' });
+    expect(rejectedNoStepUp.status).toBe(200);
+    expect(rejectedNoStepUp.body.data.status).toBe('REJECTED');
+    expect(rejectedNoStepUp.body.data.rejectionReason).toBe('نرخ نامناسب');
 
     const live = await dataSource
       .getRepository(FlightInstance)
       .createQueryBuilder('fi')
-      .where('fi.id = :id', { id: created2.body.data.id })
+      .where('fi.id = :id', { id })
       .getOneOrFail();
     // Rejected first-cycle definition becomes REJECTED; capacity unchanged.
     expect(live.definitionStatus).toBe('REJECTED');
     expect(live.capacity).toBe(146);
 
-    // Register path + idempotency
+    // Register path + idempotency — also no step-up/OTP required.
     const created3 = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${comm}`)
@@ -311,17 +396,15 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .put(`/pricing/flights/${created3.body.data.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39200000' });
-    const su1 = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const r1 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p3.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ source: 'PROPOSED', ...su1 });
+      .send({ source: 'PROPOSED' });
     expect(r1.status).toBe(200);
-    const su2 = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const r2 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p3.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ source: 'PROPOSED', ...su2 });
+      .send({ source: 'PROPOSED' });
     expect(r2.status).toBe(200);
     expect(r2.body.data.status).toBe('REGISTERED');
     expect(r2.body.data.registeredPriceIrr).toBe(
@@ -382,11 +465,10 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(proposal.status).toBe(200);
 
     const { accessToken: ceo } = await loginAs(app, 'ceo');
-    const stepUp = await stepUpFor(app, ceo!, 'ceo', 'PRICE_CAPACITY_CHANGE');
     const reg = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
-      .send({ source: 'PROPOSED', ...stepUp });
+      .send({ source: 'PROPOSED' });
     expect(reg.status).toBe(200);
 
     const search = await request(app.getHttpServer())

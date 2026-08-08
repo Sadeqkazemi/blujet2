@@ -18,7 +18,6 @@ import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
-import { StepUpService } from '../auth/step-up.service';
 import { FlightDefinitionService } from '../flights/flight-definition.service';
 import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -55,7 +54,6 @@ export class PricingService {
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
-    private readonly stepUp: StepUpService,
     private readonly definitions: FlightDefinitionService,
     private readonly search: SearchService,
   ) {}
@@ -291,15 +289,7 @@ export class PricingService {
     actor: AuthenticatedUser,
     id: string,
     source: 'PROPOSED' | 'AI',
-    stepUpChallengeId: string,
-    stepUpCode: string,
   ) {
-    await this.stepUp.verify(
-      actor,
-      stepUpChallengeId,
-      stepUpCode,
-      'PRICE_CAPACITY_CHANGE',
-    );
     const proposal = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
     )
@@ -407,11 +397,11 @@ export class PricingService {
         });
       }
 
-      await this.definitions.applyCeoApprovalInTx(
+      const { previousLocation } = await this.definitions.applyCeoApprovalInTx(
         manager,
         lockedProposal.flightInstanceId,
       );
-      return { alreadyRegistered: false as const, price };
+      return { alreadyRegistered: false as const, price, previousLocation };
     });
 
     if (registered.alreadyRegistered) {
@@ -438,6 +428,17 @@ export class PricingService {
 
     // Newly APPROVED inventory must appear in search immediately.
     await this.search.invalidateForInstance(proposal.flightInstanceId);
+    // A revision may have moved the flight to a different route/date — the
+    // OLD listing's cache entry is a separate key and must be busted too,
+    // or the flight keeps appearing under its stale former date/route for
+    // the rest of the cache TTL.
+    if (registered.previousLocation) {
+      await this.search.invalidateForRouteDate(
+        registered.previousLocation.originCode,
+        registered.previousLocation.destCode,
+        registered.previousLocation.departureAt,
+      );
+    }
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
       .where('p.id = :id', { id })
@@ -449,17 +450,8 @@ export class PricingService {
     id: string,
     dto: {
       rejectionReason: string;
-      stepUpChallengeId: string;
-      stepUpCode: string;
     },
   ) {
-    await this.stepUp.verify(
-      actor,
-      dto.stepUpChallengeId,
-      dto.stepUpCode,
-      'PRICE_CAPACITY_CHANGE',
-    );
-
     const reason = (dto.rejectionReason ?? '').trim();
     if (!reason) {
       throw new BadRequestException({

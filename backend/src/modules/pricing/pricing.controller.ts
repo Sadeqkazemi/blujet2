@@ -103,21 +103,14 @@ export class PricingController {
     @Param('id') id: string,
     @Body() dto: RegisterProposalDto,
   ) {
-    const data = await this.pricing.register(
-      actor,
-      id,
-      dto.source,
-      dto.stepUpChallengeId,
-      dto.stepUpCode,
-    );
+    const data = await this.pricing.register(actor, id, dto.source);
     return { success: true, data };
   }
 
   @Patch('proposals/:id/reject')
   @Roles(Role.CEO)
   @ApiOperation({
-    summary:
-      'رد پیشنهاد قیمت با دلیل اجباری + step-up — نسخه فعال پرواز تغییر نمی‌کند',
+    summary: 'رد پیشنهاد قیمت با دلیل اجباری — نسخه فعال پرواز تغییر نمی‌کند',
   })
   async reject(
     @CurrentUser() actor: AuthenticatedUser,

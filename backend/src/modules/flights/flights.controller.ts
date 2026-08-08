@@ -26,6 +26,13 @@ import {
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
+import { AircraftService } from './aircraft.service';
+import { UpsertAircraftDto } from './dto/aircraft.dto';
+import { CommitmentsService } from './commitments.service';
+import {
+  CreateAgencySeatCommitmentDto,
+  CreateCharterCommitmentDto,
+} from './dto/commitment.dto';
 import {
   CreateFlightDefinitionDto,
   UpdateFlightDefinitionDto,
@@ -44,7 +51,7 @@ import {
 } from '../../common/dto/irr.decorator';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { Role } from '../../database/enums';
+import { CabinClass, Role } from '../../database/enums';
 
 class CreateAirportDto {
   @ApiProperty({ description: 'نام شهر', example: 'وان' })
@@ -167,10 +174,12 @@ class ChangeAircraftTypeDto {
   stepUpCode: string;
 }
 
+const FARE_RULE_CABIN_CLASSES = Object.values(CabinClass);
+
 class CreateFareRuleDto {
-  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
+  @ApiProperty({ enum: FARE_RULE_CABIN_CLASSES })
+  @IsIn(FARE_RULE_CABIN_CLASSES)
+  cabin: CabinClass;
 
   @ApiProperty({ description: 'کد کلاس نرخی', example: 'Y' })
   @IsString()
@@ -347,6 +356,8 @@ export class FlightsController {
   constructor(
     private readonly flights: FlightsService,
     private readonly definitions: FlightDefinitionService,
+    private readonly aircraft: AircraftService,
+    private readonly commitments: CommitmentsService,
   ) {}
 
   // EMPLOYEE: PERMISSION_CATALOG's fl_view for the GET endpoints below;
@@ -406,6 +417,54 @@ export class FlightsController {
   @ApiOperation({ summary: 'کاتالوگ انواع هواپیما برای فرم تغییر نوع هواپیما' })
   async aircraftTypes() {
     const data = await this.flights.aircraftTypes();
+    return { success: true, data };
+  }
+
+  @Get('aircraft')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({
+    summary: 'فهرست تعریف هواپیماها (کد/مدل/وضعیت/ظرفیت/کابین‌ها)',
+  })
+  async listAircraft() {
+    const data = await this.aircraft.list();
+    return { success: true, data };
+  }
+
+  @Get('aircraft/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'جزئیات تعریف هواپیما شامل کابین‌ها و صندلی‌ها' })
+  async aircraftDetail(@Param('id') id: string) {
+    const data = await this.aircraft.detail(id);
+    return { success: true, data };
+  }
+
+  @Post('aircraft')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'افزودن تعریف هواپیما — کابین‌ها و صندلی‌ها از نقشه ردیف/ستون تولید می‌شوند',
+  })
+  async createAircraft(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: UpsertAircraftDto,
+  ) {
+    const data = await this.aircraft.create(actor, dto);
+    return { success: true, data };
+  }
+
+  @Put('aircraft/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'ویرایش تعریف هواپیما' })
+  async updateAircraft(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpsertAircraftDto,
+  ) {
+    const data = await this.aircraft.update(actor, id, dto);
     return { success: true, data };
   }
 
@@ -638,6 +697,87 @@ export class FlightsController {
       instanceId,
       allotmentId,
     );
+    return { success: true, data };
+  }
+
+  @Get(':instanceId/commitments')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({
+    summary: 'فهرست تعهدات صندلی چارتر و آژانس این پرواز',
+  })
+  async listCommitments(@Param('instanceId') instanceId: string) {
+    const data = await this.commitments.listForInstance(instanceId);
+    return { success: true, data };
+  }
+
+  @Get(':instanceId/commitments/summary')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({
+    summary:
+      'خلاصه ظرفیت هر کابین: کل / متعهد چارتر / متعهد آژانس / فروخته‌شده / قابل فروش آنلاین',
+  })
+  async commitmentsSummary(@Param('instanceId') instanceId: string) {
+    const data = await this.commitments.capacitySummary(instanceId);
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/commitments/charter')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'ثبت تعهد صندلی چارتر — رد با ۴۰۹ اگر مجموع تعهدات از ظرفیت کابین بیشتر شود',
+  })
+  async createCharterCommitment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: CreateCharterCommitmentDto,
+  ) {
+    const data = await this.commitments.createCharter(actor, instanceId, dto);
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/commitments/agency')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'ثبت تعهد صندلی آژانس — رد با ۴۰۹ اگر مجموع تعهدات از ظرفیت کابین بیشتر شود',
+  })
+  async createAgencyCommitment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: CreateAgencySeatCommitmentDto,
+  ) {
+    const data = await this.commitments.createAgency(actor, instanceId, dto);
+    return { success: true, data };
+  }
+
+  @Delete(':instanceId/commitments/charter/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'لغو تعهد صندلی چارتر' })
+  async cancelCharterCommitment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Param('id') id: string,
+  ) {
+    const data = await this.commitments.cancelCharter(actor, instanceId, id);
+    return { success: true, data };
+  }
+
+  @Delete(':instanceId/commitments/agency/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'لغو تعهد صندلی آژانس' })
+  async cancelAgencyCommitment(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Param('id') id: string,
+  ) {
+    const data = await this.commitments.cancelAgency(actor, instanceId, id);
     return { success: true, data };
   }
 }

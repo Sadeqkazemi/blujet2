@@ -2,11 +2,14 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { ArrayMinSize, IsArray, IsIn, ValidateNested } from 'class-validator';
 import { BookingPassengerDto } from '../../booking-engine/dto/create-booking.dto';
+import { CabinClass } from '../../../database/enums';
+
+const CABIN_CLASSES = Object.values(CabinClass);
 
 export class CreateAllotmentBookingDto {
-  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS'] })
-  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS'])
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
+  @ApiProperty({ enum: CABIN_CLASSES })
+  @IsIn(CABIN_CLASSES)
+  cabin: CabinClass;
 
   @ApiProperty({ type: [BookingPassengerDto] })
   @IsArray()

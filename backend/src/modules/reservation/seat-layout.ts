@@ -1,7 +1,7 @@
 export interface SeatCell {
   seatCode: string;
   row: number;
-  cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY';
+  cabin: 'BUSINESS' | 'COMFORT' | 'ECONOMY' | 'FIRST';
 }
 
 /** Structural shape shared by seat-map rows — ORM-agnostic. */
@@ -14,6 +14,10 @@ export interface AircraftSeatMapLike {
   comfortRowEnd?: number | null;
   comfortColsLeft?: string[] | null;
   comfortColsRight?: string[] | null;
+  firstRowStart?: number | null;
+  firstRowEnd?: number | null;
+  firstColsLeft?: string[] | null;
+  firstColsRight?: string[] | null;
   economyRowStart: number;
   economyRowEnd: number;
   economyColsLeft: string[] | null;
@@ -57,6 +61,15 @@ export function enumerateSeats(map: AircraftSeatMapLike): SeatCell[] {
   pushCabinRows(
     seats,
     excluded,
+    map.firstRowStart,
+    map.firstRowEnd,
+    map.firstColsLeft,
+    map.firstColsRight,
+    'FIRST',
+  );
+  pushCabinRows(
+    seats,
+    excluded,
     map.businessRowStart,
     map.businessRowEnd,
     map.businessColsLeft,
@@ -86,8 +99,8 @@ export function enumerateSeats(map: AircraftSeatMapLike): SeatCell[] {
 
 export function countSeatsByCabin(
   map: AircraftSeatMapLike,
-): Record<'BUSINESS' | 'COMFORT' | 'ECONOMY', number> {
-  const out = { BUSINESS: 0, COMFORT: 0, ECONOMY: 0 };
+): Record<'BUSINESS' | 'COMFORT' | 'ECONOMY' | 'FIRST', number> {
+  const out = { BUSINESS: 0, COMFORT: 0, ECONOMY: 0, FIRST: 0 };
   for (const seat of enumerateSeats(map)) {
     out[seat.cabin] += 1;
   }
