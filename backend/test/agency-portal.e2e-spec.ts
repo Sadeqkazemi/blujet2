@@ -728,8 +728,11 @@ describe('Agency Portal (e2e)', () => {
       .where('instance.status = :status', { status: 'SCHEDULED' })
       .getOneOrFail();
     await dataSource
-      .getRepository(FlightInstance)
-      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+      .createQueryBuilder()
+      .update(FlightInstance)
+      .set({ saleStartsAt: null, saleEndsAt: null })
+      .where('id = :id', { id: instance.id })
+      .execute();
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -793,8 +796,11 @@ describe('Agency Portal (e2e)', () => {
       .where('instance.status = :status', { status: 'SCHEDULED' })
       .getOneOrFail();
     await dataSource
-      .getRepository(FlightInstance)
-      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+      .createQueryBuilder()
+      .update(FlightInstance)
+      .set({ saleStartsAt: null, saleEndsAt: null })
+      .where('id = :id', { id: instance.id })
+      .execute();
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -855,7 +861,9 @@ describe('Agency Portal (e2e)', () => {
     expect(
       await dataSource
         .getRepository(Booking)
-        .countBy({ allotmentId: noCreditAllotment.id }),
+        .createQueryBuilder('b')
+        .where('b.allotmentId = :id', { id: noCreditAllotment.id })
+        .getCount(),
     ).toBe(0);
   });
 
@@ -871,8 +879,11 @@ describe('Agency Portal (e2e)', () => {
       .where('instance.status = :status', { status: 'SCHEDULED' })
       .getOneOrFail();
     await dataSource
-      .getRepository(FlightInstance)
-      .update({ id: instance.id }, { saleStartsAt: null, saleEndsAt: null });
+      .createQueryBuilder()
+      .update(FlightInstance)
+      .set({ saleStartsAt: null, saleEndsAt: null })
+      .where('id = :id', { id: instance.id })
+      .execute();
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -916,7 +927,9 @@ describe('Agency Portal (e2e)', () => {
     expect(
       await dataSource
         .getRepository(Booking)
-        .countBy({ allotmentId: allotment.id }),
+        .createQueryBuilder('b')
+        .where('b.allotmentId = :id', { id: allotment.id })
+        .getCount(),
     ).toBe(1);
   });
 });

@@ -42,6 +42,7 @@ import {
   type NormalizedCabinCapacity,
 } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
+import { toPublishStatus } from './definition-sellability';
 import {
   countSeatsByCabin,
   type AircraftSeatMapLike,
@@ -56,6 +57,7 @@ export type DefinitionSnapshot = {
   departureAt: string;
   durationMinutes: number;
   aircraftType: string;
+  aircraftDefinitionId: string | null;
   capacity: number;
   charterSeats: number;
   cabinCapacities: NormalizedCabinCapacity[];
@@ -63,6 +65,14 @@ export type DefinitionSnapshot = {
   competitorPriceIrr: string | null;
   chargeRules: ReturnType<typeof serializeChargeRule>[];
 };
+
+/** Route/date a flight instance was searchable under before an approval
+ * moved it — see applyCeoApprovalInTx's doc comment. */
+export type PreviousSearchLocation = {
+  originCode: string;
+  destCode: string;
+  departureAt: Date;
+} | null;
 
 @Injectable()
 export class FlightDefinitionService {
@@ -188,6 +198,7 @@ export class FlightDefinitionService {
     departureAt: Date;
     durationMinutes: number;
     aircraftType: string;
+    aircraftDefinitionId: string | null;
     capacity: number;
     charterSeats: number;
     cabinCapacities: NormalizedCabinCapacity[];
@@ -202,6 +213,7 @@ export class FlightDefinitionService {
       departureAt: input.departureAt.toISOString(),
       durationMinutes: input.durationMinutes,
       aircraftType: input.aircraftType,
+      aircraftDefinitionId: input.aircraftDefinitionId,
       capacity: input.capacity,
       charterSeats: input.charterSeats,
       cabinCapacities: input.cabinCapacities,
@@ -388,6 +400,10 @@ export class FlightDefinitionService {
       approvedSnapshot: instance.approvedSnapshot,
       pendingRevisionSnapshot: instance.pendingRevisionSnapshot,
       definitionStatus: instance.definitionStatus,
+      publishStatus: toPublishStatus(
+        instance.definitionStatus,
+        instance.approvedSnapshot != null,
+      ),
     };
   }
 
@@ -510,6 +526,7 @@ export class FlightDefinitionService {
           rejectionReason: null,
           approvedSnapshot: null,
           pendingRevisionSnapshot: null,
+          aircraftDefinitionId: map.aircraftDefinitionId,
           ...(existingFlight && dto.aircraftType
             ? { aircraftTypeOverride: aircraftType }
             : {}),
@@ -681,6 +698,7 @@ export class FlightDefinitionService {
         departureAt,
         durationMinutes,
         aircraftType,
+        aircraftDefinitionId: map.aircraftDefinitionId,
         capacity: dto.capacity,
         charterSeats,
         cabinCapacities,
@@ -735,6 +753,7 @@ export class FlightDefinitionService {
         instance.basePriceIrr = dto.basePriceIrr;
         instance.competitorPriceIrr = dto.competitorPriceIrr ?? null;
         instance.cabinCapacities = cabinCapacities;
+        instance.aircraftDefinitionId = map.aircraftDefinitionId;
         instance.definitionStatus =
           status === FlightDefinitionStatus.REJECTED
             ? FlightDefinitionStatus.DRAFT
@@ -779,22 +798,32 @@ export class FlightDefinitionService {
 
   /**
    * Promote pending revision (or first approval) onto the live instance.
-   * Called from pricing.register after CEO step-up.
+   * Called from pricing.register after CEO step-up. Returns the route/date
+   * the instance was searchable under BEFORE this change (revision only —
+   * a first-time approval has no prior searchable listing), so the caller
+   * can invalidate that now-stale search-cache entry too: invalidateForInstance
+   * only ever busts the *current* (post-update) key, since by the time it
+   * runs the DB row already reflects the new state.
    */
   async applyCeoApprovalInTx(
     manager: EntityManager,
     flightInstanceId: string,
-  ): Promise<void> {
+  ): Promise<{ previousLocation: PreviousSearchLocation }> {
     const instance = await manager.findOne(FlightInstance, {
       where: { id: flightInstanceId },
       relations: { flight: { route: true } },
     });
-    if (!instance?.flight?.route) return;
+    if (!instance?.flight?.route) return { previousLocation: null };
 
     if (
       instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION &&
       instance.pendingRevisionSnapshot
     ) {
+      const previousLocation: PreviousSearchLocation = {
+        originCode: instance.flight.route.originCode,
+        destCode: instance.flight.route.destCode,
+        departureAt: instance.departureAt,
+      };
       const snap = instance.pendingRevisionSnapshot as DefinitionSnapshot;
       const departureAt = new Date(snap.departureAt);
       const arrivalAt = arrivalFromDuration(departureAt, snap.durationMinutes);
@@ -810,6 +839,7 @@ export class FlightDefinitionService {
           ? BigInt(snap.competitorPriceIrr)
           : null;
       instance.cabinCapacities = snap.cabinCapacities;
+      instance.aircraftDefinitionId = snap.aircraftDefinitionId ?? null;
       instance.approvedSnapshot = snap;
       instance.pendingRevisionSnapshot = null;
       instance.definitionStatus = FlightDefinitionStatus.APPROVED;
@@ -844,10 +874,12 @@ export class FlightDefinitionService {
         .execute();
 
       await manager.save(instance);
-      return;
+      return { previousLocation };
     }
 
     // First-time approval of DRAFT / PENDING_CEO / REJECTED→pending path.
+    // No prior searchable listing existed, so there is no stale cache
+    // entry to invalidate.
     const activeRules = await manager.find(FlightChargeRule, {
       where: {
         flightInstanceId: instance.id,
@@ -871,6 +903,7 @@ export class FlightDefinitionService {
       departureAt: instance.departureAt,
       durationMinutes,
       aircraftType: resolveAircraftType(instance),
+      aircraftDefinitionId: instance.aircraftDefinitionId,
       capacity: instance.capacity,
       charterSeats: instance.charterSeats,
       cabinCapacities,
@@ -883,10 +916,13 @@ export class FlightDefinitionService {
     instance.definitionStatus = FlightDefinitionStatus.APPROVED;
     instance.rejectionReason = null;
     await manager.save(instance);
+    return { previousLocation: null };
   }
 
-  async applyCeoApproval(flightInstanceId: string): Promise<void> {
-    await this.dataSource.transaction((manager) =>
+  async applyCeoApproval(
+    flightInstanceId: string,
+  ): Promise<{ previousLocation: PreviousSearchLocation }> {
+    return this.dataSource.transaction((manager) =>
       this.applyCeoApprovalInTx(manager, flightInstanceId),
     );
   }

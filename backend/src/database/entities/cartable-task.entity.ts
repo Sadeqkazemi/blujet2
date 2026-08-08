@@ -14,6 +14,7 @@ import { User } from './user.entity';
 
 @Index('cartable_tasks_assigneeId_status_idx', ['assigneeId', 'status'])
 @Index('cartable_tasks_sourceType_sourceId_idx', ['sourceType', 'sourceId'])
+@Index('cartable_tasks_assigneeId_readAt_idx', ['assigneeId', 'readAt'])
 @Entity('cartable_tasks')
 export class CartableTask {
   @PrimaryColumn({
@@ -97,6 +98,9 @@ export class CartableTask {
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   resolvedAt!: Date | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  readAt!: Date | null;
 
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;

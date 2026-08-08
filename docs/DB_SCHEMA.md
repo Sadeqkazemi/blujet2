@@ -2574,3 +2574,133 @@ availability, `used + requested <= seatsAllocated`, and
 `outstanding SALE+SETTLEMENT + price <= limitIrr`; then writes Booking,
 Passengers, and one positive SALE LedgerEntry. This serializes concurrent
 attempts and keeps inventory, allotment, and credit consistent.
+
+## Phase 69 — Aircraft catalog, charter/agency seat commitments
+
+Branch: `agent/commercial-operations-backend`.
+
+### `CabinClass` enum
+
+Adds `FIRST` (Postgres enum-value addition, irreversible per the standard
+Postgres limitation — every prior `ADD VALUE` migration in this codebase
+follows the same documented, one-way convention).
+
+### `AircraftSeatMap` (existing table)
+
+Adds a nullable FIRST band, mirroring the pre-existing COMFORT band:
+`firstRowStart`, `firstRowEnd`, `firstColsLeft text[]`, `firstColsRight
+text[]`. Adds `aircraftDefinitionId` (plain text column, **no FK
+constraint** — see below). No existing row's BUSINESS/COMFORT/ECONOMY band
+values are touched; MD-80 and Airbus A320 are unaffected until explicitly
+edited through the new Aircraft CRUD.
+
+### `FlightInstance` (existing table)
+
+Adds `aircraftDefinitionId` (plain text column, no FK constraint),
+best-effort backfilled from the existing `aircraftTypeOverride`/
+`Flight.aircraftType` match against the new catalog; `NULL` when no match
+is found (never fabricated).
+
+### `AircraftDefinition` / `AircraftCabin` / `AircraftSeat` (new tables)
+
+Normalized aircraft catalog, one row set backfilled per pre-existing
+`AircraftSeatMap` row (derived from — not replacing — that row's band
+description):
+
+- `AircraftDefinition`: `id`, `code` (unique), `model`, `title`, `status`
+  (`AircraftStatus`: ACTIVE/INACTIVE), `totalCapacity`, `version`
+  (optimistic edit counter), `createdById`/`updatedById` (plain, no FK —
+  see below), `createdAt`/`updatedAt`.
+- `AircraftCabin`: `id`, `aircraftDefinitionId -> AircraftDefinition`
+  (`ON DELETE CASCADE`, real FK + entity relation), `cabinType`
+  (`CabinClass`), `capacity`. Unique on `(aircraftDefinitionId, cabinType)`.
+- `AircraftSeat`: `id`, `aircraftDefinitionId -> AircraftDefinition`
+  (`ON DELETE CASCADE`, real FK + entity relation), `row`, `column`,
+  `label`, `cabinType`, `side` (`AircraftSeatSide`: LEFT/RIGHT),
+  `isBlocked`. Unique on `(aircraftDefinitionId, label)`.
+
+`AircraftCabin`/`AircraftSeat`'s `aircraftDefinitionId` DOES carry a real FK
++ `@ManyToOne` relation (single level of nesting, not the recursive jsonb
+type that triggers TS2589 — safe). `AircraftSeatMap.aircraftDefinitionId`,
+`FlightInstance.aircraftDefinitionId`, and `AircraftDefinition.createdById`/
+`updatedById` are, by contrast, plain columns with **no** relation and
+**no** DB-level FK constraint — the established TS2589-avoidance convention
+in this codebase (adding a relation on an entity that already carries jsonb
+columns risks pushing unrelated `.findOneBy()`/`.update()` calls elsewhere
+in the codebase over the TypeScript compiler's type-recursion limit).
+`schema-parity.e2e-spec.ts` (which asserts the TypeORM entities describe the
+live schema byte-for-byte) is the guard rail that keeps migration DDL and
+entity relation metadata from drifting apart on this point.
+
+### `CharterCommitment` / `AgencySeatCommitment` (new tables)
+
+Per-cabin capacity/financial-declaration layer, additive alongside the
+pre-existing `AgencyAllotment` (unchanged; continues to drive actual
+per-ticket agency-channel booking). Both tables share the same shape:
+
+- `id`, `flightInstanceId` (plain, no FK — same convention as above),
+  `cabin` (`CabinClass`), `seats`, `contractPriceIrr` (bigint, renamed from
+  `amountIrr`), `startDate`/`releaseAt` (nullable, renamed from
+  `periodStart`/`periodEnd` — `releaseAt` matches the pre-existing
+  `AgencyAllotment.releaseAt` convention; the API also accepts `endDate` as
+  an alias for `releaseAt`), `status` (`CommitmentStatus`:
+  ACTIVE/CANCELLED), `idempotencyKey` (nullable, unique),
+  `createdById`/`cancelledById` (plain, no FK), `createdAt`/`cancelledAt`.
+  Renamed in migration `1786694400000-RenameCommitmentFields` (Phase 70) —
+  data preserved, only column names changed.
+- `AgencySeatCommitment` additionally has `agencyId` (plain, no FK — an
+  `AgencyProfile.userId`).
+- Indexed on `(flightInstanceId, cabin)` for the capacity-summary
+  aggregation query; `AgencySeatCommitment` additionally indexes `agencyId`.
+
+`LedgerEntry.type` gains `COMMITMENT` (irreversible enum-value addition,
+same convention as `CabinClass.FIRST`); every commitment create writes one
+`LedgerEntry` row with the commitment's `contractPriceIrr` — no direct
+balance mutation, matching the codebase's double-entry-ledger rule.
+
+Capacity math (`CommitmentsService.assertCapacity`, row-locks the
+`FlightInstance` first) enforces `SUM(ACTIVE commitments for the cabin) +
+SUM(already-sold seats for the cabin) + new seats <= min(configured
+cabinCapacities seats, physical seat-map seats for that cabin)` — a
+commitment can never exceed the aircraft's real layout even if
+`cabinCapacities` were configured higher. **Phase 70 fix**: the sold-seats
+term was previously missing entirely, allowing a new commitment to be
+accepted even when the cabin was already fully (or over-)sold — caught by
+a new concurrency test exercising real seat sales against commitment
+capacity.
+
+## Phase 70 — Notifications, cartable unread state
+
+Branch: `agent/commercial-operations-backend`. See `docs/API.md`'s Phase 70
+section and `docs/api-contract-pr126.md` for the full endpoint contract.
+
+### `Notification` (new table, migration `1786780800000-Notifications`)
+
+- `id`, `recipientId` (plain text, no FK — same TS2589-avoidance convention
+  as every other new back-reference column in this file), `category`
+  (`NotificationCategory`: CARTABLE/MESSAGE/REQUEST/APPROVAL/SYSTEM),
+  `action` (text — stable English code, e.g. `CREATED`/`REFERRED`/
+  `APPROVED`/`REJECTED`/`ACCESS_REVOKED`), `title`, `body` (nullable),
+  `entityType`/`entityId` (nullable, plain — polymorphic reference, not a
+  real FK), `dedupeKey` (nullable, **unique** — the idempotency mechanism:
+  `notify()` checks-then-inserts on this key), `readAt` (nullable —
+  `NULL` means unread), `createdAt`.
+- Indexes: `(recipientId, readAt)`, `(recipientId, category, readAt)`
+  (both power the unread-count/list queries), unique on `dedupeKey`.
+
+### `CartableTask.readAt` (new column, migration
+`1786867200000-CartableTaskReadAt`)
+
+Nullable `timestamp`, same unread-state semantics as `Notification.readAt`
+(`NULL` = never viewed). Indexed as `(assigneeId, readAt)`. Existing rows
+are `NULL` on migrate — pre-existing tasks are treated as unread, matching
+prior behavior where every open task was effectively "new" until acted on.
+
+### `CharterCommitment`/`AgencySeatCommitment` — no DB FK confirmed by audit
+
+Re-confirmed during Phase 70 (cross-checked every entity file against every
+migration's raw `CREATE TABLE`/`FOREIGN KEY` DDL): both tables'
+`flightInstanceId` columns have **zero** DB-level constraint, matching
+their entity declarations — the sandbox purge script (see API.md Phase 70)
+therefore deletes these two tables explicitly by `flightInstanceId` rather
+than relying on any cascade.

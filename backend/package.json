@@ -30,6 +30,8 @@
     "data:purge:uat:execute": "node dist/database/uat-demo-data-purge.js --execute-purge",
     "data:cleanup:uat-flight-catalog": "node dist/database/uat-flight-catalog-cleanup.js",
     "data:cleanup:uat-flight-catalog:execute": "node dist/database/uat-flight-catalog-cleanup.js --execute-cleanup",
+    "data:purge:sandbox-flights": "tsx src/database/sandbox-active-flight-purge.ts",
+    "data:purge:sandbox-flights:execute": "tsx src/database/sandbox-active-flight-purge.ts --execute-purge",
     "accounts:bootstrap:prod": "node dist/database/bootstrap-panel-accounts.js",
     "accounts:bootstrap:temporary:prod": "node dist/database/bootstrap-temporary-panel-accounts.js",
     "accounts:rotate:temporary:prod": "node dist/database/rotate-temporary-panel-passwords.js",

@@ -8,6 +8,8 @@ import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AgencyMembershipRequest } from '../src/database/entities/agency-membership-request.entity';
 import { AgencyRequestOtp } from '../src/database/entities/agency-request-otp.entity';
 import { SmsLog } from '../src/database/entities/sms-log.entity';
+import { CartableTask } from '../src/database/entities/cartable-task.entity';
+import { Notification } from '../src/database/entities/notification.entity';
 import { TWO_FACTOR_PROVIDER } from '../src/modules/auth/providers/two-factor-provider.interface';
 import { MockTwoFactorProvider } from '../src/modules/auth/providers/mock-two-factor.provider';
 import { loginAs } from './helpers/login.helper';
@@ -96,6 +98,44 @@ describe('Phase 16 — agency self-registration (e2e)', () => {
     expect(row.phone).toBe(phone);
     expect(row.email).toBeNull();
     expect(row.city).toBeNull();
+  });
+
+  it('submitting a request creates a cartable task and a notification for every active SITE_ADMIN', async () => {
+    const phone = '09121110004';
+    const res = await submitFreshRequest(phone);
+    expect(res.status).toBe(201);
+    const requestId = res.body.data.id as string;
+
+    const siteAdmin = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'site.admin' });
+
+    const task = await dataSource.getRepository(CartableTask).findOneBy({
+      sourceType: 'AGENCY_REQUEST',
+      sourceId: requestId,
+      assigneeId: siteAdmin.id,
+    });
+    expect(task).not.toBeNull();
+    expect(task!.category).toBe('AGENCY');
+    expect(task!.status).toBe('OPEN');
+
+    const notification = await dataSource
+      .getRepository(Notification)
+      .createQueryBuilder('n')
+      .where('n.recipientId = :id', { id: siteAdmin.id })
+      .andWhere("n.action = 'CREATED'")
+      .andWhere('n.entityId = :entityId', { entityId: requestId })
+      .getOne();
+    expect(notification).not.toBeNull();
+
+    // The site admin actually sees it in their own cartable.
+    const siteAdminLogin = await loginAs(app, 'site.admin');
+    const list = await request(app.getHttpServer())
+      .get('/cartable?category=AGENCY')
+      .set('Authorization', auth(siteAdminLogin.accessToken));
+    expect(
+      (list.body.data.tasks as { id: string }[]).some((t) => t.id === task!.id),
+    ).toBe(true);
   });
 
   it('wrong OTP code is rejected, and a code cannot be reused', async () => {

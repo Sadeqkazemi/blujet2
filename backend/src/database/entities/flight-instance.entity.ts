@@ -135,4 +135,17 @@ export class FlightInstance {
   /** Pending definition while definitionStatus = PENDING_REVISION. */
   @Column({ type: 'jsonb', nullable: true })
   pendingRevisionSnapshot!: JsonValue | null;
+
+  /**
+   * Real link to the normalized aircraft catalog, resolved automatically
+   * from the effective aircraftType string (aircraftTypeOverride ??
+   * flight.aircraftType) whenever it matches an AircraftDefinition.code.
+   * Nullable: an aircraftType with no catalog entry yet (e.g. an ad-hoc
+   * string not yet onboarded into AircraftDefinition) still works exactly
+   * as before via the legacy AircraftSeatMap lookup — this column is an
+   * enrichment, not a hard requirement. No relation mapping (see the same
+   * TS2589-avoidance note on AircraftSeatMap.aircraftDefinitionId).
+   */
+  @Column({ type: 'text', nullable: true })
+  aircraftDefinitionId!: string | null;
 }

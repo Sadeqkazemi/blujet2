@@ -21,6 +21,7 @@ import { AgencyRequestsPublicController } from './agency-requests-public.control
 import { AgenciesService } from './agencies.service';
 import { PanelsModule } from '../panels/panels.module';
 import { AuditModule } from '../audit/audit.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { CartableModule } from '../cartable/cartable.module';
 import { AuthModule } from '../auth/auth.module';
 import { SmsModule } from '../sms/sms.module';
@@ -47,6 +48,7 @@ import { SmsModule } from '../sms/sms.module';
     ]),
     PanelsModule,
     AuditModule,
+    NotificationsModule,
     CartableModule,
     AuthModule,
     SmsModule,

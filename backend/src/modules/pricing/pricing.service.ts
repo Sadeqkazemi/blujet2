@@ -13,12 +13,12 @@ import { Flight } from '../../database/entities/flight.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { PricingProposalStatus } from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
-import { StepUpService } from '../auth/step-up.service';
 import { FlightDefinitionService } from '../flights/flight-definition.service';
 import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -53,9 +53,9 @@ export class PricingService {
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
-    private readonly stepUp: StepUpService,
     private readonly definitions: FlightDefinitionService,
     private readonly search: SearchService,
   ) {}
@@ -291,15 +291,7 @@ export class PricingService {
     actor: AuthenticatedUser,
     id: string,
     source: 'PROPOSED' | 'AI',
-    stepUpChallengeId: string,
-    stepUpCode: string,
   ) {
-    await this.stepUp.verify(
-      actor,
-      stepUpChallengeId,
-      stepUpCode,
-      'PRICE_CAPACITY_CHANGE',
-    );
     const proposal = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
     )
@@ -311,8 +303,8 @@ export class PricingService {
         message: 'پیشنهاد قیمت یافت نشد.',
       });
     }
-    // Idempotent: a second successful register returns the already-registered
-    // row after step-up, without mutating the active definition again.
+    // Idempotent: a second successful register call just returns the
+    // already-registered row, without mutating the active definition again.
     if (proposal.status === PricingProposalStatus.REGISTERED) {
       return proposal;
     }
@@ -407,11 +399,11 @@ export class PricingService {
         });
       }
 
-      await this.definitions.applyCeoApprovalInTx(
+      const { previousLocation } = await this.definitions.applyCeoApprovalInTx(
         manager,
         lockedProposal.flightInstanceId,
       );
-      return { alreadyRegistered: false as const, price };
+      return { alreadyRegistered: false as const, price, previousLocation };
     });
 
     if (registered.alreadyRegistered) {
@@ -436,8 +428,30 @@ export class PricingService {
       metadata: { registeredPriceIrr: registered.price, source },
     });
 
+    await this.notifications.notify({
+      recipientId: proposal.proposedById,
+      category: 'APPROVAL',
+      action: 'APPROVED',
+      title: 'پیشنهاد قیمت شما تأیید شد',
+      body: `مدیرعامل قیمت پرواز ${proposal.flightInstance.flight.flightNo} را تأیید و منتشر کرد.`,
+      entityType: 'FarePricingProposal',
+      entityId: id,
+      dedupeKey: `FarePricingProposal:${id}:APPROVED`,
+    });
+
     // Newly APPROVED inventory must appear in search immediately.
     await this.search.invalidateForInstance(proposal.flightInstanceId);
+    // A revision may have moved the flight to a different route/date — the
+    // OLD listing's cache entry is a separate key and must be busted too,
+    // or the flight keeps appearing under its stale former date/route for
+    // the rest of the cache TTL.
+    if (registered.previousLocation) {
+      await this.search.invalidateForRouteDate(
+        registered.previousLocation.originCode,
+        registered.previousLocation.destCode,
+        registered.previousLocation.departureAt,
+      );
+    }
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
       .where('p.id = :id', { id })
@@ -449,17 +463,8 @@ export class PricingService {
     id: string,
     dto: {
       rejectionReason: string;
-      stepUpChallengeId: string;
-      stepUpCode: string;
     },
   ) {
-    await this.stepUp.verify(
-      actor,
-      dto.stepUpChallengeId,
-      dto.stepUpCode,
-      'PRICE_CAPACITY_CHANGE',
-    );
-
     const reason = (dto.rejectionReason ?? '').trim();
     if (!reason) {
       throw new BadRequestException({
@@ -565,6 +570,17 @@ export class PricingService {
       entityType: 'FarePricingProposal',
       entityId: id,
       metadata: { rejectionReason: reason },
+    });
+
+    await this.notifications.notify({
+      recipientId: proposal.proposedById,
+      category: 'APPROVAL',
+      action: 'REJECTED',
+      title: 'پیشنهاد قیمت شما رد شد',
+      body: `مدیرعامل پیشنهاد قیمت پرواز ${proposal.flightInstance.flight.flightNo} را رد کرد: ${reason}`,
+      entityType: 'FarePricingProposal',
+      entityId: id,
+      dedupeKey: `FarePricingProposal:${id}:REJECTED`,
     });
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))

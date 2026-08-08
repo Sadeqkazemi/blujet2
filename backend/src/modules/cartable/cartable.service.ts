@@ -6,14 +6,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, Not, Raw, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, Not, Raw, Repository } from 'typeorm';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
 import { ChairReportPermission } from '../../database/entities/chair-report-permission.entity';
 import { ManagerReferral } from '../../database/entities/manager-referral.entity';
 import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
 import { User } from '../../database/entities/user.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import {
   EXEC_ROLES,
@@ -39,7 +41,10 @@ export class CartableService {
     @InjectRepository(ManagerReferralReport)
     private readonly managerReferralReportRepo: Repository<ManagerReferralReport>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepo: Repository<AuditLog>,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async getOwnOpenTaskOrThrow(
@@ -125,6 +130,52 @@ export class CartableService {
       counts,
       totalOpen: counts.ADMIN + counts.AGENCY + counts.MANAGER,
     };
+  }
+
+  /** Detail view — self-scoped like list(), any status (so resolved items
+   * stay reachable), plus per-task audit history. First view marks the
+   * task read; repeat views are a no-op (idempotent). */
+  async getById(actor: AuthenticatedUser, id: string) {
+    const task = await this.taskRepo.findOne({
+      where: { id, assigneeId: actor.id },
+      relations: { sender: true, transferredTo: true },
+      select: {
+        sender: { id: true, fullName: true, role: true },
+        transferredTo: { id: true, fullName: true },
+      },
+    });
+    if (!task) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مورد کارتابل یافت نشد.',
+      });
+    }
+
+    if (!task.readAt) {
+      const now = new Date();
+      await this.taskRepo.update({ id, readAt: IsNull() }, { readAt: now });
+      task.readAt = now;
+    }
+
+    // The task's own lifecycle events (created implicitly, then whatever
+    // resolve()/transfer() logged with entityType 'CartableTask') — not the
+    // linked source entity's separate history (e.g. AgencyMembershipRequest
+    // exposes its own full trail via GET /agencies/requests/:id).
+    const history = await this.auditLogRepo.find({
+      where: { entityType: 'CartableTask', entityId: id },
+      order: { createdAt: 'DESC' },
+    });
+
+    return { ...task, history };
+  }
+
+  /** Badge count for "کارتابل من" — never-viewed tasks regardless of
+   * status, so a resolved-but-unseen item still counts. */
+  async unreadCount(actor: AuthenticatedUser) {
+    const count = await this.taskRepo.count({
+      where: { assigneeId: actor.id, readAt: IsNull() },
+    });
+    return { count };
   }
 
   /** Side effects of resolving a task, keyed by its source link. */
@@ -279,6 +330,17 @@ export class CartableService {
       entityType: 'CartableTask',
       entityId: id,
       metadata: { transferredToId: toId, newTaskId: newTask.id },
+    });
+
+    await this.notifications.notify({
+      recipientId: toId,
+      category: 'CARTABLE',
+      action: 'REFERRED',
+      title: 'ارجاع مورد کارتابل',
+      body: `«${task.title}» توسط ${actor.fullName} به کارتابل شما ارجاع شد.`,
+      entityType: 'CartableTask',
+      entityId: newTask.id,
+      dedupeKey: `CartableTask:${id}:REFERRED:${toId}`,
     });
 
     return newTask;

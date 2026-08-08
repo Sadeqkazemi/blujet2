@@ -326,8 +326,11 @@ describe('Survey (e2e)', () => {
         .findOneByOrFail({ bookingId: booking.id });
 
       await dataSource
-        .getRepository(Booking)
-        .update({ id: booking.id }, { status: BookingStatus.NO_SHOW });
+        .createQueryBuilder()
+        .update(Booking)
+        .set({ status: BookingStatus.NO_SHOW })
+        .where('id = :id', { id: booking.id })
+        .execute();
 
       const getRes = await request(app.getHttpServer()).get(
         `/survey/${invite.token}`,

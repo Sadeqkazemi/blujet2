@@ -113,7 +113,9 @@ describe('Phase 13 — reservation engine completion', () => {
       iids.length > 0
         ? await dataSource
             .getRepository(Booking)
-            .findBy({ flightInstanceId: In(iids) })
+            .createQueryBuilder('b')
+            .where('b.flightInstanceId IN (:...iids)', { iids })
+            .getMany()
         : [];
     const bids = bookings.map((b) => b.id);
     // Paying a booking creates LedgerEntry/ClubPointsEntry/WalletEntry rows

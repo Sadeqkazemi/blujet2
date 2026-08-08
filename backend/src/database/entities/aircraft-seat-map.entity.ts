@@ -57,9 +57,33 @@ export class AircraftSeatMap {
   @Column({ type: 'text', array: true, nullable: true })
   economyColsRight!: string[] | null;
 
+  /** Optional first-class cabin band, same nullable-band convention as
+   * COMFORT above. Null = no FIRST seats (true for every existing
+   * aircraft type — never fabricated). */
+  @Column({ type: 'int', nullable: true })
+  firstRowStart!: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  firstRowEnd!: number | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  firstColsLeft!: string[] | null;
+
+  @Column({ type: 'text', array: true, nullable: true })
+  firstColsRight!: string[] | null;
+
   @Column({ type: 'timestamp', precision: 3 })
   updatedAt!: Date;
 
   @Column({ type: 'text', array: true, nullable: true, default: [] })
   excludedSeatCodes!: string[] | null;
+
+  /** Links to the normalized aircraft catalog (nullable: legacy rows
+   * predate AircraftDefinition; backfilled by migration for existing
+   * types). No relation mapping here — plain FK column only, to avoid the
+   * TS2589 "excessively deep" TypeORM/jsonb-adjacent recursion issue seen
+   * elsewhere in this codebase when relations pile up on heavily-queried
+   * entities; the FK constraint is still enforced at the DB level. */
+  @Column({ type: 'text', nullable: true })
+  aircraftDefinitionId!: string | null;
 }

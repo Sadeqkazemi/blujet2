@@ -288,7 +288,9 @@ describe('Phase 13 Part D — managerial lock governance', () => {
 
     const booking = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ pnr: free.body.data.pnr });
+      .createQueryBuilder('b')
+      .where('b.pnr = :pnr', { pnr: free.body.data.pnr })
+      .getOneOrFail();
     const lock = await dataSource
       .getRepository(SeatLock)
       .findOneBy({ bookingId: booking.id });

@@ -13,14 +13,22 @@ import type { Irr } from '../../common/money';
 import { enumerateSeats } from '../reservation/seat-layout';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { serializeCabinCapacities } from '../flights/flight-definition.util';
+import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
 import {
   applySellableDefinitionFilter,
   isSellableDefinitionStatus,
+  toPublishStatus,
+  type PublishStatus,
 } from '../flights/definition-sellability';
 import type { CabinClass } from '../../database/enums';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
-const SEARCH_CABINS: readonly CabinClass[] = ['ECONOMY', 'COMFORT', 'BUSINESS'];
+const SEARCH_CABINS: readonly CabinClass[] = [
+  'ECONOMY',
+  'COMFORT',
+  'BUSINESS',
+  'FIRST',
+];
 
 // CLAUDE.md: search-result cache TTL 5-10 min; Redis is never the source of
 // truth for seats/bookings — availability is still re-checked (takenSeatCodes
@@ -103,6 +111,22 @@ export class SearchService {
     );
   }
 
+  /** Busts one specific origin/dest/date cache entry directly, without an
+   * instance lookup. Needed when a CEO-approved revision moves a flight to
+   * a new route/date: invalidateForInstance only ever busts the *current*
+   * (post-approval) key — by the time it runs, the row already reflects
+   * the new state — so the *previous* route/date's cached search results
+   * would otherwise keep showing the (now-moved) flight until TTL expiry. */
+  async invalidateForRouteDate(
+    originCode: string,
+    destCode: string,
+    departureAt: Date,
+  ): Promise<void> {
+    await this.redis.del(
+      this.searchCacheKey(originCode, destCode, departureAt),
+    );
+  }
+
   /** Phase 13: an instance with a sale window is excluded from search once
    * outside it; NULL on either end means "no restriction" (existing
    * instances keep working unchanged). Reused by createBooking's own
@@ -125,12 +149,15 @@ export class SearchService {
 
   /** seatsLeft: physical seat-map seats are authoritative. cabinCapacities
    * may only lower the cap — never invent COMFORT (or any cabin) without
-   * real seat cells. */
+   * real seat cells. `committed` (ACTIVE charter + agency seat commitments
+   * for this cabin) is subtracted too, so online search/booking never
+   * shows or sells seats already promised to a charter/agency deal. */
   private seatsLeftForCabin(
     instance: FlightInstance,
     cabin: CabinClass,
     seats: { seatCode: string; cabin: CabinClass }[],
     taken: Set<string>,
+    committed: number,
   ): number | null {
     const cabinSeats = seats.filter((s) => s.cabin === cabin);
     if (cabinSeats.length === 0) return null;
@@ -145,7 +172,7 @@ export class SearchService {
     const takenInCabin = [...taken].filter((code) =>
       cabinSeatCodes.has(code),
     ).length;
-    return Math.max(0, capacity - takenInCabin);
+    return Math.max(0, capacity - takenInCabin - committed);
   }
 
   private async searchUncached(origin: string, dest: string, date: string) {
@@ -177,6 +204,8 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
+      definitionStatus: string;
+      publishStatus: PublishStatus;
       cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
     }[] = [];
     for (const instance of instances) {
@@ -192,7 +221,18 @@ export class SearchService {
         seatsLeft: number;
       }[] = [];
       for (const cabin of SEARCH_CABINS) {
-        const seatsLeft = this.seatsLeftForCabin(instance, cabin, seats, taken);
+        const committed = await sumActiveCommittedSeats(
+          this.flightInstanceRepo.manager,
+          instance.id,
+          cabin,
+        );
+        const seatsLeft = this.seatsLeftForCabin(
+          instance,
+          cabin,
+          seats,
+          taken,
+          committed,
+        );
         if (seatsLeft === null) continue;
         cabins.push({
           cabin,
@@ -213,6 +253,11 @@ export class SearchService {
         destCode: instance.flight.route.destCode,
         departureAt: instance.departureAt,
         arrivalAt: instance.arrivalAt,
+        definitionStatus: instance.definitionStatus,
+        publishStatus: toPublishStatus(
+          instance.definitionStatus,
+          instance.approvedSnapshot != null,
+        ),
         cabins,
       });
     }
@@ -305,6 +350,8 @@ export class SearchService {
       destCode: string;
       departureAt: Date;
       arrivalAt: Date;
+      definitionStatus: string;
+      publishStatus: PublishStatus;
       cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
       connection: {
         via: string;
@@ -334,11 +381,17 @@ export class SearchService {
             aircraftType: resolveAircraftType(leg),
           });
           const legSeats = map ? enumerateSeats(map) : [];
+          const legCommitted = await sumActiveCommittedSeats(
+            this.flightInstanceRepo.manager,
+            leg.id,
+            cabin,
+          );
           const left = this.seatsLeftForCabin(
             leg,
             cabin,
             legSeats,
             await this.takenSeatCodes(leg.id),
+            legCommitted,
           );
           if (left === null) {
             ok = false;
@@ -361,6 +414,11 @@ export class SearchService {
         destCode: b.flight.route.destCode,
         departureAt: a.departureAt,
         arrivalAt: b.arrivalAt,
+        definitionStatus: a.definitionStatus,
+        publishStatus: toPublishStatus(
+          a.definitionStatus,
+          a.approvedSnapshot != null,
+        ),
         cabins,
         connection: {
           via: a.flight.route.destCode,

@@ -23,6 +23,36 @@ export function isSellableDefinitionStatus(
   );
 }
 
+/** Canonical publish-state names for the API contract (frontend PR #126
+ * expects "PUBLISHED" as the customer-visible/sellable state). The DB's
+ * `FlightDefinitionStatus` column keeps its existing values (APPROVED /
+ * PENDING_REVISION / etc.) unchanged — renaming that enum would ripple
+ * through the whole CEO-approval workflow built and tested in an earlier
+ * phase, for no behavioral gain. This is a pure display/contract mapping,
+ * always derived from `definitionStatus` (+ approvedSnapshot presence),
+ * never stored independently — there is exactly one source of truth. */
+export type PublishStatus =
+  'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'REJECTED';
+
+export function toPublishStatus(
+  status: FlightDefinitionStatusT | null | undefined,
+  hasApprovedSnapshot = false,
+): PublishStatus {
+  if (isSellableDefinitionStatus(status, hasApprovedSnapshot)) {
+    return 'PUBLISHED';
+  }
+  switch (status) {
+    case FlightDefinitionStatus.REJECTED:
+      return 'REJECTED';
+    case FlightDefinitionStatus.PENDING_CEO:
+    case FlightDefinitionStatus.PENDING_REVISION:
+      return 'PENDING_APPROVAL';
+    case FlightDefinitionStatus.DRAFT:
+    default:
+      return 'DRAFT';
+  }
+}
+
 /** Restrict a FlightInstance query to sellable definition statuses. */
 export function applySellableDefinitionFilter<T extends FlightInstance>(
   qb: SelectQueryBuilder<T>,

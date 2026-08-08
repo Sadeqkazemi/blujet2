@@ -190,7 +190,9 @@ describe('Refunds (e2e)', () => {
 
     const updatedBooking = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: booking.id });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: booking.id })
+      .getOneOrFail();
     expect(updatedBooking.status).toBe('REFUNDED');
 
     const audit = await dataSource

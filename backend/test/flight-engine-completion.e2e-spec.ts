@@ -56,9 +56,14 @@ describe('Flight engine completion', () => {
             .getMany()
         : [];
     const iids = instances.map((i) => i.id);
-    const bookings = await dataSource
-      .getRepository(Booking)
-      .findBy({ flightInstanceId: In(iids) });
+    const bookings =
+      iids.length > 0
+        ? await dataSource
+            .getRepository(Booking)
+            .createQueryBuilder('b')
+            .where('b.flightInstanceId IN (:...iids)', { iids })
+            .getMany()
+        : [];
     const bids = bookings.map((b) => b.id);
     await dataSource
       .getRepository(PaymentReconciliation)
@@ -293,7 +298,9 @@ describe('Flight engine completion', () => {
 
     const row = await dataSource
       .getRepository(Booking)
-      .findOneByOrFail({ id: booking.body.data.id });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: booking.body.data.id })
+      .getOneOrFail();
     expect(row.fareClassCode).toBe('Y');
 
     // Y bucket (1 seat) is now consumed → price moves to B
@@ -392,7 +399,9 @@ describe('Flight engine completion', () => {
     // financial record survives (soft delete, never hard delete)
     const bookingRow = await dataSource
       .getRepository(Booking)
-      .findOneBy({ id: booking.body.data.id });
+      .createQueryBuilder('b')
+      .where('b.id = :id', { id: booking.body.data.id })
+      .getOne();
     expect(bookingRow).not.toBeNull();
   });
 });

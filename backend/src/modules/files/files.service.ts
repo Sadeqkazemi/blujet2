@@ -15,6 +15,7 @@ import { ManagerReferralReport } from '../../database/entities/manager-referral-
 import { ManagerMessage } from '../../database/entities/manager-message.entity';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
 import { CartableSourceType } from '../../database/enums';
+import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -41,6 +42,7 @@ export class FilesService {
     private readonly messageRepo: Repository<ManagerMessage>,
     @InjectRepository(CartableTask)
     private readonly cartableTaskRepo: Repository<CartableTask>,
+    private readonly audit: AuditService,
   ) {}
 
   async store(actor: AuthenticatedUser, file: Express.Multer.File) {
@@ -179,5 +181,45 @@ export class FilesService {
       });
     }
     return { stored, stream: fs.createReadStream(stored.path) };
+  }
+
+  /** Owner-only delete — stricter than read()'s participant access, since
+   * this permanently removes the underlying content. Deletes the DB row
+   * first (source of truth), then best-effort removes the on-disk file —
+   * `force: true` tolerates the file already being gone, so a retried call
+   * (or a call after manual disk cleanup) never throws. A second delete of
+   * the same id 404s (the row is gone), which is standard, safe idempotent
+   * DELETE behavior: the end state after N calls is identical to after 1.
+   * Any FK referencing this file with `ON DELETE SET NULL` (e.g.
+   * JobPosting.imageFileId) is cleared by Postgres itself. */
+  async delete(actor: AuthenticatedUser, id: string) {
+    const stored = await this.storedFileRepo.findOne({ where: { id } });
+    if (!stored) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'فایل یافت نشد.',
+      });
+    }
+    if (stored.ownerId !== actor.id) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'فقط مالک فایل مجاز به حذف آن است.',
+      });
+    }
+
+    await this.storedFileRepo.delete({ id });
+    fs.rmSync(stored.path, { force: true });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'CONTENT',
+      action: 'حذف پیوست',
+      detail: `${actor.fullName} پیوست «${stored.fileName}» را حذف کرد.`,
+      entityType: 'StoredFile',
+      entityId: id,
+    });
+
+    return { id };
   }
 }

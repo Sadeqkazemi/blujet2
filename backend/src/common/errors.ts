@@ -24,6 +24,9 @@ export enum ErrorCode {
   SURVEY_DISABLED = 'SURVEY_DISABLED',
   // UAT shared-password addendum — identity-only sandbox agency account
   UAT_TEMPORARY_ACCOUNT_READ_ONLY = 'UAT_TEMPORARY_ACCOUNT_READ_ONLY',
+  // Access revocation — account/role disabled while a still-valid access
+  // token exists; every authenticated request re-checks live account state.
+  ACCESS_REVOKED = 'ACCESS_REVOKED',
 }
 
 export interface ApiErrorBody {
