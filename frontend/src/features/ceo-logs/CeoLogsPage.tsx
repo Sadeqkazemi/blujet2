@@ -29,25 +29,61 @@ const LEVEL_META: Record<
 export default function CeoLogsPage() {
   const [rows, setRows] = useState<SystemEventRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function load() {
+    setError(null);
+    try {
+      setRows(await fetchSystemEvents());
+    } catch {
+      setError('خطا در دریافت لاگ‌ها.');
+    }
+  }
 
   useEffect(() => {
-    fetchSystemEvents()
-      .then(setRows)
-      .catch(() => setError('خطا در دریافت لاگ‌ها.'));
+    void load();
   }, []);
 
   const rowsPager = usePagination(rows ?? []);
 
-  if (error) return <p className="px-[21px] pt-[18px] text-sm text-[#f87171]">{error}</p>;
+  if (error && !rows) {
+    return (
+      <div className="px-[21px] pt-[18px]">
+        <p className="text-sm text-[#f87171]">{error}</p>
+        <button
+          type="button"
+          data-testid="ceo-logs-retry"
+          onClick={() => void load()}
+          className="mt-3 rounded-[9px] bg-[#1668c4] px-3 py-2 text-xs font-bold text-white"
+        >
+          تلاش مجدد
+        </button>
+      </div>
+    );
+  }
   if (!rows) return <p className="px-[21px] pt-[18px] text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
 
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
-      <div className="mb-5">
-        <h1 className="text-[20.5px] font-black text-white">لاگ و رویدادها</h1>
-        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-          رصد فعالیت‌ها و رخدادهای کلیدی سامانه و پنل‌های مدیریتی
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[20.5px] font-black text-white">لاگ و رویدادها</h1>
+          <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+            رصد فعالیت‌ها و رخدادهای کلیدی سامانه و پنل‌های مدیریتی
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="ceo-logs-refresh"
+          disabled={refreshing}
+          onClick={() => {
+            setRefreshing(true);
+            void load().finally(() => setRefreshing(false));
+          }}
+          className="rounded-[9px] border border-[#28344c] px-3 py-2 text-xs font-bold text-[#c7d2e3]"
+        >
+          {refreshing ? 'در حال به‌روزرسانی…' : 'به‌روزرسانی'}
+        </button>
       </div>
 
       <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">

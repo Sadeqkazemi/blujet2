@@ -1,6 +1,11 @@
 import type { ApiEnvelope } from './envelope';
 import { ApiRequestError } from './envelope';
 import { getAccessToken, setAccessToken } from './token-store';
+import {
+  ACCESS_REVOKED_MESSAGE,
+  emitAccessRevoked,
+  isAccessRevokedError,
+} from '../lib/access-revoked';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -63,6 +68,28 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
   return fetchWithTimeout(path, { ...init, headers, credentials: 'include' });
 }
 
+function throwApiError(status: number, code: string, message: string): never {
+  const err = new ApiRequestError(code, message, status);
+  const hadSession = Boolean(getAccessToken());
+  // Only revoke the whole session for explicit disable / failed refresh /
+  // access-revoked codes — not every ordinary 403 on a single resource.
+  if (
+    hadSession &&
+    (code === 'ACCESS_REVOKED' ||
+      isAccessRevokedError({ status, code, message }) ||
+      message.includes('غیرفعال شده') ||
+      message.includes('موقتاً غیرفعال'))
+  ) {
+    emitAccessRevoked({
+      message: ACCESS_REVOKED_MESSAGE,
+      status,
+      code,
+      source: 'http',
+    });
+  }
+  throw err;
+}
+
 /** All frontend HTTP calls go through here — components never call fetch directly. */
 export async function apiRequest<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
   const res = await doFetch(path, init);
@@ -70,6 +97,8 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
   if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiRequest<T>(path, init, false);
+    setAccessToken(null);
+    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
   }
 
   const raw = await res.text();
@@ -77,10 +106,12 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
   try {
     body = JSON.parse(raw) as ApiEnvelope<T>;
   } catch {
-    throw new ApiRequestError(
-      'BAD_GATEWAY',
-      res.status === 502 ? 'سرور در دسترس نیست. لطفاً چند لحظه بعد دوباره تلاش کنید.' : 'خطا در ارتباط با سرور',
+    throwApiError(
       res.status,
+      'BAD_GATEWAY',
+      res.status === 502
+        ? 'سرور در دسترس نیست. لطفاً چند لحظه بعد دوباره تلاش کنید.'
+        : 'خطا در ارتباط با سرور',
     );
   }
   if (!body.success || body.data == null) {
@@ -88,7 +119,7 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}, retry 
     const message = Array.isArray(rawMessage)
       ? rawMessage.join(' ')
       : (rawMessage ?? 'خطای ناشناخته');
-    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', message, res.status);
+    throwApiError(res.status, body.error?.code ?? 'UNKNOWN', message);
   }
   return body.data;
 }
@@ -105,11 +136,17 @@ export async function apiGetBlob(path: string, retry = true): Promise<Blob> {
   if (res.status === 401 && retry && getAccessToken()) {
     const refreshed = await refreshAccessToken();
     if (refreshed) return apiGetBlob(path, false);
+    setAccessToken(null);
+    throwApiError(401, 'ACCESS_REVOKED', ACCESS_REVOKED_MESSAGE);
   }
 
   if (!res.ok) {
     const body = (await res.json()) as ApiEnvelope<never>;
-    throw new ApiRequestError(body.error?.code ?? 'UNKNOWN', body.error?.message ?? 'خطای ناشناخته', res.status);
+    throwApiError(
+      res.status,
+      body.error?.code ?? 'UNKNOWN',
+      body.error?.message ?? 'خطای ناشناخته',
+    );
   }
   return res.blob();
 }

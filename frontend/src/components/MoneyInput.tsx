@@ -3,7 +3,7 @@ import { formatTomanGrouped } from '../lib/money-input';
 import type { MoneyInputProps } from './money-input-types';
 
 const inputClass =
-  'w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none';
+  'w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] py-0 text-[13px] text-[#e7ecf3] outline-none';
 
 function digitCountBefore(value: string, caret: number): number {
   let count = 0;
@@ -26,7 +26,7 @@ function caretFromDigitCount(formatted: string, digitCount: number): number {
   return formatted.length;
 }
 
-/** Reusable تومان money field for staff panels. */
+/** Reusable تومان money field for staff panels. Unit sits on the physical right. */
 export default function MoneyInput({
   id,
   label,
@@ -68,13 +68,13 @@ export default function MoneyInput({
   }
 
   return (
-    <div className={className}>
+    <div className={className} data-testid={testId ? `${testId}-wrap` : undefined}>
       {label ? (
         <label className="mb-[7px] block text-[11.5px] text-[#9fb0c7]" htmlFor={id}>
           {label}
         </label>
       ) : null}
-      <div className="relative">
+      <div className="relative" data-testid={testId ? `${testId}-field` : 'money-input-field'}>
         <input
           ref={ref}
           id={id}
@@ -87,9 +87,12 @@ export default function MoneyInput({
           value={valueToman}
           onChange={onChange}
           onPaste={onPaste}
-          className={`${inputClass} pe-14 text-left font-num`}
+          className={`${inputClass} pl-3 pr-[3.25rem] text-left font-num`}
         />
-        <span className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#6b7b94]">
+        <span
+          data-testid={testId ? `${testId}-unit` : 'money-input-unit'}
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] font-bold text-[#6b7b94]"
+        >
           تومان
         </span>
       </div>

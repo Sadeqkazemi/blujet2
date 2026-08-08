@@ -20,6 +20,7 @@ import PanelSearchBox from './PanelSearchBox';
 import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
 import ConfirmActionDialog from './ConfirmActionDialog';
+import { usePanelNotify } from '../hooks/usePanelNotify';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -67,6 +68,7 @@ export default function PanelShell() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const { notify } = usePanelNotify();
   const [nav, setNav] = useState<PanelNavItem[] | null>(null);
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
@@ -103,9 +105,26 @@ export default function PanelShell() {
 
   const visibleNav = useMemo(() => {
     if (nav === null) return null;
-    if (user?.isSuperAdmin) return nav;
-    if (user?.role !== 'SITE_ADMIN') return nav;
-    return nav.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    let items = nav;
+    if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
+      items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    }
+    // Frontend-only commercial menu — backend panel-nav has no aircraft key yet.
+    if (
+      (user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'SENIOR_MANAGER') &&
+      !items.some((i) => i.key === 'aircraft')
+    ) {
+      const flightsIdx = items.findIndex((i) => i.key === 'flights');
+      const aircraftItem: PanelNavItem = {
+        key: 'aircraft',
+        labelFa: 'تعریف هواپیما',
+        implemented: true,
+      };
+      items = [...items];
+      if (flightsIdx >= 0) items.splice(flightsIdx + 1, 0, aircraftItem);
+      else items.push(aircraftItem);
+    }
+    return items;
   }, [nav, user?.role, user?.isSuperAdmin]);
 
   const navKeys = useMemo(() => new Set(visibleNav?.map((item) => item.key) ?? []), [visibleNav]);
@@ -333,15 +352,21 @@ export default function PanelShell() {
       setBadges(next);
       setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
     });
-  }, [visibleNav, navKeys, user?.role, lowSalesAlerts]);
+    // Recompute when the active panel tab changes so badges refresh after
+    // reading/acting on cartable, referrals, tickets, etc.
+  }, [visibleNav, navKeys, user?.role, lowSalesAlerts, location.pathname]);
 
   async function onSignOut() {
     setLogoutBusy(true);
     try {
       await signOut();
+      notify('با موفقیت از پنل خارج شدید.', 'success');
       navigate('/login', { replace: true });
+    } catch {
+      notify('خروج با خطا مواجه شد.', 'error');
     } finally {
       setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
     }
   }
 

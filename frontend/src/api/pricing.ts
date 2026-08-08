@@ -37,24 +37,18 @@ export function setLegalRate(id: string, legalRateIrr: string | number) {
   });
 }
 
-export function registerProposal(
-  id: string,
-  source: "PROPOSED" | "AI",
-  stepUp: { stepUpChallengeId: string; stepUpCode: string },
-) {
+/** CEO register — no OTP/step-up on the client; backend may still require it. */
+export function registerProposal(id: string, source: "PROPOSED" | "AI") {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/register`, {
     source,
-    ...stepUp,
   });
 }
 
-/** Expected: PATCH /pricing/proposals/:id/reject — CEO rejection with required reason + step-up. */
+/** CEO reject — reason only; no OTP/step-up on the client. */
 export function rejectProposal(
   id: string,
   dto: {
     rejectionReason: string;
-    stepUpChallengeId: string;
-    stepUpCode: string;
   },
 ) {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/reject`, dto);

@@ -3,7 +3,6 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import PricingPage from "./PricingPage";
 import * as pricingApi from "../../api/pricing";
-import * as authApi from "../../api/auth";
 import * as useAuthModule from "../../hooks/useAuth";
 import { mockAuthUserWithRole } from "../../test/mockAuthUser";
 import type {
@@ -210,14 +209,11 @@ describe("PricingPage", () => {
     expect(screen.queryByText("قیمت‌های ثبت‌شده")).not.toBeInTheDocument();
   });
 
-  it("CEO approving proposed price calls registerProposal with step-up", async () => {
+  it("CEO approving proposed price confirms then calls registerProposal without OTP", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
     vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
       pendingApprovalsCount: 2,
-    });
-    vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
-      challengeId: "ch1",
     });
     const register = vi
       .spyOn(pricingApi, "registerProposal")
@@ -235,33 +231,25 @@ describe("PricingPage", () => {
       screen.getAllByRole("button", { name: "تأیید نهایی" })[0]!,
     );
 
-    const stepUpDialog = await screen.findByRole("dialog", {
-      name: "تأیید مجدد هویت",
-    });
-    await userEvent.type(within(stepUpDialog).getByRole("textbox"), "482913");
+    expect(
+      screen.queryByRole("dialog", { name: "تأیید مجدد هویت" }),
+    ).not.toBeInTheDocument();
+    const confirm = await screen.findByTestId("ceo-register-confirm");
     await userEvent.click(
-      within(stepUpDialog).getByRole("button", { name: "تأیید" }),
+      within(confirm).getByTestId("ceo-register-confirm-confirm"),
     );
 
-    await waitFor(() =>
-      expect(register).toHaveBeenCalledWith("pp1", "PROPOSED", {
-        stepUpChallengeId: "ch1",
-        stepUpCode: "482913",
-      }),
-    );
+    await waitFor(() => expect(register).toHaveBeenCalledWith("pp1", "PROPOSED"));
     expect(
       await screen.findByText("قیمت پرواز تأیید و ثبت شد ✓"),
     ).toBeInTheDocument();
   });
 
-  it("CEO reject requires a reason before calling the API", async () => {
+  it("CEO reject requires a reason then ConfirmActionDialog without OTP", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
     vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
       pendingApprovalsCount: 2,
-    });
-    vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
-      challengeId: "ch2",
     });
     const reject = vi.spyOn(pricingApi, "rejectProposal").mockResolvedValue({
       ...PROPOSAL,
@@ -295,19 +283,15 @@ describe("PricingPage", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "ثبت رد" }));
 
-    const stepUpDialog = await screen.findByRole("dialog", {
-      name: "تأیید مجدد هویت",
-    });
-    await userEvent.type(within(stepUpDialog).getByRole("textbox"), "123456");
-    await userEvent.click(
-      within(stepUpDialog).getByRole("button", { name: "تأیید" }),
-    );
+    expect(
+      screen.queryByRole("dialog", { name: "تأیید مجدد هویت" }),
+    ).not.toBeInTheDocument();
+    const confirm = await screen.findByTestId("ceo-reject-confirm");
+    await userEvent.click(within(confirm).getByTestId("ceo-reject-confirm-confirm"));
 
     await waitFor(() =>
       expect(reject).toHaveBeenCalledWith("pp1", {
         rejectionReason: "نرخ پیشنهادی بالاست",
-        stepUpChallengeId: "ch2",
-        stepUpCode: "123456",
       }),
     );
     expect(
@@ -315,14 +299,11 @@ describe("PricingPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("CEO registering with AI calls the API with source=AI", async () => {
+  it("CEO registering with AI calls the API with source=AI without OTP", async () => {
     mockRole("CEO");
     vi.spyOn(pricingApi, "fetchCeoPricing").mockResolvedValue(CEO_DATA);
     vi.spyOn(pricingApi, "fetchPendingApprovalsCount").mockResolvedValue({
       pendingApprovalsCount: 2,
-    });
-    vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
-      challengeId: "ch1",
     });
     const register = vi
       .spyOn(pricingApi, "registerProposal")
@@ -335,20 +316,12 @@ describe("PricingPage", () => {
       await screen.findByRole("button", { name: "ثبت با AI" }),
     );
 
-    const stepUpDialog = await screen.findByRole("dialog", {
-      name: "تأیید مجدد هویت",
-    });
-    await userEvent.type(within(stepUpDialog).getByRole("textbox"), "482913");
+    const confirm = await screen.findByTestId("ceo-register-confirm");
     await userEvent.click(
-      within(stepUpDialog).getByRole("button", { name: "تأیید" }),
+      within(confirm).getByTestId("ceo-register-confirm-confirm"),
     );
 
-    await waitFor(() =>
-      expect(register).toHaveBeenCalledWith("pp2", "AI", {
-        stepUpChallengeId: "ch1",
-        stepUpCode: "482913",
-      }),
-    );
+    await waitFor(() => expect(register).toHaveBeenCalledWith("pp2", "AI"));
     expect(
       await screen.findByText("قیمت پرواز تأیید و ثبت شد ✓"),
     ).toBeInTheDocument();

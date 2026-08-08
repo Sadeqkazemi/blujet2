@@ -4,6 +4,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import AddFlightPage from "./AddFlightPage";
 import * as flightsApi from "../../api/flights";
 import * as pricingApi from "../../api/pricing";
+import * as aircraftApi from "../../api/aircraft";
+import * as agenciesApi from "../../api/agencies";
 
 describe("AddFlightPage", () => {
   beforeEach(() => {
@@ -13,7 +15,18 @@ describe("AddFlightPage", () => {
     ]);
     vi.spyOn(flightsApi, "fetchAircraftTypes").mockResolvedValue([
       { aircraftType: "Airbus A320", capacity: 180 },
+      { aircraftType: "Boeing 737", capacity: 150 },
     ]);
+    vi.spyOn(flightsApi, "fetchAllotments").mockResolvedValue([]);
+    vi.spyOn(agenciesApi, "fetchAgencies").mockResolvedValue({
+      agencies: [],
+      kpis: {
+        activeCount: 0,
+        totalCreditGrantedIrr: "0",
+        totalUsedIrr: "0",
+        pendingSettlementCount: 0,
+      },
+    });
   });
 
   it("renders the design sections and empty fare state", async () => {
@@ -67,10 +80,14 @@ describe("AddFlightPage", () => {
     await user.click(screen.getByTestId("af-date"));
     await user.click(screen.getByTestId("af-date-today"));
 
-    await user.type(screen.getByLabelText(/ساعت پرواز/), "08:30");
+    await user.click(screen.getByTestId("af-time-trigger"));
+    await user.selectOptions(screen.getByTestId("af-time-hour"), "8");
+    await user.selectOptions(screen.getByTestId("af-time-minute"), "30");
+    await user.click(screen.getByTestId("af-time-done"));
 
     await user.selectOptions(screen.getByTestId("duration-hours"), "2");
     await user.selectOptions(screen.getByTestId("duration-minutes"), "15");
+    expect(screen.getByTestId("af-arrival")).toHaveValue("۱۰:۴۵");
 
     const cabinSeatInput = screen.getByLabelText(/تعداد صندلی اکونومی/);
     await user.clear(cabinSeatInput);
@@ -107,6 +124,52 @@ describe("AddFlightPage", () => {
       ),
     );
     expect(onSuccess).toHaveBeenCalled();
+  });
+
+  it("loads cabin capacities when an aircraft type is selected", async () => {
+    vi.spyOn(aircraftApi, "fetchAircraftTypeDetail").mockResolvedValue({
+      id: "ac-737",
+      name: "Boeing 737",
+      code: "B737",
+      status: "ACTIVE",
+      totalSeats: 150,
+      cabins: [
+        { cabin: "ECONOMY", enabled: true, seats: 132 },
+        { cabin: "BUSINESS", enabled: true, seats: 18 },
+        { cabin: "COMFORT", enabled: false, seats: 0 },
+        { cabin: "FIRST", enabled: false, seats: 0 },
+        { cabin: "PREMIUM_ECONOMY", enabled: false, seats: 0 },
+      ],
+      seatMap: [],
+    });
+
+    render(<AddFlightPage onClose={vi.fn()} onSuccess={vi.fn()} />);
+    await screen.findByTestId("add-flight-page");
+    const user = userEvent.setup();
+    await user.selectOptions(screen.getByTestId("af-aircraft"), "Boeing 737");
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/تعداد صندلی اکونومی/)).toHaveValue("132");
+    });
+    expect(screen.getByLabelText(/تعداد صندلی بیزینس/)).toHaveValue("18");
+  });
+
+  it("keeps duration selects aligned with other h-11 fields and computes arrival", async () => {
+    render(<AddFlightPage onClose={vi.fn()} onSuccess={vi.fn()} />);
+    await screen.findByTestId("add-flight-page");
+    const user = userEvent.setup();
+
+    const hours = screen.getByTestId("duration-hours");
+    expect(hours.className).toMatch(/h-11/);
+    expect(screen.getByTestId("duration-minutes").className).toMatch(/h-11/);
+
+    await user.click(screen.getByTestId("af-time-trigger"));
+    await user.selectOptions(screen.getByTestId("af-time-hour"), "9");
+    await user.selectOptions(screen.getByTestId("af-time-minute"), "0");
+    await user.click(screen.getByTestId("af-time-done"));
+    await user.selectOptions(hours, "1");
+    await user.selectOptions(screen.getByTestId("duration-minutes"), "30");
+    expect(screen.getByTestId("af-arrival")).toHaveValue("۱۰:۳۰");
   });
 
   it("loads edit mode and shows revision success message", async () => {

@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  createAllotment,
   createFareRule,
   createFlight,
   fetchAircraftTypes,
   fetchAirports,
+  fetchAllotments,
   fetchFlightDefinition,
+  planFlight,
   updateFlightDefinition,
 } from "../../api/flights";
+import { fetchAircraftTypeDetail } from "../../api/aircraft";
 import { upsertProposal } from "../../api/pricing";
 import { ApiRequestError } from "../../api/envelope";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
 import MoneyInput from "../../components/MoneyInput";
+import TimePicker from "../../components/TimePicker";
+import { toFlightCabinKind } from "../../types/aircraft";
 import {
   chargeRuleFromApi,
   draftRulesToApi,
@@ -49,6 +55,11 @@ import CabinCapacityEditor, {
 import ChargeRulesEditor from "./components/ChargeRulesEditor";
 import DurationFields from "./components/DurationFields";
 import FlightNumberInput from "./components/FlightNumberInput";
+import AgencyCommitmentsEditor, {
+  allotmentToDraft,
+  draftToCreatePayload,
+  type AgencyCommitmentDraft,
+} from "./components/AgencyCommitmentsEditor";
 
 type Channel = "SYSTEM" | "CHARTER" | "AGENCY";
 
@@ -209,6 +220,9 @@ export default function AddFlightPage({
   const [cabinRows, setCabinRows] =
     useState<CabinCapacityRow[]>(defaultCabinRows);
   const [charter, setCharter] = useState("");
+  const [agencyCommitments, setAgencyCommitments] = useState<
+    AgencyCommitmentDraft[]
+  >([]);
   const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
   const [fares, setFares] = useState<DraftFare[]>([]);
@@ -309,6 +323,9 @@ export default function AddFlightPage({
         if (def.basePriceIrr) {
           setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
+        return fetchAllotments(flightId)
+          .then((rows) => setAgencyCommitments(rows.map(allotmentToDraft)))
+          .catch(() => setAgencyCommitments([]));
       })
       .catch((e) => {
         setError(
@@ -321,6 +338,35 @@ export default function AddFlightPage({
       })
       .finally(() => setLoadingDefinition(false));
   }, [isEdit, flightId]);
+
+  async function applyAircraftDefinition(type: string) {
+    setAircraft(type);
+    try {
+      const detail = await fetchAircraftTypeDetail(type);
+      const enabled = detail.cabins.filter((c) => c.enabled && c.seats > 0);
+      const rows: CabinCapacityRow[] = [];
+      for (const c of enabled) {
+        const mapped = toFlightCabinKind(c.cabin);
+        if (!mapped) continue;
+        if (rows.some((r) => r.cabin === mapped)) continue;
+        rows.push({
+          key: `cab-${mapped}`,
+          cabin: mapped,
+          seats: String(c.seats),
+        });
+      }
+      if (rows.length > 0) setCabinRows(rows);
+    } catch {
+      // Detail endpoint may be missing — keep current cabin rows; capacity
+      // from the list dropdown is still available via aircraftTypes.
+      const match = aircraftTypes.find((a) => a.aircraftType === type);
+      if (match && match.capacity > 0) {
+        setCabinRows([
+          { key: "cab-auto", cabin: "ECONOMY", seats: String(match.capacity) },
+        ]);
+      }
+    }
+  }
 
   const cityByCode = useMemo(
     () => new Map(airports.map((a) => [a.code, a.cityFa])),
@@ -498,6 +544,14 @@ export default function AddFlightPage({
       setError("تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.");
       return;
     }
+    const agencySeatsSum = agencyCommitments.reduce(
+      (sum, r) => sum + (Number(latinDigits(r.seats)) || 0),
+      0,
+    );
+    if (charterSeats + agencySeatsSum > capacity) {
+      setError("مجموع تعهد چارتری و تعهدات آژانس از ظرفیت پرواز بیشتر است.");
+      return;
+    }
 
     const departureAt = buildDepartureIso(dateIso, time);
     if (!departureAt) {
@@ -568,6 +622,23 @@ export default function AddFlightPage({
           validUntil: f.validUntil || undefined,
         };
         await createFareRule(created.id, farePayload);
+      }
+
+      if (agencySeatsSum > 0) {
+        await planFlight(created.id, {
+          priceIrr: proposedIrr,
+          agencySeats: agencySeatsSum,
+        });
+        for (const draft of agencyCommitments) {
+          const body = draftToCreatePayload(draft);
+          await createAllotment(created.id, {
+            agencyId: body.agencyId,
+            seatsAllocated: body.seatsAllocated,
+            type: body.type,
+            releaseAt: body.releaseAt,
+            contractPriceIrr: body.contractPriceIrr,
+          });
+        }
       }
 
       const legalIrr = moneyInputToRialString(legalToman);
@@ -751,20 +822,14 @@ export default function AddFlightPage({
                     />
                   </div>
                 </div>
-                <div>
-                  <label className={labelClass} htmlFor="af-time">
-                    ساعت پرواز *
-                  </label>
-                  <input
-                    id="af-time"
-                    type="time"
-                    step={300}
-                    dir="ltr"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className={`${inputClass} text-left font-num`}
-                  />
-                </div>
+                <TimePicker
+                  id="af-time"
+                  label="ساعت پرواز *"
+                  value={time}
+                  onChange={setTime}
+                  testId="af-time"
+                  placeholder="HH:mm"
+                />
                 <DurationFields
                   hours={durationHours}
                   minutes={durationMins}
@@ -778,9 +843,10 @@ export default function AddFlightPage({
                   </label>
                   <input
                     id="af-arrival"
+                    data-testid="af-arrival"
                     dir="ltr"
                     readOnly
-                    value={arrival}
+                    value={arrival ? faDigits(arrival) : ""}
                     placeholder="—"
                     className={`${inputClass} text-left font-num opacity-80`}
                   />
@@ -791,9 +857,10 @@ export default function AddFlightPage({
                   </label>
                   <select
                     id="af-aircraft"
+                    data-testid="af-aircraft"
                     value={aircraft}
-                    onChange={(e) => setAircraft(e.target.value)}
-                    className={`${inputClass} cursor-pointer`}
+                    onChange={(e) => void applyAircraftDefinition(e.target.value)}
+                    className={`${inputClass} cursor-pointer font-num`}
                   >
                     {(aircraftTypes.length
                       ? aircraftTypes.map((a) => a.aircraftType)
@@ -831,6 +898,14 @@ export default function AddFlightPage({
                   rows={cabinRows}
                   onChange={setCabinRows}
                   error={cabinCapacityError}
+                />
+              </div>
+              <div className="mt-4">
+                <AgencyCommitmentsEditor
+                  capacity={capacity}
+                  charterSeats={Number(latinDigits(charter)) || 0}
+                  value={agencyCommitments}
+                  onChange={setAgencyCommitments}
                 />
               </div>
             </section>

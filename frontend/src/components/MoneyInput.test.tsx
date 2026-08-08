@@ -2,7 +2,7 @@ import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { formatTomanGrouped } from "../lib/money-input";
+import { formatTomanGrouped, moneyInputToRialString } from "../lib/money-input";
 import MoneyInput from "./MoneyInput";
 import JalaliDatePicker from "./JalaliDatePicker";
 import { dayjs, toIsoDateOnly } from "../lib/jalali";
@@ -10,14 +10,16 @@ import { dayjs, toIsoDateOnly } from "../lib/jalali";
 function MoneyHarness({ onChange }: { onChange: (v: string) => void }) {
   const [v, setV] = useState("");
   return (
-    <MoneyInput
-      testId="money"
-      valueToman={v}
-      onChangeToman={(next) => {
-        onChange(next);
-        setV(next);
-      }}
-    />
+    <div dir="rtl">
+      <MoneyInput
+        testId="money"
+        valueToman={v}
+        onChangeToman={(next) => {
+          onChange(next);
+          setV(next);
+        }}
+      />
+    </div>
   );
 }
 
@@ -29,7 +31,20 @@ describe("MoneyInput", () => {
     await user.type(screen.getByTestId("money"), "1234567");
     expect(onChange).toHaveBeenCalled();
     expect(formatTomanGrouped("1234567")).toBe("۱٬۲۳۴٬۵۶۷");
-    expect(screen.getByText("تومان")).toBeInTheDocument();
+    expect(screen.getByTestId("money-unit")).toHaveTextContent("تومان");
+  });
+
+  it("keeps تومان on the physical right with padding so it does not overlay digits", () => {
+    render(
+      <div dir="rtl">
+        <MoneyInput testId="money" valueToman="۱٬۲۳۴٬۵۶۷" onChangeToman={() => undefined} />
+      </div>,
+    );
+    const input = screen.getByTestId("money");
+    const unit = screen.getByTestId("money-unit");
+    expect(input.className).toMatch(/pr-\[3\.25rem\]/);
+    expect(unit.className).toMatch(/\bright-3\b/);
+    expect(moneyInputToRialString("۱٬۲۳۴٬۵۶۷")).toBe("12345670");
   });
 });
 
