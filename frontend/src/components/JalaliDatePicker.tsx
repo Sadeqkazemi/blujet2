@@ -1,6 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { fetchPriceCalendar } from "../api/publicSite";
+import type { StoredLocale } from "../hooks/useLocale";
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../lib/jalali";
 import { faDigits } from "../lib/fa-format";
+import {
+  formatPriceCalendarPrice,
+  isPriceCalendarEmpty,
+  priceCalendarCopy,
+} from "../lib/price-calendar";
 
 const WEEKDAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 const MONTH_NAMES = [
@@ -58,6 +65,12 @@ interface JalaliDatePickerProps {
   compact?: boolean;
   /** Full-height single-line trigger for standard form fields. */
   singleLine?: boolean;
+  /** Mobile flight-search mode: load real fares into the month grid. */
+  priceCalendar?: {
+    origin: string;
+    dest: string;
+    locale: StoredLocale;
+  };
 }
 
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
@@ -73,8 +86,15 @@ export default function JalaliDatePicker({
   theme = "light",
   compact = false,
   singleLine = false,
+  priceCalendar,
 }: JalaliDatePickerProps) {
   const [open, setOpen] = useState(false);
+  const [draftIso, setDraftIso] = useState<string | null>(
+    value ? value.slice(0, 10) : null,
+  );
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [pricesLoading, setPricesLoading] = useState(false);
+  const [pricesError, setPricesError] = useState(false);
   const [viewMonth, setViewMonth] = useState(() =>
     value ? dayjs(value).calendar("jalali") : dayjs().calendar("jalali"),
   );
@@ -87,6 +107,10 @@ export default function JalaliDatePicker({
   });
   const rootRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const priceCacheRef = useRef(new Map<string, Record<string, string>>());
+  const minIso = minDate ?? null;
+  const cells = buildMonthCells(viewMonth, minIso);
+  const monthKey = `${viewMonth.year()}-${viewMonth.month()}`;
 
   useEffect(() => {
     if (!open) return;
@@ -100,6 +124,10 @@ export default function JalaliDatePicker({
 
   useLayoutEffect(() => {
     if (!open || !rootRef.current || !popupRef.current) return;
+    if (priceCalendar) {
+      setPopupPos({ bottom: 12, left: 12, top: undefined });
+      return;
+    }
     const trigger = rootRef.current.getBoundingClientRect();
     const popup = popupRef.current.getBoundingClientRect();
     const margin = 8;
@@ -115,11 +143,67 @@ export default function JalaliDatePicker({
         ? { bottom: vh - trigger.top + margin, left, top: undefined }
         : { top: trigger.bottom + margin, left, bottom: undefined },
     );
-  }, [open, isRTL, viewMonth]);
+  }, [open, isRTL, viewMonth, priceCalendar]);
 
-  const minIso = minDate ?? null;
-  const cells = buildMonthCells(viewMonth, minIso);
-  const selectedIsoDay = value ? value.slice(0, 10) : null;
+  useEffect(() => {
+    if (!open || !priceCalendar) return;
+
+    const visibleCells = buildMonthCells(viewMonth, minDate ?? null).filter(
+      (cell): cell is Cell => cell !== null,
+    );
+    const cacheKey = `${priceCalendar.origin}-${priceCalendar.dest}-${monthKey}`;
+    const cached = priceCacheRef.current.get(cacheKey);
+    if (cached) {
+      setPrices(cached);
+      setPricesLoading(false);
+      setPricesError(false);
+      return;
+    }
+
+    // The endpoint returns ±3 days. One center per seven-day chunk covers
+    // the visible Jalali month without inventing any unavailable fare.
+    const centers: string[] = [];
+    for (let index = 0; index < visibleCells.length; index += 7) {
+      const chunk = visibleCells.slice(index, index + 7);
+      centers.push(chunk[Math.floor(chunk.length / 2)].iso);
+    }
+
+    let cancelled = false;
+    setPricesLoading(true);
+    setPricesError(false);
+    Promise.all(
+      centers.map((center) =>
+        fetchPriceCalendar(priceCalendar.origin, priceCalendar.dest, center),
+      ),
+    )
+      .then((responses) => {
+        if (cancelled) return;
+        const visibleDates = new Set(visibleCells.map((cell) => cell.iso));
+        const next: Record<string, string> = {};
+        responses.flat().forEach((day) => {
+          if (visibleDates.has(day.date)) next[day.date] = day.minPriceIrr;
+        });
+        priceCacheRef.current.set(cacheKey, next);
+        setPrices(next);
+        setPricesLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPrices({});
+        setPricesLoading(false);
+        setPricesError(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, monthKey, minDate, priceCalendar, viewMonth]);
+
+  const selectedIsoDay = priceCalendar
+    ? draftIso
+    : value
+      ? value.slice(0, 10)
+      : null;
 
   const displayValue = value
     ? faDigits(dayjs(value).calendar("jalali").format("YYYY/MM/DD"))
@@ -149,7 +233,11 @@ export default function JalaliDatePicker({
     <div ref={rootRef} style={{ position: "relative", height: "100%" }}>
       <div
         data-testid={testId}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setDraftIso(value ? value.slice(0, 10) : null);
+          if (value) setViewMonth(dayjs(value).calendar("jalali"));
+          setOpen((v) => !v);
+        }}
         style={{
           cursor: "pointer",
           padding: compact ? "0 10px" : singleLine ? "0 15px" : "5px 13px",
@@ -263,15 +351,17 @@ export default function JalaliDatePicker({
             top: popupPos.top,
             bottom: popupPos.bottom,
             left: popupPos.left,
-            width: 300,
-            maxWidth: "calc(100vw - 16px)",
+            width: priceCalendar ? "calc(100vw - 24px)" : 300,
+            maxWidth: priceCalendar ? 840 : "calc(100vw - 16px)",
+            maxHeight: priceCalendar ? "calc(100vh - 24px)" : undefined,
+            overflowY: priceCalendar ? "auto" : undefined,
             background: popupBg,
             border: `1px solid ${popupBorder}`,
             borderRadius: 18,
             boxShadow: dark
               ? "0 24px 60px -16px rgba(0,0,0,.6)"
               : "0 24px 56px -14px rgba(13,38,102,.34)",
-            padding: "18px 20px",
+            padding: priceCalendar ? "18px 16px 14px" : "18px 20px",
             zIndex: 200,
             color: dark ? "#e7ecf3" : undefined,
           }}
@@ -284,6 +374,21 @@ export default function JalaliDatePicker({
               marginBottom: 14,
             }}
           >
+            {priceCalendar && (
+              <span
+                style={{
+                  marginInlineStart: "auto",
+                  padding: "7px 15px",
+                  border: `1.5px solid ${popupBorder}`,
+                  borderRadius: 22,
+                  color: mutedColor,
+                  fontSize: "11.5px",
+                  fontWeight: 700,
+                }}
+              >
+                {priceCalendar.locale === "en" ? "Gregorian" : priceCalendar.locale === "ar" ? "ميلادي" : "تقویم میلادی"}
+              </span>
+            )}
             <span
               data-testid={testId ? `${testId}-today` : undefined}
               onClick={() => {
@@ -291,8 +396,12 @@ export default function JalaliDatePicker({
                 const iso = toIsoDateOnly(today);
                 if (minIso && iso < minIso.slice(0, 10)) return;
                 setViewMonth(today);
-                onChange(isoDateAtNoon(iso));
-                setOpen(false);
+                if (priceCalendar) {
+                  setDraftIso(iso);
+                } else {
+                  onChange(isoDateAtNoon(iso));
+                  setOpen(false);
+                }
               }}
               style={{
                 padding: "7px 15px",
@@ -397,18 +506,25 @@ export default function JalaliDatePicker({
             {cells.map((c, i) => {
               if (!c) return <span key={`blank-${i}`} />;
               const isSelected = selectedIsoDay === c.iso;
+              const price = prices[c.iso];
+              const hasPrice = price != null && !isPriceCalendarEmpty(price);
               return (
                 <span
                   key={c.iso}
                   data-testid={testId ? `${testId}-day-${c.date}` : undefined}
                   onClick={() => {
                     if (c.disabled) return;
-                    onChange(isoDateAtNoon(c.iso));
-                    setOpen(false);
+                    if (priceCalendar) {
+                      setDraftIso(c.iso);
+                    } else {
+                      onChange(isoDateAtNoon(c.iso));
+                      setOpen(false);
+                    }
                   }}
                   style={{
-                    height: 36,
+                    minHeight: priceCalendar ? 58 : 36,
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: "11.5px",
@@ -422,16 +538,96 @@ export default function JalaliDatePicker({
                         : dark
                           ? "#e7ecf3"
                           : "#16202e",
-                    background: isSelected ? "#1668c4" : "transparent",
+                    background: isSelected
+                      ? "#3f6fc6"
+                      : priceCalendar
+                        ? dark
+                          ? "#172236"
+                          : "#fff"
+                        : "transparent",
+                    border: priceCalendar
+                      ? `1px solid ${isSelected ? "#3f6fc6" : popupBorder}`
+                      : undefined,
                     borderRadius: 10,
                     cursor: c.disabled ? "not-allowed" : "pointer",
                   }}
                 >
                   {faDigits(c.date)}
+                  {priceCalendar && hasPrice && (
+                    <small
+                      data-testid={testId ? `${testId}-price-${c.iso}` : undefined}
+                      title={formatPriceCalendarPrice(
+                        price,
+                        priceCalendar.locale,
+                        priceCalendarCopy(priceCalendar.locale).emptyDay,
+                      )}
+                      style={{
+                        marginTop: 3,
+                        maxWidth: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        fontSize: 8,
+                        lineHeight: 1.2,
+                        color: isSelected ? "#fff" : "#1f8a5b",
+                        direction: "ltr",
+                      }}
+                    >
+                      {formatPriceCalendarPrice(
+                        price,
+                        priceCalendar.locale,
+                        priceCalendarCopy(priceCalendar.locale).emptyDay,
+                      )}
+                    </small>
+                  )}
                 </span>
               );
             })}
           </div>
+          {priceCalendar && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                borderTop: `1px solid ${popupBorder}`,
+                marginTop: 14,
+                paddingTop: 12,
+              }}
+            >
+              <span style={{ color: pricesError ? "#c2410c" : mutedColor, fontSize: 11 }}>
+                {pricesLoading
+                  ? priceCalendarCopy(priceCalendar.locale).loading
+                  : pricesError
+                    ? priceCalendarCopy(priceCalendar.locale).error
+                    : draftIso
+                      ? faDigits(dayjs(isoDateAtNoon(draftIso)).calendar("jalali").format("YYYY/MM/DD"))
+                      : ""}
+              </span>
+              <button
+                type="button"
+                data-testid={testId ? `${testId}-confirm` : undefined}
+                disabled={!draftIso}
+                onClick={() => {
+                  if (!draftIso) return;
+                  onChange(isoDateAtNoon(draftIso));
+                  setOpen(false);
+                }}
+                style={{
+                  border: 0,
+                  borderRadius: 10,
+                  background: draftIso ? "#3f6fc6" : "#ccd3dd",
+                  color: "#fff",
+                  padding: "10px 24px",
+                  fontFamily: "inherit",
+                  fontWeight: 800,
+                  cursor: draftIso ? "pointer" : "not-allowed",
+                }}
+              >
+                {priceCalendar.locale === "en" ? "Confirm" : priceCalendar.locale === "ar" ? "تأكيد" : "تأیید"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

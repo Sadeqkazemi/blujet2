@@ -433,17 +433,19 @@ export default function ResultsPage() {
 
       <ResultsAiRadar locale={locale} copy={copy} aiState={aiState} advisory={advisory} onAnalyze={() => void askAi()} />
 
-      <FlightPriceCalendar
-        origin={origin}
-        dest={dest}
-        selectedDate={date}
-        locale={locale}
-        onSelectDate={(nextDate) => {
-          const next = new URLSearchParams(params);
-          next.set('date', nextDate);
-          setParams(next);
-        }}
-      />
+      {!isMobile && (
+        <FlightPriceCalendar
+          origin={origin}
+          dest={dest}
+          selectedDate={date}
+          locale={locale}
+          onSelectDate={(nextDate) => {
+            const next = new URLSearchParams(params);
+            next.set('date', nextDate);
+            setParams(next);
+          }}
+        />
+      )}
 
       <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 39px' }}>
         <div
