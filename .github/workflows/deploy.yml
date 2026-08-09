@@ -196,4 +196,36 @@ jobs:
                 touch "$catalog_sentinel"
                 chmod 600 "$catalog_sentinel"
               fi
+              # Owner-approved one-time reset of every sandbox flight so the
+              # operations -> CEO -> public-sale workflow can be retested from
+              # a clean catalog. Shared airports/routes and UAT access accounts
+              # are intentionally retained. A root-only backup and dry-run
+              # report are written before the transactional purge.
+              flight_reset_sentinel=/root/.blujet-uat-all-flights-purge-20260809-v1-complete
+              if [ ! -f "$flight_reset_sentinel" ]; then
+                umask 077
+                flight_reset_backup="/root/blujet-uat-before-all-flights-purge-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                flight_reset_audit=/root/blujet-uat-all-flights-purge-20260809-v1.json
+                docker compose -f docker-compose.prod.yml exec -T db \
+                  pg_dump -U blujet -d blujet --format=custom > "$flight_reset_backup"
+                chmod 600 "$flight_reset_backup"
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e NODE_ENV=uat \
+                  -e AUTH_SANDBOX_ENABLED=true \
+                  backend node dist/database/sandbox-active-flight-purge.js \
+                  --all-flights --actor=uat.it > "$flight_reset_audit"
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e NODE_ENV=uat \
+                  -e AUTH_SANDBOX_ENABLED=true \
+                  -e SANDBOX_FLIGHT_PURGE_CONFIRM=PURGE_BLUJET_SANDBOX_ACTIVE_FLIGHTS \
+                  -e SANDBOX_FLIGHT_PURGE_ALL_CONFIRM=PURGE_ALL_BLUJET_SANDBOX_FLIGHTS \
+                  backend node dist/database/sandbox-active-flight-purge.js \
+                  --execute-purge --all-flights --actor=uat.it \
+                  >> "$flight_reset_audit"
+                chmod 600 "$flight_reset_audit"
+                docker compose -f docker-compose.prod.yml exec -T redis \
+                  redis-cli FLUSHDB > /dev/null
+                touch "$flight_reset_sentinel"
+                chmod 600 "$flight_reset_sentinel"
+              fi
               docker image prune -f

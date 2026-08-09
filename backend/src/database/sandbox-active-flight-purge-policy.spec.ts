@@ -91,6 +91,14 @@ describe('Sandbox active-flight purge policy', () => {
       expect(allotmentsIdx).toBeLessThan(instancesIdx);
     });
 
+    it('deletes approval history before flight_instances', () => {
+      const order = SANDBOX_FLIGHT_PURGE_TABLE_ORDER;
+      expect(order.indexOf('flight_reviews')).toBeGreaterThanOrEqual(0);
+      expect(order.indexOf('flight_reviews')).toBeLessThan(
+        order.indexOf('flight_instances'),
+      );
+    });
+
     it('deletes flight_instances before schedules before flights (RESTRICT chain)', () => {
       const order = SANDBOX_FLIGHT_PURGE_TABLE_ORDER;
       expect(order.indexOf('flight_instances')).toBeLessThan(

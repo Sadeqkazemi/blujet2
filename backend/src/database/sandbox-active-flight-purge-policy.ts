@@ -93,6 +93,7 @@ export const SANDBOX_FLIGHT_PURGE_TABLE_ORDER = [
   'fare_pricing_proposals',
   'agency_seat_commitments',
   'charter_commitments',
+  'flight_reviews',
   'bookings',
   'agency_allotments',
   'flight_instances',
