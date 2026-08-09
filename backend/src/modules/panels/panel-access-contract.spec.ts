@@ -11,7 +11,9 @@ describe('operations panel access contract', () => {
 
   it('returns ACCESS_REVOKED for a disabled operations panel', async () => {
     const panelRepo = {
-      findOneBy: jest.fn().mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
+      findOneBy: jest
+        .fn<() => Promise<{ panelKey: string; enabled: boolean }>>()
+        .mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
     };
     const service = new PanelsService(
       {} as never,
@@ -21,19 +23,52 @@ describe('operations panel access contract', () => {
       {} as never,
     );
 
-    await expect(service.assertPanelEnabledForSelf('OPERATIONS_MANAGER')).rejects.toMatchObject<
-      Partial<ForbiddenException>
-    >({ response: expect.objectContaining({ code: 'ACCESS_REVOKED' }) });
+    let caught: unknown;
+    try {
+      await service.assertPanelEnabledForSelf('OPERATIONS_MANAGER');
+    } catch (error: unknown) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ForbiddenException);
+    expect((caught as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCESS_REVOKED',
+    });
   });
 
   it('revokes every live operations-manager refresh session when disabled', async () => {
-    const userRepo = { find: jest.fn().mockResolvedValue([{ id: 'ops-1' }, { id: 'ops-2' }]) };
+    let capturedFindOptions: unknown;
+    const findUsers = jest
+      .fn<(options: unknown) => Promise<Array<{ id: string }>>>()
+      .mockImplementation((options) => {
+        capturedFindOptions = options;
+        return Promise.resolve([{ id: 'ops-1' }, { id: 'ops-2' }]);
+      });
+    const userRepo = { find: findUsers };
     const panelRepo = {
-      upsert: jest.fn().mockResolvedValue(undefined),
-      findOneByOrFail: jest.fn().mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
+      upsert: jest
+        .fn<(row: unknown, keys: unknown) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      findOneByOrFail: jest
+        .fn<() => Promise<{ panelKey: string; enabled: boolean }>>()
+        .mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
     };
-    const refreshRepo = { update: jest.fn().mockResolvedValue({ affected: 2 }) };
-    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    let capturedRefreshCriteria: unknown;
+    let capturedRefreshPatch: unknown;
+    const updateRefreshTokens = jest
+      .fn<
+        (criteria: unknown, patch: unknown) => Promise<{ affected: number }>
+      >()
+      .mockImplementation((criteria, patch) => {
+        capturedRefreshCriteria = criteria;
+        capturedRefreshPatch = patch;
+        return Promise.resolve({ affected: 2 });
+      });
+    const refreshRepo = { update: updateRefreshTokens };
+    const audit = {
+      record: jest
+        .fn<(entry: unknown) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    };
     const service = new PanelsService(
       userRepo as never,
       {} as never,
@@ -48,12 +83,19 @@ describe('operations panel access contract', () => {
       false,
     );
 
-    expect(userRepo.find).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { role: 'OPERATIONS_MANAGER' } }),
-    );
-    expect(refreshRepo.update).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: expect.anything(), revokedAt: expect.anything() }),
-      expect.objectContaining({ revokedAt: expect.any(Date) }),
-    );
+    const findOptions = capturedFindOptions as {
+      where: { role: string };
+    };
+    expect(findOptions.where.role).toBe('OPERATIONS_MANAGER');
+    const refreshCriteria = capturedRefreshCriteria as {
+      userId: unknown;
+      revokedAt: unknown;
+    };
+    const refreshPatch = capturedRefreshPatch as {
+      revokedAt: Date;
+    };
+    expect(refreshCriteria.userId).toBeDefined();
+    expect(refreshCriteria.revokedAt).toBeDefined();
+    expect(refreshPatch.revokedAt).toBeInstanceOf(Date);
   });
 });
