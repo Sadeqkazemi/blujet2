@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav, fetchEmployeeContext } from '../api/panels';
@@ -10,6 +10,7 @@ import {
 } from '../api/cartable';
 import { fetchRefunds } from '../api/refunds';
 import { fetchLowSalesAlerts, fetchStaffReports } from '../api/reporting';
+import { runFlightsAiAnalysis } from '../api/flights';
 import { fetchLogsBadgeCount } from '../api/audit';
 import { fetchCeoPricing, fetchPendingApprovalsCount } from '../api/pricing';
 import {
@@ -99,6 +100,7 @@ export default function PanelShell() {
   const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const autoAiRequestedRef = useRef(false);
 
   useEffect(() => {
     fetchNav()
@@ -121,9 +123,25 @@ export default function PanelShell() {
       setLowSalesAlerts([]);
       return;
     }
-    fetchLowSalesAlerts()
-      .then(setLowSalesAlerts)
-      .catch(() => setLowSalesAlerts([]));
+    let cancelled = false;
+    void (async () => {
+      try {
+        let alerts = await fetchLowSalesAlerts();
+        if (
+          user?.role === 'COMMERCIAL_MANAGER' &&
+          !autoAiRequestedRef.current &&
+          alerts.some((alert) => alert.suggestedPriceIrr == null)
+        ) {
+          autoAiRequestedRef.current = true;
+          const result = await runFlightsAiAnalysis();
+          if (result.available) alerts = await fetchLowSalesAlerts();
+        }
+        if (!cancelled) setLowSalesAlerts(alerts);
+      } catch {
+        if (!cancelled) setLowSalesAlerts([]);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [user?.role]);
 
   const visibleNav = useMemo(() => {

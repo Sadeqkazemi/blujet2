@@ -115,11 +115,13 @@ describe('AircraftListPage', () => {
     expect(screen.getByTestId('aircraft-list-loading')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByTestId('aircraft-list-table')).toBeInTheDocument();
+      expect(screen.getByTestId('aircraft-card-grid')).toBeInTheDocument();
     });
 
     expect(screen.getByText('مک‌دانل داگلاس MD-80')).toBeInTheDocument();
     expect(screen.getByText('ایرباس A320')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-kpi-total')).toHaveTextContent('۲');
+    expect(screen.getAllByTestId('aircraft-card')).toHaveLength(2);
     expect(screen.getByRole('link', { name: '+ تعریف هواپیمای جدید' })).toHaveAttribute(
       'href',
       '/panel/aircraft/new',

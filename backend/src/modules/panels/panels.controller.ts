@@ -4,6 +4,7 @@ import { PanelsService } from './panels.service';
 import { UpdatePanelAccessDto } from './dto/update-panel-access.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PanelAccessGuard } from './panel-access.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -15,6 +16,7 @@ export class PanelsController {
   constructor(private readonly panels: PanelsService) {}
 
   @Get('nav')
+  @UseGuards(PanelAccessGuard)
   @ApiOperation({
     summary:
       "Caller's role-scoped sidebar — server-computed, never client-decided",

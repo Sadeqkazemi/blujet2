@@ -133,8 +133,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
 
 /** Which panel keys each role may toggle via PATCH /panels/access/:panelKey. */
 export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
-  CEO: ['FINANCE', 'COMMERCIAL', 'IT'],
-  SENIOR_MANAGER: ['CEO', 'SITE_ADMIN', 'FINANCE', 'COMMERCIAL', 'IT'],
+  CEO: ['FINANCE', 'COMMERCIAL', 'OPERATIONS', 'IT'],
+  SENIOR_MANAGER: ['CEO', 'SITE_ADMIN', 'FINANCE', 'COMMERCIAL', 'OPERATIONS', 'IT'],
 };
 
 /**
@@ -193,5 +193,6 @@ export const ALL_PANEL_KEYS = [
   'SENIOR_MANAGER',
   'FINANCE',
   'COMMERCIAL',
+  'OPERATIONS',
   'IT',
 ];

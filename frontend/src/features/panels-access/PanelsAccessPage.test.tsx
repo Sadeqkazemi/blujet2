@@ -9,6 +9,7 @@ import type { PanelAccessFlag } from '../../types/panels';
 import type { Role } from '../../types/auth';
 
 const FLAGS: PanelAccessFlag[] = [
+  { panelKey: 'OPERATIONS', enabled: true, updatedAt: null },
   { panelKey: 'FINANCE', enabled: true, updatedAt: null },
   { panelKey: 'IT', enabled: false, updatedAt: '2026-07-15T09:00:00.000Z' },
 ];
@@ -64,8 +65,12 @@ describe('PanelsAccessPage', () => {
 
     render(<PanelsAccessPage />);
     expect(await screen.findByText(/واحدها توسط مدیر IT مدیریت می‌شود/)).toBeInTheDocument();
-    expect(screen.getByText('دسترسی فعال')).toBeInTheDocument();
+    expect(screen.getAllByText('دسترسی فعال').length).toBeGreaterThan(0);
     expect(screen.getByText('دسترسی مسدود')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'پنل مدیر عملیات' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('switch', { name: 'پنل مدیر مالی' }));

@@ -532,7 +532,7 @@ export class ReportingService {
       .createQueryBuilder('fi')
       .leftJoin('fi.flight', 'flight')
       .leftJoin('flight.route', 'route')
-      .select(['fi.id', 'fi.departureAt', 'fi.capacity'])
+      .select(['fi.id', 'fi.departureAt', 'fi.capacity', 'fi.basePriceIrr', 'fi.competitorPriceIrr', 'fi.aiSuggestion'])
       .addSelect(['flight.id', 'flight.flightNo'])
       .addSelect(['route.id', 'route.originCode', 'route.destCode'])
       .where('fi.status = :status', { status: 'DEPARTED' })
@@ -695,6 +695,13 @@ export class ReportingService {
           capacity: i.capacity,
           soldSeats,
           occupancyPct: i.capacity > 0 ? soldSeats / i.capacity : 0,
+          currentPriceIrr: i.basePriceIrr,
+          competitorPriceIrr: i.competitorPriceIrr,
+          suggestedPriceIrr: (i.aiSuggestion as { priceIrr?: number } | null)?.priceIrr ?? null,
+          reasonFa: (i.aiSuggestion as { reason?: string } | null)?.reason ?? null,
+          factorsFa: (i.aiSuggestion as { factors?: string[] } | null)?.factors ?? [],
+          confidence: (i.aiSuggestion as { confidence?: number } | null)?.confidence ?? null,
+          generatedAt: (i.aiSuggestion as { generatedAt?: string } | null)?.generatedAt ?? null,
         };
       })
       .filter((i) => i.occupancyPct < LOW_SALES_OCCUPANCY_THRESHOLD);

@@ -35,6 +35,7 @@ import PricingPage from "../pricing/PricingPage";
 import FlightCitiesTab from "./FlightCitiesTab";
 import TravelCostsTab from "./TravelCostsTab";
 import AddFlightPage from "./AddFlightPage";
+import FlightLifecycleModal from "./FlightLifecycleModal";
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -42,6 +43,7 @@ import type {
   CompletedFlightRow,
   DerivedFlightStatus,
   FlightDetail,
+  FlightRow,
   FlightsOverview,
   FutureFlightRow,
 } from "../../types/flights";
@@ -76,7 +78,7 @@ export default function FlightsPage() {
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [subTab, setSubTab] = useState<
-    "active" | "done" | "future" | "cities" | "costs"
+    "active" | "done" | "history" | "future" | "cities" | "costs"
   >("active");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export default function FlightsPage() {
   const pricingSectionRef = useRef<HTMLDivElement>(null);
 
   const [detail, setDetail] = useState<FlightDetail | null>(null);
+  const [lifecycleFlight, setLifecycleFlight] = useState<FlightRow | CompletedFlightRow | null>(null);
   const [expandedDone, setExpandedDone] = useState<string | null>(null);
 
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
@@ -355,6 +358,15 @@ export default function FlightsPage() {
   const activePager = usePagination(data?.active ?? []);
   const completedPager = usePagination(data?.completed?.rows ?? []);
   const futurePager = usePagination(visibleFuture);
+  const weakActiveFlights = useMemo(
+    () =>
+      (data?.active ?? []).filter((row) => {
+        const hoursToDeparture = (new Date(row.departureAt).getTime() - Date.now()) / 3_600_000;
+        const occupancy = row.capacity > 0 ? row.sold / row.capacity : 0;
+        return row.derivedStatus !== "CANCELLED" && hoursToDeparture >= 0 && hoursToDeparture <= 72 && occupancy < 0.6;
+      }),
+    [data?.active],
+  );
 
   const kpis = data?.kpis;
   const isCommercial =
@@ -366,6 +378,7 @@ export default function FlightsPage() {
     ? ([
         ["active", "پروازهای فعال"],
         ["done", "پروازهای انجام‌شده"],
+        ["history", "تاریخچه پرواز"],
         ["cities", "شهرهای پروازی"],
         ["costs", "هزینه‌های سفر"],
       ] as const)
@@ -500,6 +513,17 @@ export default function FlightsPage() {
                   + افزودن پرواز
                 </button>
               </div>
+              {isCommercial && weakActiveFlights.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 border-b border-panel-border bg-[#f59e0b0b] p-4 lg:grid-cols-2" data-testid="weak-sales-ai-list">
+                  {weakActiveFlights.map((flight) => (
+                    <article key={flight.id} className="rounded-xl border border-[#f59e0b55] bg-[#171d29] p-4">
+                      <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-extrabold text-[#fbbf24]">هشدار خودکار فروش ضعیف</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{flight.flightNo} · {flight.originCode} ← {flight.destCode}</div></div><span className="font-num rounded-full bg-[#f59e0b1f] px-2 py-1 text-[10px] text-[#fbbf24]">فروش {faDigits(flight.sold)} از {faDigits(flight.capacity)}</span></div>
+                      {flight.aiSuggestion ? <div className="mt-3 rounded-lg bg-black/15 p-3"><div className="text-[10px] text-panel-muted">پیشنهاد رقابتی هوش مصنوعی</div><div className="font-num mt-1 text-base font-black text-[#34d399]">{faMoney(flight.aiSuggestion.priceIrr)} تومان</div><p className="mt-1 text-[10.5px] leading-5 text-[#aebbd0]">{flight.aiSuggestion.reason}</p></div> : <p className="mt-3 text-[10.5px] text-panel-muted">پیشنهاد قیمت در حال آماده‌سازی است؛ نرخ فعلی خودکار تغییر نمی‌کند.</p>}
+                      <button type="button" onClick={() => void openDetail(flight.id)} className="mt-3 text-[11px] font-bold text-accent">مشاهده و مدیریت پرواز ←</button>
+                    </article>
+                  ))}
+                </div>
+              )}
               <div className="overflow-x-auto">
                 <div className="min-w-[760px]">
                   <div className="grid grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] gap-3 border-b border-panel-border px-5 py-2 text-[11px] font-bold text-panel-muted">
@@ -586,6 +610,24 @@ export default function FlightsPage() {
             </section>
           )}
 
+          {subTab === "history" && isCommercial && data && (
+            <section className="rounded-xl border border-panel-border bg-panel-surface" data-testid="active-flight-history">
+              <div className="border-b border-panel-border px-5 py-4">
+                <h2 className="text-sm font-bold text-panel-ink">تاریخچه پروازهای در حال انجام</h2>
+                <p className="mt-1 text-[11px] text-panel-muted">نظر مدیران، تغییرات قیمت و رویدادهای پروازهای فعال؛ سوابق پروازهای انجام‌شده در تب مخصوص همان بخش است.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-2">
+                {data.active.filter((row) => row.derivedStatus !== "CANCELLED").map((row) => (
+                  <button key={row.id} type="button" onClick={() => setLifecycleFlight(row)} className="rounded-xl border border-panel-border bg-panel-canvas p-4 text-right transition hover:border-accent/60">
+                    <div className="flex items-start justify-between gap-3"><div><div className="font-bold text-panel-ink">{routeLabel(row.originCode, row.destCode)}</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{row.flightNo}</div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_META[row.derivedStatus].className}`}>{STATUS_META[row.derivedStatus].label}</span></div>
+                    <div className="mt-4 flex items-center justify-between border-t border-panel-border pt-3 text-[11px]"><span className="font-num text-panel-muted">{formatJalaliDateTime(row.departureAt)}</span><span className="font-bold text-accent">مشاهده همه جزئیات ←</span></div>
+                  </button>
+                ))}
+                {data.active.filter((row) => row.derivedStatus !== "CANCELLED").length === 0 && <p className="col-span-full py-8 text-center text-xs text-panel-muted">پرواز در حال انجامی وجود ندارد.</p>}
+              </div>
+            </section>
+          )}
+
           {subTab === "done" && data && (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-4 gap-3">
@@ -656,9 +698,11 @@ export default function FlightsPage() {
                         </div>
                         {completedPager.pageItems.map(
                           (d: CompletedFlightRow) => (
-                            <div
+                            <button
                               key={d.id}
-                              className="grid grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-[11px]"
+                              type="button"
+                              onClick={() => setLifecycleFlight(d)}
+                              className="grid w-full grid-cols-[1.5fr_0.9fr_0.8fr_1fr_1fr_1fr_1fr_1.1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
                             >
                               <span>
                                 <span className="block font-bold text-panel-ink">
@@ -691,7 +735,7 @@ export default function FlightsPage() {
                                   ? faMoney(d.profitIrr)
                                   : "—"}
                               </span>
-                            </div>
+                            </button>
                           ),
                         )}
                       </>
@@ -712,11 +756,10 @@ export default function FlightsPage() {
                           (d: CompletedFlightRow) => (
                             <div key={d.id}>
                               <button
-                                onClick={() =>
-                                  setExpandedDone(
-                                    expandedDone === d.id ? null : d.id,
-                                  )
-                                }
+                                onClick={() => {
+                                  setExpandedDone(expandedDone === d.id ? null : d.id);
+                                  setLifecycleFlight(d);
+                                }}
                                 className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
                               >
                                 <span>
@@ -1585,6 +1628,9 @@ export default function FlightsPage() {
 
           <FareRulesSection instanceId={plan.id} />
         </Modal>
+      )}
+      {lifecycleFlight && (
+        <FlightLifecycleModal flight={lifecycleFlight} onClose={() => setLifecycleFlight(null)} />
       )}
     </div>
   );

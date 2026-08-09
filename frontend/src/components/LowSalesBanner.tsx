@@ -1,4 +1,4 @@
-import { faDigits } from '../lib/fa-format';
+import { faDigits, faMoney } from '../lib/fa-format';
 import { formatJalaliDate } from '../lib/jalali';
 import type { LowSalesAlert } from '../types/reporting';
 
@@ -54,6 +54,12 @@ export default function LowSalesBanner({
           {faDigits(alert.capacity)} صندلی فروخته شده است. این هشدار برای مدیر عامل، مدیر ارشد، مدیر مالی و مدیر
           بازرگانی ارسال شد.
         </div>
+        {alert.suggestedPriceIrr != null && (
+          <div className="mt-2 rounded-lg bg-black/10 px-3 py-2 text-[11px] text-[#dce8f8]">
+            پیشنهاد قیمت هوش مصنوعی: <strong className="font-num text-[#fbbf24]">{faMoney(alert.suggestedPriceIrr)} تومان</strong>
+            {alert.reasonFa ? <span className="mr-2 text-[#aebbd0]">— {alert.reasonFa}</span> : null}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -91,6 +91,13 @@ export interface LowSalesAlert {
   capacity: number;
   soldSeats: number;
   occupancyPct: number;
+  currentPriceIrr?: string | null;
+  competitorPriceIrr?: string | null;
+  suggestedPriceIrr?: number | null;
+  reasonFa?: string | null;
+  factorsFa?: string[];
+  confidence?: number | null;
+  generatedAt?: string | null;
 }
 
 export interface PeriodQuery {

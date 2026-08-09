@@ -1,13 +1,13 @@
 import {
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { EmployeePermission } from '../../database/entities/employee-permission.entity';
 import { PanelAccessFlag } from '../../database/entities/panel-access-flag.entity';
+import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -30,6 +30,8 @@ export class PanelsService {
     private readonly employeePermissionRepo: Repository<EmployeePermission>,
     @InjectRepository(PanelAccessFlag)
     private readonly panelAccessFlagRepo: Repository<PanelAccessFlag>,
+    @InjectRepository(RefreshToken)
+    private readonly refreshTokenRepo: Repository<RefreshToken>,
     private readonly audit: AuditService,
   ) {}
 
@@ -201,6 +203,32 @@ export class PanelsService {
     );
     const flag = await this.panelAccessFlagRepo.findOneByOrFail({ panelKey });
 
+    if (!enabled) {
+      const roleByPanelKey = {
+        SITE_ADMIN: 'SITE_ADMIN',
+        CEO: 'CEO',
+        BOARD_CHAIR: 'BOARD_CHAIR',
+        SENIOR_MANAGER: 'SENIOR_MANAGER',
+        FINANCE: 'FINANCE_MANAGER',
+        COMMERCIAL: 'COMMERCIAL_MANAGER',
+        OPERATIONS: 'OPERATIONS_MANAGER',
+        IT: 'IT_MANAGER',
+      } as const;
+      const role = roleByPanelKey[panelKey as keyof typeof roleByPanelKey];
+      if (role) {
+        const users = await this.userRepo.find({
+          where: { role },
+          select: { id: true },
+        });
+        if (users.length > 0) {
+          await this.refreshTokenRepo.update(
+            { userId: In(users.map((user) => user.id)), revokedAt: IsNull() },
+            { revokedAt: updatedAt },
+          );
+        }
+      }
+    }
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -219,6 +247,7 @@ export class PanelsService {
       SITE_ADMIN: 'SITE_ADMIN',
       FINANCE_MANAGER: 'FINANCE',
       COMMERCIAL_MANAGER: 'COMMERCIAL',
+      OPERATIONS_MANAGER: 'OPERATIONS',
       IT_MANAGER: 'IT',
     };
     const key = selfKeyByRole[role];
@@ -226,9 +255,9 @@ export class PanelsService {
 
     const flag = await this.panelAccessFlagRepo.findOneBy({ panelKey: key });
     if (flag && !flag.enabled) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'این پنل موقتاً غیرفعال شده است.',
+      throw new ForbiddenException({
+        code: ErrorCode.ACCESS_REVOKED,
+        message: 'اجازه دسترسی برای شما امکان‌پذیر نیست.',
       });
     }
   }

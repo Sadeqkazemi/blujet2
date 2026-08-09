@@ -2705,3 +2705,15 @@ migration's raw `CREATE TABLE`/`FOREIGN KEY` DDL): both tables'
 their entity declarations — the sandbox purge script (see API.md Phase 70)
 therefore deletes these two tables explicitly by `flightInstanceId` rather
 than relying on any cascade.
+# 2026-08 management panel hardening (no migration)
+
+- Panel availability continues to use `panel_access_flags`. The `OPERATIONS`
+  key maps to users with role `OPERATIONS_MANAGER`.
+- Disabling a panel sets `revokedAt` on every non-revoked `refresh_tokens` row
+  owned by a user in the affected role. Existing access JWTs are rejected by the
+  panel guard through the live panel flag.
+- CEO pricing-screen retention is a query rule over
+  `fare_pricing_proposals.approvedAt`; it does not delete proposal or audit rows.
+- Commercial flight lifecycle views reuse `flight_reviews`, `audit_logs`,
+  `fare_pricing_proposals`, and `flight_instances.aiSuggestion`; no duplicate
+  history or AI-decision table is added.

@@ -20,7 +20,7 @@ const RULES: ClubTierRules = {
 };
 
 describe('ClubTierRulesPage', () => {
-  it('renders the seeded thresholds and preview table', async () => {
+  it('renders the seeded thresholds and redesigned tier cards', async () => {
     vi.spyOn(clubApi, 'fetchClubTierRules').mockResolvedValue(RULES);
     render(<ClubTierRulesPage />);
 
@@ -29,6 +29,8 @@ describe('ClubTierRulesPage', () => {
     expect(screen.getByTestId('ctr-card')).toHaveValue('5000');
     expect(screen.getByText('طلایی')).toBeInTheDocument();
     expect(screen.getByText('پلاتین')).toBeInTheDocument();
+    expect(screen.getAllByTestId('club-tier-card')).toHaveLength(3);
+    expect(screen.getByTestId('club-tier-GOLD')).toHaveTextContent('۵٬۰۰۰');
   });
 
   it('shows a client-side validation error when gold >= platinum, without calling the API', async () => {

@@ -11,12 +11,14 @@ const PANEL_LABEL: Record<string, string> = {
   SENIOR_MANAGER: 'پنل مدیر ارشد',
   FINANCE: 'پنل مدیر مالی',
   COMMERCIAL: 'پنل مدیر بازرگانی',
+  OPERATIONS: 'پنل مدیر عملیات',
   IT: 'پنل مدیر IT',
 };
 
 const PANEL_DESC: Record<string, string> = {
   FINANCE: 'تراکنش‌ها، تسویه، استرداد و گزارش‌های مالی',
   COMMERCIAL: 'آژانس‌ها، نرخ‌گذاری و فروش',
+  OPERATIONS: 'داشبورد، کارتابل و بررسی عملیاتی پروازها',
   IT: 'کاربران، سرویس‌ها، امنیت و رزرواسیون',
   CEO: 'داشبورد اجرایی، کارتابل و تأییدهای سطح بالا',
   SITE_ADMIN: 'آژانس‌ها، پرواز، باشگاه، استرداد، کارتابل، تیکت‌ها و مدیریت سایت',
@@ -43,6 +45,16 @@ const PANEL_ICON: Record<string, { bg: string; color: string; svg: ReactNode }> 
         <path d="M3 21h18" />
         <path d="M6 21V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v16" />
         <path d="M19 21V10a1 1 0 0 0-1-1h-3" />
+      </svg>
+    ),
+  },
+  OPERATIONS: {
+    bg: 'rgba(14,165,233,.16)',
+    color: '#38bdf8',
+    svg: (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 11.5 21 4l-6.2 16-3.3-6.2L3 11.5Z" />
+        <path d="m11.5 13.8 3.2-3.2" />
       </svg>
     ),
   },
@@ -77,7 +89,7 @@ const PANEL_ICON: Record<string, { bg: string; color: string; svg: ReactNode }> 
   },
 };
 
-const CARD_ORDER = ['FINANCE', 'COMMERCIAL', 'IT', 'CEO', 'SITE_ADMIN', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
+const CARD_ORDER = ['FINANCE', 'COMMERCIAL', 'OPERATIONS', 'IT', 'CEO', 'SITE_ADMIN', 'SENIOR_MANAGER', 'BOARD_CHAIR'];
 
 const IT_PANEL_CARDS = [
   {

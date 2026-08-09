@@ -3450,3 +3450,22 @@ See `docs/features/flight-approval-workflow.md`.
   module, transactional outbox for domain events
   (`flight.submitted_to_operations`, …).
 - Migration: `1786953600000-FlightApprovalWorkflow`.
+# 2026-08 management panel hardening
+
+- `GET /panels/access-flags` includes `OPERATIONS` for CEO and senior-manager
+  actors. `PATCH /panels/access-flags/OPERATIONS` controls the
+  `OPERATIONS_MANAGER` panel.
+- A protected panel request made while its flag is disabled returns HTTP `403`
+  with `{ "code": "ACCESS_REVOKED", "message": "اجازه دسترسی برای شما امکان‌پذیر نیست." }`.
+  Disabling access revokes current refresh-token sessions for the affected role.
+- `GET /pricing/ceo` returns registered proposals only while
+  `approvedAt >= now - 3 days`; records remain available through audit/history
+  endpoints after leaving this screen.
+- CEO pricing workflow tasks are excluded from generic `GET /cartable`; pricing
+  review is served exclusively by `/pricing/ceo`.
+- `GET /flights/:id/history` is the canonical lifecycle feed for active-history
+  and completed-flight detail views. It includes manager reviews and relevant
+  flight/pricing audit entries.
+- Low-sales responses may include `suggestedPriceIrr`, `reasonFa`, `factorsFa`,
+  `confidence`, and `generatedAt`. Missing fields mean no current ML suggestion;
+  consumers must show a graceful advisory-unavailable state.
