@@ -224,6 +224,38 @@ describe('ResultsPage', () => {
     expect(await screen.findByTestId('ai-result')).toHaveTextContent('همین حالا بخرید');
   });
 
+  it('opens the login prompt before checkout when a guest buys a ticket and lets them close it', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage('unauthenticated');
+    await screen.findByTestId('result-card');
+    await expandFirstCard();
+
+    await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'برای ادامه وارد شوید' });
+    expect(dialog).toHaveTextContent('لطفاً برای تکمیل رزرو این پرواز وارد شوید یا یک حساب رایگان بسازید.');
+    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت‌نام' })).toBeInTheDocument();
+    expect(sessionStorage.getItem('blujet_checkout_draft')).toContain('fi-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'بستن پنجره ورود' }));
+    expect(screen.queryByRole('dialog', { name: 'برای ادامه وارد شوید' })).not.toBeInTheDocument();
+  });
+
+  it('dismisses the AI radar with its close button on mobile results', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage('unauthenticated', 'origin=THR&dest=MHD&date=2026-08-01', true);
+    await screen.findByTestId('result-card');
+
+    expect(screen.getByTestId('ai-radar')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بستن رادار هوشمند قیمت' }));
+    expect(screen.queryByTestId('ai-radar')).not.toBeInTheDocument();
+  });
+
   describe('real قفل قیمت (price lock)', () => {
     it('redirects an unauthenticated visitor to /signin, remembering the search', async () => {
       mockSearchApis();
@@ -375,8 +407,8 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT_WITH_COMFORT]);
       vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
       vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
-        status: 'unauthenticated',
-        user: null,
+        status: 'authenticated',
+        user: mockAuthUser({ id: 'u1', fullName: 'کاربر تست', role: 'USER' }),
         requestLogin: vi.fn(),
         confirmTwoFactor: vi.fn(),
         agencyLogin: vi.fn(),

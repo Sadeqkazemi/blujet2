@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -215,8 +215,11 @@ export default function CustomerLoginPage() {
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
+  const [searchParams] = useSearchParams();
 
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup'>(() =>
+    searchParams.get('mode') === 'signup' ? 'signup' : 'login',
+  );
   const [phase, setPhase] = useState<'id' | 'otp'>('id');
   const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');

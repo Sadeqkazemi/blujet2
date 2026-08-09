@@ -34,8 +34,8 @@ afterEach(() => {
   vi.spyOn(useLocaleModule, 'useLocale').mockRestore();
 });
 
-function renderWithRouter(node: React.ReactNode) {
-  return render(<MemoryRouter>{node}</MemoryRouter>);
+function renderWithRouter(node: React.ReactNode, initialEntry = '/') {
+  return render(<MemoryRouter initialEntries={[initialEntry]}>{node}</MemoryRouter>);
 }
 
 describe('CustomerLoginPage', () => {
@@ -75,6 +75,13 @@ describe('CustomerLoginPage', () => {
     await userEvent.type(screen.getByTestId('signin-phone'), '09121234567');
     await userEvent.click(screen.getByTestId('signup-terms'));
     expect(screen.getByTestId('signin-request')).toBeEnabled();
+  });
+
+  it('opens directly on signup when requested by the guest purchase prompt', () => {
+    renderWithRouter(<CustomerLoginPage />, '/signin?mode=signup');
+
+    expect(screen.getByTestId('signup-name')).toBeInTheDocument();
+    expect(screen.getByText('ساخت حساب کاربری')).toBeInTheDocument();
   });
 
   it('renders translated tabs, agency link, and forgot-password pill in English', () => {

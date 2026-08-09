@@ -10,9 +10,17 @@ type Props = {
   aiState: 'idle' | 'loading' | 'done' | 'unavailable' | 'error';
   advisory: SearchAdvisoryResult | null;
   onAnalyze: () => void;
+  onClose: () => void;
 };
 
-export default function ResultsAiRadar({ locale, copy, aiState, advisory, onAnalyze }: Props) {
+export default function ResultsAiRadar({ locale, copy, aiState, advisory, onAnalyze, onClose }: Props) {
+  const closeLabel =
+    locale === 'en'
+      ? `Close ${copy.aiRadarTitle}`
+      : locale === 'ar'
+        ? `إغلاق ${copy.aiRadarTitle}`
+        : `بستن ${copy.aiRadarTitle}`;
+
   return (
     <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 0' }} data-testid="ai-radar">
       <div
@@ -51,63 +59,87 @@ export default function ResultsAiRadar({ locale, copy, aiState, advisory, onAnal
             <div style={{ fontSize: 12.5, color: '#d6ece7', whiteSpace: 'nowrap' }}>{copy.aiRadarSub}</div>
           </div>
         </div>
-        {aiState === 'idle' && (
-          <button
-            type="button"
-            onClick={onAnalyze}
-            data-testid="ai-ask"
-            style={{
-              padding: '7px 13px',
-              background: '#fff',
-              color: '#1668c4',
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 800,
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {copy.aiAnalyze}
-          </button>
-        )}
-        {aiState === 'loading' && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontSize: 13, fontWeight: 600 }}>
-            <span
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+          {aiState === 'idle' && (
+            <button
+              type="button"
+              onClick={onAnalyze}
+              data-testid="ai-ask"
               style={{
-                width: 14,
-                height: 14,
-                border: '2px solid #ffffff55',
-                borderTopColor: '#fff',
-                borderRadius: '50%',
-                display: 'inline-block',
-                animation: 'spin 0.8s linear infinite',
+                padding: '7px 13px',
+                background: '#fff',
+                color: '#1668c4',
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
               }}
-            />
-            {copy.aiAnalyzing}
-          </span>
-        )}
-        {aiState === 'done' && (
+            >
+              {copy.aiAnalyze}
+            </button>
+          )}
+          {aiState === 'loading' && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#fff', fontSize: 13, fontWeight: 600 }}>
+              <span
+                style={{
+                  width: 14,
+                  height: 14,
+                  border: '2px solid #ffffff55',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.8s linear infinite',
+                }}
+              />
+              {copy.aiAnalyzing}
+            </span>
+          )}
+          {aiState === 'done' && (
+            <button
+              type="button"
+              onClick={onAnalyze}
+              style={{
+                padding: '6px 11px',
+                border: '1.5px solid #ffffff66',
+                color: '#fff',
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 700,
+                background: 'transparent',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copy.aiReanalyze}
+            </button>
+          )}
           <button
             type="button"
-            onClick={onAnalyze}
+            onClick={onClose}
+            aria-label={closeLabel}
             style={{
-              padding: '6px 11px',
-              border: '1.5px solid #ffffff66',
-              color: '#fff',
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid #ffffff55',
               borderRadius: 8,
-              fontSize: 12.5,
-              fontWeight: 700,
-              background: 'transparent',
+              background: '#ffffff18',
+              color: '#fff',
+              fontSize: 20,
+              lineHeight: 1,
               cursor: 'pointer',
               fontFamily: 'inherit',
-              whiteSpace: 'nowrap',
             }}
           >
-            {copy.aiReanalyze}
+            ×
           </button>
-        )}
+        </div>
       </div>
 
       {aiState === 'unavailable' && (
