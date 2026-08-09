@@ -28,6 +28,7 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import ResultsAiRadar from './results/ResultsAiRadar';
+import ResultsGuestAuthModal from './results/ResultsGuestAuthModal';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
@@ -94,6 +95,8 @@ export default function ResultsPage() {
   const [sort, setSort] = useState<'cheap' | 'fast' | 'early'>('cheap');
   const [aiState, setAiState] = useState<'idle' | 'loading' | 'done' | 'unavailable' | 'error'>('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
+  const [aiVisible, setAiVisible] = useState(true);
+  const [pendingCheckoutPath, setPendingCheckoutPath] = useState<string | null>(null);
 
   const [club, setClub] = useState<{ isMember: boolean; level: string | null } | null>(null);
   const [lockBusyKey, setLockBusyKey] = useState<string | null>(null);
@@ -438,7 +441,16 @@ export default function ResultsPage() {
         </div>
       </div>
 
-      <ResultsAiRadar locale={locale} copy={copy} aiState={aiState} advisory={advisory} onAnalyze={() => void askAi()} />
+      {aiVisible && (
+        <ResultsAiRadar
+          locale={locale}
+          copy={copy}
+          aiState={aiState}
+          advisory={advisory}
+          onAnalyze={() => void askAi()}
+          onClose={() => setAiVisible(false)}
+        />
+      )}
 
       {!isMobile && (
         <FlightPriceCalendar
@@ -712,7 +724,12 @@ export default function ResultsPage() {
                     origin: r.originCode,
                     dest: r.destCode,
                   });
-                  navigate(`/checkout/new?${q.toString()}`, { state: { cabin: c, flight } });
+                  const checkoutPath = `/checkout/new?${q.toString()}`;
+                  if (status !== 'authenticated') {
+                    setPendingCheckoutPath(checkoutPath);
+                    return;
+                  }
+                  navigate(checkoutPath, { state: { cabin: c, flight } });
                 }}
                 onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
                 onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
@@ -781,6 +798,20 @@ export default function ResultsPage() {
           variant="light"
         />
       </div>
+
+      <ResultsGuestAuthModal
+        locale={locale}
+        open={pendingCheckoutPath !== null}
+        onClose={() => setPendingCheckoutPath(null)}
+        onLogin={() => {
+          if (!pendingCheckoutPath) return;
+          navigate('/signin', { state: { from: pendingCheckoutPath } });
+        }}
+        onSignup={() => {
+          if (!pendingCheckoutPath) return;
+          navigate('/signin?mode=signup', { state: { from: pendingCheckoutPath } });
+        }}
+      />
 
       <ResultsEditSearchModal
         open={editOpen}
