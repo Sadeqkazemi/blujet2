@@ -42,7 +42,10 @@ import {
   type NormalizedCabinCapacity,
 } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
-import { toPublishStatus } from './definition-sellability';
+import {
+  toFlightUiStatus,
+  toPublishStatus,
+} from './definition-sellability';
 import {
   countSeatsByCabin,
   type AircraftSeatMapLike,
@@ -366,13 +369,16 @@ export class FlightDefinitionService {
       formDepartureAt,
     );
 
-    // Definition edits are allowed except while the first submission sits
-    // with the CEO (PENDING_CEO). PENDING_REVISION keeps the live snapshot
-    // and stages a new draft the commercial team can still adjust.
-    const canEdit = approvalStatus !== FlightDefinitionStatus.PENDING_CEO;
+    // Edits blocked while waiting on ops or CEO. PENDING_REVISION keeps the
+    // live snapshot and stages a draft commercial can still adjust.
+    const canEdit =
+      approvalStatus !== FlightDefinitionStatus.PENDING_CEO &&
+      approvalStatus !== FlightDefinitionStatus.PENDING_OPERATIONS;
     const editBlockedReason = canEdit
       ? null
-      : 'این تعریف در انتظار تأیید مدیرعامل است.';
+      : approvalStatus === FlightDefinitionStatus.PENDING_OPERATIONS
+        ? 'این تعریف در انتظار بررسی مدیر عملیات است.'
+        : 'این تعریف در انتظار تأیید مدیرعامل است.';
 
     return {
       id: instance.id,
@@ -404,6 +410,13 @@ export class FlightDefinitionService {
         instance.definitionStatus,
         instance.approvedSnapshot != null,
       ),
+      uiStatus: toFlightUiStatus(
+        instance.definitionStatus,
+        instance.approvedSnapshot != null,
+      ),
+      version: instance.version,
+      publishedAt: instance.publishedAt?.toISOString() ?? null,
+      publishedByUserId: instance.publishedByUserId,
     };
   }
 
@@ -522,10 +535,13 @@ export class FlightDefinitionService {
           durationMinutes,
           competitorPriceIrr: dto.competitorPriceIrr ?? null,
           cabinCapacities,
-          definitionStatus: FlightDefinitionStatus.PENDING_CEO,
+          definitionStatus: FlightDefinitionStatus.DRAFT,
           rejectionReason: null,
           approvedSnapshot: null,
           pendingRevisionSnapshot: null,
+          version: 1,
+          publishedAt: null,
+          publishedByUserId: null,
           aircraftDefinitionId: map.aircraftDefinitionId,
           ...(existingFlight && dto.aircraftType
             ? { aircraftTypeOverride: aircraftType }
@@ -554,15 +570,15 @@ export class FlightDefinitionService {
       actorId: actor.id,
       actorRole: actor.role,
       category: 'SYSTEM',
-      action: 'افزودن و ارسال تعریف پرواز',
-      detail: `تعریف پرواز ${dto.flightNo} (${dto.originCode} ← ${dto.destCode}) توسط ${actor.fullName} ایجاد و برای تأیید مدیرعامل ارسال شد.`,
+      action: 'افزودن تعریف پرواز (پیش‌نویس)',
+      detail: `تعریف پرواز ${dto.flightNo} (${dto.originCode} ← ${dto.destCode}) توسط ${actor.fullName} به‌صورت پیش‌نویس ایجاد شد.`,
       entityType: 'FlightInstance',
       entityId: createdId,
       metadata: {
         durationMinutes,
         cabinCapacities,
         chargeRuleCount: chargeInputs.length,
-        definitionStatus: FlightDefinitionStatus.PENDING_CEO,
+        definitionStatus: FlightDefinitionStatus.DRAFT,
       },
     });
 
@@ -629,15 +645,21 @@ export class FlightDefinitionService {
 
     const status = instance.definitionStatus;
 
-    if (status === FlightDefinitionStatus.PENDING_CEO) {
+    if (
+      status === FlightDefinitionStatus.PENDING_CEO ||
+      status === FlightDefinitionStatus.PENDING_OPERATIONS
+    ) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message:
-          'این تعریف در انتظار تأیید مدیرعامل است و فعلاً قابل ویرایش نیست.',
+          status === FlightDefinitionStatus.PENDING_OPERATIONS
+            ? 'این تعریف در انتظار بررسی مدیر عملیات است و فعلاً قابل ویرایش نیست.'
+            : 'این تعریف در انتظار تأیید مدیرعامل است و فعلاً قابل ویرایش نیست.',
       });
     }
 
     const isApprovedLive =
+      status === FlightDefinitionStatus.PUBLISHED ||
       status === FlightDefinitionStatus.APPROVED ||
       (status === FlightDefinitionStatus.PENDING_REVISION &&
         instance.approvedSnapshot != null);
@@ -712,6 +734,7 @@ export class FlightDefinitionService {
         instance.pendingRevisionSnapshot = snapshot;
         instance.definitionStatus = FlightDefinitionStatus.PENDING_REVISION;
         instance.rejectionReason = null;
+        instance.version += 1;
         await manager.save(instance);
         await this.replaceChargeRules(manager, instance.id, chargeInputs, true);
 
@@ -754,14 +777,10 @@ export class FlightDefinitionService {
         instance.competitorPriceIrr = dto.competitorPriceIrr ?? null;
         instance.cabinCapacities = cabinCapacities;
         instance.aircraftDefinitionId = map.aircraftDefinitionId;
-        instance.definitionStatus =
-          status === FlightDefinitionStatus.REJECTED
-            ? FlightDefinitionStatus.DRAFT
-            : status === FlightDefinitionStatus.DRAFT
-              ? FlightDefinitionStatus.DRAFT
-              : FlightDefinitionStatus.DRAFT;
+        instance.definitionStatus = FlightDefinitionStatus.DRAFT;
         instance.rejectionReason = null;
         instance.pendingRevisionSnapshot = null;
+        instance.version += 1;
         if (dto.aircraftType) {
           instance.aircraftTypeOverride = aircraftType;
         }
@@ -808,12 +827,23 @@ export class FlightDefinitionService {
   async applyCeoApprovalInTx(
     manager: EntityManager,
     flightInstanceId: string,
+    publishedByUserId?: string,
   ): Promise<{ previousLocation: PreviousSearchLocation }> {
     const instance = await manager.findOne(FlightInstance, {
       where: { id: flightInstanceId },
       relations: { flight: { route: true } },
     });
     if (!instance?.flight?.route) return { previousLocation: null };
+
+    if (
+      instance.definitionStatus !== FlightDefinitionStatus.PENDING_CEO &&
+      instance.definitionStatus !== FlightDefinitionStatus.PENDING_REVISION
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'فقط پرواز در انتظار مدیرعامل قابل انتشار است.',
+      });
+    }
 
     if (
       instance.definitionStatus === FlightDefinitionStatus.PENDING_REVISION &&
@@ -842,8 +872,11 @@ export class FlightDefinitionService {
       instance.aircraftDefinitionId = snap.aircraftDefinitionId ?? null;
       instance.approvedSnapshot = snap;
       instance.pendingRevisionSnapshot = null;
-      instance.definitionStatus = FlightDefinitionStatus.APPROVED;
+      instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
       instance.rejectionReason = null;
+      instance.publishedAt = new Date();
+      instance.publishedByUserId = publishedByUserId ?? instance.publishedByUserId;
+      instance.version += 1;
 
       const flight = await manager.findOneByOrFail(Flight, {
         id: instance.flightId,
@@ -877,7 +910,7 @@ export class FlightDefinitionService {
       return { previousLocation };
     }
 
-    // First-time approval of DRAFT / PENDING_CEO / REJECTED→pending path.
+    // First-time publish from PENDING_CEO.
     // No prior searchable listing existed, so there is no stale cache
     // entry to invalidate.
     const activeRules = await manager.find(FlightChargeRule, {
@@ -913,17 +946,21 @@ export class FlightDefinitionService {
     });
     instance.approvedSnapshot = snapshot;
     instance.pendingRevisionSnapshot = null;
-    instance.definitionStatus = FlightDefinitionStatus.APPROVED;
+    instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
     instance.rejectionReason = null;
+    instance.publishedAt = new Date();
+    instance.publishedByUserId = publishedByUserId ?? null;
+    instance.version += 1;
     await manager.save(instance);
     return { previousLocation: null };
   }
 
   async applyCeoApproval(
     flightInstanceId: string,
+    publishedByUserId?: string,
   ): Promise<{ previousLocation: PreviousSearchLocation }> {
     return this.dataSource.transaction((manager) =>
-      this.applyCeoApprovalInTx(manager, flightInstanceId),
+      this.applyCeoApprovalInTx(manager, flightInstanceId, publishedByUserId),
     );
   }
 
@@ -944,16 +981,18 @@ export class FlightDefinitionService {
         isPendingRevision: true,
       });
       instance.pendingRevisionSnapshot = null;
-      instance.definitionStatus = FlightDefinitionStatus.APPROVED;
+      instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
       instance.rejectionReason = reason;
+      instance.version += 1;
     } else if (
-      instance.definitionStatus === FlightDefinitionStatus.DRAFT ||
       instance.definitionStatus === FlightDefinitionStatus.PENDING_CEO
     ) {
       instance.definitionStatus = FlightDefinitionStatus.REJECTED;
       instance.rejectionReason = reason;
+      instance.version += 1;
     } else {
       instance.rejectionReason = reason;
+      instance.version += 1;
     }
     await manager.save(instance);
   }
@@ -967,23 +1006,16 @@ export class FlightDefinitionService {
     );
   }
 
-  /** Mark definition awaiting CEO when a pricing proposal is submitted. */
+  /**
+   * Legacy hook from pricing upsert — no longer jumps DRAFT → PENDING_CEO.
+   * Operations must approve first via submit-operations / ops-decision.
+   * Kept so callers compile; intentionally a no-op for status.
+   */
   async markPendingCeoInTx(
-    manager: EntityManager,
-    flightInstanceId: string,
+    _manager: EntityManager,
+    _flightInstanceId: string,
   ): Promise<void> {
-    const instance = await manager.findOne(FlightInstance, {
-      where: { id: flightInstanceId },
-    });
-    if (!instance) return;
-    if (
-      instance.definitionStatus === FlightDefinitionStatus.DRAFT ||
-      instance.definitionStatus === FlightDefinitionStatus.REJECTED
-    ) {
-      instance.definitionStatus = FlightDefinitionStatus.PENDING_CEO;
-      instance.rejectionReason = null;
-      await manager.save(instance);
-    }
+    return;
   }
 
   async markPendingCeo(flightInstanceId: string): Promise<void> {

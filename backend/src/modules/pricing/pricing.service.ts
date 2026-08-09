@@ -402,6 +402,7 @@ export class PricingService {
       const { previousLocation } = await this.definitions.applyCeoApprovalInTx(
         manager,
         lockedProposal.flightInstanceId,
+        actor.id,
       );
       return { alreadyRegistered: false as const, price, previousLocation };
     });

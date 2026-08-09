@@ -7,9 +7,9 @@ import {
 import type { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { ErrorCode } from '../../common/errors';
 
-/** Customer-facing sellable definition states (live approved inventory). */
+/** Customer-facing sellable definition states (live published inventory). */
 export const SELLABLE_DEFINITION_STATUSES: FlightDefinitionStatusT[] = [
-  FlightDefinitionStatus.APPROVED,
+  FlightDefinitionStatus.PUBLISHED,
   FlightDefinitionStatus.PENDING_REVISION,
 ];
 
@@ -18,38 +18,70 @@ export function isSellableDefinitionStatus(
   hasApprovedSnapshot = false,
 ): boolean {
   return (
+    status === FlightDefinitionStatus.PUBLISHED ||
+    // Legacy rows until migration completes / mixed environments
     status === FlightDefinitionStatus.APPROVED ||
     (status === FlightDefinitionStatus.PENDING_REVISION && hasApprovedSnapshot)
   );
 }
 
-/** Canonical publish-state names for the API contract (frontend PR #126
- * expects "PUBLISHED" as the customer-visible/sellable state). The DB's
- * `FlightDefinitionStatus` column keeps its existing values (APPROVED /
- * PENDING_REVISION / etc.) unchanged — renaming that enum would ripple
- * through the whole CEO-approval workflow built and tested in an earlier
- * phase, for no behavioral gain. This is a pure display/contract mapping,
- * always derived from `definitionStatus` (+ approvedSnapshot presence),
- * never stored independently — there is exactly one source of truth. */
+/** Canonical publish-state names for the API / frontend contract. */
 export type PublishStatus =
-  'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'REJECTED';
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'PUBLISHED'
+  | 'REJECTED';
+
+/** FE uiStatus mapping documented in docs/features/flight-approval-workflow.md */
+export type FlightUiStatus =
+  | 'draft'
+  | 'pending_ops'
+  | 'ops_rejected'
+  | 'pending_ceo'
+  | 'registered'
+  | 'rejected';
 
 export function toPublishStatus(
   status: FlightDefinitionStatusT | null | undefined,
-  hasApprovedSnapshot = false,
+  _hasApprovedSnapshot = false,
 ): PublishStatus {
-  if (isSellableDefinitionStatus(status, hasApprovedSnapshot)) {
-    return 'PUBLISHED';
-  }
   switch (status) {
+    case FlightDefinitionStatus.PUBLISHED:
+    case FlightDefinitionStatus.APPROVED:
+      return 'PUBLISHED';
     case FlightDefinitionStatus.REJECTED:
+    case FlightDefinitionStatus.OPERATIONS_REJECTED:
       return 'REJECTED';
     case FlightDefinitionStatus.PENDING_CEO:
     case FlightDefinitionStatus.PENDING_REVISION:
+    case FlightDefinitionStatus.PENDING_OPERATIONS:
       return 'PENDING_APPROVAL';
     case FlightDefinitionStatus.DRAFT:
     default:
       return 'DRAFT';
+  }
+}
+
+export function toFlightUiStatus(
+  status: FlightDefinitionStatusT | null | undefined,
+  _hasApprovedSnapshot = false,
+): FlightUiStatus {
+  switch (status) {
+    case FlightDefinitionStatus.PUBLISHED:
+    case FlightDefinitionStatus.APPROVED:
+      return 'registered';
+    case FlightDefinitionStatus.PENDING_OPERATIONS:
+      return 'pending_ops';
+    case FlightDefinitionStatus.OPERATIONS_REJECTED:
+      return 'ops_rejected';
+    case FlightDefinitionStatus.PENDING_CEO:
+    case FlightDefinitionStatus.PENDING_REVISION:
+      return 'pending_ceo';
+    case FlightDefinitionStatus.REJECTED:
+      return 'rejected';
+    case FlightDefinitionStatus.DRAFT:
+    default:
+      return 'draft';
   }
 }
 
@@ -59,11 +91,14 @@ export function applySellableDefinitionFilter<T extends FlightInstance>(
   alias = 'fi',
 ): SelectQueryBuilder<T> {
   return qb.andWhere(
-    `(${alias}.definitionStatus = :approvedDefinition OR (` +
+    `(${alias}.definitionStatus IN (:...sellableStatuses) OR (` +
       `${alias}.definitionStatus = :pendingRevisionDefinition AND ` +
       `${alias}.approvedSnapshot IS NOT NULL))`,
     {
-      approvedDefinition: FlightDefinitionStatus.APPROVED,
+      sellableStatuses: [
+        FlightDefinitionStatus.PUBLISHED,
+        FlightDefinitionStatus.APPROVED,
+      ],
       pendingRevisionDefinition: FlightDefinitionStatus.PENDING_REVISION,
     },
   );
