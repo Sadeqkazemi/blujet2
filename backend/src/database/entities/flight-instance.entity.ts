@@ -114,16 +114,26 @@ export class FlightInstance {
   cabinCapacities!: JsonValue | null;
 
   /**
-   * Definition workflow. Legacy rows default to APPROVED so existing inventory
-   * stays bookable without a CEO re-approval.
+   * Definition workflow. Legacy inventory defaults to PUBLISHED so existing
+   * rows stay bookable without a re-approval.
    */
   @Column({
     type: 'enum',
     enum: FlightDefinitionStatus,
     enumName: 'FlightDefinitionStatus',
-    default: FlightDefinitionStatus.APPROVED,
+    default: FlightDefinitionStatus.PUBLISHED,
   })
   definitionStatus!: FlightDefinitionStatus;
+
+  /** Optimistic lock — bump on every workflow / definition mutation. */
+  @Column({ type: 'int', default: 1 })
+  version!: number;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  publishedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  publishedByUserId!: string | null;
 
   @Column({ type: 'text', nullable: true })
   rejectionReason!: string | null;
