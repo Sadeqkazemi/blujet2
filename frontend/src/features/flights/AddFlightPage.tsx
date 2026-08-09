@@ -9,6 +9,7 @@ import {
   fetchCommitmentsSummary,
   fetchFlightDefinition,
   planFlight,
+  submitFlightToOperations,
   updateFlightDefinition,
 } from "../../api/flights";
 import {
@@ -210,6 +211,7 @@ export default function AddFlightPage({
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
   const [loadingDefinition, setLoadingDefinition] = useState(isEdit);
+  const [operationsFeedback, setOperationsFeedback] = useState<string | null>(null);
 
   const [flightNo, setFlightNo] = useState("");
   const [originCode, setOriginCode] = useState("");
@@ -327,6 +329,11 @@ export default function AddFlightPage({
         setCharter(String(def.charterSeats ?? 0));
         setAircraft(def.aircraftType || "Airbus A320");
         setChargeRules(def.chargeRules.map(chargeRuleFromApi));
+        setOperationsFeedback(
+          def.definitionStatus === "OPERATIONS_REJECTED"
+            ? def.rejectionReason
+            : null,
+        );
         if (def.basePriceIrr) {
           setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
@@ -618,15 +625,13 @@ export default function AddFlightPage({
           legalRateIrr: legalIrr ?? undefined,
           note: note.trim() || undefined,
         });
+        await submitFlightToOperations(flightId, updated.version);
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
-        if (
-          updated.pendingRevision ||
-          updated.approvalStatus === "PENDING_REVISION"
-        ) {
-          onSuccess("تغییرات برای تأیید مجدد مدیرعامل ارسال شد.");
-        } else {
-          onSuccess(`مشخصات پرواز به‌روزرسانی شد ✓ — ${route}`);
-        }
+        onSuccess(
+          updated.pendingRevision || updated.approvalStatus === "PENDING_REVISION"
+            ? "تغییرات برای بررسی مجدد مدیر عملیات ارسال شد."
+            : `مشخصات پرواز برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
+        );
         return;
       }
 
@@ -669,10 +674,11 @@ export default function AddFlightPage({
         legalRateIrr: legalIrr ?? undefined,
         note: note.trim() || undefined,
       });
+      await submitFlightToOperations(created.id, created.version);
 
       const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
       onSuccess(
-        `پرواز جدید ثبت و قیمت برای تأیید مدیر عامل ارسال شد ✓ — ${route}`,
+        `پرواز جدید ثبت و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
       );
     } catch (e) {
       setError(
@@ -694,7 +700,7 @@ export default function AddFlightPage({
       : "ذخیره تغییرات"
     : saving
       ? "در حال ثبت…"
-      : "ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل";
+      : "ثبت پرواز و ارسال برای مدیر عملیات";
 
   return (
     <div
@@ -725,8 +731,8 @@ export default function AddFlightPage({
               <h1 className="m-0 text-xl font-black text-white">{pageTitle}</h1>
               <p className="mt-[3px] text-xs text-[#6b7b94]">
                 {isEdit
-                  ? "مشخصات پرواز را ویرایش کنید؛ تغییرات پرواز تأییدشده برای تأیید مجدد مدیرعامل ارسال می‌شود."
-                  : "اطلاعات پرواز را وارد کنید، قیمت را با کمک هوش مصنوعی تعیین و برای تأیید مدیر عامل ارسال کنید."}
+                  ? "مشخصات پرواز را ویرایش کنید؛ تغییرات ابتدا برای بررسی مدیر عملیات ارسال می‌شود."
+                  : "اطلاعات پرواز را وارد کنید؛ پس از تأیید مدیر عملیات، پرونده برای مدیر عامل ارسال می‌شود."}
               </p>
             </div>
           </div>
@@ -745,6 +751,12 @@ export default function AddFlightPage({
           </p>
         ) : (
           <>
+            {operationsFeedback && (
+              <div className="mb-4 rounded-xl border border-[#f8717155] bg-[#f8717114] p-4 text-sm leading-7 text-[#fca5a5]">
+                <strong className="block text-xs text-[#f87171]">نظر مدیر عملیات برای اصلاح</strong>
+                {operationsFeedback}
+              </div>
+            )}
             {/* مشخصات پرواز */}
             <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
               <div className="mb-4 flex items-center gap-2">
@@ -1388,7 +1400,7 @@ export default function AddFlightPage({
               </div>
               <div className="mt-[13px]">
                 <label className={labelClass} htmlFor="af-note">
-                  یادداشت برای مدیر عامل (اختیاری)
+                  یادداشت برای گردش تأیید (اختیاری)
                 </label>
                 <textarea
                   id="af-note"

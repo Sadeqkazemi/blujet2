@@ -234,6 +234,81 @@ export interface FlightDefinitionDetail extends FlightRow {
   editBlockedReason: string | null;
   pendingRevision: boolean;
   approvedSnapshot: FlightDefinitionSnapshot | null;
+  pendingRevisionSnapshot?: FlightDefinitionSnapshot | null;
+  definitionStatus?: OperationsFlightStatus;
+  publishStatus?: string;
+  uiStatus?: string;
+  version: number;
+  publishedAt?: string | null;
+}
+
+export type OperationsFlightStatus =
+  | "PENDING_OPERATIONS"
+  | "OPERATIONS_REJECTED"
+  | "REJECTED"
+  | "PENDING_CEO"
+  | "PUBLISHED";
+
+export interface OperationsFlightRow {
+  id: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  capacity: number;
+  charterSeats: number;
+  aircraftType: string;
+  basePriceIrr: string | null;
+  competitorPriceIrr: string | null;
+  proposal: {
+    id: string;
+    proposedPriceIrr: string;
+    legalRateIrr: string | null;
+    note: string | null;
+    status: string;
+    proposedBy: { id: string; fullName: string } | null;
+  } | null;
+  definitionStatus: OperationsFlightStatus;
+  publishStatus: string;
+  uiStatus: string;
+  version: number;
+  rejectionReason: string | null;
+}
+
+export interface OperationsOverview {
+  counts: {
+    pendingOperations: number;
+    pendingCeo: number;
+    operationsRejected: number;
+    published: number;
+  };
+  pending: OperationsFlightRow[];
+  rows: OperationsFlightRow[];
+}
+
+export interface FlightWorkflowHistory {
+  id: string;
+  definitionStatus: string;
+  publishStatus: string;
+  uiStatus: string;
+  version: number;
+  reviews: {
+    id: string;
+    stage: "OPERATIONS" | "CEO";
+    decision: "APPROVED" | "REJECTED";
+    comment: string;
+    reviewedByUserId: string;
+    reviewedAt: string;
+  }[];
+  audit: {
+    id: string;
+    category: string;
+    action: string;
+    detail: string;
+    actorRole: string;
+    createdAt: string;
+    metadata?: Record<string, unknown> | null;
+  }[];
 }
 
 export interface UpdateFareRulePayload {

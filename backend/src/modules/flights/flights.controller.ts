@@ -583,6 +583,16 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Get('operations-overview')
+  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER)
+  @ApiOperation({
+    summary: 'داشبورد و فهرست وضعیت‌های گردش کار مدیر عملیات',
+  })
+  async operationsOverview() {
+    const data = await this.workflow.operationsOverview();
+    return { success: true, data };
+  }
+
   @Post(':id/submit-operations')
   @HttpCode(200)
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)

@@ -407,6 +407,9 @@ stays untouched on the same page).
   version mismatch.
 - GET `/flights/operations-queue` — `OPERATIONS_MANAGER` (+ Senior) —
   list instances awaiting ops (`status` defaults `PENDING_OPERATIONS`).
+- GET `/flights/operations-overview` — `OPERATIONS_MANAGER` (+ Senior) —
+  dashboard counters plus pending/recent workflow rows. Each row includes
+  proposal prices/note, aircraft/capacity, status and optimistic-lock version.
 - POST `/flights/:id/operations-decision` — ops only —
   `{ decision: APPROVED|REJECTED, comment, expectedVersion? }`. Comment
   required. Approve → `PENDING_CEO`; reject → `OPERATIONS_REJECTED`.

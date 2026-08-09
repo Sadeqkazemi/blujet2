@@ -8,9 +8,11 @@ import type {
   FareRuleRow,
   FlightDefinitionDetail,
   FlightDetail,
-  FlightRow,
   FlightsOverview,
   PlanResult,
+  OperationsFlightRow,
+  OperationsOverview,
+  FlightWorkflowHistory,
   UpdateFareRulePayload,
   UpdateFlightDefinitionPayload,
 } from "../types/flights";
@@ -43,7 +45,37 @@ export function fetchAircraftTypes() {
 export interface CreateFlightPayload extends CreateFlightDefinitionPayload {}
 
 export function createFlight(payload: CreateFlightPayload) {
-  return apiPost<FlightRow>("/flights", payload);
+  return apiPost<FlightDefinitionDetail>("/flights", payload);
+}
+
+export function submitFlightToOperations(id: string, expectedVersion?: number) {
+  return apiPost<FlightDefinitionDetail>(`/flights/${id}/submit-operations`, {
+    expectedVersion,
+  });
+}
+
+export function fetchOperationsQueue(status?: "PENDING_OPERATIONS" | "OPERATIONS_REJECTED") {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiGet<OperationsFlightRow[]>(`/flights/operations-queue${query}`);
+}
+
+export function fetchOperationsOverview() {
+  return apiGet<OperationsOverview>("/flights/operations-overview");
+}
+
+export function decideFlightOperations(
+  id: string,
+  dto: {
+    decision: "APPROVED" | "REJECTED";
+    comment: string;
+    expectedVersion?: number;
+  },
+) {
+  return apiPost<FlightDefinitionDetail>(`/flights/${id}/operations-decision`, dto);
+}
+
+export function fetchFlightHistory(id: string) {
+  return apiGet<FlightWorkflowHistory>(`/flights/${id}/history`);
 }
 
 /** Expected: GET /flights/:id/definition — full editable flight definition. */

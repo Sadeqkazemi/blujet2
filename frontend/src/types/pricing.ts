@@ -79,7 +79,15 @@ export interface CommercialFlightRow {
   basePriceIrr: string | null;
   /** Real competitor fare when present — never invent base+3% client-side. */
   competitorPriceIrr?: string | null;
-  flight: { flightNo: string; route: { originCode: string; destCode: string } };
+  definitionStatus?: string;
+  version?: number;
+  rejectionReason?: string | null;
+  aircraftTypeOverride?: string | null;
+  flight: {
+    flightNo: string;
+    aircraftType?: string;
+    route: { originCode: string; destCode: string };
+  };
   pricing: PricingProposal | null;
 }
 

@@ -3,7 +3,14 @@ import { faDigits, latinDigits } from "./fa-format";
 export type CabinKind = "BUSINESS" | "COMFORT" | "ECONOMY";
 
 export type FlightApprovalStatus =
-  "DRAFT" | "PENDING_CEO" | "APPROVED" | "REJECTED" | "PENDING_REVISION";
+  | "DRAFT"
+  | "PENDING_OPERATIONS"
+  | "OPERATIONS_REJECTED"
+  | "PENDING_CEO"
+  | "APPROVED"
+  | "PUBLISHED"
+  | "REJECTED"
+  | "PENDING_REVISION";
 
 export type ChargeKind = 'TAX' | 'FEE';
 /** UI / preview method; wire adapter maps PERCENT → PERCENTAGE. */
@@ -24,11 +31,20 @@ export const APPROVAL_STATUS_META: Record<
   { label: string; className: string }
 > = {
   DRAFT: { label: "پیش‌نویس", className: "bg-[#9fb0c724] text-[#9fb0c7]" },
+  PENDING_OPERATIONS: {
+    label: "در انتظار بررسی مدیر عملیات",
+    className: "bg-[#f59e0b24] text-[#f59e0b]",
+  },
+  OPERATIONS_REJECTED: {
+    label: "ردشده توسط مدیر عملیات",
+    className: "bg-[#f8717124] text-[#f87171]",
+  },
   PENDING_CEO: {
     label: "در انتظار تأیید مدیرعامل",
     className: "bg-[#a78bfa24] text-[#a78bfa]",
   },
   APPROVED: { label: "تأییدشده", className: "bg-[#34d39924] text-[#34d399]" },
+  PUBLISHED: { label: "منتشرشده", className: "bg-[#34d39924] text-[#34d399]" },
   REJECTED: { label: "ردشده", className: "bg-[#f8717124] text-[#f87171]" },
   PENDING_REVISION: {
     label: "تغییرات در انتظار تأیید",

@@ -130,25 +130,136 @@ export class FlightWorkflowService {
       take: 100,
     });
 
-    return rows.map((inst) => ({
-      id: inst.id,
-      flightNo: inst.flight.flightNo,
-      originCode: inst.flight.route.originCode,
-      destCode: inst.flight.route.destCode,
-      departureAt: inst.departureAt.toISOString(),
-      capacity: inst.capacity,
-      definitionStatus: inst.definitionStatus,
-      publishStatus: toPublishStatus(
-        inst.definitionStatus,
-        inst.approvedSnapshot != null,
+    return this.shapeOperationsRows(rows);
+  }
+
+  async operationsOverview() {
+    const trackedStatuses = [
+      FlightDefinitionStatus.PENDING_OPERATIONS,
+      FlightDefinitionStatus.OPERATIONS_REJECTED,
+      FlightDefinitionStatus.REJECTED,
+      FlightDefinitionStatus.PENDING_CEO,
+      FlightDefinitionStatus.PUBLISHED,
+    ];
+    const [
+      pendingRows,
+      recentRows,
+      pendingOperations,
+      pendingCeo,
+      opsRejected,
+      ceoRejected,
+      published,
+    ] = await Promise.all([
+      this.instanceRepo.find({
+        where: {
+          definitionStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
+        },
+        relations: { flight: { route: true } },
+        order: { departureAt: 'ASC' },
+        take: 100,
+      }),
+      this.instanceRepo.find({
+        where: {
+          definitionStatus: In(
+            trackedStatuses.filter(
+              (status) => status !== FlightDefinitionStatus.PENDING_OPERATIONS,
+            ),
+          ),
+        },
+        relations: { flight: { route: true } },
+        order: { departureAt: 'DESC' },
+        take: 100,
+      }),
+      this.countByDefinitionStatus(FlightDefinitionStatus.PENDING_OPERATIONS),
+      this.countByDefinitionStatus(FlightDefinitionStatus.PENDING_CEO),
+      this.countByDefinitionStatus(FlightDefinitionStatus.OPERATIONS_REJECTED),
+      this.countByDefinitionStatus(FlightDefinitionStatus.REJECTED),
+      this.countByDefinitionStatus(FlightDefinitionStatus.PUBLISHED),
+    ]);
+    const rows = [...pendingRows, ...recentRows];
+    const shaped = await this.shapeOperationsRows(rows);
+
+    return {
+      counts: {
+        pendingOperations,
+        pendingCeo,
+        operationsRejected: opsRejected + ceoRejected,
+        published,
+      },
+      pending: shaped.filter(
+        (row) =>
+          row.definitionStatus === FlightDefinitionStatus.PENDING_OPERATIONS,
       ),
-      uiStatus: toFlightUiStatus(
-        inst.definitionStatus,
-        inst.approvedSnapshot != null,
-      ),
-      version: inst.version,
-      rejectionReason: inst.rejectionReason,
-    }));
+      rows: shaped,
+    };
+  }
+
+  private async shapeOperationsRows(rows: FlightInstance[]) {
+    const proposals = rows.length
+      ? await this.proposalRepo.find({
+          where: { flightInstanceId: In(rows.map((row) => row.id)) },
+          relations: { proposedBy: true },
+        })
+      : [];
+    const proposalByFlight = new Map(
+      proposals.map((proposal) => [proposal.flightInstanceId, proposal]),
+    );
+
+    return rows.map((inst) => {
+      const proposal = proposalByFlight.get(inst.id);
+      return {
+        id: inst.id,
+        flightNo: inst.flight.flightNo,
+        originCode: inst.flight.route.originCode,
+        destCode: inst.flight.route.destCode,
+        departureAt: inst.departureAt.toISOString(),
+        capacity: inst.capacity,
+        charterSeats: inst.charterSeats,
+        aircraftType:
+          inst.aircraftTypeOverride ?? inst.flight.aircraftType ?? '—',
+        basePriceIrr:
+          proposal?.basePriceIrr?.toString() ??
+          inst.basePriceIrr?.toString() ??
+          null,
+        competitorPriceIrr:
+          proposal?.competitorPriceIrr?.toString() ??
+          inst.competitorPriceIrr?.toString() ??
+          null,
+        proposal: proposal
+          ? {
+              id: proposal.id,
+              proposedPriceIrr: proposal.proposedPriceIrr.toString(),
+              legalRateIrr: proposal.legalRateIrr?.toString() ?? null,
+              note: proposal.note,
+              status: proposal.status,
+              proposedBy: proposal.proposedBy
+                ? {
+                    id: proposal.proposedBy.id,
+                    fullName: proposal.proposedBy.fullName,
+                  }
+                : null,
+            }
+          : null,
+        definitionStatus: inst.definitionStatus,
+        publishStatus: toPublishStatus(
+          inst.definitionStatus,
+          inst.approvedSnapshot != null,
+        ),
+        uiStatus: toFlightUiStatus(
+          inst.definitionStatus,
+          inst.approvedSnapshot != null,
+        ),
+        version: inst.version,
+        rejectionReason: inst.rejectionReason,
+      };
+    });
+  }
+
+  private countByDefinitionStatus(status: FlightDefinitionStatus) {
+    return this.instanceRepo
+      .createQueryBuilder('instance')
+      .where('instance.definitionStatus = :status', { status })
+      .getCount();
   }
 
   async operationsDecision(

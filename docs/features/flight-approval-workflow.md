@@ -42,6 +42,7 @@ Invalid transition → HTTP `409 CONFLICT`.
 - [x] `POST /flights` creates `DRAFT` (not `PENDING_CEO`) — `flight-definition.e2e-spec.ts` / `flight-approval-workflow.e2e-spec.ts` #1
 - [x] `POST /flights/:id/submit-operations` — `flight-approval-workflow.e2e-spec.ts` #1
 - [x] `GET /flights/operations-queue` — covered via ops decision path + controller RBAC
+- [x] `GET /flights/operations-overview` — dashboard counters + enriched live rows; e2e #1
 - [x] `POST /flights/:id/operations-decision` (comment required, `expectedVersion`) — e2e #3/#4/#5/#9
 - [x] `GET /flights/:id/history` — e2e #8
 - [x] CEO queue is gated by operations approval — `flight-approval-workflow.e2e-spec.ts` (CEO queue test)
@@ -51,6 +52,9 @@ Invalid transition → HTTP `409 CONFLICT`.
 - [x] Optimistic lock: stale `expectedVersion` → 409 — e2e #9
 - [x] Migration maps legacy `APPROVED` → `PUBLISHED` without deleting rows — migration + e2e #10 (legacy sellable)
 - [x] RBAC: ops role cannot publish; commercial cannot ops-decide; non-ops 403 — e2e #2 + ops-cannot-register
+- [x] React operations panel — dashboard, decision cartable and flight-history detail
+- [x] Commercial create/edit submits to operations before CEO; rejected comments are shown on edit
+- [x] Commercial published-price adjustment is wired to the backend and recorded in history
 
 ## Unit
 
