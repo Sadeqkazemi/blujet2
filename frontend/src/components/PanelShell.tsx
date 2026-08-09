@@ -39,6 +39,7 @@ const ROLE_LABELS: Record<string, string> = {
   SENIOR_MANAGER: 'مدیر ارشد',
   FINANCE_MANAGER: 'مدیر مالی',
   COMMERCIAL_MANAGER: 'مدیر بازرگانی',
+  OPERATIONS_MANAGER: 'مدیر عملیات',
   IT_MANAGER: 'مدیر فناوری اطلاعات',
   SITE_ADMIN: 'ادمین سایت',
   EMPLOYEE: 'کارمند',
@@ -53,6 +54,7 @@ const ROLE_BRAND_SUB: Record<string, string> = {
   EMPLOYEE: 'پنل کارمند',
   // Logo line in design HTML / screenshots is «پنل مدیریت» (not roleDefs.sub).
   SITE_ADMIN: 'پنل مدیریت',
+  OPERATIONS_MANAGER: 'پنل مدیریت',
 };
 
 type NavBadge = { count: number; className: string };
@@ -435,12 +437,13 @@ export default function PanelShell() {
   const roleLabel = user?.isSuperAdmin ? 'سوپر ادمین' : user ? (ROLE_LABELS[user.role] ?? user.role) : '';
   const brandSub = (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
-  /** Dark executive chrome: CEO / Board / Senior / Commercial (design v2 shells). */
+  /** Dark executive chrome: CEO / Board / Senior / Commercial / Operations. */
   const executiveShell =
     user?.role === 'CEO' ||
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER' ||
-    user?.role === 'COMMERCIAL_MANAGER';
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    user?.role === 'OPERATIONS_MANAGER';
   /** Finance + Employee + Site Admin get avatar footer chrome. */
   const avatarShell =
     executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE' || user?.role === 'SITE_ADMIN';
@@ -455,6 +458,8 @@ export default function PanelShell() {
             ? 'مم'
             : user?.role === 'COMMERCIAL_MANAGER'
               ? 'مب'
+              : user?.role === 'OPERATIONS_MANAGER'
+                ? 'مع'
               : user?.role === 'SITE_ADMIN'
                 ? 'اس'
                 : user?.role === 'EMPLOYEE' && user.fullName

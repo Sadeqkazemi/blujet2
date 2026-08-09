@@ -31,6 +31,20 @@ export function upsertProposal(
   );
 }
 
+export function updatePublishedPrice(
+  flightInstanceId: string,
+  dto: {
+    salePriceIrr: string | number;
+    reason: string;
+    expectedVersion?: number;
+  },
+) {
+  return apiPatch<PricingProposal & { version: number }>(
+    `/pricing/flights/${flightInstanceId}/price`,
+    dto,
+  );
+}
+
 export function setLegalRate(id: string, legalRateIrr: string | number) {
   return apiPatch<PricingProposal>(`/pricing/proposals/${id}/legal-rate`, {
     legalRateIrr,

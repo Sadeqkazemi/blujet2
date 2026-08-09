@@ -5,6 +5,7 @@ import CommercialDashboardPage from '../features/dashboard/CommercialDashboardPa
 import ItDashboardPage from '../features/it-manager/ItDashboardPage';
 import SiteAdminDashboardPage from '../features/dashboard/SiteAdminDashboardPage';
 import EmployeeDashboardPage from '../features/dashboard/EmployeeDashboardPage';
+import OperationsDashboardPage from '../features/operations/OperationsDashboardPage';
 import ComingSoonPage from './ComingSoonPage';
 import { useAuth } from '../hooks/useAuth';
 import type { PanelShellContext } from '../types/panel-shell';
@@ -34,5 +35,6 @@ export default function DashboardRouter() {
   if (user?.role === 'SITE_ADMIN') return <SiteAdminDashboardPage />;
   if (user?.role === 'EMPLOYEE') return <EmployeeDashboardPage />;
   if (user?.role === 'COMMERCIAL_MANAGER') return <CommercialDashboardPage />;
+  if (user?.role === 'OPERATIONS_MANAGER') return <OperationsDashboardPage />;
   return <DashboardPage />;
 }

@@ -5,6 +5,7 @@ export type Role =
   | 'EMPLOYEE'
   | 'IT_MANAGER'
   | 'COMMERCIAL_MANAGER'
+  | 'OPERATIONS_MANAGER'
   | 'FINANCE_MANAGER'
   | 'SENIOR_MANAGER'
   | 'CEO'

@@ -8,9 +8,10 @@ import {
   rejectProposal,
   runAiAnalysis,
   setLegalRate,
+  updatePublishedPrice,
   upsertProposal,
 } from "../../api/pricing";
-import { fetchAirports } from "../../api/flights";
+import { fetchAirports, submitFlightToOperations } from "../../api/flights";
 import {
   faDigits,
   faMoney,
@@ -36,6 +37,8 @@ import type {
   PricingProposal,
 } from "../../types/pricing";
 import type { AirportEntry } from "../../types/flights";
+import type { OperationsFlightRow, OperationsFlightStatus } from "../../types/flights";
+import FlightHistoryModal from "../operations/FlightHistoryModal";
 
 /** Design hint-placeholder-count for commercial pricing rows = 5. */
 /** Global panel list rule: 10 records per page. */
@@ -882,9 +885,12 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<CommercialFlightRow | null>(null);
+  const [historyFlight, setHistoryFlight] = useState<OperationsFlightRow | null>(null);
   const [proposedInput, setProposedInput] = useState("");
   const [legalInput, setLegalInput] = useState("");
   const [noteInput, setNoteInput] = useState("");
+  const [salePriceInput, setSalePriceInput] = useState("");
+  const [priceChangeReason, setPriceChangeReason] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
 
   const cityByCode = useMemo(
@@ -926,25 +932,55 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
     btn: string;
     btnBg: string;
     btnColor: string;
+    disabled: boolean;
   } {
     if (row.pricing?.status === "REGISTERED") {
       return {
-        label: "تأییدشده و قفل‌شده",
+        label: "منتشرشده — قابل مدیریت",
         color: "#34d399",
         bg: "rgba(16,185,129,.14)",
-        btn: "قفل‌شده",
-        btnBg: "#18223a",
-        btnColor: "#6b7b94",
+        btn: "مدیریت قیمت",
+        btnBg: "#0f766e",
+        btnColor: "#fff",
+        disabled: false,
       };
     }
-    if (row.pricing) {
+    if (row.definitionStatus === "PENDING_OPERATIONS") {
+      return {
+        label: "در انتظار بررسی مدیر عملیات",
+        color: "#fbbf24",
+        bg: "rgba(251,191,36,.14)",
+        btn: "در انتظار بررسی",
+        btnBg: "#18223a",
+        btnColor: "#6b7b94",
+        disabled: true,
+      };
+    }
+    if (row.definitionStatus === "PENDING_CEO") {
       return {
         label: "در انتظار تأیید مدیر عامل",
         color: "#a78bfa",
         bg: "rgba(167,139,250,.16)",
-        btn: "ویرایش پیشنهاد",
+        btn: "ارسال‌شده",
+        btnBg: "#18223a",
+        btnColor: "#6b7b94",
+        disabled: true,
+      };
+    }
+    if (row.pricing) {
+      return {
+        label:
+          row.definitionStatus === "OPERATIONS_REJECTED"
+            ? "نیاز به اصلاح — رد عملیات"
+            : row.definitionStatus === "REJECTED"
+              ? "نیاز به اصلاح — رد مدیر عامل"
+              : "پیشنهاد ثبت‌شده",
+        color: "#fb7185",
+        bg: "rgba(251,113,133,.14)",
+        btn: "اصلاح و ارسال مجدد",
         btnBg: "#3b82f6",
         btnColor: "#fff",
+        disabled: false,
       };
     }
     return {
@@ -954,6 +990,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
       btn: "تعیین قیمت",
       btnBg: "#3b82f6",
       btnColor: "#fff",
+      disabled: false,
     };
   }
 
@@ -968,6 +1005,10 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
   function openModal(row: CommercialFlightRow) {
     setSelected(row);
     setModalError(null);
+    setSalePriceInput(
+      irrToTomanInput(row.pricing?.registeredPriceIrr ?? row.pricing?.proposedPriceIrr),
+    );
+    setPriceChangeReason("");
     if (row.pricing && row.pricing.status !== "REGISTERED") {
       setProposedInput(irrToTomanInput(row.pricing.proposedPriceIrr));
       setLegalInput(irrToTomanInput(row.pricing.legalRateIrr));
@@ -999,11 +1040,84 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
         legalRateIrr: legalRial ?? undefined,
         note: noteInput.trim() || undefined,
       });
-      setNotice("نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓");
+      if (
+        selected.definitionStatus === "DRAFT" ||
+        selected.definitionStatus === "OPERATIONS_REJECTED" ||
+        selected.definitionStatus === "REJECTED" ||
+        selected.definitionStatus === "PENDING_REVISION"
+      ) {
+        await submitFlightToOperations(selected.id, selected.version);
+      }
+      setNotice("نرخ پیشنهادی برای بررسی مدیر عملیات ارسال شد ✓");
       setSelected(null);
       await load();
     } catch (e) {
       setModalError(e instanceof Error ? e.message : "خطا در ارسال پیشنهاد.");
+    }
+  }
+
+  function openHistory(row: CommercialFlightRow) {
+    const allowed = new Set<OperationsFlightStatus>([
+      "PENDING_OPERATIONS",
+      "OPERATIONS_REJECTED",
+      "REJECTED",
+      "PENDING_CEO",
+      "PUBLISHED",
+    ]);
+    const rawStatus = row.definitionStatus as OperationsFlightStatus | undefined;
+    const definitionStatus = rawStatus && allowed.has(rawStatus) ? rawStatus : "PUBLISHED";
+    setHistoryFlight({
+      id: row.id,
+      flightNo: row.flight.flightNo,
+      originCode: row.flight.route.originCode,
+      destCode: row.flight.route.destCode,
+      departureAt: row.departureAt,
+      capacity: row.capacity,
+      charterSeats: row.charterSeats,
+      aircraftType: row.aircraftTypeOverride ?? row.flight.aircraftType ?? "—",
+      basePriceIrr: row.basePriceIrr,
+      competitorPriceIrr: row.competitorPriceIrr ?? null,
+      proposal: row.pricing
+        ? {
+            id: row.pricing.id,
+            proposedPriceIrr: row.pricing.proposedPriceIrr,
+            legalRateIrr: row.pricing.legalRateIrr,
+            note: row.pricing.note,
+            status: row.pricing.status,
+            proposedBy: row.pricing.proposedBy,
+          }
+        : null,
+      definitionStatus,
+      publishStatus: definitionStatus === "PUBLISHED" ? "PUBLISHED" : "NOT_PUBLISHED",
+      uiStatus: definitionStatus,
+      version: row.version ?? 1,
+      rejectionReason: row.rejectionReason ?? null,
+    });
+  }
+
+  async function onPublishedPriceUpdate() {
+    if (!selected) return;
+    const salePriceIrr = parseTomanToRialString(salePriceInput);
+    if (!salePriceIrr) {
+      setModalError("قیمت جدید را وارد کنید.");
+      return;
+    }
+    if (priceChangeReason.trim().length < 2) {
+      setModalError("دلیل تغییر قیمت را وارد کنید.");
+      return;
+    }
+    setModalError(null);
+    try {
+      await updatePublishedPrice(selected.id, {
+        salePriceIrr,
+        reason: priceChangeReason.trim(),
+        expectedVersion: selected.version,
+      });
+      setNotice("قیمت فروش پرواز به‌روزرسانی و در تاریخچه ثبت شد ✓");
+      setSelected(null);
+      await load();
+    } catch (reason) {
+      setModalError(reason instanceof Error ? reason.message : "تغییر قیمت انجام نشد.");
     }
   }
 
@@ -1016,11 +1130,10 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
       {!embedded && (
         <div className="mb-6">
           <h1 className="m-0 text-[20.5px] font-black text-white">
-            تعیین قیمت پرواز و ارسال به مدیر عامل
+            تعیین قیمت پرواز و ارسال به گردش تأیید
           </h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-            نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر
-            عامل، قیمت ثبت و قفل می‌شود و قابل تغییر نخواهد بود.
+            نرخ پیشنهادی را ثبت کنید؛ ابتدا مدیر عملیات و سپس مدیر عامل آن را بررسی می‌کنند.
           </p>
         </div>
       )}
@@ -1040,11 +1153,10 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
         {embedded && (
           <div className="border-b border-[#1f2a3d] px-[15px] py-[13px]">
             <h2 className="m-0 text-[14.5px] font-extrabold text-white">
-              تعیین قیمت پرواز و ارسال به مدیر عامل
+              تعیین قیمت پرواز و ارسال به گردش تأیید
             </h2>
             <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-              نرخ پیشنهادی و نرخ قانونی هر پرواز را تعیین کنید؛ پس از تأیید مدیر
-              عامل، قیمت ثبت و قفل می‌شود و قابل تغییر نخواهد بود.
+              پس از ثبت پیشنهاد، بررسی مدیر عملیات و تأیید نهایی مدیر عامل انجام می‌شود.
             </p>
           </div>
         )}
@@ -1125,11 +1237,18 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                   <button
                     type="button"
                     onClick={() => openModal(row)}
-                    disabled={st.btn === "قفل‌شده"}
+                    disabled={st.disabled}
                     className="flex-none whitespace-nowrap rounded-[9px] px-[15px] py-[9px] text-[11.5px] font-extrabold disabled:cursor-default"
                     style={{ background: st.btnBg, color: st.btnColor }}
                   >
                     {st.btn}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openHistory(row)}
+                    className="flex-none whitespace-nowrap rounded-[9px] border border-[#3b82f666] px-[12px] py-[9px] text-[10.5px] font-bold text-[#93c5fd]"
+                  >
+                    تاریخچه
                   </button>
                 </div>
               );
@@ -1173,29 +1292,33 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
           </div>
 
           {locked ? (
-            <div className="rounded-xl border border-[rgba(16,185,129,.4)] bg-[rgba(16,185,129,.09)] p-[15px] text-center">
-              <p className="text-xs font-extrabold text-[#34d399]">
-                قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است
-              </p>
-              <p className="font-num mt-2 text-[22px] font-black text-white">
-                {moneyOrDash(selected.pricing?.registeredPriceIrr)}
-              </p>
-              {selected.pricing?.legalRateIrr && (
-                <p className="font-num mt-1.5 text-[11px] text-[#8494ac]">
-                  نرخ قانونی ثبت‌شده:{" "}
-                  {moneyOrDash(selected.pricing.legalRateIrr)}
-                </p>
-              )}
-              <p className="mt-1 text-[11px] text-[#8494ac]">
-                این قیمت دیگر قابل تغییر نیست.
-              </p>
+            <div>
+              <div className="rounded-xl border border-[rgba(16,185,129,.4)] bg-[rgba(16,185,129,.09)] p-[15px] text-center">
+                <p className="text-xs font-extrabold text-[#34d399]">قیمت جاری فروش</p>
+                <p className="font-num mt-2 text-[22px] font-black text-white">{moneyOrDash(selected.pricing?.registeredPriceIrr)}</p>
+                {selected.pricing?.legalRateIrr && <p className="font-num mt-1.5 text-[11px] text-[#8494ac]">سقف نرخ قانونی: {moneyOrDash(selected.pricing.legalRateIrr)}</p>}
+              </div>
+              <div className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/10 p-3 text-[11px] leading-6 text-blue-200">
+                <strong className="block text-blue-300">راهنمای هوشمند مدیریت فروش</strong>
+                {competitorIrr(selected)
+                  ? `قیمت رقیب ${moneyOrDash(competitorIrr(selected))} است. اگر فروش پایین است، قیمت را به نرخ رقیب نزدیک کنید؛ همه تغییرات در تاریخچه ثبت می‌شوند.`
+                  : "برای پروازهای کم‌فروش، کاهش مرحله‌ای قیمت و بررسی دوباره ضریب اشغال پیشنهاد می‌شود."}
+              </div>
+              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="sale-price-input">قیمت جدید فروش (تومان)</label>
+              <input id="sale-price-input" dir="ltr" value={salePriceInput} onChange={(event) => setSalePriceInput(event.target.value)} className="font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-right text-[13px] text-[#e7ecf3] outline-none" />
+              <label className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]" htmlFor="price-change-reason">دلیل تغییر قیمت</label>
+              <textarea id="price-change-reason" value={priceChangeReason} onChange={(event) => setPriceChangeReason(event.target.value)} rows={2} placeholder="مثلاً: فروش پایین و کمتر از ۷۲ ساعت تا پرواز" className="w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none" />
+              {modalError && <p role="alert" className="mt-2 text-xs text-[#f87171]">{modalError}</p>}
+              <button type="button" onClick={() => void onPublishedPriceUpdate()} className="mt-4 h-[46px] w-full rounded-[11px] bg-[#0f766e] text-[13px] font-extrabold text-white">ثبت قیمت جدید</button>
             </div>
           ) : (
             <>
               {selected.pricing && (
                 <p className="mb-[13px] flex items-center gap-[7px] rounded-[10px] border border-[rgba(167,139,250,.3)] bg-[rgba(167,139,250,.1)] px-3 py-[9px] text-[11px] text-[#c4b5fd]">
-                  این پیشنهاد در انتظار تأیید مدیر عامل است؛ می‌توانید تا زمان
-                  تأیید آن را ویرایش کنید.
+                  {selected.definitionStatus === "OPERATIONS_REJECTED" ||
+                  selected.definitionStatus === "REJECTED"
+                    ? "پیشنهاد رد شده است؛ اصلاحات را ثبت کنید تا دوباره برای مدیر عملیات ارسال شود."
+                    : "پیشنهاد را تکمیل کنید؛ پس از ثبت برای بررسی مدیر عملیات ارسال می‌شود."}
                 </p>
               )}
               <label
@@ -1230,7 +1353,7 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 className="mb-1.5 mt-3 block text-[11.5px] text-[#9fb0c7]"
                 htmlFor="note-input"
               >
-                یادداشت برای مدیر عامل (اختیاری)
+                یادداشت برای گردش تأیید (اختیاری)
               </label>
               <textarea
                 id="note-input"
@@ -1259,11 +1382,17 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
                 >
                   <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
                 </svg>
-                ارسال نرخ پیشنهادی برای تأیید مدیر عامل
+                ارسال نرخ پیشنهادی برای بررسی مدیر عملیات
               </button>
             </>
           )}
         </Modal>
+      )}
+      {historyFlight && (
+        <FlightHistoryModal
+          flight={historyFlight}
+          onClose={() => setHistoryFlight(null)}
+        />
       )}
     </div>
   );

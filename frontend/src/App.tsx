@@ -41,7 +41,7 @@ import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
 import RefundsPage from './features/refunds/RefundsPage';
 import SupportTicketsPage from './features/support-tickets/SupportTicketsPage';
-import FlightsPage from './features/flights/FlightsPage';
+import FlightsRouter from './components/FlightsRouter';
 import FlightOpsPage from './features/flightops/FlightOpsPage';
 import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
@@ -183,7 +183,7 @@ export default function App() {
                 <Route index element={<PricingPage />} />
               </Route>
               <Route path="flights" element={<TabGate tabKey="flights" />}>
-                <Route index element={<FlightsPage />} />
+                <Route index element={<FlightsRouter />} />
               </Route>
               <Route path="aircraft" element={<TabGate tabKey="aircraft" />}>
                 <Route index element={<AircraftListPage />} />

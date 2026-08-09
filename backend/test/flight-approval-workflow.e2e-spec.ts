@@ -92,6 +92,18 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     expect([200, 201]).toContain(submitted.status);
     expect(submitted.body.data.definitionStatus).toBe('PENDING_OPERATIONS');
     expect(submitted.body.data.uiStatus).toBe('pending_ops');
+
+    const { accessToken: ops } = await loginAs(app, 'ops');
+    const overview = await request(app.getHttpServer())
+      .get('/flights/operations-overview')
+      .set('Authorization', `Bearer ${ops}`);
+    expect(overview.status).toBe(200);
+    expect(overview.body.data.counts.pendingOperations).toBeGreaterThan(0);
+    const overviewRow = overview.body.data.rows.find(
+      (row: { id: string }) => row.id === draft.id,
+    );
+    expect(overviewRow).toBeDefined();
+    expect(overviewRow).toHaveProperty('proposal.proposedPriceIrr');
   });
 
   it('2) non-ops role cannot ops-decide (403)', async () => {

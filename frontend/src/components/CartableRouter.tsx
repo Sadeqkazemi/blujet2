@@ -1,6 +1,7 @@
 import { useAuth } from '../hooks/useAuth';
 import CartablePage from '../features/cartable/CartablePage';
 import EmployeeCartablePage from '../features/cartable/EmployeeCartablePage';
+import OperationsCartablePage from '../features/operations/OperationsCartablePage';
 
 /** The `cartable` tab key backs two views: exec panels get the full
  * review/transfer/compose UI (CartablePage); EMPLOYEE gets the simpler
@@ -8,5 +9,6 @@ import EmployeeCartablePage from '../features/cartable/EmployeeCartablePage';
 export default function CartableRouter() {
   const { user } = useAuth();
   if (user?.role === 'EMPLOYEE') return <EmployeeCartablePage />;
+  if (user?.role === 'OPERATIONS_MANAGER') return <OperationsCartablePage />;
   return <CartablePage />;
 }

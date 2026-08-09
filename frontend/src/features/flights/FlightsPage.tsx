@@ -380,10 +380,17 @@ export default function FlightsPage() {
 
   function pricingStatusLabel(row: FutureFlightRow): string {
     if (row.pricingRegistered) return "نرخ ثبت‌شده";
+    if (row.approvalStatus === "PENDING_OPERATIONS")
+      return "در انتظار بررسی مدیر عملیات";
+    if (row.approvalStatus === "OPERATIONS_REJECTED")
+      return "رد شده توسط عملیات — نیاز به اصلاح";
+    if (row.approvalStatus === "REJECTED")
+      return "رد شده توسط مدیرعامل — نیاز به اصلاح";
     if (row.approvalStatus === "PENDING_CEO") return "در انتظار تأیید مدیرعامل";
     if (row.approvalStatus === "PENDING_REVISION")
       return "تغییرات در انتظار تأیید";
-    if (row.approvalStatus === "APPROVED") return "تأییدشده";
+    if (row.approvalStatus === "APPROVED" || row.approvalStatus === "PUBLISHED")
+      return "منتشرشده";
     return "نرخ‌گذاری ثبت شده";
   }
 
@@ -391,6 +398,9 @@ export default function FlightsPage() {
     return (
       Boolean(row.pricingRegistered) ||
       row.approvalStatus === "APPROVED" ||
+      row.approvalStatus === "PUBLISHED" ||
+      row.approvalStatus === "PENDING_OPERATIONS" ||
+      row.approvalStatus === "OPERATIONS_REJECTED" ||
       row.approvalStatus === "PENDING_CEO" ||
       row.approvalStatus === "PENDING_REVISION"
     );

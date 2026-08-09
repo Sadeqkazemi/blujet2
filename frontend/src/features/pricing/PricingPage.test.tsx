@@ -83,6 +83,8 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       capacity: 180,
       charterSeats: 60,
       basePriceIrr: "38000000",
+      definitionStatus: "PENDING_CEO",
+      version: 2,
       flight: {
         flightNo: "EP-821",
         route: { originCode: "THR", destCode: "DXB" },
@@ -96,6 +98,8 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       charterSeats: 60,
       // No base — modal opens empty so validation can be exercised.
       basePriceIrr: null,
+      definitionStatus: "DRAFT",
+      version: 1,
       flight: {
         flightNo: "EP-822",
         route: { originCode: "THR", destCode: "IST" },
@@ -108,6 +112,8 @@ const COMMERCIAL_DATA: CommercialPricingResult = {
       capacity: 180,
       charterSeats: 60,
       basePriceIrr: "38000000",
+      definitionStatus: "PUBLISHED",
+      version: 4,
       flight: {
         flightNo: "EP-823",
         route: { originCode: "MHD", destCode: "KIH" },
@@ -418,18 +424,16 @@ describe("PricingPage", () => {
     renderPage();
 
     expect(
-      await screen.findByText("تعیین قیمت پرواز و ارسال به مدیر عامل"),
+      await screen.findByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
     ).toBeInTheDocument();
     expect(screen.getByText("در انتظار تأیید مدیر عامل")).toBeInTheDocument();
     expect(screen.getByText("قیمت‌گذاری نشده")).toBeInTheDocument();
-    expect(screen.getByText("تأییدشده و قفل‌شده")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "ویرایش پیشنهاد" }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("منتشرشده — قابل مدیریت")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ارسال‌شده" })).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "تعیین قیمت" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "قفل‌شده" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "مدیریت قیمت" })).toBeEnabled();
     // Subtitle shows base + competitor for rows that already have a proposal.
     expect(screen.getAllByText(/پایه/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/رقبا/).length).toBeGreaterThan(0);
@@ -473,6 +477,9 @@ describe("PricingPage", () => {
     const upsert = vi
       .spyOn(pricingApi, "upsertProposal")
       .mockResolvedValue(PROPOSAL);
+    const submitOperations = vi
+      .spyOn((await import("../../api/flights")), "submitFlightToOperations")
+      .mockResolvedValue({} as never);
 
     const { default: userEvent } = await import("@testing-library/user-event");
     renderPage();
@@ -482,7 +489,7 @@ describe("PricingPage", () => {
     );
     await userEvent.click(
       screen.getByRole("button", {
-        name: "ارسال نرخ پیشنهادی برای تأیید مدیر عامل",
+        name: "ارسال نرخ پیشنهادی برای بررسی مدیر عملیات",
       }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -496,7 +503,7 @@ describe("PricingPage", () => {
     );
     await userEvent.click(
       screen.getByRole("button", {
-        name: "ارسال نرخ پیشنهادی برای تأیید مدیر عامل",
+        name: "ارسال نرخ پیشنهادی برای بررسی مدیر عملیات",
       }),
     );
     // 3,850,000 toman -> 38,500,000 rial (decimal string on the wire)
@@ -507,9 +514,10 @@ describe("PricingPage", () => {
         note: undefined,
       }),
     );
+    expect(submitOperations).toHaveBeenCalledWith("fi2", 1);
     expect(
       await screen.findByText(
-        "نرخ پیشنهادی برای تأیید به مدیر عامل ارسال شد ✓",
+        "نرخ پیشنهادی برای بررسی مدیر عملیات ارسال شد ✓",
       ),
     ).toBeInTheDocument();
   });

@@ -26,6 +26,7 @@ describe("AddFlightPage", () => {
       sold: 0,
       availableOnline: 0,
     });
+    vi.spyOn(flightsApi, "submitFlightToOperations").mockResolvedValue({} as never);
     vi.spyOn(agenciesApi, "fetchAgencies").mockResolvedValue({
       agencies: [],
       kpis: {
@@ -51,7 +52,7 @@ describe("AddFlightPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل",
+        name: "ثبت پرواز و ارسال برای مدیر عملیات",
       }),
     ).toBeInTheDocument();
     expect(
@@ -59,7 +60,7 @@ describe("AddFlightPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("submits create + proposal to the CEO path", async () => {
+  it("submits create + proposal to the operations path", async () => {
     const onSuccess = vi.fn();
     vi.spyOn(flightsApi, "createFlight").mockResolvedValue({
       id: "inst-1",
@@ -72,7 +73,8 @@ describe("AddFlightPage", () => {
       sold: 0,
       basePriceIrr: "68000000",
       derivedStatus: "ACTIVE",
-    });
+      version: 1,
+    } as never);
     vi.spyOn(pricingApi, "upsertProposal").mockResolvedValue({} as never);
 
     render(<AddFlightPage onClose={vi.fn()} onSuccess={onSuccess} />);
@@ -107,7 +109,7 @@ describe("AddFlightPage", () => {
 
     await user.click(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل",
+        name: "ثبت پرواز و ارسال برای مدیر عملیات",
       }),
     );
 
@@ -130,6 +132,10 @@ describe("AddFlightPage", () => {
         "inst-1",
         expect.objectContaining({ proposedPriceIrr: "72000000" }),
       ),
+    );
+    expect(flightsApi.submitFlightToOperations).toHaveBeenCalledWith(
+      "inst-1",
+      1,
     );
     expect(onSuccess).toHaveBeenCalled();
   });
@@ -225,6 +231,7 @@ describe("AddFlightPage", () => {
       editBlockedReason: null,
       pendingRevision: false,
       approvedSnapshot: null,
+      version: 2,
     });
     vi.spyOn(flightsApi, "updateFlightDefinition").mockResolvedValue({
       id: "inst-edit",
@@ -248,6 +255,7 @@ describe("AddFlightPage", () => {
       editBlockedReason: null,
       pendingRevision: true,
       approvedSnapshot: null,
+      version: 3,
     });
     vi.spyOn(pricingApi, "upsertProposal").mockResolvedValue({} as never);
 
@@ -273,8 +281,12 @@ describe("AddFlightPage", () => {
     );
     await waitFor(() =>
       expect(onSuccess).toHaveBeenCalledWith(
-        "تغییرات برای تأیید مجدد مدیرعامل ارسال شد.",
+        "تغییرات برای بررسی مجدد مدیر عملیات ارسال شد.",
       ),
+    );
+    expect(flightsApi.submitFlightToOperations).toHaveBeenCalledWith(
+      "inst-edit",
+      3,
     );
   });
 });
