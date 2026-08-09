@@ -27,8 +27,10 @@ describe('price-calendar helpers', () => {
 
   it('formats Jalali weekday/date for fa and Gregorian for en', () => {
     const fa = formatPriceCalendarDayParts('2026-08-01', 'fa');
-    expect(fa.weekday.length).toBeGreaterThan(0);
+    expect(fa.weekday).toBe('شنبه');
+    expect(fa.dateStr).toContain('مرداد');
     expect(fa.dateStr).toMatch(/[۰-۹]/);
+    expect(`${fa.weekday} ${fa.dateStr}`).not.toMatch(/[A-Za-z]/);
 
     const en = formatPriceCalendarDayParts('2026-08-01', 'en');
     expect(en.weekday).toMatch(/[A-Za-z]/);

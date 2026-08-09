@@ -1,6 +1,6 @@
 import type { StoredLocale } from '../hooks/useLocale';
 import type { PriceCalendarDay } from '../types/public-site';
-import { faDigits, localeMoney } from './fa-format';
+import { localeMoney } from './fa-format';
 import { dayjs } from './jalali';
 
 /** A day with no bookable inventory — API sends `"0"`. */
@@ -42,12 +42,24 @@ export function formatPriceCalendarDayParts(
       dateStr: d.format('D MMM'),
     };
   }
-  const d = dayjs(noon).calendar('jalali');
-  const weekdayRaw = d.format('dd');
-  const dateRaw = d.format('D MMMM');
+
+  // Jalaliday changes the calendar calculations but does not automatically
+  // load Day.js's Persian/Arabic locale data. Formatting `dd` / `MMMM` on
+  // that instance therefore leaks English labels such as `Su` and `Mordad`
+  // into an otherwise Persian page. Native Intl formats both labels and
+  // digits for the requested language while keeping the Persian calendar.
+  const date = new Date(noon);
+  const localeTag = locale === 'fa' ? 'fa-IR-u-ca-persian' : 'ar-IR-u-ca-persian';
   return {
-    weekday: faDigits(weekdayRaw),
-    dateStr: faDigits(dateRaw),
+    weekday: new Intl.DateTimeFormat(localeTag, {
+      weekday: 'short',
+      timeZone: 'UTC',
+    }).format(date),
+    dateStr: new Intl.DateTimeFormat(localeTag, {
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(date),
   };
 }
 
