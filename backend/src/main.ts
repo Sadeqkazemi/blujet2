@@ -15,7 +15,11 @@ import './common/bigint-json';
 initSentry();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+    // Needed for HMAC verification of bank loan webhooks.
+    rawBody: true,
+  });
 
   const logger = app.get(Logger);
   app.useLogger(logger);

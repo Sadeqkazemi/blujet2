@@ -2263,7 +2263,13 @@ async function main() {
     ['NJF', 'نجف', 'Asia/Baghdad'],
   ];
   for (const [code, cityFa, tz] of AIRPORTS) {
-    await upsertBy(airportRepo, { code }, { code, cityFa, tz }, { cityFa, tz });
+    const isInternational = code === 'DXB' || code === 'IST' || code === 'NJF';
+    await upsertBy(
+      airportRepo,
+      { code },
+      { code, cityFa, tz, isInternational },
+      { cityFa, tz, isInternational },
+    );
   }
 
   // Seeded per-route durations (the add-flight form has no arrival input).

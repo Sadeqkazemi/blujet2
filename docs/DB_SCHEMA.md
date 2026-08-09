@@ -2717,3 +2717,13 @@ than relying on any cascade.
 - Commercial flight lifecycle views reuse `flight_reviews`, `audit_logs`,
   `fare_pricing_proposals`, and `flight_instances.aiSuggestion`; no duplicate
   history or AI-decision table is added.
+
+## Phase 72 — V4 gaps
+
+- `flight_schedule_templates` — seasonal template with airports, aircraft,
+  weekdays, IRR prices, cabin capacity snapshot, idempotencyKey, status.
+- `flight_instances.scheduleTemplateId` — nullable link to template.
+- `bank_loan_applications` — bankReferenceId, requestedAmountIrr, bankStatus,
+  statusSummary (non-sensitive), webhook event id, optional walletCreditReference.
+- `airports.isInternational` — used by destination stats (DXB/IST/NJF seeded true).
+- Migration: `1787040000000-V4ScheduleTemplatesLoansDestStats`.

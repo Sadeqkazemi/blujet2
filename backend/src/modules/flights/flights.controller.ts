@@ -41,6 +41,12 @@ import {
   OperationsDecisionDto,
   SubmitOperationsDto,
 } from './dto/flight-workflow.dto';
+import {
+  CreateScheduleTemplateDto,
+  ListScheduleTemplatesQueryDto,
+  ScheduleTemplatePreviewDto,
+} from './dto/schedule-template.dto';
+import { ScheduleTemplateService } from './schedule-template.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -361,6 +367,7 @@ export class FlightsController {
     private readonly flights: FlightsService,
     private readonly definitions: FlightDefinitionService,
     private readonly workflow: FlightWorkflowService,
+    private readonly scheduleTemplates: ScheduleTemplateService,
     private readonly aircraft: AircraftService,
     private readonly commitments: CommitmentsService,
   ) {}
@@ -670,6 +677,70 @@ export class FlightsController {
     @Body() dto: UpdateFlightDefinitionDto,
   ) {
     const data = await this.definitions.updateDefinition(actor, id, dto);
+    return { success: true, data };
+  }
+
+  @Post('schedule-templates/preview')
+  @HttpCode(200)
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary: 'پیش‌نمایش تاریخ‌های برنامه فصلی (بدون ذخیره)',
+  })
+  async previewScheduleTemplate(@Body() dto: ScheduleTemplatePreviewDto) {
+    const data = await this.scheduleTemplates.preview(dto);
+    return { success: true, data };
+  }
+
+  @Post('schedule-templates')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'ایجاد برنامه فصلی و تولید instanceها (idempotent؛ بدون تغییر نقشه MD-80)',
+  })
+  async createScheduleTemplate(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateScheduleTemplateDto,
+  ) {
+    const data = await this.scheduleTemplates.create(actor, dto);
+    return { success: true, data };
+  }
+
+  @Get('schedule-templates')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'فهرست برنامه‌های فصلی' })
+  async listScheduleTemplates(@Query() query: ListScheduleTemplatesQueryDto) {
+    const data = await this.scheduleTemplates.list(
+      query.page ?? 1,
+      query.pageSize ?? 20,
+    );
+    return { success: true, data };
+  }
+
+  @Get('schedule-templates/:id')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'جزئیات برنامه فصلی' })
+  async getScheduleTemplate(@Param('id') id: string) {
+    const data = await this.scheduleTemplates.get(id);
+    return { success: true, data };
+  }
+
+  @Post('schedule-templates/:id/deactivate')
+  @HttpCode(200)
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'غیرفعال‌سازی آینده برنامه فصلی بدون حذف سوابق فروش‌شده',
+  })
+  async deactivateScheduleTemplate(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.scheduleTemplates.deactivate(actor, id);
     return { success: true, data };
   }
 

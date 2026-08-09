@@ -7,6 +7,7 @@ import { SiteDestinationHighlight } from '../../database/entities/site-destinati
 import { SiteRouteHighlight } from '../../database/entities/site-route-highlight.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { BlogPost } from '../../database/entities/blog-post.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { SiteContentAdminController } from './site-content-admin.controller';
 import { SiteContentPublicController } from './site-content-public.controller';
 import { SiteContentService } from './site-content.service';
@@ -23,6 +24,7 @@ import { PanelsModule } from '../panels/panels.module';
       SiteRouteHighlight,
       Airport,
       BlogPost,
+      FlightInstance,
     ]),
     AuditModule,
     PanelsModule,

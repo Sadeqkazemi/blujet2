@@ -127,6 +127,33 @@ export const FlightReviewDecision = {
 export type FlightReviewDecision =
   (typeof FlightReviewDecision)[keyof typeof FlightReviewDecision];
 
+/** Seasonal schedule template lifecycle (commercial planning). */
+export const FlightScheduleTemplateStatus = {
+  ACTIVE: 'ACTIVE',
+  DEACTIVATED: 'DEACTIVATED',
+} as const;
+export type FlightScheduleTemplateStatus =
+  (typeof FlightScheduleTemplateStatus)[keyof typeof FlightScheduleTemplateStatus];
+
+/**
+ * Opaque bank-side loan application statuses (mirrored, never invented).
+ * Display mapping lives in the loans module — do not treat these as
+ * underwriting decisions made by blujet.
+ */
+export const BankLoanStatus = {
+  SUBMITTED: 'SUBMITTED',
+  PENDING: 'PENDING',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  DISBURSED: 'DISBURSED',
+  CANCELLED: 'CANCELLED',
+  FAILED: 'FAILED',
+  UNKNOWN: 'UNKNOWN',
+} as const;
+export type BankLoanStatus =
+  (typeof BankLoanStatus)[keyof typeof BankLoanStatus];
+
 export const ChargeCalculationMode = {
   FIXED: 'FIXED',
   PERCENTAGE: 'PERCENTAGE',

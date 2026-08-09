@@ -84,6 +84,11 @@ export class FlightInstance {
   })
   schedule!: Schedule | null;
 
+  /** Seasonal template that materialised this instance (nullable). */
+  @Column({ type: 'text', nullable: true })
+  @Index('flight_instances_scheduleTemplateId_idx', ['scheduleTemplateId'])
+  scheduleTemplateId!: string | null;
+
   @Column({ type: 'text', nullable: true })
   aircraftRegistration!: string | null;
 
