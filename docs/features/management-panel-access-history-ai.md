@@ -32,7 +32,7 @@ only an authorized commercial manager can apply a price change.
       remain backed by the existing club-rules API.
 - [x] Backend unit tests, frontend component tests, lint/type checks, production
       builds, and targeted browser verification pass.
-- [ ] Changes are committed and pushed to a review branch only; no production/UAT
+- [x] Changes are committed and pushed to a review branch only; no production/UAT
       deployment is triggered by this task.
 
 ## Data and retention rules
