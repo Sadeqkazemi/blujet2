@@ -348,6 +348,15 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       expect(res.body.data.accessToken).toBeDefined();
     });
 
+    it('the operations manager account logs in with the shared password', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/auth/staff/login')
+        .send({ username: 'uat.operations', password: STRONG_PASSWORD });
+      expect(res.status).toBe(200);
+      expect(res.body.data.loginMode).toBe('TEMPORARY_PASSWORD_ONLY');
+      expect(res.body.data.accessToken).toBeDefined();
+    });
+
     it('the temp agency account logs in with the shared password via /auth/agency/login even with no AgencyProfile', async () => {
       const res = await request(app.getHttpServer())
         .post('/auth/agency/login')

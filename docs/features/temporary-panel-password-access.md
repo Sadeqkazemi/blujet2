@@ -16,8 +16,9 @@ after a review pass — see "Review corrections" below for what changed
 from the first version of this addendum.
 
 - **Coverage**: `TEMPORARY_PANEL_ACCOUNTS` (username + password via
-  `/auth/staff/login`) gained `uat.employee` (`EMPLOYEE`, `dept:
-  'commercial'`) alongside the original seven. A new
+  `/auth/staff/login`) includes `uat.operations` (`OPERATIONS_MANAGER`) and
+  `uat.employee` (`EMPLOYEE`, `dept: 'commercial'`) alongside the original
+  manager/admin accounts. A new
   `TEMPORARY_PHONE_LOGIN_ACCOUNTS` covers `uat.agency` (`AGENCY`, phone
   `09000000001`, via `/auth/agency/login`) and `uat.customer` (`USER`,
   phone `09000000002`, via `/auth/customer/login-password`) — both
@@ -78,6 +79,10 @@ from the first version of this addendum.
   (already consumed on the live server), with a new one-time block
   (`.blujet-uat-shared-password-v1-complete`) that bootstraps any missing
   accounts and rotates every temporary account to the shared password.
+  Deployments created after the flight-approval workflow also use the
+  one-time `.blujet-uat-operations-account-v1-complete` block to rerun the
+  idempotent bootstrap and create `uat.operations` on hosts where the v1
+  sentinel was already consumed.
 
 ### Review corrections (kept for context, not re-litigated)
 

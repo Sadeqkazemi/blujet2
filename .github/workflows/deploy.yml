@@ -131,6 +131,27 @@ jobs:
               touch "$shared_password_sentinel"
               chmod 600 "$shared_password_sentinel"
             fi
+            # Provision the operations-manager UAT account introduced after
+            # the shared-password v1 sentinel had already been consumed on
+            # the live UAT host. Bootstrap is idempotent and therefore skips
+            # every existing temporary account while creating only the new
+            # uat.operations identity with the same shared secret.
+            operations_account_sentinel=/root/.blujet-uat-operations-account-v1-complete
+            if [ ! -f "$operations_account_sentinel" ]; then
+              if [ -z "${UAT_PANEL_SHARED_PASSWORD:-}" ]; then
+                echo "Refusing: UAT_PANEL_SHARED_PASSWORD secret is empty or unset." >&2
+                exit 1
+              fi
+              umask 077
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_BOOTSTRAP_CONFIRM=CREATE_7_DAY_PANEL_TEST_ACCOUNTS \
+                -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                backend node dist/database/bootstrap-temporary-panel-accounts.js --execute \
+                > /root/blujet-uat-operations-account-v1.json
+              chmod 600 /root/blujet-uat-operations-account-v1.json
+              touch "$operations_account_sentinel"
+              chmod 600 "$operations_account_sentinel"
+            fi
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
             # reference/configuration tables are retained by the purge policy.
