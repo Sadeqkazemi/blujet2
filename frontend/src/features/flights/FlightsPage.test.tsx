@@ -183,7 +183,7 @@ describe("FlightsPage", () => {
     expect(screen.getByText("افزودن پرواز جدید")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال قیمت برای تأیید مدیر عامل",
+        name: "ثبت پرواز و ارسال برای مدیر عملیات",
       }),
     ).toBeInTheDocument();
   });
@@ -295,7 +295,7 @@ describe("FlightsPage", () => {
 
     render(<FlightsPage />);
     expect(
-      await screen.findByText("تعیین قیمت پرواز و ارسال به مدیر عامل"),
+      await screen.findByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "پروازهای آینده" }),
@@ -317,7 +317,7 @@ describe("FlightsPage", () => {
     render(<FlightsPage />);
     await screen.findByText("مدیریت پروازها و موجودی");
     expect(
-      screen.queryByText("تعیین قیمت پرواز و ارسال به مدیر عامل"),
+      screen.queryByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
     ).not.toBeInTheDocument();
   });
 
