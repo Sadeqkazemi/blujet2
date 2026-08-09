@@ -7,6 +7,7 @@ import { runSandboxActiveFlightPurge } from '../src/database/sandbox-active-flig
 import { Route } from '../src/database/entities/route.entity';
 import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { FlightReview } from '../src/database/entities/flight-review.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { Passenger } from '../src/database/entities/passenger.entity';
 import { SeatLock } from '../src/database/entities/seat-lock.entity';
@@ -14,6 +15,10 @@ import { CabinFare } from '../src/database/entities/cabin-fare.entity';
 import { CharterCommitment } from '../src/database/entities/charter-commitment.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { User } from '../src/database/entities/user.entity';
+import {
+  FlightReviewDecision,
+  FlightReviewStage,
+} from '../src/database/enums';
 
 /**
  * Task #33 — this suite calls runSandboxActiveFlightPurge() directly
@@ -146,6 +151,17 @@ describe('Sandbox active-flight purge — direct DataSource, task #33 (e2e)', ()
         createdAt: new Date(),
       }),
     );
+    await dataSource.getRepository(FlightReview).save(
+      dataSource.getRepository(FlightReview).create({
+        flightInstanceId: instance.id,
+        stage: FlightReviewStage.OPERATIONS,
+        decision: FlightReviewDecision.APPROVED,
+        comment: 'تأیید آزمایشی پیش از پاک‌سازی',
+        reviewedByUserId: actorId,
+        reviewedAt: new Date(),
+        expectedVersion: null,
+      }),
+    );
     return { route, flight, instance, booking };
   }
 
@@ -213,6 +229,11 @@ describe('Sandbox active-flight purge — direct DataSource, task #33 (e2e)', ()
     expect(
       await dataSource
         .getRepository(CharterCommitment)
+        .findOneBy({ flightInstanceId: instance.id }),
+    ).toBeNull();
+    expect(
+      await dataSource
+        .getRepository(FlightReview)
         .findOneBy({ flightInstanceId: instance.id }),
     ).toBeNull();
 

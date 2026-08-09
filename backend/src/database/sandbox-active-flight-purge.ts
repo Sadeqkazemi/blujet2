@@ -210,6 +210,7 @@ export async function runSandboxActiveFlightPurge(
         case 'cabin_fares':
         case 'fare_rules':
         case 'fare_pricing_proposals':
+        case 'flight_reviews':
         case 'agency_seat_commitments':
         case 'charter_commitments':
         case 'agency_allotments':
