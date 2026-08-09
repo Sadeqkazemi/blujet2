@@ -258,7 +258,7 @@ describe('Panels (e2e)', () => {
     const after = await request(app.getHttpServer())
       .get('/reporting/kpis?granularity=q6')
       .set('Authorization', `Bearer ${finance.accessToken}`);
-    expect(after.status).toBe(404);
+    expect(after.status).toBe(403);
 
     // Cleanup — re-enable so other tests/manual runs aren't affected.
     await request(app.getHttpServer())
