@@ -40,6 +40,7 @@ import { FareRule } from './entities/fare-rule.entity';
 import { Flight } from './entities/flight.entity';
 import { FlightChargeRule } from './entities/flight-charge-rule.entity';
 import { FlightInstance } from './entities/flight-instance.entity';
+import { FlightReview } from './entities/flight-review.entity';
 import { InternalService } from './entities/internal-service.entity';
 import { JobApplication } from './entities/job-application.entity';
 import { JobPosting } from './entities/job-posting.entity';
@@ -93,6 +94,9 @@ import { TravelExtraSetting } from './entities/travel-extra-setting.entity';
  * CLAUDE.md's Prisma rule "never `db push`, never manual SQL").
  */
 export const dataSourceOptions: DataSourceOptions = {
+  // Allow individual migrations to set `transaction = false` (needed for
+  // Postgres enum ADD VALUE + immediate use in the same migration).
+  migrationsTransactionMode: 'each',
   type: 'postgres',
   url: process.env.DATABASE_URL,
   synchronize: false,
@@ -139,6 +143,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Flight,
     FlightChargeRule,
     FlightInstance,
+    FlightReview,
     InternalService,
     JobApplication,
     JobPosting,

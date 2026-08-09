@@ -11,7 +11,14 @@ import { FarePricingProposal } from '../../database/entities/fare-pricing-propos
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { Booking } from '../../database/entities/booking.entity';
-import { PricingProposalStatus } from '../../database/enums';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import { FlightReview } from '../../database/entities/flight-review.entity';
+import {
+  FlightDefinitionStatus,
+  FlightReviewDecision,
+  FlightReviewStage,
+  PricingProposalStatus,
+} from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
@@ -26,7 +33,7 @@ import { compareIrr, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 
 const LOCKED_MESSAGE =
-  'قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است و دیگر قابل تغییر نیست.';
+  'پیشنهاد اولیه تأیید شده است؛ قیمت فروش را از عملیات تغییر قیمت پرواز منتشرشده ویرایش کنید.';
 
 export interface PersistedAiSuggestion {
   priceIrr: number;
@@ -74,7 +81,7 @@ export class PricingService {
       .addSelect(['approvedBy.id', 'approvedBy.fullName', 'approvedBy.role']);
   }
 
-  /** CEO view: pending + registered lists (+ pendingApprovalsCount). */
+  /** CEO view: only operations-approved pending rows are actionable. */
   async listForCeo() {
     const proposals = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
@@ -82,7 +89,12 @@ export class PricingService {
       .orderBy('p.createdAt', 'DESC')
       .getMany();
     const pending = proposals.filter(
-      (p) => p.status === PricingProposalStatus.PENDING,
+      (p) =>
+        p.status === PricingProposalStatus.PENDING &&
+        (p.flightInstance.definitionStatus ===
+          FlightDefinitionStatus.PENDING_CEO ||
+          p.flightInstance.definitionStatus ===
+            FlightDefinitionStatus.PENDING_REVISION),
     );
     return {
       pending,
@@ -97,9 +109,17 @@ export class PricingService {
   }
 
   async pendingApprovalsCount(): Promise<{ pendingApprovalsCount: number }> {
-    const count = await this.proposalRepo.count({
-      where: { status: PricingProposalStatus.PENDING },
-    });
+    const count = await this.proposalRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.flightInstance', 'fi')
+      .where('p.status = :status', { status: PricingProposalStatus.PENDING })
+      .andWhere('fi.definitionStatus IN (:...statuses)', {
+        statuses: [
+          FlightDefinitionStatus.PENDING_CEO,
+          FlightDefinitionStatus.PENDING_REVISION,
+        ],
+      })
+      .getCount();
     return { pendingApprovalsCount: count };
   }
 
@@ -210,7 +230,7 @@ export class PricingService {
         savedId = created.id;
       }
 
-      await this.definitions.markPendingCeoInTx(manager, flightInstanceId);
+      this.definitions.markPendingCeoInTx(manager, flightInstanceId);
       return savedId;
     });
 
@@ -225,7 +245,7 @@ export class PricingService {
       actorRole: actor.role,
       category: 'PRICING',
       action: 'ارسال نرخ پیشنهادی پرواز',
-      detail: `نرخ پیشنهادی پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} برای تأیید مدیر عامل ارسال شد.`,
+      detail: `نرخ پیشنهادی پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} برای گردش تأیید ثبت شد.`,
       entityType: 'FarePricingProposal',
       entityId: proposal.id,
       metadata: {
@@ -235,6 +255,108 @@ export class PricingService {
     });
 
     return proposal;
+  }
+
+  async updatePublishedPrice(
+    actor: AuthenticatedUser,
+    flightInstanceId: string,
+    dto: { salePriceIrr: Irr; reason: string; expectedVersion?: number },
+  ) {
+    const reason = dto.reason.trim();
+    const result = await this.dataSource.transaction(async (manager) => {
+      const instance = await manager.findOne(FlightInstance, {
+        where: { id: flightInstanceId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!instance) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پرواز یافت نشد.',
+        });
+      }
+      if (instance.definitionStatus !== FlightDefinitionStatus.PUBLISHED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'فقط قیمت پرواز منتشرشده قابل تغییر است.',
+        });
+      }
+      if (
+        dto.expectedVersion != null &&
+        instance.version !== dto.expectedVersion
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'نسخه پرواز تغییر کرده است. صفحه را تازه کنید و دوباره تلاش کنید.',
+        });
+      }
+
+      const proposal = await manager.findOne(FarePricingProposal, {
+        where: { flightInstanceId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !proposal ||
+        proposal.status !== PricingProposalStatus.REGISTERED ||
+        proposal.registeredPriceIrr == null
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'قیمت ثبت‌شده‌ای برای این پرواز وجود ندارد.',
+        });
+      }
+      if (
+        proposal.legalRateIrr != null &&
+        compareIrr(dto.salePriceIrr, proposal.legalRateIrr) > 0
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'قیمت جدید از نرخ قانونی بیشتر است.',
+        });
+      }
+      if (compareIrr(dto.salePriceIrr, proposal.registeredPriceIrr) === 0) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'قیمت جدید با قیمت فعلی یکسان است.',
+        });
+      }
+
+      const previousPrice = proposal.registeredPriceIrr;
+      proposal.registeredPriceIrr = dto.salePriceIrr;
+      proposal.updatedAt = new Date();
+      instance.version += 1;
+      await manager.save(proposal);
+      await manager.save(instance);
+
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'PRICING',
+          action: 'تغییر قیمت فروش پرواز منتشرشده',
+          detail: reason,
+          entityType: 'FarePricingProposal',
+          entityId: proposal.id,
+          metadata: {
+            flightInstanceId,
+            previousPriceIrr: String(previousPrice),
+            salePriceIrr: String(dto.salePriceIrr),
+            reason,
+            version: instance.version,
+          },
+        }),
+      );
+
+      return { proposalId: proposal.id, version: instance.version };
+    });
+
+    await this.search.invalidateForInstance(flightInstanceId);
+    const proposal = await this.withProposalRelations(
+      this.proposalRepo.createQueryBuilder('p'),
+    )
+      .where('p.id = :id', { id: result.proposalId })
+      .getOneOrFail();
+    return { ...proposal, version: result.version };
   }
 
   async setLegalRate(actor: AuthenticatedUser, id: string, legalRateIrr: Irr) {
@@ -254,6 +376,17 @@ export class PricingService {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: LOCKED_MESSAGE,
+      });
+    }
+    if (
+      proposal.flightInstance.definitionStatus !==
+        FlightDefinitionStatus.PENDING_CEO &&
+      proposal.flightInstance.definitionStatus !==
+        FlightDefinitionStatus.PENDING_REVISION
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این پیشنهاد هنوز توسط مدیر عملیات تأیید نشده است.',
       });
     }
 
@@ -291,6 +424,7 @@ export class PricingService {
     actor: AuthenticatedUser,
     id: string,
     source: 'PROPOSED' | 'AI',
+    comment?: string,
   ) {
     const proposal = await this.withProposalRelations(
       this.proposalRepo.createQueryBuilder('p'),
@@ -402,6 +536,43 @@ export class PricingService {
       const { previousLocation } = await this.definitions.applyCeoApprovalInTx(
         manager,
         lockedProposal.flightInstanceId,
+        actor.id,
+      );
+
+      const reviewComment =
+        comment?.trim() ||
+        (source === 'AI'
+          ? 'قیمت پیشنهادی هوش مصنوعی و انتشار پرواز تأیید شد.'
+          : 'قیمت پیشنهادی بازرگانی و انتشار پرواز تأیید شد.');
+      const review = await manager.save(
+        manager.create(FlightReview, {
+          flightInstanceId: lockedProposal.flightInstanceId,
+          stage: FlightReviewStage.CEO,
+          decision: FlightReviewDecision.APPROVED,
+          comment: reviewComment,
+          reviewedByUserId: actor.id,
+          reviewedAt: new Date(),
+          expectedVersion: null,
+        }),
+      );
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'PRICING',
+          action:
+            source === 'AI'
+              ? 'ثبت قیمت پرواز با پیشنهاد AI'
+              : 'تأیید قیمت پیشنهادی بازرگانی',
+          detail: `قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} تأیید و منتشر شد.`,
+          entityType: 'FarePricingProposal',
+          entityId: id,
+          metadata: {
+            registeredPriceIrr: String(price),
+            source,
+            reviewId: review.id,
+          },
+        }),
       );
       return { alreadyRegistered: false as const, price, previousLocation };
     });
@@ -413,20 +584,6 @@ export class PricingService {
         .where('p.id = :id', { id })
         .getOneOrFail();
     }
-
-    await this.audit.record({
-      actorId: actor.id,
-      actorRole: actor.role,
-      category: 'PRICING',
-      action:
-        source === 'AI'
-          ? 'ثبت قیمت پرواز با پیشنهاد AI'
-          : 'تأیید قیمت پیشنهادی بازرگانی',
-      detail: `قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} تأیید و ثبت شد.`,
-      entityType: 'FarePricingProposal',
-      entityId: id,
-      metadata: { registeredPriceIrr: registered.price, source },
-    });
 
     await this.notifications.notify({
       recipientId: proposal.proposedById,
@@ -550,6 +707,29 @@ export class PricingService {
         lockedProposal.flightInstanceId,
         reason,
       );
+      const review = await manager.save(
+        manager.create(FlightReview, {
+          flightInstanceId: lockedProposal.flightInstanceId,
+          stage: FlightReviewStage.CEO,
+          decision: FlightReviewDecision.REJECTED,
+          comment: reason,
+          reviewedByUserId: actor.id,
+          reviewedAt: new Date(),
+          expectedVersion: null,
+        }),
+      );
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'PRICING',
+          action: 'رد پیشنهاد قیمت پرواز',
+          detail: `پیشنهاد قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} رد شد.`,
+          entityType: 'FarePricingProposal',
+          entityId: id,
+          metadata: { rejectionReason: reason, reviewId: review.id },
+        }),
+      );
       return { alreadyRejected: false as const };
     });
 
@@ -560,17 +740,6 @@ export class PricingService {
         .where('p.id = :id', { id })
         .getOneOrFail();
     }
-
-    await this.audit.record({
-      actorId: actor.id,
-      actorRole: actor.role,
-      category: 'PRICING',
-      action: 'رد پیشنهاد قیمت پرواز',
-      detail: `پیشنهاد قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} رد شد.`,
-      entityType: 'FarePricingProposal',
-      entityId: id,
-      metadata: { rejectionReason: reason },
-    });
 
     await this.notifications.notify({
       recipientId: proposal.proposedById,
@@ -610,6 +779,7 @@ export class PricingService {
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.DRAFT,
       }),
     );
     return this.instanceRepo

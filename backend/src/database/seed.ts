@@ -303,6 +303,11 @@ async function main() {
       role: Role.COMMERCIAL_MANAGER,
     },
     {
+      username: 'ops',
+      fullName: 'نیلوفر اکبری',
+      role: Role.OPERATIONS_MANAGER,
+    },
+    {
       username: 'finance',
       fullName: 'سحر کاظمی',
       role: Role.FINANCE_MANAGER,

@@ -389,16 +389,36 @@ stays untouched on the same page).
   competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
   (COMFORT requires real comfort rows; never merged into ECONOMY). The flight,
   charge rules and exactly one initial pricing proposal are created in one
-  transaction and returned as `definitionStatus=PENDING_CEO`; CEO register →
-  `APPROVED` (bookable). `PUT /pricing/flights/:id/proposal` may refine the
-  proposed/legal rate, but is no longer required for CEO visibility.
+  transaction and returned as `definitionStatus=DRAFT`. Commercial then
+  calls `POST /flights/:id/submit-operations` → `PENDING_OPERATIONS`.
+  Operations manager approves → `PENDING_CEO`; CEO register → `PUBLISHED`
+  (bookable). `PUT /pricing/flights/:id/proposal` may refine the
+  proposed/legal rate while the definition is in the approval pipeline.
 - GET `/flights/:id/definition` — editable definition detail (real sold /
-  derivedStatus). Under `PENDING_REVISION`, form fields come from
-  `pendingRevisionSnapshot` (includes `charterSeats`); live approved
+  derivedStatus + `publishStatus` + `version`). Under `PENDING_REVISION`,
+  form fields come from `pendingRevisionSnapshot`; live published
   inventory stays sellable until CEO re-approves.
-- PUT `/flights/:id/definition` — edit DRAFT/REJECTED in place; edit of
-  APPROVED stages `PENDING_REVISION` without mutating live inventory.
-  Audited.
+- PUT `/flights/:id/definition` — edit DRAFT / OPERATIONS_REJECTED /
+  REJECTED in place; edit of PUBLISHED stages `PENDING_REVISION` without
+  mutating live inventory. Audited.
+- POST `/flights/:id/submit-operations` — Commercial/Senior/Employee+`fl_manage`
+  — moves `DRAFT|OPERATIONS_REJECTED|REJECTED|PENDING_REVISION` →
+  `PENDING_OPERATIONS`. Body `{ expectedVersion? }`. 409 on illegal state /
+  version mismatch.
+- GET `/flights/operations-queue` — `OPERATIONS_MANAGER` (+ Senior) —
+  list instances awaiting ops (`status` defaults `PENDING_OPERATIONS`).
+- POST `/flights/:id/operations-decision` — ops only —
+  `{ decision: APPROVED|REJECTED, comment, expectedVersion? }`. Comment
+  required. Approve → `PENDING_CEO`; reject → `OPERATIONS_REJECTED`.
+  Writes append-only `FlightReview`.
+- GET `/flights/:id/history` — reviews + audit trail for the instance
+  (Commercial/Ops/CEO/Senior as permitted by role), including CEO decisions
+  and every post-publication price change.
+- PATCH `/pricing/flights/:flightInstanceId/price` — Commercial Manager only
+  — `{ salePriceIrr, reason, expectedVersion? }`; changes the current sale
+  price only for `PUBLISHED` inventory, enforces the legal-rate ceiling,
+  bumps the flight version, invalidates search cache and appends an immutable
+  PRICING audit event with the previous and new IRR amounts.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.
@@ -3405,3 +3425,25 @@ first when wiring up the frontend.** Summary of what changed:
 - All three are additive/reversible (`down()` implemented), rewrite no
   existing row data, and follow the same plain-column/no-DB-FK convention
   as Phase 69 where applicable.
+
+## Phase 71 — Flight approval workflow (operations → CEO → PUBLISHED)
+
+See `docs/features/flight-approval-workflow.md`.
+
+- Role `OPERATIONS_MANAGER` added (seed user `ops` / `Blujet@1404`).
+- `definitionStatus` gains `PENDING_OPERATIONS`, `OPERATIONS_REJECTED`,
+  `PUBLISHED`. Legacy `APPROVED` rows are data-migrated to `PUBLISHED`
+  (enum value `APPROVED` may remain unused in Postgres).
+- CEO `PATCH /pricing/proposals/:id/register` (and `/approve`) sets
+  `definitionStatus=PUBLISHED`, `publishedAt`, `publishedByUserId`, bumps
+  `version`, records a CEO `FlightReview`, and invalidates search cache.
+- CEO proposal lists/counts expose only `PENDING_CEO`/`PENDING_REVISION`
+  rows; drafts and operations-pending proposals are not visible there.
+- Commercial `PATCH /pricing/flights/:flightInstanceId/price` updates a
+  published sale price with optimistic-version checking and immutable history.
+- Public `GET /search/flights` sellability uses `PUBLISHED` (+ revision
+  snapshot rule). Response continues to expose derived `publishStatus`.
+- Deferred stubs only (next phase): pricing-alerts rule engine, loans
+  module, transactional outbox for domain events
+  (`flight.submitted_to_operations`, …).
+- Migration: `1786953600000-FlightApprovalWorkflow`.

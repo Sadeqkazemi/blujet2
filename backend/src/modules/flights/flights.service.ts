@@ -44,7 +44,7 @@ import {
 } from '../../common/money';
 import type { Irr } from '../../common/money';
 import { RedisService } from '../../redis/redis.service';
-import type { CabinClass } from '../../database/enums';
+import { FlightDefinitionStatus, type CabinClass } from '../../database/enums';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -484,6 +484,7 @@ export class FlightsService {
         capacity: dto.capacity,
         charterSeats,
         status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.DRAFT,
         basePriceIrr: dto.basePriceIrr,
         ...(existingFlight && dto.aircraftType
           ? { aircraftTypeOverride: aircraftType }
@@ -600,7 +601,7 @@ export class FlightsService {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message:
-          'قیمت این پرواز توسط مدیر عامل تأیید و قفل شده است و دیگر قابل تغییر نیست.',
+          'پیشنهاد اولیه تأیید شده است؛ برای اصلاح نرخ از عملیات تغییر قیمت فروش استفاده کنید.',
       });
     }
     const agencyMax = instance.capacity - instance.charterSeats;
@@ -950,6 +951,7 @@ export class FlightsService {
         capacity: schedule.capacity,
         charterSeats: 0,
         status: 'SCHEDULED' as const,
+        definitionStatus: FlightDefinitionStatus.DRAFT,
       };
     });
 

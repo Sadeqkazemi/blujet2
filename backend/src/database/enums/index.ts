@@ -11,6 +11,7 @@ export const Role = {
   IT_MANAGER: 'IT_MANAGER',
   COMMERCIAL_MANAGER: 'COMMERCIAL_MANAGER',
   FINANCE_MANAGER: 'FINANCE_MANAGER',
+  OPERATIONS_MANAGER: 'OPERATIONS_MANAGER',
   SENIOR_MANAGER: 'SENIOR_MANAGER',
   CEO: 'CEO',
   BOARD_CHAIR: 'BOARD_CHAIR',
@@ -93,16 +94,38 @@ export const AircraftSeatSide = {
 export type AircraftSeatSide =
   (typeof AircraftSeatSide)[keyof typeof AircraftSeatSide];
 
-/** Flight definition / revision workflow (frontend: PENDING_CEO ≡ PENDING_APPROVAL). */
+/**
+ * Flight definition / revision workflow.
+ * Sellable: PUBLISHED, or PENDING_REVISION with approvedSnapshot.
+ * Legacy DB value APPROVED is data-migrated to PUBLISHED.
+ */
 export const FlightDefinitionStatus = {
   DRAFT: 'DRAFT',
+  PENDING_OPERATIONS: 'PENDING_OPERATIONS',
+  OPERATIONS_REJECTED: 'OPERATIONS_REJECTED',
   PENDING_CEO: 'PENDING_CEO',
-  APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
   PENDING_REVISION: 'PENDING_REVISION',
+  PUBLISHED: 'PUBLISHED',
+  /** @deprecated migrated to PUBLISHED — kept for TypeORM/Postgres enum parity during transition */
+  APPROVED: 'APPROVED',
 } as const;
 export type FlightDefinitionStatus =
   (typeof FlightDefinitionStatus)[keyof typeof FlightDefinitionStatus];
+
+export const FlightReviewStage = {
+  OPERATIONS: 'OPERATIONS',
+  CEO: 'CEO',
+} as const;
+export type FlightReviewStage =
+  (typeof FlightReviewStage)[keyof typeof FlightReviewStage];
+
+export const FlightReviewDecision = {
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+export type FlightReviewDecision =
+  (typeof FlightReviewDecision)[keyof typeof FlightReviewDecision];
 
 export const ChargeCalculationMode = {
   FIXED: 'FIXED',

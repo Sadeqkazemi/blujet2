@@ -17,6 +17,7 @@ import {
   type PriceSuggestionProvider,
   type PriceSuggestionResult,
 } from '../src/modules/ai/price-suggestion.provider';
+import { FlightDefinitionStatus } from '../src/database/enums';
 import { loginAs } from './helpers/login.helper';
 
 /** Deterministic in-test stand-in for the ml-service — set `nextResult` to
@@ -82,6 +83,8 @@ describe('Pricing (e2e)', () => {
         capacity: 180,
         charterSeats: 60,
         status: 'SCHEDULED',
+        // Pricing CEO-register path requires ops gate complete → PENDING_CEO.
+        definitionStatus: FlightDefinitionStatus.PENDING_CEO,
       }),
     );
   }

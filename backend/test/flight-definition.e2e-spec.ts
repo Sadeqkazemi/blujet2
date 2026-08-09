@@ -11,6 +11,7 @@ import { Booking } from '../src/database/entities/booking.entity';
 import { FlightChargeRule } from '../src/database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
+import { advanceToPendingCeo } from './helpers/flight-workflow.helper';
 import { loginAs, loginAsCustomer } from './helpers/login.helper';
 
 describe('Flight definition + charge rules + CEO approval (e2e)', () => {
@@ -107,7 +108,8 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     );
     expect(create.body.data.durationMinutes).toBe(95);
     expect(create.body.data.chargeRules.length).toBe(2);
-    expect(create.body.data.approvalStatus).toBe('PENDING_CEO');
+    expect(create.body.data.approvalStatus).toBe('DRAFT');
+    expect(create.body.data.definitionStatus).toBe('DRAFT');
     const proposals = await dataSource
       .getRepository(FarePricingProposal)
       .createQueryBuilder('p')
@@ -164,7 +166,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(badSum.status).toBe(400);
   });
 
-  it('GET/PUT definition; APPROVED edit stages PENDING_REVISION', async () => {
+  it('GET/PUT definition; PUBLISHED edit stages PENDING_REVISION', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const created = await request(app.getHttpServer())
       .post('/flights')
@@ -185,6 +187,8 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .send({ proposedPriceIrr: '39000000' });
     expect(proposal.status).toBe(200);
 
+    await advanceToPendingCeo(app, id, comm);
+
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     const reg = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
@@ -196,7 +200,8 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     const defAfter = await request(app.getHttpServer())
       .get(`/flights/${id}/definition`)
       .set('Authorization', `Bearer ${comm}`);
-    expect(defAfter.body.data.approvalStatus).toBe('APPROVED');
+    expect(defAfter.body.data.approvalStatus).toBe('PUBLISHED');
+    expect(defAfter.body.data.definitionStatus).toBe('PUBLISHED');
     expect(defAfter.body.data.approvedSnapshot?.charterSeats).toBe(0);
 
     const revised = await request(app.getHttpServer())
@@ -237,6 +242,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .put(`/pricing/flights/${id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39000000' });
+    await advanceToPendingCeo(app, id, comm);
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     const reg1 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
@@ -257,7 +263,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     ).toBe(true);
 
     // Revise the flight to a different departure date (a "dangerous"
-    // change on an already-APPROVED flight → PENDING_REVISION; live
+    // change on an already-PUBLISHED flight → PENDING_REVISION; live
     // inventory, and therefore the primed cache entry above, must stay
     // exactly as-is until the CEO re-approves).
     const newDeparture = new Date(Date.now() + 20 * 24 * 3_600_000);
@@ -320,7 +326,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     ).toBe(true);
   });
 
-  it('pending-count is 0 on empty pending set and increments with PENDING proposals', async () => {
+  it('CEO pending-count increments only after operations approval', async () => {
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     // Clear is not allowed — just assert endpoint shape; count is non-negative.
     const emptyish = await request(app.getHttpServer())
@@ -332,10 +338,16 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
 
     const before = emptyish.body.data.pendingApprovalsCount as number;
     const { accessToken: comm } = await loginAs(app, 'comm');
-    await request(app.getHttpServer())
+    const created = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${comm}`)
       .send(payload());
+    const beforeOps = await request(app.getHttpServer())
+      .get('/pricing/proposals/pending-count')
+      .set('Authorization', `Bearer ${ceo}`);
+    expect(beforeOps.body.data.pendingApprovalsCount).toBe(before);
+
+    await advanceToPendingCeo(app, created.body.data.id as string, comm);
     const after = await request(app.getHttpServer())
       .get('/pricing/proposals/pending-count')
       .set('Authorization', `Bearer ${ceo}`);
@@ -354,6 +366,8 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39000000' });
     const proposalId = proposal.body.data.id as string;
+
+    await advanceToPendingCeo(app, id, comm);
 
     const { accessToken: finance } = await loginAs(app, 'finance');
     const forbidden = await request(app.getHttpServer())
@@ -396,6 +410,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .put(`/pricing/flights/${created3.body.data.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
       .send({ proposedPriceIrr: '39200000' });
+    await advanceToPendingCeo(app, created3.body.data.id as string, comm);
     const r1 = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${p3.body.data.id}/register`)
       .set('Authorization', `Bearer ${ceo}`)
@@ -432,7 +447,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     expect(bookings).toBe(0);
   });
 
-  it('PENDING_CEO is hidden; CEO approval makes COMFORT searchable, bookable, and payable', async () => {
+  it('DRAFT/ops-pending are hidden; CEO publish makes COMFORT searchable, bookable, and payable', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const body = payload({ flightNo: uniqueFlightNo() });
     const created = await request(app.getHttpServer())
@@ -464,6 +479,8 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .send({ proposedPriceIrr: '39000000' });
     expect(proposal.status).toBe(200);
 
+    await advanceToPendingCeo(app, id, comm);
+
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     const reg = await request(app.getHttpServer())
       .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
@@ -484,9 +501,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       }[]
     ).find((r) => r.flightInstanceId === id);
     expect(row).toBeDefined();
-    // The DB's canonical enum value stays APPROVED; publishStatus is the
-    // API-contract mapping to the customer-facing "PUBLISHED" name.
-    expect(row!.definitionStatus).toBe('APPROVED');
+    expect(row!.definitionStatus).toBe('PUBLISHED');
     expect(row!.publishStatus).toBe('PUBLISHED');
     const comfort = row!.cabins.find((c) => c.cabin === 'COMFORT');
     expect(comfort).toBeDefined();
@@ -495,7 +510,9 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     const definitionAfterApproval = await request(app.getHttpServer())
       .get(`/flights/${id}/definition`)
       .set('Authorization', `Bearer ${comm}`);
-    expect(definitionAfterApproval.body.data.definitionStatus).toBe('APPROVED');
+    expect(definitionAfterApproval.body.data.definitionStatus).toBe(
+      'PUBLISHED',
+    );
     expect(definitionAfterApproval.body.data.publishStatus).toBe('PUBLISHED');
 
     const seatmap = await request(app.getHttpServer()).get(
