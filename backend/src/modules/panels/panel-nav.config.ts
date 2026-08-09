@@ -108,6 +108,11 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
   ],
+  OPERATIONS_MANAGER: [
+    { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    { key: 'flights', labelFa: 'صف بررسی پروازها', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+  ],
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared
     // sales/KPI one the other 5 roles get (IT_MANAGER stays excluded from

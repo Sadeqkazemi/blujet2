@@ -3,10 +3,12 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -26,6 +28,7 @@ import {
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
+import { FlightWorkflowService } from './flight-workflow.service';
 import { AircraftService } from './aircraft.service';
 import { UpsertAircraftDto } from './dto/aircraft.dto';
 import { CommitmentsService } from './commitments.service';
@@ -34,6 +37,10 @@ import {
   CreateFlightDefinitionDto,
   UpdateFlightDefinitionDto,
 } from './dto/flight-definition.dto';
+import {
+  OperationsDecisionDto,
+  SubmitOperationsDto,
+} from './dto/flight-workflow.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -353,6 +360,7 @@ export class FlightsController {
   constructor(
     private readonly flights: FlightsService,
     private readonly definitions: FlightDefinitionService,
+    private readonly workflow: FlightWorkflowService,
     private readonly aircraft: AircraftService,
     private readonly commitments: CommitmentsService,
   ) {}
@@ -555,7 +563,7 @@ export class FlightsController {
   @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
-      'افزودن تعریف پرواز — مدت، ظرفیت کابین (ECONOMY/COMFORT/BUSINESS)، قوانین مالیات/عوارض',
+      'افزودن تعریف پرواز به‌صورت پیش‌نویس (DRAFT) — سپس submit-operations',
   })
   async create(
     @CurrentUser() actor: AuthenticatedUser,
@@ -565,8 +573,73 @@ export class FlightsController {
     return { success: true, data };
   }
 
-  @Get(':id/definition')
+  @Get('operations-queue')
+  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER)
+  @ApiOperation({
+    summary: 'صف بررسی مدیر عملیات (PENDING_OPERATIONS)',
+  })
+  async operationsQueue(@Query('status') status?: string) {
+    const data = await this.workflow.listOperationsQueue(status);
+    return { success: true, data };
+  }
+
+  @Post(':id/submit-operations')
+  @HttpCode(200)
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary: 'ارسال تعریف پرواز به مدیر عملیات (→ PENDING_OPERATIONS)',
+  })
+  async submitOperations(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SubmitOperationsDto,
+  ) {
+    const data = await this.workflow.submitOperations(
+      actor,
+      id,
+      dto.expectedVersion,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':id/operations-decision')
+  @HttpCode(200)
+  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER)
+  @ApiOperation({
+    summary: 'تصمیم مدیر عملیات — تأیید (→ PENDING_CEO) یا رد',
+  })
+  async operationsDecision(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: OperationsDecisionDto,
+  ) {
+    const data = await this.workflow.operationsDecision(actor, id, dto);
+    return { success: true, data };
+  }
+
+  @Get(':id/history')
+  @Roles(
+    Role.SENIOR_MANAGER,
+    Role.COMMERCIAL_MANAGER,
+    Role.OPERATIONS_MANAGER,
+    Role.CEO,
+    Role.EMPLOYEE,
+  )
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'تاریخچه بررسی و audit تعریف پرواز' })
+  async history(@Param('id') id: string) {
+    const data = await this.workflow.history(id);
+    return { success: true, data };
+  }
+
+  @Get(':id/definition')
+  @Roles(
+    Role.SENIOR_MANAGER,
+    Role.COMMERCIAL_MANAGER,
+    Role.OPERATIONS_MANAGER,
+    Role.EMPLOYEE,
+  )
   @RequiresPermission('fl_view')
   @ApiOperation({ summary: 'دریافت تعریف کامل قابل ویرایش پرواز' })
   async getDefinition(@Param('id') id: string) {
@@ -579,7 +652,7 @@ export class FlightsController {
   @RequiresPermission('fl_manage')
   @ApiOperation({
     summary:
-      'ویرایش تعریف پرواز — روی نسخه تأییدشده revision جدید (PENDING_REVISION) می‌سازد',
+      'ویرایش تعریف پرواز — روی نسخه منتشرشده revision جدید (PENDING_REVISION) می‌سازد',
   })
   async updateDefinition(
     @CurrentUser() actor: AuthenticatedUser,

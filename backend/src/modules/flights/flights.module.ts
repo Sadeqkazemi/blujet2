@@ -19,9 +19,12 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
+import { FlightReview } from '../../database/entities/flight-review.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
+import { FlightWorkflowService } from './flight-workflow.service';
 import { AircraftService } from './aircraft.service';
 import { CommitmentsService } from './commitments.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -52,6 +55,8 @@ import { AuthModule } from '../auth/auth.module';
       SeatLock,
       FarePricingProposal,
       FlightChargeRule,
+      FlightReview,
+      AuditLog,
     ]),
     PanelsModule,
     AuditModule,
@@ -63,9 +68,10 @@ import { AuthModule } from '../auth/auth.module';
   providers: [
     FlightsService,
     FlightDefinitionService,
+    FlightWorkflowService,
     AircraftService,
     CommitmentsService,
   ],
-  exports: [FlightDefinitionService],
+  exports: [FlightDefinitionService, FlightWorkflowService],
 })
 export class FlightsModule {}
