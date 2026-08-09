@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+} from 'class-validator';
 import {
   IsIrrAmount,
   MinIrrAmount,
@@ -54,6 +62,14 @@ export class RegisterProposalDto {
   })
   @IsIn(['PROPOSED', 'AI'])
   source: 'PROPOSED' | 'AI';
+
+  @ApiPropertyOptional({
+    example: 'قیمت و برنامه فروش تأیید شد.',
+    description: 'نظر اختیاری مدیر عامل برای تاریخچه پرواز',
+  })
+  @IsOptional()
+  @IsString()
+  comment?: string;
 }
 
 export class RejectProposalDto {
@@ -63,4 +79,34 @@ export class RejectProposalDto {
   })
   @IsString()
   rejectionReason: string;
+}
+
+export class UpdatePublishedPriceDto {
+  @ApiProperty({
+    example: '37500000',
+    type: String,
+    description: 'قیمت جدید فروش پرواز منتشرشده به ریال',
+  })
+  @IsIrrAmount()
+  @MinIrrAmount(1n, { message: 'قیمت جدید را وارد کنید' })
+  @TransformToIrr()
+  salePriceIrr: Irr;
+
+  @ApiProperty({
+    example: 'اصلاح نرخ برای افزایش ضریب اشغال',
+    description: 'دلیل تغییر قیمت؛ در تاریخچه غیرقابل‌حذف ثبت می‌شود',
+  })
+  @IsString()
+  @MinLength(2)
+  reason: string;
+
+  @ApiPropertyOptional({
+    example: 7,
+    description: 'نسخه مشاهده‌شده پرواز برای جلوگیری از تغییر هم‌زمان',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  expectedVersion?: number;
 }

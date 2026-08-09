@@ -44,7 +44,9 @@ Invalid transition → HTTP `409 CONFLICT`.
 - [x] `GET /flights/operations-queue` — covered via ops decision path + controller RBAC
 - [x] `POST /flights/:id/operations-decision` (comment required, `expectedVersion`) — e2e #3/#4/#5/#9
 - [x] `GET /flights/:id/history` — e2e #8
+- [x] CEO queue is gated by operations approval — `flight-approval-workflow.e2e-spec.ts` (CEO queue test)
 - [x] CEO `PATCH /pricing/proposals/:id/register` (and `/approve`) → `PUBLISHED` — e2e #6 + `flight-definition.e2e-spec.ts`
+- [x] Commercial `PATCH /pricing/flights/:id/price` changes published sale price and appends audit history — `flight-approval-workflow.e2e-spec.ts` (published-price test)
 - [x] Public search only returns sellable (`PUBLISHED` or `PENDING_REVISION`+snapshot) — e2e #6/#7 + `definition-sellability.spec.ts`
 - [x] Optimistic lock: stale `expectedVersion` → 409 — e2e #9
 - [x] Migration maps legacy `APPROVED` → `PUBLISHED` without deleting rows — migration + e2e #10 (legacy sellable)

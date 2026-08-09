@@ -13,6 +13,7 @@ import { bigintTransformer } from '../transformers/bigint.transformer';
 import type { JsonValue } from '../json-types';
 import { Flight } from './flight.entity';
 import { Schedule } from './schedule.entity';
+import { User } from './user.entity';
 
 @Index('flight_instances_departureAt_idx', ['departureAt'])
 @Index(
@@ -134,6 +135,17 @@ export class FlightInstance {
 
   @Column({ type: 'text', nullable: true })
   publishedByUserId!: string | null;
+
+  @ManyToOne(() => User, {
+    nullable: true,
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'publishedByUserId',
+    foreignKeyConstraintName: 'flight_instances_publishedByUserId_fkey',
+  })
+  publishedBy!: User | null;
 
   @Column({ type: 'text', nullable: true })
   rejectionReason!: string | null;

@@ -16,6 +16,7 @@ import {
   RegisterProposalDto,
   RejectProposalDto,
   SetLegalRateDto,
+  UpdatePublishedPriceDto,
   UpsertProposalDto,
 } from './dto/pricing.dtos';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -81,6 +82,24 @@ export class PricingController {
     return { success: true, data };
   }
 
+  @Patch('flights/:flightInstanceId/price')
+  @Roles(Role.COMMERCIAL_MANAGER)
+  @ApiOperation({
+    summary: 'افزایش/کاهش قیمت فروش پرواز منتشرشده با ثبت تاریخچه و کنترل نسخه',
+  })
+  async updatePublishedPrice(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('flightInstanceId') flightInstanceId: string,
+    @Body() dto: UpdatePublishedPriceDto,
+  ) {
+    const data = await this.pricing.updatePublishedPrice(
+      actor,
+      flightInstanceId,
+      dto,
+    );
+    return { success: true, data };
+  }
+
   @Patch('proposals/:id/legal-rate')
   @Roles(Role.CEO)
   @ApiOperation({ summary: 'ثبت نرخ قانونی (مصوب سازمان هواپیمایی)' })
@@ -103,7 +122,12 @@ export class PricingController {
     @Param('id') id: string,
     @Body() dto: RegisterProposalDto,
   ) {
-    const data = await this.pricing.register(actor, id, dto.source);
+    const data = await this.pricing.register(
+      actor,
+      id,
+      dto.source,
+      dto.comment,
+    );
     return { success: true, data };
   }
 
@@ -118,7 +142,12 @@ export class PricingController {
     @Param('id') id: string,
     @Body() dto: RegisterProposalDto,
   ) {
-    const data = await this.pricing.register(actor, id, dto.source);
+    const data = await this.pricing.register(
+      actor,
+      id,
+      dto.source,
+      dto.comment,
+    );
     return { success: true, data };
   }
 

@@ -42,10 +42,7 @@ import {
   type NormalizedCabinCapacity,
 } from './flight-definition.util';
 import { resolveAircraftType } from './aircraft-type.util';
-import {
-  toFlightUiStatus,
-  toPublishStatus,
-} from './definition-sellability';
+import { toFlightUiStatus, toPublishStatus } from './definition-sellability';
 import {
   countSeatsByCabin,
   type AircraftSeatMapLike,
@@ -875,7 +872,8 @@ export class FlightDefinitionService {
       instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
       instance.rejectionReason = null;
       instance.publishedAt = new Date();
-      instance.publishedByUserId = publishedByUserId ?? instance.publishedByUserId;
+      instance.publishedByUserId =
+        publishedByUserId ?? instance.publishedByUserId;
       instance.version += 1;
 
       const flight = await manager.findOneByOrFail(Flight, {
@@ -1011,16 +1009,9 @@ export class FlightDefinitionService {
    * Operations must approve first via submit-operations / ops-decision.
    * Kept so callers compile; intentionally a no-op for status.
    */
-  async markPendingCeoInTx(
-    _manager: EntityManager,
-    _flightInstanceId: string,
-  ): Promise<void> {
+  markPendingCeoInTx(_manager: EntityManager, _flightInstanceId: string): void {
+    void _manager;
+    void _flightInstanceId;
     return;
-  }
-
-  async markPendingCeo(flightInstanceId: string): Promise<void> {
-    await this.dataSource.transaction((manager) =>
-      this.markPendingCeoInTx(manager, flightInstanceId),
-    );
   }
 }

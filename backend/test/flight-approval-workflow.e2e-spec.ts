@@ -82,7 +82,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('1) commercial create → DRAFT → submit-operations', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     expect(draft.definitionStatus).toBe('DRAFT');
 
     const submitted = await request(app.getHttpServer())
@@ -96,7 +96,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('2) non-ops role cannot ops-decide (403)', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     await request(app.getHttpServer())
       .post(`/flights/${draft.id}/submit-operations`)
       .set('Authorization', `Bearer ${comm}`)
@@ -111,7 +111,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('3) ops without comment → 400', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     await request(app.getHttpServer())
       .post(`/flights/${draft.id}/submit-operations`)
       .set('Authorization', `Bearer ${comm}`)
@@ -127,7 +127,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('4) ops reject → OPERATIONS_REJECTED; commercial can resubmit', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     await request(app.getHttpServer())
       .post(`/flights/${draft.id}/submit-operations`)
       .set('Authorization', `Bearer ${comm}`)
@@ -151,16 +151,16 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('5) ops approve → PENDING_CEO', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
-    const after = await advanceToPendingCeo(app, draft.id, comm!);
+    const draft = await createDraft(comm);
+    const after = await advanceToPendingCeo(app, draft.id, comm);
     expect(after.definitionStatus).toBe('PENDING_CEO');
   });
 
   it('6) CEO register → PUBLISHED + appears in /search/flights', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     const date = String(draft.departureAt).slice(0, 10);
-    await advanceToPendingCeo(app, draft.id, comm!);
+    await advanceToPendingCeo(app, draft.id, comm);
 
     const proposal = await request(app.getHttpServer())
       .put(`/pricing/flights/${draft.id}/proposal`)
@@ -196,7 +196,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('7) draft / ops / rejected not in public search', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     const date = String(draft.departureAt).slice(0, 10);
 
     const before = await request(app.getHttpServer())
@@ -224,8 +224,8 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('8) history returns ops review rows after decision', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
-    await advanceToPendingCeo(app, draft.id, comm!);
+    const draft = await createDraft(comm);
+    await advanceToPendingCeo(app, draft.id, comm);
 
     const history = await request(app.getHttpServer())
       .get(`/flights/${draft.id}/history`)
@@ -242,9 +242,86 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     expect(reviews).toHaveLength(1);
   });
 
+  it('CEO queue hides proposals until operations approval', async () => {
+    const { accessToken: comm } = await loginAs(app, 'comm');
+    const draft = await createDraft(comm);
+    const { accessToken: ceo } = await loginAs(app, 'ceo');
+
+    const before = await request(app.getHttpServer())
+      .get('/pricing/proposals')
+      .set('Authorization', `Bearer ${ceo}`);
+    expect(before.status).toBe(200);
+    expect(
+      before.body.data.pending.some(
+        (p: { flightInstanceId: string }) => p.flightInstanceId === draft.id,
+      ),
+    ).toBe(false);
+
+    await advanceToPendingCeo(app, draft.id, comm);
+    const after = await request(app.getHttpServer())
+      .get('/pricing/proposals')
+      .set('Authorization', `Bearer ${ceo}`);
+    expect(
+      after.body.data.pending.some(
+        (p: { flightInstanceId: string }) => p.flightInstanceId === draft.id,
+      ),
+    ).toBe(true);
+  });
+
+  it('commercial changes a published price and history records CEO + price events', async () => {
+    const { accessToken: comm } = await loginAs(app, 'comm');
+    const draft = await createDraft(comm);
+    await advanceToPendingCeo(app, draft.id, comm);
+    const proposal = await request(app.getHttpServer())
+      .put(`/pricing/flights/${draft.id}/proposal`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ proposedPriceIrr: '39000000', legalRateIrr: '42000000' });
+
+    const { accessToken: ceo } = await loginAs(app, 'ceo');
+    const published = await request(app.getHttpServer())
+      .patch(`/pricing/proposals/${proposal.body.data.id}/register`)
+      .set('Authorization', `Bearer ${ceo}`)
+      .send({ source: 'PROPOSED', comment: 'انتشار نهایی پرواز' });
+    expect(published.status).toBe(200);
+
+    const changed = await request(app.getHttpServer())
+      .patch(`/pricing/flights/${draft.id}/price`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({
+        salePriceIrr: '37500000',
+        reason: 'اصلاح نرخ برای افزایش ضریب اشغال',
+        expectedVersion: published.body.data.flightInstance.version,
+      });
+    expect(changed.status).toBe(200);
+    expect(changed.body.data.registeredPriceIrr).toBe('37500000');
+
+    const forbidden = await request(app.getHttpServer())
+      .patch(`/pricing/flights/${draft.id}/price`)
+      .set('Authorization', `Bearer ${ceo}`)
+      .send({ salePriceIrr: '37000000', reason: 'نباید مجاز باشد' });
+    expect(forbidden.status).toBe(403);
+
+    const history = await request(app.getHttpServer())
+      .get(`/flights/${draft.id}/history`)
+      .set('Authorization', `Bearer ${comm}`);
+    expect(history.status).toBe(200);
+    expect(
+      history.body.data.reviews.some(
+        (r: { stage: string; decision: string }) =>
+          r.stage === 'CEO' && r.decision === 'APPROVED',
+      ),
+    ).toBe(true);
+    expect(
+      history.body.data.audit.some(
+        (a: { action: string }) =>
+          a.action === 'تغییر قیمت فروش پرواز منتشرشده',
+      ),
+    ).toBe(true);
+  });
+
   it('9) stale expectedVersion → 409', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
+    const draft = await createDraft(comm);
     await request(app.getHttpServer())
       .post(`/flights/${draft.id}/submit-operations`)
       .set('Authorization', `Bearer ${comm}`)
@@ -265,8 +342,8 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
   it('10) migration path: APPROVED rows are treated as sellable like PUBLISHED', async () => {
     // Simulate a pre-migration leftover enum value still present in PG.
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
-    await advanceToPendingCeo(app, draft.id, comm!);
+    const draft = await createDraft(comm);
+    await advanceToPendingCeo(app, draft.id, comm);
     const proposal = await request(app.getHttpServer())
       .put(`/pricing/flights/${draft.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)
@@ -298,8 +375,8 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
 
   it('ops cannot call CEO register; commercial cannot ops-decide', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
-    const draft = await createDraft(comm!);
-    await advanceToPendingCeo(app, draft.id, comm!);
+    const draft = await createDraft(comm);
+    await advanceToPendingCeo(app, draft.id, comm);
     const proposal = await request(app.getHttpServer())
       .put(`/pricing/flights/${draft.id}/proposal`)
       .set('Authorization', `Bearer ${comm}`)

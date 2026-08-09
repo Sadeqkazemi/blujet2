@@ -17,12 +17,8 @@ import {
 } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { AuditService } from '../audit/audit.service';
 import { FlightDefinitionService } from './flight-definition.service';
-import {
-  toFlightUiStatus,
-  toPublishStatus,
-} from './definition-sellability';
+import { toFlightUiStatus, toPublishStatus } from './definition-sellability';
 
 const SUBMITTABLE: FlightDefinitionStatus[] = [
   FlightDefinitionStatus.DRAFT,
@@ -43,7 +39,6 @@ export class FlightWorkflowService {
     private readonly proposalRepo: Repository<FarePricingProposal>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepo: Repository<AuditLog>,
-    private readonly audit: AuditService,
     private readonly definitions: FlightDefinitionService,
   ) {}
 
@@ -99,20 +94,22 @@ export class FlightWorkflowService {
       instance.version += 1;
       await manager.save(instance);
 
-      await this.audit.record({
-        actorId: actor.id,
-        actorRole: actor.role,
-        category: 'SYSTEM',
-        action: 'ارسال تعریف پرواز به عملیات',
-        detail: `پرواز برای بررسی مدیر عملیات ارسال شد (${fromStatus} → PENDING_OPERATIONS).`,
-        entityType: 'FlightInstance',
-        entityId: id,
-        metadata: {
-          fromStatus,
-          toStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
-          version: instance.version,
-        },
-      });
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'SYSTEM',
+          action: 'ارسال تعریف پرواز به عملیات',
+          detail: `پرواز برای بررسی مدیر عملیات ارسال شد (${fromStatus} → PENDING_OPERATIONS).`,
+          entityType: 'FlightInstance',
+          entityId: id,
+          metadata: {
+            fromStatus,
+            toStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
+            version: instance.version,
+          },
+        }),
+      );
 
       return instance.id;
     });
@@ -214,24 +211,26 @@ export class FlightWorkflowService {
       });
       await manager.save(review);
 
-      await this.audit.record({
-        actorId: actor.id,
-        actorRole: actor.role,
-        category: 'SYSTEM',
-        action: approved
-          ? 'تأیید تعریف پرواز توسط عملیات'
-          : 'رد تعریف پرواز توسط عملیات',
-        detail: comment,
-        entityType: 'FlightInstance',
-        entityId: id,
-        metadata: {
-          fromStatus,
-          toStatus: instance.definitionStatus,
-          decision: dto.decision,
-          version: instance.version,
-          reviewId: review.id,
-        },
-      });
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'SYSTEM',
+          action: approved
+            ? 'تأیید تعریف پرواز توسط عملیات'
+            : 'رد تعریف پرواز توسط عملیات',
+          detail: comment,
+          entityType: 'FlightInstance',
+          entityId: id,
+          metadata: {
+            fromStatus,
+            toStatus: instance.definitionStatus,
+            decision: dto.decision,
+            version: instance.version,
+            reviewId: review.id,
+          },
+        }),
+      );
 
       return instance.id;
     });
@@ -253,18 +252,21 @@ export class FlightWorkflowService {
       order: { reviewedAt: 'DESC' },
     });
 
+    const proposal = await this.proposalRepo.findOne({
+      where: { flightInstanceId: id },
+      select: { id: true },
+    });
+    const entityIds = proposal ? [id, proposal.id] : [id];
+
     const audits = await this.auditLogRepo.find({
       where: {
         entityType: In(['FlightInstance', 'FarePricingProposal']),
-        entityId: In([id]),
+        entityId: In(entityIds),
       },
       order: { createdAt: 'DESC' },
       take: 100,
     });
 
-    // Also include pricing audits that reference this instance in metadata
-    // via proposal entityId — already covered when entityId is proposal id
-    // is incomplete; pull SYSTEM/PRICING rows with matching entityId = instance.
     return {
       id,
       definitionStatus: instance.definitionStatus,
@@ -291,6 +293,8 @@ export class FlightWorkflowService {
         category: a.category,
         action: a.action,
         detail: a.detail,
+        entityType: a.entityType,
+        entityId: a.entityId,
         actorRole: a.actorRole,
         createdAt: a.createdAt.toISOString(),
         metadata: a.metadata,

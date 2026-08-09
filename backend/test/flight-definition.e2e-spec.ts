@@ -326,7 +326,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
     ).toBe(true);
   });
 
-  it('pending-count is 0 on empty pending set and increments with PENDING proposals', async () => {
+  it('CEO pending-count increments only after operations approval', async () => {
     const { accessToken: ceo } = await loginAs(app, 'ceo');
     // Clear is not allowed — just assert endpoint shape; count is non-negative.
     const emptyish = await request(app.getHttpServer())
@@ -338,10 +338,16 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
 
     const before = emptyish.body.data.pendingApprovalsCount as number;
     const { accessToken: comm } = await loginAs(app, 'comm');
-    await request(app.getHttpServer())
+    const created = await request(app.getHttpServer())
       .post('/flights')
       .set('Authorization', `Bearer ${comm}`)
       .send(payload());
+    const beforeOps = await request(app.getHttpServer())
+      .get('/pricing/proposals/pending-count')
+      .set('Authorization', `Bearer ${ceo}`);
+    expect(beforeOps.body.data.pendingApprovalsCount).toBe(before);
+
+    await advanceToPendingCeo(app, created.body.data.id as string, comm);
     const after = await request(app.getHttpServer())
       .get('/pricing/proposals/pending-count')
       .set('Authorization', `Bearer ${ceo}`);

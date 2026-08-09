@@ -3,10 +3,7 @@
  * No job or endpoints are wired yet — rule-engine + AI adapter land later.
  */
 
-export type PricingAlertType =
-  | 'LOW_SALES'
-  | 'NO_SALES'
-  | 'LOAD_FACTOR_DROP';
+export type PricingAlertType = 'LOW_SALES' | 'NO_SALES' | 'LOAD_FACTOR_DROP';
 
 export interface PricingAlertDraft {
   flightInstanceId: string;

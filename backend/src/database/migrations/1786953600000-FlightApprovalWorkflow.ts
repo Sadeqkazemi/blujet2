@@ -68,6 +68,12 @@ export class FlightApprovalWorkflow1786953600000 implements MigrationInterface {
       ALTER TABLE "flight_instances"
         ADD COLUMN IF NOT EXISTS "publishedByUserId" text
     `);
+    await queryRunner.query(`
+      ALTER TABLE "flight_instances"
+        ADD CONSTRAINT "flight_instances_publishedByUserId_fkey"
+        FOREIGN KEY ("publishedByUserId") REFERENCES "users"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE
+    `);
 
     await queryRunner.query(`
       UPDATE "flight_instances"
@@ -113,6 +119,18 @@ export class FlightApprovalWorkflow1786953600000 implements MigrationInterface {
       CREATE INDEX IF NOT EXISTS "flight_reviews_flightInstanceId_reviewedAt_idx"
       ON "flight_reviews" ("flightInstanceId", "reviewedAt")
     `);
+    await queryRunner.query(`
+      ALTER TABLE "flight_reviews"
+        ADD CONSTRAINT "flight_reviews_flightInstanceId_fkey"
+        FOREIGN KEY ("flightInstanceId") REFERENCES "flight_instances"("id")
+        ON DELETE RESTRICT ON UPDATE CASCADE
+    `);
+    await queryRunner.query(`
+      ALTER TABLE "flight_reviews"
+        ADD CONSTRAINT "flight_reviews_reviewedByUserId_fkey"
+        FOREIGN KEY ("reviewedByUserId") REFERENCES "users"("id")
+        ON DELETE RESTRICT ON UPDATE CASCADE
+    `);
 
     await queryRunner.query(`
       DO $$
@@ -150,6 +168,9 @@ export class FlightApprovalWorkflow1786953600000 implements MigrationInterface {
         SET DEFAULT 'APPROVED'::"public"."FlightDefinitionStatus"
     `);
 
+    await queryRunner.query(
+      `ALTER TABLE "flight_instances" DROP CONSTRAINT IF EXISTS "flight_instances_publishedByUserId_fkey"`,
+    );
     await queryRunner.query(
       `ALTER TABLE "flight_instances" DROP COLUMN IF EXISTS "publishedByUserId"`,
     );

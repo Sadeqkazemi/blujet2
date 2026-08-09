@@ -34,5 +34,9 @@ export async function advanceToPendingCeo(
       `operations-decision failed: ${decision.status} ${JSON.stringify(decision.body)}`,
     );
   }
-  return decision.body.data;
+  return decision.body.data as unknown as {
+    id: string;
+    definitionStatus: string;
+    version: number;
+  };
 }

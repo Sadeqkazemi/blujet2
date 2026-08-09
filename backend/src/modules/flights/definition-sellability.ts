@@ -27,10 +27,7 @@ export function isSellableDefinitionStatus(
 
 /** Canonical publish-state names for the API / frontend contract. */
 export type PublishStatus =
-  | 'DRAFT'
-  | 'PENDING_APPROVAL'
-  | 'PUBLISHED'
-  | 'REJECTED';
+  'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'REJECTED';
 
 /** FE uiStatus mapping documented in docs/features/flight-approval-workflow.md */
 export type FlightUiStatus =
@@ -45,6 +42,7 @@ export function toPublishStatus(
   status: FlightDefinitionStatusT | null | undefined,
   _hasApprovedSnapshot = false,
 ): PublishStatus {
+  void _hasApprovedSnapshot;
   switch (status) {
     case FlightDefinitionStatus.PUBLISHED:
     case FlightDefinitionStatus.APPROVED:
@@ -66,6 +64,7 @@ export function toFlightUiStatus(
   status: FlightDefinitionStatusT | null | undefined,
   _hasApprovedSnapshot = false,
 ): FlightUiStatus {
+  void _hasApprovedSnapshot;
   switch (status) {
     case FlightDefinitionStatus.PUBLISHED:
     case FlightDefinitionStatus.APPROVED:

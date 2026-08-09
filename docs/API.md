@@ -412,7 +412,13 @@ stays untouched on the same page).
   required. Approve → `PENDING_CEO`; reject → `OPERATIONS_REJECTED`.
   Writes append-only `FlightReview`.
 - GET `/flights/:id/history` — reviews + audit trail for the instance
-  (Commercial/Ops/CEO/Senior as permitted by role).
+  (Commercial/Ops/CEO/Senior as permitted by role), including CEO decisions
+  and every post-publication price change.
+- PATCH `/pricing/flights/:flightInstanceId/price` — Commercial Manager only
+  — `{ salePriceIrr, reason, expectedVersion? }`; changes the current sale
+  price only for `PUBLISHED` inventory, enforces the legal-rate ceiling,
+  bumps the flight version, invalidates search cache and appends an immutable
+  PRICING audit event with the previous and new IRR amounts.
 - GET `/flights/:instanceId` — flight detail modal: sold/cap, ضریب اشغال,
   قیمت پایه, real channel breakdown (seats + revenue per سیستمی/چارتری/
   آژانس) and مجموع درآمد from bookings.
@@ -3430,7 +3436,11 @@ See `docs/features/flight-approval-workflow.md`.
   (enum value `APPROVED` may remain unused in Postgres).
 - CEO `PATCH /pricing/proposals/:id/register` (and `/approve`) sets
   `definitionStatus=PUBLISHED`, `publishedAt`, `publishedByUserId`, bumps
-  `version`, invalidates search cache.
+  `version`, records a CEO `FlightReview`, and invalidates search cache.
+- CEO proposal lists/counts expose only `PENDING_CEO`/`PENDING_REVISION`
+  rows; drafts and operations-pending proposals are not visible there.
+- Commercial `PATCH /pricing/flights/:flightInstanceId/price` updates a
+  published sale price with optimistic-version checking and immutable history.
 - Public `GET /search/flights` sellability uses `PUBLISHED` (+ revision
   snapshot rule). Response continues to expose derived `publishStatus`.
 - Deferred stubs only (next phase): pricing-alerts rule engine, loans
