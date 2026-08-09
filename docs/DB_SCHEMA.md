@@ -125,7 +125,8 @@ migrations doesn't require renaming.
 
 - `Route { id, originCode, destCode }`
 - `Flight { id, flightNo, routeId→Route, aircraftType }`
-- `FlightInstance { id, flightId→Flight, departureAt(UTC), arrivalAt(UTC), capacity, charterSeats, status: SCHEDULED|DEPARTED|CANCELLED, durationMinutes?, competitorPriceIrr?, cabinCapacities jsonb [{cabin,seats}], definitionStatus: DRAFT|PENDING_CEO|APPROVED|REJECTED|PENDING_REVISION (legacy default APPROVED), rejectionReason?, approvedSnapshot jsonb?, pendingRevisionSnapshot jsonb? }` — public sale only for APPROVED and PENDING_REVISION (live approved inventory).
+- `FlightInstance { id, flightId→Flight, departureAt(UTC), arrivalAt(UTC), capacity, charterSeats, status: SCHEDULED|DEPARTED|CANCELLED, durationMinutes?, competitorPriceIrr?, cabinCapacities jsonb [{cabin,seats}], definitionStatus: DRAFT|PENDING_OPERATIONS|OPERATIONS_REJECTED|PENDING_CEO|REJECTED|PENDING_REVISION|PUBLISHED (legacy APPROVED rows migrated → PUBLISHED; default PUBLISHED for pre-workflow inventory), version Int @default(1) optimistic lock, publishedAt?, publishedByUserId?, rejectionReason?, approvedSnapshot jsonb?, pendingRevisionSnapshot jsonb? }` — public sale only for `PUBLISHED` and `PENDING_REVISION` (with approvedSnapshot).
+- `FlightReview { id, flightInstanceId, stage: OPERATIONS|CEO, decision: APPROVED|REJECTED, comment, reviewedByUserId, reviewedAt, expectedVersion?, createdAt }` — append-only ops/CEO decisions.
 - `FlightChargeRule { id, flightInstanceId, title, kind: TAX|FEE, calculationMode: FIXED|PERCENTAGE, fixedAmountIrr?, percentageBasisPoints?, cabin null=all, effectiveFrom/To, isActive, isPendingRevision }` — server-authoritative taxes/fees; booking stores immutable `chargeSnapshot`.
 - `AircraftSeatMap` — business + optional comfort + economy row/col bands; COMFORT cannot be sold without comfort rows.
 - `FarePricingProposal.status` — PENDING|REGISTERED|REJECTED; `competitorPriceIrr` nullable.
