@@ -1,6 +1,6 @@
 /** Shared access-revoked signal — contract: 403 + code ACCESS_REVOKED. */
 
-export const ACCESS_REVOKED_MESSAGE = 'دسترسی شما به این پنل غیرفعال شده است.';
+export const ACCESS_REVOKED_MESSAGE = 'اجازه دسترسی برای شما امکان‌پذیر نیست.';
 export const ACCESS_REVOKED_EVENT = 'blujet:access-revoked';
 
 export type AccessRevokedDetail = {

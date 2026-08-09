@@ -164,6 +164,8 @@ export class FlightsService {
       return {
         ...this.baseRow(i, s),
         derivedStatus: this.derivedStatus(i.status, s, i.capacity),
+        aiSuggestion: i.aiSuggestion as unknown as PersistedAiSuggestion | null,
+        competitorPriceIrr: i.competitorPriceIrr,
       };
     });
 
@@ -762,37 +764,46 @@ export class FlightsService {
     };
   }
 
-  /** Advisory ML analysis over the future list (suggestion persisted on the
-   * instance; graceful degradation identical to Phase 6). */
+  /** Advisory ML analysis over future planning and weak-selling flights.
+   * Suggestions are persisted but never applied automatically. */
   async runAiAnalysis(actor: AuthenticatedUser, requestId?: string) {
+    const now = new Date();
     const futureCutoff = new Date(
-      Date.now() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
+      now.getTime() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
     );
-    const future = await this.instanceRepo
+    const lowSalesWindowEnd = new Date(now.getTime() + 72 * 3_600_000);
+    const upcoming = await this.instanceRepo
       .createQueryBuilder('fi')
       .leftJoinAndSelect('fi.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route')
       .where('fi.status = :status', { status: 'SCHEDULED' })
-      .andWhere('fi.departureAt > :cutoff', { cutoff: futureCutoff })
+      .andWhere('fi.departureAt > :now', { now })
       .getMany();
-    if (future.length === 0) return { analyzed: 0, available: true };
+    const sold = await this.soldByInstance(upcoming.map((item) => item.id));
+    const analyzable = upcoming.filter((item) => {
+      if (item.basePriceIrr == null) return false;
+      if (item.departureAt > futureCutoff) return true;
+      const occupancy = item.capacity > 0 ? (sold.get(item.id) ?? 0) / item.capacity : 0;
+      return item.departureAt <= lowSalesWindowEnd && occupancy < 0.6;
+    });
+    if (analyzable.length === 0) return { analyzed: 0, available: true };
 
     const result = await this.priceSuggestions.suggest(
-      future.map((i) => {
+      analyzable.map((i) => {
         // ADVISORY-ONLY ML boundary (CLAUDE.md ML Service Rules): the
         // FastAPI service expects plain JSON numbers, and this payload is
         // a one-way outbound signal for a suggestion — never round-tripped
         // back into a stored/authoritative field without going through
         // NestJS's own re-pricing logic. Individual fare amounts are far
         // below 2^53, so Number() loses no precision here.
-        const basePriceIrr = Number(i.basePriceIrr ?? 30_000_000n);
+        const basePriceIrr = Number(i.basePriceIrr);
         return {
           proposal_id: i.id,
           origin_code: i.flight.route.originCode,
           dest_code: i.flight.route.destCode,
           departure_at: i.departureAt.toISOString(),
           base_price_irr: basePriceIrr,
-          competitor_price_irr: basePriceIrr,
+          competitor_price_irr: Number(i.competitorPriceIrr ?? i.basePriceIrr),
           proposed_price_irr: basePriceIrr,
           capacity: i.capacity,
           charter_seats: i.charterSeats,
@@ -803,7 +814,7 @@ export class FlightsService {
     if (!result) return { analyzed: 0, available: false };
 
     const generatedAt = new Date().toISOString();
-    const futureById = new Map(future.map((i) => [i.id, i]));
+    const futureById = new Map(analyzable.map((i) => [i.id, i]));
     for (const s of result.suggestions) {
       const suggestion: PersistedAiSuggestion = {
         priceIrr: s.price_irr,
@@ -825,8 +836,8 @@ export class FlightsService {
       actorId: actor.id,
       actorRole: actor.role,
       category: 'PRICING',
-      action: 'تحلیل قیمت‌گذاری پروازهای آینده با هوش مصنوعی',
-      detail: `تحلیل هوش مصنوعی برای ${result.suggestions.length} پرواز آینده توسط ${actor.fullName} اجرا شد.`,
+      action: 'تحلیل قیمت‌گذاری و فروش پروازها با هوش مصنوعی',
+      detail: `تحلیل هوش مصنوعی برای ${result.suggestions.length} پرواز آینده یا کم‌فروش توسط ${actor.fullName} اجرا شد.`,
       metadata: {
         analyzed: result.suggestions.length,
         modelVersion: result.model_version,

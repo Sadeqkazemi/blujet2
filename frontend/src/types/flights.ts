@@ -77,6 +77,8 @@ export interface FlightRow {
   editBlockedReason?: string | null;
   pendingRevision?: boolean;
   approvedSnapshot?: FlightDefinitionSnapshot | null;
+  aiSuggestion?: FlightAiSuggestion | null;
+  competitorPriceIrr?: string | null;
 }
 
 export interface FlightAiSuggestion {

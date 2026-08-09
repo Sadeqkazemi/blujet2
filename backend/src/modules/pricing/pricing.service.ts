@@ -46,6 +46,18 @@ export interface PersistedAiSuggestion {
   generatedAt: string;
 }
 
+const CEO_REGISTERED_VISIBILITY_MS = 3 * 24 * 60 * 60 * 1000;
+
+export function isCeoRegisteredProposalVisible(
+  proposal: Pick<FarePricingProposal, 'approvedAt'>,
+  now = new Date(),
+): boolean {
+  return (
+    proposal.approvedAt != null &&
+    proposal.approvedAt.getTime() >= now.getTime() - CEO_REGISTERED_VISIBILITY_MS
+  );
+}
+
 @Injectable()
 export class PricingService {
   constructor(
@@ -99,7 +111,9 @@ export class PricingService {
     return {
       pending,
       registered: proposals.filter(
-        (p) => p.status === PricingProposalStatus.REGISTERED,
+        (p) =>
+          p.status === PricingProposalStatus.REGISTERED &&
+          isCeoRegisteredProposalVisible(p),
       ),
       rejected: proposals.filter(
         (p) => p.status === PricingProposalStatus.REJECTED,

@@ -63,6 +63,11 @@ body {
 }
 
 .font-num {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.font-num.ltr {
   font-family: var(--font-mono);
 }
 

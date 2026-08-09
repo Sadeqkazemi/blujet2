@@ -1,0 +1,101 @@
+import { ForbiddenException } from '@nestjs/common';
+import { ALL_PANEL_KEYS, PANEL_ACCESS_TOGGLE_RIGHTS } from './panel-nav.config';
+import { PanelsService } from './panels.service';
+
+describe('operations panel access contract', () => {
+  it('is controllable by CEO and senior manager', () => {
+    expect(ALL_PANEL_KEYS).toContain('OPERATIONS');
+    expect(PANEL_ACCESS_TOGGLE_RIGHTS.CEO).toContain('OPERATIONS');
+    expect(PANEL_ACCESS_TOGGLE_RIGHTS.SENIOR_MANAGER).toContain('OPERATIONS');
+  });
+
+  it('returns ACCESS_REVOKED for a disabled operations panel', async () => {
+    const panelRepo = {
+      findOneBy: jest
+        .fn<() => Promise<{ panelKey: string; enabled: boolean }>>()
+        .mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
+    };
+    const service = new PanelsService(
+      {} as never,
+      {} as never,
+      panelRepo as never,
+      {} as never,
+      {} as never,
+    );
+
+    let caught: unknown;
+    try {
+      await service.assertPanelEnabledForSelf('OPERATIONS_MANAGER');
+    } catch (error: unknown) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ForbiddenException);
+    expect((caught as ForbiddenException).getResponse()).toMatchObject({
+      code: 'ACCESS_REVOKED',
+    });
+  });
+
+  it('revokes every live operations-manager refresh session when disabled', async () => {
+    let capturedFindOptions: unknown;
+    const findUsers = jest
+      .fn<(options: unknown) => Promise<Array<{ id: string }>>>()
+      .mockImplementation((options) => {
+        capturedFindOptions = options;
+        return Promise.resolve([{ id: 'ops-1' }, { id: 'ops-2' }]);
+      });
+    const userRepo = { find: findUsers };
+    const panelRepo = {
+      upsert: jest
+        .fn<(row: unknown, keys: unknown) => Promise<void>>()
+        .mockResolvedValue(undefined),
+      findOneByOrFail: jest
+        .fn<() => Promise<{ panelKey: string; enabled: boolean }>>()
+        .mockResolvedValue({ panelKey: 'OPERATIONS', enabled: false }),
+    };
+    let capturedRefreshCriteria: unknown;
+    let capturedRefreshPatch: unknown;
+    const updateRefreshTokens = jest
+      .fn<
+        (criteria: unknown, patch: unknown) => Promise<{ affected: number }>
+      >()
+      .mockImplementation((criteria, patch) => {
+        capturedRefreshCriteria = criteria;
+        capturedRefreshPatch = patch;
+        return Promise.resolve({ affected: 2 });
+      });
+    const refreshRepo = { update: updateRefreshTokens };
+    const audit = {
+      record: jest
+        .fn<(entry: unknown) => Promise<void>>()
+        .mockResolvedValue(undefined),
+    };
+    const service = new PanelsService(
+      userRepo as never,
+      {} as never,
+      panelRepo as never,
+      refreshRepo as never,
+      audit as never,
+    );
+
+    await service.setAccessFlag(
+      { id: 'ceo-1', role: 'CEO', fullName: 'مدیر عامل', isSuperAdmin: false },
+      'OPERATIONS',
+      false,
+    );
+
+    const findOptions = capturedFindOptions as {
+      where: { role: string };
+    };
+    expect(findOptions.where.role).toBe('OPERATIONS_MANAGER');
+    const refreshCriteria = capturedRefreshCriteria as {
+      userId: unknown;
+      revokedAt: unknown;
+    };
+    const refreshPatch = capturedRefreshPatch as {
+      revokedAt: Date;
+    };
+    expect(refreshCriteria.userId).toBeDefined();
+    expect(refreshCriteria.revokedAt).toBeDefined();
+    expect(refreshPatch.revokedAt).toBeInstanceOf(Date);
+  });
+});

@@ -28,9 +28,10 @@ const inputClass =
   'font-num h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-center text-[13px] text-[#e7ecf3] outline-none';
 
 function rangeLabel(minPoints: number, maxPoints: number | null): string {
-  const min = faDigits(minPoints);
+  const format = (value: number) => faDigits(value.toLocaleString('en-US').replace(/,/g, '٬'));
+  const min = format(minPoints);
   if (maxPoints === null) return `بیش از ${min}`;
-  return `${min} تا ${faDigits(maxPoints)}`;
+  return `${min} تا ${format(maxPoints)}`;
 }
 
 export default function ClubTierRulesPage() {
@@ -194,36 +195,39 @@ export default function ClubTierRulesPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
-        <div className="border-b border-[#1f2a3d] px-[15px] py-3">
+      <div className="rounded-[16px] border border-[#1f2a3d] bg-[#141d2e] p-5">
+        <div className="mb-4">
           <h2 className="m-0 text-[14.5px] font-extrabold text-white">پیش‌نمایش سطوح</h2>
+          <p className="mt-1 text-[10.5px] text-[#6b7b94]">مسیر ارتقای اعضا بر اساس امتیازهای ثبت‌شده</p>
         </div>
-        <div className="grid grid-cols-3 border-b border-[#1f2a3d] px-[15px] py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
-          <span>سطح</span>
-          <span>محدوده امتیاز</span>
-          <span>رنگ نمایش</span>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {rules.preview.map((row, index) => {
+            const styles = {
+              SILVER: ['from-[#334155] to-[#1e293b]', '#94a3b8', 'نقطه شروع'],
+              GOLD: ['from-[#7c5414] to-[#3d2c13]', '#fbbf24', 'اعضای وفادار'],
+              PLATINUM: ['from-[#1d4ed8] to-[#172554]', '#60a5fa', 'بالاترین سطح'],
+            }[row.tier];
+            return (
+              <div
+                key={row.tier}
+                data-testid="club-tier-card"
+                id={`club-tier-${row.tier}`}
+                className={`relative overflow-hidden rounded-[15px] border border-white/10 bg-gradient-to-br ${styles[0]} p-5`}
+              >
+                <div data-testid={`club-tier-${row.tier}`} className="relative z-10">
+                  <div className="mb-6 flex items-start justify-between">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-xl">{index === 0 ? '◇' : index === 1 ? '◆' : '✦'}</span>
+                    <span className="rounded-full bg-black/20 px-2.5 py-1 text-[9.5px] font-bold" style={{ color: styles[1] }}>{styles[2]}</span>
+                  </div>
+                  <div className="text-lg font-black text-white">{TIER_LABEL[row.tier]}</div>
+                  <div className="font-num mt-2 text-sm font-bold" style={{ color: styles[1] }}>{rangeLabel(row.minPoints, row.maxPoints)} امتیاز</div>
+                  <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/25"><div className="h-full rounded-full" style={{ width: `${34 + index * 33}%`, background: styles[1] }} /></div>
+                  <span data-testid={`ctr-swatch-${row.tier}`} className="sr-only" style={{ background: TIER_SWATCH[row.tier] }}>{TIER_SWATCH[row.tier]}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        {rules.preview.map((row) => (
-          <div
-            key={row.tier}
-            className="grid grid-cols-3 items-center border-b border-[#1a2436] px-[15px] py-[11px] text-xs last:border-b-0"
-          >
-            <span className="font-bold text-[#e7ecf3]">{TIER_LABEL[row.tier]}</span>
-            <span dir="ltr" className="font-num text-[#9fb0c7]">
-              {rangeLabel(row.minPoints, row.maxPoints)}
-            </span>
-            <span className="flex items-center gap-[7px]">
-              <span
-                data-testid={`ctr-swatch-${row.tier}`}
-                className="h-4 w-4 rounded-[5px]"
-                style={{ background: TIER_SWATCH[row.tier] }}
-              />
-              <span dir="ltr" className="font-num text-[10.5px] text-[#9fb0c7]">
-                {TIER_SWATCH[row.tier]}
-              </span>
-            </span>
-          </div>
-        ))}
       </div>
     </div>
   );
