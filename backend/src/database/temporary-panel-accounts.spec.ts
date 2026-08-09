@@ -19,6 +19,7 @@ describe('temporary panel accounts', () => {
   it('also identifies the phone-login temporary accounts (agency, customer)', () => {
     expect(isTemporaryPanelUsername('uat.agency')).toBe(true);
     expect(isTemporaryPanelUsername('UAT.CUSTOMER')).toBe(true);
+    expect(isTemporaryPanelUsername('UAT.OPERATIONS')).toBe(true);
   });
 
   it('defines exactly one reserved username-login account for every staff/manager role', () => {
@@ -27,6 +28,7 @@ describe('temporary panel accounts', () => {
         'SITE_ADMIN',
         'IT_MANAGER',
         'COMMERCIAL_MANAGER',
+        'OPERATIONS_MANAGER',
         'FINANCE_MANAGER',
         'SENIOR_MANAGER',
         'CEO',

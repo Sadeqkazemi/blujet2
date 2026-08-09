@@ -19,6 +19,11 @@ export const TEMPORARY_PANEL_ACCOUNTS = [
     fullName: 'UAT Commercial Manager',
   },
   {
+    username: 'uat.operations',
+    role: 'OPERATIONS_MANAGER',
+    fullName: 'UAT Operations Manager',
+  },
+  {
     username: 'uat.finance',
     role: 'FINANCE_MANAGER',
     fullName: 'UAT Finance Manager',
