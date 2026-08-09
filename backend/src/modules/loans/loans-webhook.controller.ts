@@ -26,7 +26,9 @@ export class LoansWebhookController {
     const raw =
       req.rawBody ??
       Buffer.from(
-        typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {}),
+        typeof req.body === 'string'
+          ? req.body
+          : JSON.stringify(req.body ?? {}),
       );
     this.loans.verifyWebhookSignature(raw, signature);
 

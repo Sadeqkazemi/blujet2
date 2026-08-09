@@ -278,7 +278,7 @@ export class ScheduleTemplateService {
 
       const rows = ctx.occurrences.map((o) => ({
         id: randomUUID(),
-        flightId: flight!.id,
+        flightId: flight.id,
         scheduleId: null,
         scheduleTemplateId: template.id,
         departureAt: o.departureAt,
@@ -299,7 +299,7 @@ export class ScheduleTemplateService {
         .createQueryBuilder()
         .insert()
         .into(FlightInstance)
-        .values(rows as never)
+        .values(rows)
         .orIgnore()
         .execute();
 

@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ErrorCode } from '../../common/errors';
 import { CircuitBreaker } from './circuit-breaker';
@@ -11,6 +15,14 @@ import {
 } from './bank-loan.types';
 
 export const BANK_LOAN_PROVIDER = Symbol('BANK_LOAN_PROVIDER');
+
+function asScalarString(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return fallback;
+}
 
 /**
  * Config-driven HTTP adapter. Bank name/URLs never hard-coded — all from env.
@@ -133,7 +145,10 @@ export class BankLoanHttpAdapter implements BankLoanProvider {
       }),
     });
     const o = body as Record<string, unknown>;
-    const bankReferenceId = String(o.referenceId ?? o.bankReferenceId ?? '');
+    const bankReferenceId = asScalarString(
+      o.referenceId ?? o.bankReferenceId,
+      '',
+    );
     if (!bankReferenceId) {
       throw new ServiceUnavailableException({
         code: ErrorCode.INTERNAL_ERROR,
@@ -142,16 +157,18 @@ export class BankLoanHttpAdapter implements BankLoanProvider {
     }
     return {
       bankReferenceId,
-      bankStatus: parseBankStatus(String(o.status ?? 'SUBMITTED')),
+      bankStatus: parseBankStatus(asScalarString(o.status, 'SUBMITTED')),
       walletCreditIrr:
-        o.walletCreditIrr != null ? String(o.walletCreditIrr) : null,
+        o.walletCreditIrr != null
+          ? asScalarString(o.walletCreditIrr) || null
+          : null,
       walletCreditReference:
         o.walletCreditReference != null
-          ? String(o.walletCreditReference)
+          ? asScalarString(o.walletCreditReference) || null
           : null,
       summary: {
-        status: o.status,
-        updatedAt: o.updatedAt,
+        status: asScalarString(o.status, 'SUBMITTED'),
+        updatedAt: asScalarString(o.updatedAt),
       },
     };
   }
@@ -167,16 +184,18 @@ export class BankLoanHttpAdapter implements BankLoanProvider {
     const o = body as Record<string, unknown>;
     return {
       bankReferenceId,
-      bankStatus: parseBankStatus(String(o.status ?? 'UNKNOWN')),
+      bankStatus: parseBankStatus(asScalarString(o.status, 'UNKNOWN')),
       walletCreditIrr:
-        o.walletCreditIrr != null ? String(o.walletCreditIrr) : null,
+        o.walletCreditIrr != null
+          ? asScalarString(o.walletCreditIrr) || null
+          : null,
       walletCreditReference:
         o.walletCreditReference != null
-          ? String(o.walletCreditReference)
+          ? asScalarString(o.walletCreditReference) || null
           : null,
       summary: {
-        status: o.status,
-        updatedAt: o.updatedAt,
+        status: asScalarString(o.status, 'UNKNOWN'),
+        updatedAt: asScalarString(o.updatedAt),
       },
     };
   }

@@ -62,11 +62,17 @@ export class LoansService {
     };
   }
 
-  async create(actor: AuthenticatedUser, dto: {
-    requestedAmountIrr: string;
-    idempotencyKey: string;
-  }) {
-    if (!/^\d+$/.test(dto.requestedAmountIrr) || BigInt(dto.requestedAmountIrr) <= 0n) {
+  async create(
+    actor: AuthenticatedUser,
+    dto: {
+      requestedAmountIrr: string;
+      idempotencyKey: string;
+    },
+  ) {
+    if (
+      !/^\d+$/.test(dto.requestedAmountIrr) ||
+      BigInt(dto.requestedAmountIrr) <= 0n
+    ) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'مبلغ درخواستی نامعتبر است.',
@@ -181,7 +187,10 @@ export class LoansService {
       });
     }
     const correlationId = randomUUID();
-    const status = await this.bank.getStatus(row.bankReferenceId, correlationId);
+    const status = await this.bank.getStatus(
+      row.bankReferenceId,
+      correlationId,
+    );
     await this.applyBankUpdate(row, status.bankStatus, status.summary, {
       walletCreditIrr: status.walletCreditIrr,
       walletCreditReference: status.walletCreditReference,
@@ -310,8 +319,7 @@ export class LoansService {
       if (locked.lastWebhookEventId === opts.eventId) return;
 
       locked.bankStatus = bankStatus;
-      locked.statusSummary =
-        asJsonSummary(summary) ?? locked.statusSummary;
+      locked.statusSummary = asJsonSummary(summary) ?? locked.statusSummary;
       locked.lastSyncedAt = new Date();
       locked.lastWebhookEventId = opts.eventId;
       await manager.save(locked);

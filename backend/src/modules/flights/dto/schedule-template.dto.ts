@@ -34,7 +34,10 @@ export class ScheduleTemplatePreviewDto {
   @MinLength(1)
   aircraftDefinitionId!: string;
 
-  @ApiProperty({ example: '07:30', description: 'Local time at origin airport' })
+  @ApiProperty({
+    example: '07:30',
+    description: 'Local time at origin airport',
+  })
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   departureTime!: string;
 

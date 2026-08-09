@@ -35,7 +35,9 @@ export function mapBankStatusToDisplay(
   }
 }
 
-export function parseBankStatus(raw: string | undefined | null): BankLoanStatus {
+export function parseBankStatus(
+  raw: string | undefined | null,
+): BankLoanStatus {
   const v = (raw ?? '').toUpperCase();
   const allowed = new Set([
     'SUBMITTED',
@@ -79,5 +81,8 @@ export interface BankLoanProvider {
   createApplication(
     req: BankCreateLoanRequest,
   ): Promise<BankCreateLoanResponse>;
-  getStatus(bankReferenceId: string, correlationId: string): Promise<BankLoanStatusResponse>;
+  getStatus(
+    bankReferenceId: string,
+    correlationId: string,
+  ): Promise<BankLoanStatusResponse>;
 }
