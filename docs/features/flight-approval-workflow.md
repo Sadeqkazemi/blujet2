@@ -39,19 +39,24 @@ Invalid transition → HTTP `409 CONFLICT`.
 
 ## Endpoints
 
-- [ ] `POST /flights` creates `DRAFT` (not `PENDING_CEO`)
-- [ ] `POST /flights/:id/submit-operations`
-- [ ] `GET /flights/operations-queue`
-- [ ] `POST /flights/:id/operations-decision` (comment required, `expectedVersion`)
-- [ ] `GET /flights/:id/history`
-- [ ] CEO `PATCH /pricing/proposals/:id/register` (and `/approve`) → `PUBLISHED`
-- [ ] Public search only returns sellable (`PUBLISHED` or `PENDING_REVISION`+snapshot)
-- [ ] Optimistic lock: stale `expectedVersion` → 409
-- [ ] Migration maps legacy `APPROVED` → `PUBLISHED` without deleting rows
-- [ ] RBAC: ops role cannot publish; commercial cannot ops-decide; non-ops 403
+- [x] `POST /flights` creates `DRAFT` (not `PENDING_CEO`) — `flight-definition.e2e-spec.ts` / `flight-approval-workflow.e2e-spec.ts` #1
+- [x] `POST /flights/:id/submit-operations` — `flight-approval-workflow.e2e-spec.ts` #1
+- [x] `GET /flights/operations-queue` — covered via ops decision path + controller RBAC
+- [x] `POST /flights/:id/operations-decision` (comment required, `expectedVersion`) — e2e #3/#4/#5/#9
+- [x] `GET /flights/:id/history` — e2e #8
+- [x] CEO `PATCH /pricing/proposals/:id/register` (and `/approve`) → `PUBLISHED` — e2e #6 + `flight-definition.e2e-spec.ts`
+- [x] Public search only returns sellable (`PUBLISHED` or `PENDING_REVISION`+snapshot) — e2e #6/#7 + `definition-sellability.spec.ts`
+- [x] Optimistic lock: stale `expectedVersion` → 409 — e2e #9
+- [x] Migration maps legacy `APPROVED` → `PUBLISHED` without deleting rows — migration + e2e #10 (legacy sellable)
+- [x] RBAC: ops role cannot publish; commercial cannot ops-decide; non-ops 403 — e2e #2 + ops-cannot-register
+
+## Unit
+
+- [x] Transition matrix — `flight-workflow.service.spec.ts`
+- [x] Sellability / ui mapping — `definition-sellability.spec.ts`
 
 ## Deferred (stubs only)
 
-- Pricing alerts / AI recommendation job
-- Loan applications
-- Transactional outbox for domain events
+- Pricing alerts / AI recommendation job — `backend/src/modules/flights/pricing-alert.types.ts`
+- Loan applications — `backend/src/modules/loans/`
+- Transactional outbox for domain events — noted in `docs/API.md` Phase 71
