@@ -10,6 +10,11 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { Airport } from '../src/database/entities/airport.entity';
 import { AircraftDefinition } from '../src/database/entities/aircraft-definition.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { FlightScheduleTemplate } from '../src/database/entities/flight-schedule-template.entity';
+import { CharterCommitment } from '../src/database/entities/charter-commitment.entity';
+import { AgencySeatCommitment } from '../src/database/entities/agency-seat-commitment.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs } from './helpers/login.helper';
 
 describe('Seasonal schedule templates (e2e)', () => {
@@ -60,18 +65,33 @@ describe('Seasonal schedule templates (e2e)', () => {
     return { origin, dest, aircraft: aircraft ?? fallback };
   }
 
+  /** Unique local clock so aircraft overlap checks don't hit seed/history. */
+  function uniqueSlot(stamp: number) {
+    const minute = stamp % 60;
+    const hour = 2 + Math.floor((stamp / 60) % 4); // 02–05
+    const departureTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    const y = 2028;
+    const m = 1 + (stamp % 9); // Jan–Sep
+    const startDay = 1 + (stamp % 20);
+    const startDate = `${y}-${String(m).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+    const endDate = `${y}-${String(m).padStart(2, '0')}-${String(Math.min(startDay + 14, 28)).padStart(2, '0')}`;
+    return { departureTime, startDate, endDate };
+  }
+
   it('preview + create is idempotent; conflict on replay with different key overlapping', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now();
+    const slot = uniqueSlot(stamp);
     const body = {
       originAirportId: origin.id,
       destinationAirportId: dest.id,
-      flightNoBase: `ST${Date.now() % 100000}`,
+      flightNoBase: `ST${stamp % 1000000}`,
       aircraftDefinitionId: aircraft.id,
-      departureTime: '08:15',
+      departureTime: slot.departureTime,
       durationMinutes: 95,
-      startDate: '2026-11-02',
-      endDate: '2026-11-20',
+      startDate: slot.startDate,
+      endDate: slot.endDate,
       weekdays: [1, 3, 5],
       agencyPriceIrr: '38000000',
       legalCeilingIrr: '42000000',
@@ -115,22 +135,78 @@ describe('Seasonal schedule templates (e2e)', () => {
     expect(instances).toBe(preview.body.data.occurrenceCount);
   });
 
-  it('deactivate cancels future unsold instances', async () => {
+  it('concurrent creates do not leave incomplete or duplicate schedules', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 17;
+    const slot = uniqueSlot(stamp);
     const body = {
       originAirportId: origin.id,
       destinationAirportId: dest.id,
-      flightNoBase: `SD${Date.now() % 100000}`,
+      flightNoBase: `SC${stamp % 1000000}`,
       aircraftDefinitionId: aircraft.id,
-      departureTime: '09:00',
+      departureTime: slot.departureTime,
+      durationMinutes: 100,
+      startDate: slot.startDate,
+      endDate: slot.endDate,
+      weekdays: [1, 3],
+      agencyPriceIrr: '36000000',
+      legalCeilingIrr: '41000000',
+    };
+    const preview = await request(app.getHttpServer())
+      .post('/flights/schedule-templates/preview')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(body);
+    expect(preview.status).toBe(200);
+    const expected = preview.body.data.occurrenceCount as number;
+
+    const [a, b] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...body, idempotencyKey: `conc-a-${stamp}` }),
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...body, idempotencyKey: `conc-b-${stamp}` }),
+    ]);
+
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const winner = a.status === 201 ? a : b;
+    expect(winner.body.data.instanceCount).toBe(expected);
+
+    const templates = await dataSource
+      .getRepository(FlightScheduleTemplate)
+      .count({
+        where: { flightNoBase: body.flightNoBase },
+      });
+    expect(templates).toBe(1);
+
+    const instances = await dataSource
+      .getRepository(FlightInstance)
+      .count({ where: { scheduleTemplateId: winner.body.data.id } });
+    expect(instances).toBe(expected);
+  });
+
+  it('deactivate cancels future unsold instances', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 31;
+    const slot = uniqueSlot(stamp);
+    const body = {
+      originAirportId: origin.id,
+      destinationAirportId: dest.id,
+      flightNoBase: `SD${stamp % 1000000}`,
+      aircraftDefinitionId: aircraft.id,
+      departureTime: slot.departureTime,
       durationMinutes: 90,
-      startDate: '2026-12-01',
-      endDate: '2026-12-15',
+      startDate: slot.startDate,
+      endDate: slot.endDate,
       weekdays: [2, 4],
       agencyPriceIrr: '35000000',
       legalCeilingIrr: '40000000',
-      idempotencyKey: `sched-deact-${Date.now()}`,
+      idempotencyKey: `sched-deact-${stamp}`,
     };
     const created = await request(app.getHttpServer())
       .post('/flights/schedule-templates')
@@ -144,5 +220,91 @@ describe('Seasonal schedule templates (e2e)', () => {
       .send({});
     expect(deact.status).toBe(200);
     expect(deact.body.data.status).toBe('DEACTIVATED');
+  });
+
+  it('does not cancel instances with active charter/agency commitments', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const actor = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username: 'comm' });
+    const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 53;
+    const slot = uniqueSlot(stamp);
+    const body = {
+      originAirportId: origin.id,
+      destinationAirportId: dest.id,
+      flightNoBase: `CM${stamp % 1000000}`,
+      aircraftDefinitionId: aircraft.id,
+      departureTime: slot.departureTime,
+      durationMinutes: 90,
+      startDate: slot.startDate,
+      endDate: slot.endDate,
+      weekdays: [1, 3, 5],
+      agencyPriceIrr: '34000000',
+      legalCeilingIrr: '39000000',
+      idempotencyKey: `sched-commit-${stamp}`,
+    };
+    const created = await request(app.getHttpServer())
+      .post('/flights/schedule-templates')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(body);
+    expect(created.status).toBe(201);
+
+    const instances = await dataSource.getRepository(FlightInstance).find({
+      where: { scheduleTemplateId: created.body.data.id },
+      order: { departureAt: 'ASC' },
+    });
+    expect(instances.length).toBeGreaterThan(1);
+    const protectedFi = instances[0];
+    const freeFi = instances[1];
+    expect(protectedFi).toBeDefined();
+    expect(freeFi).toBeDefined();
+    if (!protectedFi || !freeFi) {
+      throw new Error('expected at least two schedule instances');
+    }
+
+    await dataSource.getRepository(CharterCommitment).save(
+      dataSource.getRepository(CharterCommitment).create({
+        flightInstanceId: protectedFi.id,
+        cabin: 'ECONOMY',
+        seats: 2,
+        contractPriceIrr: 1_000_000n,
+        createdById: actor.id,
+        createdAt: new Date(),
+        status: 'ACTIVE',
+      }),
+    );
+    const [agency] = await dataSource.getRepository(AgencyProfile).find({
+      take: 1,
+    });
+    if (agency?.id) {
+      await dataSource.getRepository(AgencySeatCommitment).save(
+        dataSource.getRepository(AgencySeatCommitment).create({
+          flightInstanceId: protectedFi.id,
+          agencyId: agency.id,
+          cabin: 'BUSINESS',
+          seats: 1,
+          contractPriceIrr: 2_000_000n,
+          createdById: actor.id,
+          createdAt: new Date(),
+          status: 'ACTIVE',
+        }),
+      );
+    }
+
+    const deact = await request(app.getHttpServer())
+      .post(`/flights/schedule-templates/${created.body.data.id}/deactivate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(deact.status).toBe(200);
+
+    const refreshedProtected = await dataSource
+      .getRepository(FlightInstance)
+      .findOneByOrFail({ id: protectedFi.id });
+    const refreshedFree = await dataSource
+      .getRepository(FlightInstance)
+      .findOneByOrFail({ id: freeFi.id });
+    expect(refreshedProtected.status).toBe('SCHEDULED');
+    expect(refreshedFree.status).toBe('CANCELLED');
   });
 });

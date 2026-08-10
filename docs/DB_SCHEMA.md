@@ -2724,6 +2724,11 @@ than relying on any cascade.
   weekdays, IRR prices, cabin capacity snapshot, idempotencyKey, status.
 - `flight_instances.scheduleTemplateId` — nullable link to template.
 - `bank_loan_applications` — bankReferenceId, requestedAmountIrr, bankStatus,
-  statusSummary (non-sensitive), webhook event id, optional walletCreditReference.
+  statusSummary (non-sensitive), webhook event id, optional walletCreditReference;
+  unique(`userId`,`idempotencyKey`); unique partial `walletCreditReference`;
+  `lastWebhookOccurredAt` for replay protection.
+- `bank_loan_webhook_events` — append-only audit; unique(`provider`,`eventId`);
+  redacted payload; processingResult (`APPLIED` / `DUPLICATE` / `IGNORED_*`).
 - `airports.isInternational` — used by destination stats (DXB/IST/NJF seeded true).
-- Migration: `1787040000000-V4ScheduleTemplatesLoansDestStats`.
+- Migrations: `1787040000000-V4ScheduleTemplatesLoansDestStats`,
+  `1787126400000-V4LoanScheduleHardening`.

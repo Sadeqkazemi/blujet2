@@ -17,6 +17,7 @@ import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { PriceLock } from '../../database/entities/price-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
 import { FlightReview } from '../../database/entities/flight-review.entity';
@@ -55,6 +56,7 @@ import { AuthModule } from '../auth/auth.module';
       Booking,
       Passenger,
       SeatLock,
+      PriceLock,
       FarePricingProposal,
       FlightChargeRule,
       FlightReview,

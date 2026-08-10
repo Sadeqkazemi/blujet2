@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'node:crypto';
-import { DataSource, In, Repository } from 'typeorm';
+import { createHash, randomUUID } from 'node:crypto';
+import { DataSource, In, type EntityManager, Repository } from 'typeorm';
 import { Airport } from '../../database/entities/airport.entity';
 import { AircraftDefinition } from '../../database/entities/aircraft-definition.entity';
 import { AircraftCabin } from '../../database/entities/aircraft-cabin.entity';
@@ -15,10 +15,17 @@ import { Route } from '../../database/entities/route.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { Booking } from '../../database/entities/booking.entity';
+import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
+import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { PriceLock } from '../../database/entities/price-lock.entity';
 import {
+  CommitmentStatus,
   FlightDefinitionStatus,
   FlightInstanceStatus,
   FlightScheduleTemplateStatus,
+  PriceLockStatus,
 } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -31,6 +38,10 @@ import type {
   CreateScheduleTemplateDto,
   ScheduleTemplatePreviewDto,
 } from './dto/schedule-template.dto';
+
+type ResolvedCtx = Awaited<
+  ReturnType<ScheduleTemplateService['resolveContext']>
+>;
 
 @Injectable()
 export class ScheduleTemplateService {
@@ -46,12 +57,6 @@ export class ScheduleTemplateService {
     private readonly cabinRepo: Repository<AircraftCabin>,
     @InjectRepository(FlightInstance)
     private readonly instanceRepo: Repository<FlightInstance>,
-    @InjectRepository(Booking)
-    private readonly bookingRepo: Repository<Booking>,
-    @InjectRepository(Route)
-    private readonly routeRepo: Repository<Route>,
-    @InjectRepository(Flight)
-    private readonly flightRepo: Repository<Flight>,
     private readonly audit: AuditService,
   ) {}
 
@@ -167,13 +172,46 @@ export class ScheduleTemplateService {
     };
   }
 
+  private asDateOnly(value: string | Date): string {
+    if (typeof value === 'string') return value.slice(0, 10);
+    return value.toISOString().slice(0, 10);
+  }
+
+  private templateMatchesDto(
+    t: FlightScheduleTemplate,
+    actorId: string,
+    dto: CreateScheduleTemplateDto,
+    ctx: ResolvedCtx,
+  ): boolean {
+    const weekdaysA = JSON.stringify(
+      [...(Array.isArray(t.weekdays) ? t.weekdays : [])].map(Number).sort(),
+    );
+    const weekdaysB = JSON.stringify([...dto.weekdays].map(Number).sort());
+    return (
+      t.createdByUserId === actorId &&
+      t.originAirportId === dto.originAirportId &&
+      t.destinationAirportId === dto.destinationAirportId &&
+      t.flightNoBase === dto.flightNoBase &&
+      t.aircraftDefinitionId === dto.aircraftDefinitionId &&
+      t.departureTime === dto.departureTime &&
+      t.durationMinutes === dto.durationMinutes &&
+      this.asDateOnly(t.startDate) === dto.startDate &&
+      this.asDateOnly(t.endDate) === dto.endDate &&
+      weekdaysA === weekdaysB &&
+      t.agencyPriceIrr === ctx.agency &&
+      t.legalCeilingIrr === ctx.legal
+    );
+  }
+
   private async findConflicts(
+    manager: EntityManager,
     flightNo: string,
     aircraftDefinitionId: string,
     departures: Date[],
   ) {
     if (departures.length === 0) return [];
-    const rows = await this.instanceRepo
+    const rows = await manager
+      .getRepository(FlightInstance)
       .createQueryBuilder('fi')
       .innerJoinAndSelect('fi.flight', 'f')
       .where('fi.status = :scheduled', {
@@ -193,14 +231,17 @@ export class ScheduleTemplateService {
     }));
   }
 
-  async create(actor: AuthenticatedUser, dto: CreateScheduleTemplateDto) {
-    const existing = await this.templateRepo.findOne({
-      where: { idempotencyKey: dto.idempotencyKey },
-    });
-    if (existing) {
-      return this.toView(existing.id);
-    }
+  private advisoryLockKeys(
+    flightNoBase: string,
+    aircraftId: string,
+  ): [number, number] {
+    const digest = createHash('sha256')
+      .update(`schedule-template:${flightNoBase}:${aircraftId}`)
+      .digest();
+    return [digest.readInt32BE(0), digest.readInt32BE(4)];
+  }
 
+  async create(actor: AuthenticatedUser, dto: CreateScheduleTemplateDto) {
     const ctx = await this.resolveContext(dto);
     if (ctx.occurrences.length === 0) {
       throw new BadRequestException({
@@ -209,19 +250,56 @@ export class ScheduleTemplateService {
       });
     }
 
-    const conflicts = await this.findConflicts(
-      dto.flightNoBase,
-      dto.aircraftDefinitionId,
-      ctx.occurrences.map((o) => o.departureAt),
-    );
-    if (conflicts.length > 0) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: `تداخل زمان/هواپیما/شماره پرواز با پرواز موجود (${conflicts.length} مورد).`,
-      });
+    const existing = await this.templateRepo.findOne({
+      where: { idempotencyKey: dto.idempotencyKey },
+    });
+    if (existing) {
+      if (!this.templateMatchesDto(existing, actor.id, dto, ctx)) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'کلید تکراری با محتوای یا مالک متفاوت است.',
+        });
+      }
+      return this.toView(existing.id);
     }
 
+    const [lockA, lockB] = this.advisoryLockKeys(
+      dto.flightNoBase,
+      dto.aircraftDefinitionId,
+    );
+
     const templateId = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+        lockA,
+        lockB,
+      ]);
+
+      const raced = await manager.findOne(FlightScheduleTemplate, {
+        where: { idempotencyKey: dto.idempotencyKey },
+      });
+      if (raced) {
+        if (!this.templateMatchesDto(raced, actor.id, dto, ctx)) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید تکراری با محتوای یا مالک متفاوت است.',
+          });
+        }
+        return raced.id;
+      }
+
+      const conflicts = await this.findConflicts(
+        manager,
+        dto.flightNoBase,
+        dto.aircraftDefinitionId,
+        ctx.occurrences.map((o) => o.departureAt),
+      );
+      if (conflicts.length > 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: `تداخل زمان/هواپیما/شماره پرواز با پرواز موجود (${conflicts.length} مورد).`,
+        });
+      }
+
       let route = await manager.findOne(Route, {
         where: {
           originCode: ctx.origin.code,
@@ -294,14 +372,25 @@ export class ScheduleTemplateService {
         aircraftTypeOverride: ctx.aircraft.code,
       }));
 
-      // Bulk insert via query builder hits TS2589 on this entity graph.
+      // No orIgnore: partial success must not look like a full create.
+      // Loose typing avoids TS2589 on this entity graph.
+      const insertRows: Array<Record<string, unknown>> = rows;
       await manager
         .createQueryBuilder()
         .insert()
         .into(FlightInstance)
-        .values(rows)
-        .orIgnore()
+        .values(insertRows)
         .execute();
+
+      const inserted = await manager.count(FlightInstance, {
+        where: { scheduleTemplateId: template.id },
+      });
+      if (inserted !== rows.length) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'ایجاد نمونه‌های پرواز ناقص ماند؛ عملیات لغو شد.',
+        });
+      }
 
       return template.id;
     });
@@ -346,6 +435,87 @@ export class ScheduleTemplateService {
     return this.toView(id);
   }
 
+  /**
+   * Future instances with bookings, charter/agency commitments, allotments,
+   * active seat locks, or active price locks (financial) are never cancelled.
+   */
+  private async committedInstanceIds(
+    manager: EntityManager,
+    futureIds: string[],
+  ): Promise<Set<string>> {
+    const blocked = new Set<string>();
+    if (futureIds.length === 0) return blocked;
+
+    const sold = await manager.find(Booking, {
+      where: {
+        flightInstanceId: In(futureIds),
+        status: In(['HELD', 'PAID', 'TICKETED']),
+      },
+      select: ['flightInstanceId'],
+    });
+    for (const b of sold) blocked.add(b.flightInstanceId);
+
+    const charters = await manager.find(CharterCommitment, {
+      where: {
+        flightInstanceId: In(futureIds),
+        status: CommitmentStatus.ACTIVE,
+      },
+      select: ['flightInstanceId'],
+    });
+    for (const c of charters) blocked.add(c.flightInstanceId);
+
+    const agencySeats = await manager.find(AgencySeatCommitment, {
+      where: {
+        flightInstanceId: In(futureIds),
+        status: CommitmentStatus.ACTIVE,
+      },
+      select: ['flightInstanceId'],
+    });
+    for (const c of agencySeats) blocked.add(c.flightInstanceId);
+
+    const allotments = await manager
+      .getRepository(AgencyAllotment)
+      .createQueryBuilder('a')
+      .select('a.flightInstanceId', 'flightInstanceId')
+      .where('a.flightInstanceId IN (:...ids)', { ids: futureIds })
+      .andWhere('a.seatsAllocated > 0')
+      .andWhere('(a.releaseAt IS NULL OR a.releaseAt > NOW())')
+      .getRawMany<{ flightInstanceId: string }>();
+    for (const a of allotments) blocked.add(a.flightInstanceId);
+
+    const locks = await manager
+      .getRepository(SeatLock)
+      .createQueryBuilder('s')
+      .select('s.flightInstanceId', 'flightInstanceId')
+      .where('s.flightInstanceId IN (:...ids)', { ids: futureIds })
+      .andWhere('s.releasedAt IS NULL')
+      .getRawMany<{ flightInstanceId: string }>();
+    for (const s of locks) blocked.add(s.flightInstanceId);
+
+    const priceLocks = await manager.find(PriceLock, {
+      where: {
+        flightInstanceId: In(futureIds),
+        status: PriceLockStatus.ACTIVE,
+      },
+      select: ['flightInstanceId'],
+    });
+    for (const p of priceLocks) blocked.add(p.flightInstanceId);
+
+    // Financial commitment via allotment contract price (active allotments).
+    const pricedAllotments = await manager
+      .getRepository(AgencyAllotment)
+      .createQueryBuilder('a')
+      .select('a.flightInstanceId', 'flightInstanceId')
+      .where('a.flightInstanceId IN (:...ids)', { ids: futureIds })
+      .andWhere('a.contractPriceIrr IS NOT NULL')
+      .andWhere('a.seatsAllocated > 0')
+      .andWhere('(a.releaseAt IS NULL OR a.releaseAt > NOW())')
+      .getRawMany<{ flightInstanceId: string }>();
+    for (const a of pricedAllotments) blocked.add(a.flightInstanceId);
+
+    return blocked;
+  }
+
   async deactivate(actor: AuthenticatedUser, id: string) {
     const template = await this.templateRepo.findOne({ where: { id } });
     if (!template) {
@@ -375,14 +545,8 @@ export class ScheduleTemplateService {
         .map((fi) => fi.id);
       if (futureIds.length === 0) return;
 
-      const sold = await manager.find(Booking, {
-        where: {
-          flightInstanceId: In(futureIds),
-          status: In(['HELD', 'PAID', 'TICKETED']),
-        },
-      });
-      const soldSet = new Set(sold.map((b) => b.flightInstanceId));
-      const cancellable = futureIds.filter((fid) => !soldSet.has(fid));
+      const blocked = await this.committedInstanceIds(manager, futureIds);
+      const cancellable = futureIds.filter((fid) => !blocked.has(fid));
       if (cancellable.length > 0) {
         await manager
           .createQueryBuilder()
@@ -398,7 +562,7 @@ export class ScheduleTemplateService {
       actorRole: actor.role,
       category: 'SYSTEM',
       action: 'غیرفعال‌سازی برنامه فصلی پرواز',
-      detail: `برنامه ${template.flightNoBase} برای آینده غیرفعال شد (سوابق فروش حفظ شد).`,
+      detail: `برنامه ${template.flightNoBase} برای آینده غیرفعال شد (سوابق فروش و تعهدات حفظ شد).`,
       entityType: 'FlightScheduleTemplate',
       entityId: id,
     });

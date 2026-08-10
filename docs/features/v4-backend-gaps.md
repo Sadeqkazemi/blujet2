@@ -15,6 +15,8 @@
 - [x] Airport-local departure time → UTC via airport `tz` — `schedule-template.dates.spec.ts`
 - [x] Cabin capacities derived from `AircraftDefinition` cabins
 - [x] Deactivate future instances without deleting sold history
+- [x] Concurrent create uses advisory lock; no `orIgnore` partial success — `schedule-templates.e2e-spec.ts`
+- [x] Deactivate skips charter/agency commitment, allotment, seat lock, price lock — `schedule-templates.e2e-spec.ts`
 - [x] Unit + e2e: weekdays, range, replay, conflict
 
 ## 2) Bank loan adapter (no internal underwriting)
@@ -25,6 +27,11 @@
 - [x] Customer sees only own apps + display status mapping
 - [x] SITE_ADMIN read-only list/detail
 - [x] No mock auto-approval / wallet credit unless bank instructs with unique ref
+- [x] `maybeCreditWallet` only on exact `DISBURSED` + matching amount/ref — `bank-loans.e2e-spec.ts`
+- [x] Idempotency unique(`userId`,`idempotencyKey`); no cross-user leak — `bank-loans.e2e-spec.ts`
+- [x] Unique `walletCreditReference`; concurrent DISBURSED credits once — `bank-loans.e2e-spec.ts`
+- [x] Webhook event table unique(provider,eventId) + stale/transition guards — `bank-loans.e2e-spec.ts`
+- [x] Persistent redacted webhook audit — `loan-webhook-redact.spec.ts` + event rows
 - [x] Tests mock HTTP/provider boundary — `bank-loans.e2e-spec.ts`
 
 ## 3) Destination stats

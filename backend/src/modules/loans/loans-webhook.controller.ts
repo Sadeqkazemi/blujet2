@@ -38,6 +38,7 @@ export class LoansWebhookController {
       status?: string;
       walletCreditIrr?: string;
       walletCreditReference?: string;
+      occurredAt?: string;
       summary?: Record<string, unknown>;
     };
     if (!body.eventId || !body.bankReferenceId || !body.status) {
@@ -53,6 +54,7 @@ export class LoansWebhookController {
       status: body.status,
       walletCreditIrr: body.walletCreditIrr,
       walletCreditReference: body.walletCreditReference,
+      occurredAt: body.occurredAt,
       summary: body.summary,
     });
     return { success: true, data };

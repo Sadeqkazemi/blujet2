@@ -9,6 +9,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, type EntityManager, Repository } from 'typeorm';
 import { BankLoanApplication } from '../../database/entities/bank-loan-application.entity';
+import { BankLoanWebhookEvent } from '../../database/entities/bank-loan-webhook-event.entity';
 import { WalletEntry } from '../../database/entities/wallet-entry.entity';
 import { BankLoanStatus } from '../../database/enums';
 import type { JsonValue } from '../../database/json-types';
@@ -22,6 +23,8 @@ import {
   parseBankStatus,
   type BankLoanProvider,
 } from './bank-loan.types';
+import { canTransitionBankStatus } from './loan-status.transitions';
+import { redactWebhookPayload } from './loan-webhook-redact';
 
 function asJsonSummary(
   summary: Record<string, unknown> | null | undefined,
@@ -41,6 +44,16 @@ export class LoansService {
     private readonly bank: BankLoanProvider,
     private readonly audit: AuditService,
   ) {}
+
+  private providerKey(): string {
+    const fromEnv = this.config.get<string>('BANK_LOAN_PROVIDER')?.trim();
+    if (fromEnv) return fromEnv;
+    const base = (this.config.get<string>('BANK_LOAN_API_BASE_URL') ?? '')
+      .replace(/^https?:\/\//i, '')
+      .split('/')[0]
+      ?.trim();
+    return base || 'configured-bank';
+  }
 
   private serialize(row: BankLoanApplication, admin = false) {
     const base = {
@@ -80,15 +93,9 @@ export class LoansService {
     }
 
     const existing = await this.loanRepo.findOne({
-      where: { idempotencyKey: dto.idempotencyKey },
+      where: { userId: actor.id, idempotencyKey: dto.idempotencyKey },
     });
     if (existing) {
-      if (existing.userId !== actor.id) {
-        throw new BadRequestException({
-          code: ErrorCode.CONFLICT,
-          message: 'کلید تکراری متعلق به کاربر دیگری است.',
-        });
-      }
       return this.serialize(existing);
     }
 
@@ -102,29 +109,57 @@ export class LoansService {
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const raced = await manager.findOne(BankLoanApplication, {
-        where: { idempotencyKey: dto.idempotencyKey },
+        where: { userId: actor.id, idempotencyKey: dto.idempotencyKey },
+        lock: { mode: 'pessimistic_write' },
       });
-      if (raced) return raced;
+      if (raced) {
+        if (raced.userId !== actor.id) {
+          throw new BadRequestException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید تکراری متعلق به کاربر دیگری است.',
+          });
+        }
+        return raced;
+      }
 
-      const row = await manager.save(
-        manager.create(BankLoanApplication, {
-          userId: actor.id,
-          idempotencyKey: dto.idempotencyKey,
-          bankReferenceId: bankRes.bankReferenceId,
-          requestedAmountIrr: BigInt(dto.requestedAmountIrr),
-          bankStatus: bankRes.bankStatus,
-          statusSummary: asJsonSummary(bankRes.summary),
-          lastSyncedAt: new Date(),
-        }),
-      );
+      try {
+        const row = await manager.save(
+          manager.create(BankLoanApplication, {
+            userId: actor.id,
+            idempotencyKey: dto.idempotencyKey,
+            bankReferenceId: bankRes.bankReferenceId,
+            requestedAmountIrr: BigInt(dto.requestedAmountIrr),
+            bankStatus: bankRes.bankStatus,
+            statusSummary: asJsonSummary(bankRes.summary),
+            lastSyncedAt: new Date(),
+          }),
+        );
 
-      await this.maybeCreditWallet(
-        manager,
-        row,
-        bankRes.walletCreditIrr,
-        bankRes.walletCreditReference,
-      );
-      return row;
+        await this.maybeCreditWallet(
+          manager,
+          row,
+          bankRes.bankStatus,
+          bankRes.walletCreditIrr,
+          bankRes.walletCreditReference,
+        );
+        return row;
+      } catch (err: unknown) {
+        const code =
+          typeof err === 'object' && err && 'code' in err
+            ? String((err as { code?: string }).code)
+            : '';
+        if (code !== '23505') throw err;
+        const existingAfterRace = await manager.findOne(BankLoanApplication, {
+          where: { userId: actor.id, idempotencyKey: dto.idempotencyKey },
+        });
+        if (!existingAfterRace || existingAfterRace.userId !== actor.id) {
+          throw new BadRequestException({
+            code: ErrorCode.CONFLICT,
+            message: 'کلید تکراری قابل بازیابی نیست.',
+          });
+        }
+        return existingAfterRace;
+      }
     });
 
     await this.audit.record({
@@ -139,7 +174,6 @@ export class LoansService {
         bankReferenceId: saved.bankReferenceId,
         bankStatus: saved.bankStatus,
         correlationId,
-        // never log tokens / full payloads
       },
     });
 
@@ -195,6 +229,13 @@ export class LoansService {
       walletCreditIrr: status.walletCreditIrr,
       walletCreditReference: status.walletCreditReference,
       eventId: `poll:${correlationId}`,
+      occurredAt: new Date(),
+      sourcePayload: {
+        bankReferenceId: status.bankReferenceId,
+        status: status.bankStatus,
+        walletCreditIrr: status.walletCreditIrr ?? null,
+        walletCreditReference: status.walletCreditReference ?? null,
+      },
     });
     const fresh = await this.loanRepo
       .createQueryBuilder('l')
@@ -260,6 +301,7 @@ export class LoansService {
     status: string;
     walletCreditIrr?: string;
     walletCreditReference?: string;
+    occurredAt?: string;
     summary?: Record<string, unknown>;
   }) {
     if (!payload.eventId || !payload.bankReferenceId) {
@@ -273,18 +315,23 @@ export class LoansService {
       where: { bankReferenceId: payload.bankReferenceId },
     });
     if (!row) {
-      // Ack without leaking existence details beyond not-found for ops logs.
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'درخواست یافت نشد.',
       });
     }
 
-    if (row.lastWebhookEventId === payload.eventId) {
-      return { ok: true, duplicate: true };
+    const occurredAt = payload.occurredAt
+      ? new Date(payload.occurredAt)
+      : new Date();
+    if (Number.isNaN(occurredAt.getTime())) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'زمان رویداد نامعتبر است.',
+      });
     }
 
-    await this.applyBankUpdate(
+    const result = await this.applyBankUpdate(
       row,
       parseBankStatus(payload.status),
       payload.summary ?? { status: payload.status },
@@ -292,12 +339,24 @@ export class LoansService {
         walletCreditIrr: payload.walletCreditIrr,
         walletCreditReference: payload.walletCreditReference,
         eventId: payload.eventId,
+        occurredAt,
+        sourcePayload: {
+          eventId: payload.eventId,
+          bankReferenceId: payload.bankReferenceId,
+          status: payload.status,
+          walletCreditIrr: payload.walletCreditIrr ?? null,
+          walletCreditReference: payload.walletCreditReference ?? null,
+          occurredAt: payload.occurredAt ?? null,
+        },
       },
     );
 
-    // No AuditLog row: actorId is FK to users and webhooks are unauthenticated.
-    // Provenance is lastWebhookEventId + statusSummary on the loan row.
-    return { ok: true, duplicate: false };
+    return {
+      ok: true,
+      duplicate: result === 'DUPLICATE',
+      ignored: result.startsWith('IGNORED'),
+      result,
+    };
   }
 
   private async applyBankUpdate(
@@ -308,55 +367,186 @@ export class LoansService {
       walletCreditIrr?: string | null;
       walletCreditReference?: string | null;
       eventId: string;
+      occurredAt: Date;
+      sourcePayload: Record<string, unknown>;
     },
-  ) {
-    await this.dataSource.transaction(async (manager) => {
+  ): Promise<string> {
+    return this.dataSource.transaction(async (manager) => {
+      const provider = this.providerKey();
+      const existingEvent = await manager.findOne(BankLoanWebhookEvent, {
+        where: { provider, eventId: opts.eventId },
+      });
+      if (existingEvent) {
+        return 'DUPLICATE';
+      }
+
       const locked = await manager.findOne(BankLoanApplication, {
         where: { id: row.id },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!locked) return;
-      if (locked.lastWebhookEventId === opts.eventId) return;
+      if (!locked) {
+        await this.persistWebhookEvent(manager, {
+          provider,
+          eventId: opts.eventId,
+          bankReferenceId: row.bankReferenceId,
+          loanApplicationId: row.id,
+          bankStatus,
+          occurredAt: opts.occurredAt,
+          payload: opts.sourcePayload,
+          processingResult: 'IGNORED_MISSING_LOAN',
+        });
+        return 'IGNORED_MISSING_LOAN';
+      }
+
+      // Stale / replay: older event must not move status after a newer one.
+      if (
+        locked.lastWebhookOccurredAt &&
+        opts.occurredAt.getTime() < locked.lastWebhookOccurredAt.getTime() &&
+        bankStatus !== locked.bankStatus
+      ) {
+        await this.persistWebhookEvent(manager, {
+          provider,
+          eventId: opts.eventId,
+          bankReferenceId: locked.bankReferenceId,
+          loanApplicationId: locked.id,
+          bankStatus,
+          occurredAt: opts.occurredAt,
+          payload: opts.sourcePayload,
+          processingResult: 'IGNORED_STALE',
+        });
+        return 'IGNORED_STALE';
+      }
+
+      if (!canTransitionBankStatus(locked.bankStatus, bankStatus)) {
+        await this.persistWebhookEvent(manager, {
+          provider,
+          eventId: opts.eventId,
+          bankReferenceId: locked.bankReferenceId,
+          loanApplicationId: locked.id,
+          bankStatus,
+          occurredAt: opts.occurredAt,
+          payload: opts.sourcePayload,
+          processingResult: 'IGNORED_TRANSITION',
+        });
+        return 'IGNORED_TRANSITION';
+      }
 
       locked.bankStatus = bankStatus;
       locked.statusSummary = asJsonSummary(summary) ?? locked.statusSummary;
       locked.lastSyncedAt = new Date();
       locked.lastWebhookEventId = opts.eventId;
+      locked.lastWebhookOccurredAt = opts.occurredAt;
       await manager.save(locked);
 
       await this.maybeCreditWallet(
         manager,
         locked,
+        bankStatus,
         opts.walletCreditIrr,
         opts.walletCreditReference,
       );
+
+      await this.persistWebhookEvent(manager, {
+        provider,
+        eventId: opts.eventId,
+        bankReferenceId: locked.bankReferenceId,
+        loanApplicationId: locked.id,
+        bankStatus,
+        occurredAt: opts.occurredAt,
+        payload: opts.sourcePayload,
+        processingResult: 'APPLIED',
+      });
+      return 'APPLIED';
     });
   }
 
+  private async persistWebhookEvent(
+    manager: EntityManager,
+    args: {
+      provider: string;
+      eventId: string;
+      bankReferenceId: string | null;
+      loanApplicationId: string | null;
+      bankStatus: string | null;
+      occurredAt: Date | null;
+      payload: Record<string, unknown>;
+      processingResult: string;
+    },
+  ) {
+    try {
+      await manager.save(
+        manager.create(BankLoanWebhookEvent, {
+          provider: args.provider,
+          eventId: args.eventId,
+          bankReferenceId: args.bankReferenceId,
+          loanApplicationId: args.loanApplicationId,
+          bankStatus: args.bankStatus,
+          occurredAt: args.occurredAt,
+          payloadRedacted: redactWebhookPayload(args.payload),
+          processingResult: args.processingResult,
+        }),
+      );
+    } catch (err: unknown) {
+      // Concurrent insert of the same (provider, eventId) → treat as duplicate.
+      const code =
+        typeof err === 'object' && err && 'code' in err
+          ? String((err as { code?: string }).code)
+          : '';
+      if (code !== '23505') throw err;
+    }
+  }
+
+  /**
+   * Credits wallet only when bank status is exactly DISBURSED, amount matches
+   * the original request, and a unique bank walletCreditReference is present.
+   * Wallet insert + reference write are atomic under the loan row lock.
+   */
   private async maybeCreditWallet(
     manager: EntityManager,
     row: BankLoanApplication,
+    bankStatus: BankLoanStatus,
     amountIrr: string | null | undefined,
     creditRef: string | null | undefined,
   ) {
+    if (bankStatus !== 'DISBURSED') {
+      return;
+    }
     if (!amountIrr || !creditRef) return;
     if (!/^\d+$/.test(amountIrr) || BigInt(amountIrr) <= 0n) return;
+    if (BigInt(amountIrr) !== row.requestedAmountIrr) return;
     if (row.walletCreditReference) return;
 
-    // Unique bank disbursement reference — skip if already used.
     const prior = await manager.findOne(BankLoanApplication, {
       where: { walletCreditReference: creditRef },
     });
     if (prior) return;
 
-    await manager.save(
-      manager.create(WalletEntry, {
-        userId: row.userId,
-        type: 'TOPUP',
-        signedAmountIrr: BigInt(amountIrr),
-      }),
-    );
-    row.walletCreditReference = creditRef;
-    await manager.save(row);
+    try {
+      await manager.save(
+        manager.create(WalletEntry, {
+          userId: row.userId,
+          type: 'TOPUP',
+          signedAmountIrr: BigInt(amountIrr),
+        }),
+      );
+      row.walletCreditReference = creditRef;
+      await manager.save(row);
+    } catch (err: unknown) {
+      const code =
+        typeof err === 'object' && err && 'code' in err
+          ? String((err as { code?: string }).code)
+          : '';
+      if (code === '23505') {
+        // Concurrent DISBURSED race lost the unique walletCreditReference.
+        const fresh = await manager.findOne(BankLoanApplication, {
+          where: { id: row.id },
+        });
+        if (fresh?.walletCreditReference) {
+          row.walletCreditReference = fresh.walletCreditReference;
+        }
+        return;
+      }
+      throw err;
+    }
   }
 }

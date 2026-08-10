@@ -43,6 +43,7 @@ import { FlightInstance } from './entities/flight-instance.entity';
 import { FlightReview } from './entities/flight-review.entity';
 import { FlightScheduleTemplate } from './entities/flight-schedule-template.entity';
 import { BankLoanApplication } from './entities/bank-loan-application.entity';
+import { BankLoanWebhookEvent } from './entities/bank-loan-webhook-event.entity';
 import { InternalService } from './entities/internal-service.entity';
 import { JobApplication } from './entities/job-application.entity';
 import { JobPosting } from './entities/job-posting.entity';
@@ -148,6 +149,7 @@ export const dataSourceOptions: DataSourceOptions = {
     FlightReview,
     FlightScheduleTemplate,
     BankLoanApplication,
+    BankLoanWebhookEvent,
     InternalService,
     JobApplication,
     JobPosting,

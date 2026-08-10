@@ -15,12 +15,22 @@ import { bigintTransformer } from '../transformers/bigint.transformer';
 import type { JsonValue } from '../json-types';
 import { User } from './user.entity';
 
-@Index('bank_loan_applications_idempotencyKey_key', ['idempotencyKey'], {
-  unique: true,
-})
+@Index(
+  'bank_loan_applications_userId_idempotencyKey_key',
+  ['userId', 'idempotencyKey'],
+  { unique: true },
+)
 @Index('bank_loan_applications_bankReferenceId_key', ['bankReferenceId'], {
   unique: true,
 })
+@Index(
+  'bank_loan_applications_walletCreditReference_key',
+  ['walletCreditReference'],
+  {
+    unique: true,
+    where: '"walletCreditReference" IS NOT NULL',
+  },
+)
 @Index('bank_loan_applications_userId_createdAt_idx', ['userId', 'createdAt'])
 @Entity('bank_loan_applications')
 export class BankLoanApplication {
@@ -69,6 +79,10 @@ export class BankLoanApplication {
 
   @Column({ type: 'text', nullable: true })
   lastWebhookEventId!: string | null;
+
+  /** Bank-reported time of the last applied webhook (replay protection). */
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  lastWebhookOccurredAt!: Date | null;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   lastSyncedAt!: Date | null;
