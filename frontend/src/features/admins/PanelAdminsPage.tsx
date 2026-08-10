@@ -69,8 +69,15 @@ function formatRelativeFa(iso: string | null): string {
 function generatePassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#%';
   let out = '';
-  for (let i = 0; i < 10; i++)
-    out += chars[Math.floor(Math.random() * chars.length)];
+  const unbiasedLimit = Math.floor(256 / chars.length) * chars.length;
+  while (out.length < 10) {
+    const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+    for (const value of randomBytes) {
+      if (value >= unbiasedLimit) continue;
+      out += chars[value % chars.length];
+      if (out.length === 10) break;
+    }
+  }
   return out;
 }
 

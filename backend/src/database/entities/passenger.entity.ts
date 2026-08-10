@@ -50,19 +50,19 @@ export class Passenger {
   seatCode!: string | null;
 
   @Column({ type: 'text', default: 'ADULT' })
-  passengerType!: PassengerType;
+  passengerType: PassengerType = 'ADULT';
 
   @Column({ type: 'date', default: '1970-01-01' })
-  birthDate!: string;
+  birthDate = '1970-01-01';
 
   @Column({ type: 'boolean', default: true })
-  occupiesSeat!: boolean;
+  occupiesSeat = true;
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
-  fareIrr!: bigint;
+  fareIrr = 0n;
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
-  taxIrr!: bigint;
+  taxIrr = 0n;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   deletedAt!: Date | null;
