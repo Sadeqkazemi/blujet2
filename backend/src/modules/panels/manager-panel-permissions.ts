@@ -19,6 +19,7 @@ const NAV_PERMISSION_BY_KEY: Readonly<
 > = {
   flights: 'flights',
   flightops: 'flights',
+  aircraft: 'flights',
   pricing: 'flights',
   webservice: 'flights',
   agencies: 'agencies',

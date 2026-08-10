@@ -555,6 +555,7 @@ export default function MediaAdminPage() {
           </div>
           <button
             type="button"
+            data-testid="create-route-button"
             onClick={openRouteCreate}
             className="flex cursor-pointer items-center gap-1 rounded-[9px] bg-accent px-3 py-1.5 text-[11.5px] font-bold text-white"
           >
@@ -937,6 +938,7 @@ export default function MediaAdminPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-muted">مبدأ</span>
               <input
+                data-testid="route-origin-input"
                 className="rounded-lg border border-border bg-panel px-3 py-2 uppercase"
                 value={routeDraft.fromAirportCode}
                 onChange={(e) =>
@@ -947,6 +949,7 @@ export default function MediaAdminPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-muted">مقصد</span>
               <input
+                data-testid="route-destination-input"
                 className="rounded-lg border border-border bg-panel px-3 py-2 uppercase"
                 value={routeDraft.toAirportCode}
                 onChange={(e) =>
@@ -957,6 +960,7 @@ export default function MediaAdminPage() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-muted">قیمت (تومان)</span>
               <input
+                data-testid="route-price-input"
                 className="rounded-lg border border-border bg-panel px-3 py-2"
                 value={routeDraft.priceToman}
                 onChange={(e) => setRouteDraft((d) => ({ ...d, priceToman: e.target.value }))}
@@ -968,6 +972,7 @@ export default function MediaAdminPage() {
               </button>
               <button
                 type="button"
+                data-testid="save-route-button"
                 onClick={() => void saveRoute()}
                 className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white"
               >

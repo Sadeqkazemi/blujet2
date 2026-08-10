@@ -85,6 +85,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'reservation', labelFa: 'هواپیما', implemented: true },
+    { key: 'aircraft', labelFa: 'تعریف هواپیما', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
   ],
@@ -101,6 +102,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
     { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
+    { key: 'aircraft', labelFa: 'تعریف هواپیما', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
     { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
@@ -134,7 +136,14 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
 /** Which panel keys each role may toggle via PATCH /panels/access/:panelKey. */
 export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
   CEO: ['FINANCE', 'COMMERCIAL', 'OPERATIONS', 'IT'],
-  SENIOR_MANAGER: ['CEO', 'SITE_ADMIN', 'FINANCE', 'COMMERCIAL', 'OPERATIONS', 'IT'],
+  SENIOR_MANAGER: [
+    'CEO',
+    'SITE_ADMIN',
+    'FINANCE',
+    'COMMERCIAL',
+    'OPERATIONS',
+    'IT',
+  ],
 };
 
 /**

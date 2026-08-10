@@ -86,6 +86,7 @@ describe('MediaAdminPage', () => {
     vi.mocked(siteContentApi.updateContentBlock).mockResolvedValue(mockBlocks[0]);
     vi.mocked(siteContentApi.updateDestination).mockResolvedValue(mockDestinations[0]);
     vi.mocked(siteContentApi.updateRoute).mockResolvedValue(mockRoutes[0]);
+    vi.mocked(siteContentApi.createRoute).mockResolvedValue(mockRoutes[0]);
     vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue({
       settings: {
         homeHeroTitle: 'عنوان',
@@ -136,6 +137,26 @@ describe('MediaAdminPage', () => {
     expect(await screen.findByText('IST')).toBeInTheDocument();
     expect(screen.getByText(/THR ← MHD/)).toBeInTheDocument();
     expect(screen.getByText('021-91000000')).toBeInTheDocument();
+  });
+
+  it('keeps route creation available from site management', async () => {
+    const user = userEvent.setup();
+    render(<MediaAdminPage />);
+    await screen.findByTestId('create-route-button');
+
+    await user.click(screen.getByTestId('create-route-button'));
+    await user.type(screen.getByTestId('route-origin-input'), 'thr');
+    await user.type(screen.getByTestId('route-destination-input'), 'mhd');
+    await user.type(screen.getByTestId('route-price-input'), '1600000');
+    await user.click(screen.getByTestId('save-route-button'));
+
+    await waitFor(() => {
+      expect(siteContentApi.createRoute).toHaveBeenCalledWith({
+        fromAirportCode: 'THR',
+        toAirportCode: 'MHD',
+        priceIrr: 16000000,
+      });
+    });
   });
 
   it('opens hero banner editor', async () => {
