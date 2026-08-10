@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BeforeInsert,
+  Check,
   Column,
   Entity,
   Index,
@@ -14,6 +15,10 @@ import { bigintTransformer } from '../transformers/bigint.transformer';
 export type PassengerType = 'ADULT' | 'CHILD' | 'INFANT';
 
 @Index('passengers_nationalIdHash_idx', ['nationalIdHash'])
+@Check(
+  'passengers_passengerType_check',
+  `"passengerType" IN ('ADULT','CHILD','INFANT')`,
+)
 @Entity('passengers')
 export class Passenger {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'passengers_pkey' })
