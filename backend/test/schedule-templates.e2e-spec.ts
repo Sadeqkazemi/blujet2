@@ -20,6 +20,7 @@ import { loginAs } from './helpers/login.helper';
 describe('Seasonal schedule templates (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let slotSequence = 0;
 
   beforeEach(async () => {
     const moduleFixture = await Test.createTestingModule({
@@ -72,7 +73,8 @@ describe('Seasonal schedule templates (e2e)', () => {
     const minute = stamp % 60;
     const hour = 2 + Math.floor((stamp / 60) % 4); // 02–05
     const departureTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-    const y = 2028;
+    // A distinct year per call prevents cross-test schedule overlap in the shared E2E database.
+    const y = 2030 + slotSequence++;
     const m = 1 + (stamp % 9); // Jan–Sep
     const startDay = 1 + (stamp % 20);
     const startDate = `${y}-${String(m).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
