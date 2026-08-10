@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import {
   createBooking,
   fetchClubPoints,
@@ -13,11 +18,21 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { localeMoney } from '../../lib/fa-format';
-import type { BookingDetail, CabinClass, SavedPassenger, SeatMapCell } from '../../types/public-site';
+import { parseJalaliDateToIso } from '../../lib/jalali';
+import type {
+  BookingDetail,
+  CabinClass,
+  SavedPassenger,
+  SeatMapCell,
+} from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
 import { CHECKOUT_COPY } from './checkout/checkout-copy';
-import { clearCheckoutDraft, loadCheckoutDraft, saveCheckoutDraft } from './checkout/checkout-draft';
+import {
+  clearCheckoutDraft,
+  loadCheckoutDraft,
+  saveCheckoutDraft,
+} from './checkout/checkout-draft';
 import CheckoutStepBar from './checkout/CheckoutStepBar';
 import ExtrasStep from './checkout/ExtrasStep';
 import FlightSummaryCard from './checkout/FlightSummaryCard';
@@ -28,6 +43,8 @@ import OtpLoginInline from './OtpLoginInline';
 import {
   emptyPassenger,
   extraTotalIrr,
+  passengerTotalIrr,
+  validatePassengerAges,
   passengerFullName,
   type CheckoutDraft,
   type CheckoutWizardStep,
@@ -48,7 +65,8 @@ const BUSINESS_SEAT_MIN_POINTS = 15_000;
 const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
 
 function isPassengerComplete(p: PassengerFormDraft): boolean {
-  if (!p.firstNameLatin.trim() || !p.lastNameLatin.trim() || !p.gender) return false;
+  if (!p.firstNameLatin.trim() || !p.lastNameLatin.trim() || !p.gender)
+    return false;
   if (!p.birthDay || !p.birthMonth || !p.birthYear) return false;
   if (p.docType === 'NATIONAL_ID') return p.nationalId.trim().length >= 10;
   return p.passportNo.trim().length >= 5;
@@ -69,7 +87,9 @@ export default function CheckoutPage() {
   const [heldBooking, setHeldBooking] = useState<BookingDetail | null>(null);
   const [draft, setDraft] = useState<CheckoutDraft | null>(null);
   const [step, setStep] = useState<CheckoutWizardStep>('pax');
-  const [passengers, setPassengers] = useState<PassengerFormDraft[]>([emptyPassenger('')]);
+  const [passengers, setPassengers] = useState<PassengerFormDraft[]>([
+    emptyPassenger(''),
+  ]);
   const [extras, setExtras] = useState<ExtraServiceState[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
@@ -91,30 +111,57 @@ export default function CheckoutPage() {
   // Must run even while OTP gate is showing so cities survive login remount.
   useEffect(() => {
     if (!isWizard) return;
-    const stateFlight = (location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null)?.flight;
+    const stateFlight = (
+      location.state as { flight?: FlightSnapshot; cabin?: CabinClass } | null
+    )?.flight;
     const stateCabin = (location.state as { cabin?: CabinClass } | null)?.cabin;
     const fromStorage = loadCheckoutDraft();
     const flightInstanceId =
-      params.get('flightInstanceId') || stateFlight?.flightInstanceId || fromStorage?.flightInstanceId;
-    const cabin = (params.get('cabin') as CabinClass | null) || stateCabin || fromStorage?.cabin || 'ECONOMY';
+      params.get('flightInstanceId') ||
+      stateFlight?.flightInstanceId ||
+      fromStorage?.flightInstanceId;
+    const cabin =
+      (params.get('cabin') as CabinClass | null) ||
+      stateCabin ||
+      fromStorage?.cabin ||
+      'ECONOMY';
     const originFromQuery = (params.get('origin') || '').toUpperCase();
     const destFromQuery = (params.get('dest') || '').toUpperCase();
+    const passengerMix = fromStorage?.passengerMix ?? {
+      adults: Math.max(1, Number(params.get('adults') || 1)),
+      children: Math.max(0, Number(params.get('children') || 0)),
+      infants: Math.max(0, Number(params.get('infants') || 0)),
+    };
 
     const mergeFlight = (base: FlightSnapshot): FlightSnapshot => ({
       ...base,
       originCode:
         base.originCode && base.originCode !== '—'
           ? base.originCode
-          : originFromQuery || fromStorage?.flight.originCode || base.originCode,
+          : originFromQuery ||
+            fromStorage?.flight.originCode ||
+            base.originCode,
       destCode:
         base.destCode && base.destCode !== '—'
           ? base.destCode
           : destFromQuery || fromStorage?.flight.destCode || base.destCode,
-      flightNo: base.flightNo !== '—' ? base.flightNo : fromStorage?.flight.flightNo || base.flightNo,
-      priceIrr: base.priceIrr && base.priceIrr !== '0' ? base.priceIrr : fromStorage?.flight.priceIrr || base.priceIrr,
+      flightNo:
+        base.flightNo !== '—'
+          ? base.flightNo
+          : fromStorage?.flight.flightNo || base.flightNo,
+      priceIrr:
+        base.priceIrr && base.priceIrr !== '0'
+          ? base.priceIrr
+          : fromStorage?.flight.priceIrr || base.priceIrr,
       aircraftType: base.aircraftType || fromStorage?.flight.aircraftType,
-      departureAt: base.departureAt || fromStorage?.flight.departureAt || new Date().toISOString(),
-      arrivalAt: base.arrivalAt || fromStorage?.flight.arrivalAt || new Date().toISOString(),
+      departureAt:
+        base.departureAt ||
+        fromStorage?.flight.departureAt ||
+        new Date().toISOString(),
+      arrivalAt:
+        base.arrivalAt ||
+        fromStorage?.flight.arrivalAt ||
+        new Date().toISOString(),
     });
 
     if (stateFlight) {
@@ -123,17 +170,22 @@ export default function CheckoutPage() {
         cabin,
         selectedSeats: fromStorage?.selectedSeats ?? [],
         flight: mergeFlight(stateFlight),
+        passengerMix,
       };
       setDraft(d);
       saveCheckoutDraft(d);
       setSelectedSeats(d.selectedSeats);
       return;
     }
-    if (fromStorage && (!flightInstanceId || fromStorage.flightInstanceId === flightInstanceId)) {
+    if (
+      fromStorage &&
+      (!flightInstanceId || fromStorage.flightInstanceId === flightInstanceId)
+    ) {
       const d: CheckoutDraft = {
         ...fromStorage,
         cabin,
         flight: mergeFlight(fromStorage.flight),
+        passengerMix,
       };
       setDraft(d);
       saveCheckoutDraft(d);
@@ -145,6 +197,7 @@ export default function CheckoutPage() {
         flightInstanceId,
         cabin,
         selectedSeats: [],
+        passengerMix,
         flight: mergeFlight({
           flightInstanceId,
           flightNo: '—',
@@ -163,9 +216,43 @@ export default function CheckoutPage() {
   }, [isWizard, location.state, params, t.notFound]);
 
   useEffect(() => {
+    if (!draft) return;
+    const types = [
+      ...Array.from(
+        { length: draft.passengerMix.adults },
+        () => 'ADULT' as const,
+      ),
+      ...Array.from(
+        { length: draft.passengerMix.children },
+        () => 'CHILD' as const,
+      ),
+      ...Array.from(
+        { length: draft.passengerMix.infants },
+        () => 'INFANT' as const,
+      ),
+    ];
+    setPassengers((previous) =>
+      types.map((passengerType, index) => ({
+        ...(previous[index] ?? emptyPassenger('', passengerType)),
+        passengerType,
+        seatCode:
+          passengerType === 'INFANT' ? '' : (previous[index]?.seatCode ?? ''),
+      })),
+    );
+  }, [
+    draft?.passengerMix.adults,
+    draft?.passengerMix.children,
+    draft?.passengerMix.infants,
+  ]);
+
+  useEffect(() => {
     if (!isWizard) return;
     fetchPublicTravelCosts()
-      .then((values) => setExtras(values.filter((value) => value.purchaseEnabled).map(toExtraState)))
+      .then((values) =>
+        setExtras(
+          values.filter((value) => value.purchaseEnabled).map(toExtraState),
+        ),
+      )
       .catch(() => setExtras([]));
   }, [isWizard]);
 
@@ -178,8 +265,12 @@ export default function CheckoutPage() {
       .then((m) => {
         const useMd80 = shouldUseMd80SeatMap(aircraft, m.seats);
         if (useMd80 && !looksLikeMd80SeatPayload(m.seats)) {
-          const takenRaw = m.seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
-          const taken = looksLikeLegacyA320SeatPayload(m.seats) ? mapLegacyTakenSeatsToMd80(takenRaw) : takenRaw;
+          const takenRaw = m.seats
+            .filter((s) => s.status === 'TAKEN')
+            .map((s) => s.seatCode);
+          const taken = looksLikeLegacyA320SeatPayload(m.seats)
+            ? mapLegacyTakenSeatsToMd80(takenRaw)
+            : takenRaw;
           setSeats(buildMd80Seats(taken));
           return;
         }
@@ -208,10 +299,15 @@ export default function CheckoutPage() {
       if (selectedSeats.length === 0) {
         return prev.length ? prev : [emptyPassenger('')];
       }
-      return selectedSeats.map((seat, i) => ({
-        ...(prev[i] ?? emptyPassenger(seat)),
-        seatCode: seat,
-      }));
+      let seatIndex = 0;
+      return prev.map((passenger) =>
+        passenger.passengerType === 'INFANT'
+          ? { ...passenger, seatCode: '' }
+          : {
+              ...passenger,
+              seatCode: selectedSeats[seatIndex++] ?? passenger.seatCode,
+            },
+      );
     });
   }, [selectedSeats, isWizard]);
 
@@ -226,7 +322,9 @@ export default function CheckoutPage() {
 
   function toggleSeat(seatCode: string) {
     setSelectedSeats((prev) => {
-      const next = prev.includes(seatCode) ? prev.filter((s) => s !== seatCode) : [...prev, seatCode];
+      const next = prev.includes(seatCode)
+        ? prev.filter((s) => s !== seatCode)
+        : [...prev, seatCode];
       if (draft) {
         const updated = { ...draft, selectedSeats: next };
         setDraft(updated);
@@ -237,7 +335,9 @@ export default function CheckoutPage() {
   }
 
   function toggleExtra(id: ExtraServiceState['id']) {
-    setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)));
+    setExtras((arr) =>
+      arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)),
+    );
   }
 
   function changeExtraQuantity(id: ExtraServiceState['id'], quantity: number) {
@@ -251,6 +351,11 @@ export default function CheckoutPage() {
         setError(t.completePaxError);
         return;
       }
+      const ageError = passengerAgeError();
+      if (ageError) {
+        setError(ageError);
+        return;
+      }
       setStep('extras');
       return;
     }
@@ -262,6 +367,35 @@ export default function CheckoutPage() {
     void submitBooking();
   }
 
+  function passengerAgeError(): string | null {
+    if (!draft) return null;
+    const manifest = passengers.map((passenger) => ({
+      passengerType: passenger.passengerType,
+      birthDate:
+        parseJalaliDateToIso(
+          `${passenger.birthYear}/${passenger.birthMonth}/${passenger.birthDay}`,
+        )?.slice(0, 10) ?? '',
+    }));
+    const code = validatePassengerAges(manifest, draft.flight.departureAt);
+    if (!code) return null;
+    if (locale === 'en') {
+      if (code === 'INFANT_AGE_INVALID')
+        return 'This passenger is not under 2 on the flight date and cannot use an infant ticket.';
+      if (code === 'CHILD_AGE_INVALID')
+        return 'A child ticket (including a seated infant) is only valid before age 12 on the flight date.';
+      if (code === 'TOO_MANY_LAP_INFANTS')
+        return 'Each adult may accompany only one lap infant.';
+      return 'Passengers aged 12 or older must use an adult ticket.';
+    }
+    if (code === 'INFANT_AGE_INVALID')
+      return 'این مسافر در تاریخ پرواز زیر ۲ سال نیست و امکان تهیه بلیط نوزاد برای او وجود ندارد.';
+    if (code === 'CHILD_AGE_INVALID')
+      return 'بلیط کودک یا نوزاد صندلی‌دار فقط برای مسافر کمتر از ۱۲ سال در تاریخ پرواز قابل استفاده است.';
+    if (code === 'TOO_MANY_LAP_INFANTS')
+      return 'هر مسافر بزرگسال فقط می‌تواند یک نوزاد بدون صندلی همراه داشته باشد.';
+    return 'مسافر ۱۲ ساله یا بزرگ‌تر باید با نرخ بزرگسال ثبت شود.';
+  }
+
   function goBack() {
     setError(null);
     const idx = STEP_ORDER.indexOf(step);
@@ -270,7 +404,9 @@ export default function CheckoutPage() {
 
   function resolveSeatCodesForBooking(): string[] | null {
     if (!draft) return null;
-    const needed = passengers.length;
+    const needed = passengers.filter(
+      (p) => p.passengerType !== 'INFANT',
+    ).length;
     const picked = selectedSeats.filter((code) => {
       const cell = seats?.find((s) => s.seatCode === code);
       return cell?.cabin === draft.cabin && cell.status === 'FREE';
@@ -278,7 +414,12 @@ export default function CheckoutPage() {
     if (picked.length >= needed) return picked.slice(0, needed);
     const used = new Set(picked);
     const free = (seats ?? [])
-      .filter((s) => s.cabin === draft.cabin && s.status === 'FREE' && !used.has(s.seatCode))
+      .filter(
+        (s) =>
+          s.cabin === draft.cabin &&
+          s.status === 'FREE' &&
+          !used.has(s.seatCode),
+      )
       .map((s) => s.seatCode);
     const result = [...picked];
     for (const code of free) {
@@ -301,6 +442,12 @@ export default function CheckoutPage() {
       setStep('pax');
       return;
     }
+    const ageError = passengerAgeError();
+    if (ageError) {
+      setError(ageError);
+      setStep('pax');
+      return;
+    }
     if (!draft.flight.priceIrr || draft.flight.priceIrr === '0') {
       setError(
         locale === 'en'
@@ -311,22 +458,43 @@ export default function CheckoutPage() {
     }
     const seatCodes = resolveSeatCodesForBooking();
     if (!seatCodes) {
-      setError(locale === 'en' ? 'No free seats left for this cabin.' : 'صندلی خالی برای این کلاس باقی نمانده است.');
+      setError(
+        locale === 'en'
+          ? 'No free seats left for this cabin.'
+          : 'صندلی خالی برای این کلاس باقی نمانده است.',
+      );
       setStep('extras');
       return;
     }
     setBusy(true);
     setError(null);
     try {
+      let seatIndex = 0;
       const booking = await createBooking({
         flightInstanceId: draft.flightInstanceId,
         cabin: draft.cabin,
-        passengers: passengers.map((p, i) => ({
-          fullName: passengerFullName(p),
-          nationalId: p.docType === 'NATIONAL_ID' ? p.nationalId || undefined : undefined,
-          seatCode: seatCodes[i]!,
-        })),
-        extras: extras.filter((extra) => extra.selected).map((extra) => ({ id: extra.id, quantity: extra.quantity })),
+        passengers: passengers.map((p) => {
+          const birthDate = parseJalaliDateToIso(
+            `${p.birthYear}/${p.birthMonth}/${p.birthDay}`,
+          )?.slice(0, 10);
+          if (!birthDate) throw new Error(t.completePaxError);
+          return {
+            fullName: passengerFullName(p),
+            passengerType: p.passengerType,
+            birthDate,
+            nationalId:
+              p.docType === 'NATIONAL_ID'
+                ? p.nationalId || undefined
+                : undefined,
+            seatCode:
+              p.passengerType === 'INFANT'
+                ? undefined
+                : seatCodes[seatIndex++]!,
+          };
+        }),
+        extras: extras
+          .filter((extra) => extra.selected)
+          .map((extra) => ({ id: extra.id, quantity: extra.quantity })),
       });
       clearCheckoutDraft();
       navigate(`/payment/${booking.id}`);
@@ -417,9 +585,14 @@ export default function CheckoutPage() {
             locale={locale}
           />
           <div className="mt-4 rounded-2xl border border-[#eef1f5] bg-white p-5">
-            <div className="mb-3 text-[11px] font-black text-[#0d2640]">{t.enterPax}</div>
+            <div className="mb-3 text-[11px] font-black text-[#0d2640]">
+              {t.enterPax}
+            </div>
             {heldBooking.passengers.map((p) => (
-              <div key={p.seatCode} className="mb-1 flex justify-between text-xs text-[#6b7b94]">
+              <div
+                key={p.seatCode}
+                className="mb-1 flex justify-between text-xs text-[#6b7b94]"
+              >
                 <span>{p.fullName}</span>
                 <span dir="ltr">{p.seatCode}</span>
               </div>
@@ -445,12 +618,16 @@ export default function CheckoutPage() {
     );
   }
 
-  const priceIrr = draft.flight.priceIrr && draft.flight.priceIrr !== '0' ? draft.flight.priceIrr : '0';
+  const priceIrr =
+    draft.flight.priceIrr && draft.flight.priceIrr !== '0'
+      ? draft.flight.priceIrr
+      : '0';
   const passengerCount = Math.max(1, passengers.length);
+  const ticketIrr = passengerTotalIrr(priceIrr, draft.passengerMix);
   const extrasIrr = extras
     .filter((extra) => extra.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
-  const grandIrr = BigInt(priceIrr) * BigInt(passengerCount) + extrasIrr;
+  const grandIrr = ticketIrr + extrasIrr;
   const grandDisplay = localeMoney(grandIrr.toString(), locale);
 
   const stepBody = (
@@ -479,7 +656,12 @@ export default function CheckoutPage() {
         />
       )}
       {step === 'review' && (
-        <ReviewStep locale={locale} passengers={passengers} extras={extras} selectedSeats={selectedSeats} />
+        <ReviewStep
+          locale={locale}
+          passengers={passengers}
+          extras={extras}
+          selectedSeats={selectedSeats}
+        />
       )}
     </>
   );
@@ -501,14 +683,20 @@ export default function CheckoutPage() {
           >
             →
           </button>
-          <span className="text-sm font-extrabold text-[#16202e]">{t.title}</span>
+          <span className="text-sm font-extrabold text-[#16202e]">
+            {t.title}
+          </span>
         </div>
 
         <div
           className="mx-auto flex w-full max-w-[1180px] flex-col gap-[15px] px-3.5 py-3.5 pb-28"
           data-testid="checkout-mobile-main"
         >
-          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          <FlightSummaryCard
+            flight={draft.flight}
+            cabin={draft.cabin}
+            locale={locale}
+          />
           {stepBody}
           {error && (
             <div
@@ -521,7 +709,7 @@ export default function CheckoutPage() {
           {/* Design: full CTA in price card + sticky duplicate at bottom */}
           <PricingSidebar
             locale={locale}
-            priceIrr={priceIrr}
+            priceIrr={ticketIrr.toString()}
             paxCount={Math.max(1, passengers.length)}
             extras={extras}
             nextLabel={nextLabel}
@@ -575,12 +763,16 @@ export default function CheckoutPage() {
         style={{ gridTemplateColumns: 'minmax(0, 1fr) 340px' }}
       >
         <div className="flex min-w-0 flex-col gap-[15px]">
-          <FlightSummaryCard flight={draft.flight} cabin={draft.cabin} locale={locale} />
+          <FlightSummaryCard
+            flight={draft.flight}
+            cabin={draft.cabin}
+            locale={locale}
+          />
           {stepBody}
         </div>
         <PricingSidebar
           locale={locale}
-          priceIrr={priceIrr}
+          priceIrr={ticketIrr.toString()}
           paxCount={Math.max(1, passengers.length)}
           extras={extras}
           nextLabel={nextLabel}

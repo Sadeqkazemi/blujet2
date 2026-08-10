@@ -11,7 +11,15 @@ export function loadCheckoutDraft(): CheckoutDraft | null {
   try {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as CheckoutDraft;
+    const draft = JSON.parse(raw) as CheckoutDraft;
+    return {
+      ...draft,
+      passengerMix: draft.passengerMix ?? {
+        adults: 1,
+        children: 0,
+        infants: 0,
+      },
+    };
   } catch {
     return null;
   }
@@ -31,5 +39,6 @@ export function buildDraftFromFlight(
     cabin,
     selectedSeats,
     flight,
+    passengerMix: { adults: 1, children: 0, infants: 0 },
   };
 }

@@ -14,6 +14,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import {
+  ArrayUnique,
+  IsArray,
   IsEmail,
   IsIn,
   IsOptional,
@@ -28,6 +30,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
+import { MANAGER_PANEL_PERMISSION_KEYS } from '../panels/manager-panel-permissions';
 
 const CREATABLE_ROLES = [
   'SENIOR_MANAGER',
@@ -76,6 +79,34 @@ export class CreateAdminDto {
   @ApiProperty({ example: '482913' })
   @IsString()
   stepUpCode: string;
+
+  @ApiPropertyOptional({
+    enum: MANAGER_PANEL_PERMISSION_KEYS,
+    isArray: true,
+    description:
+      'Subtractive manager-panel permissions; role checks still apply.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(MANAGER_PANEL_PERMISSION_KEYS, { each: true })
+  permissions?: string[];
+}
+
+export class SetAdminPermissionsDto {
+  @ApiProperty({ enum: MANAGER_PANEL_PERMISSION_KEYS, isArray: true })
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(MANAGER_PANEL_PERMISSION_KEYS, { each: true })
+  permissions: string[];
+
+  @ApiProperty({ description: 'From POST /auth/step-up/request.' })
+  @IsString()
+  stepUpChallengeId: string;
+
+  @ApiProperty({ example: '482913' })
+  @IsString()
+  stepUpCode: string;
 }
 
 export class ResetAdminPasswordDto {
@@ -112,6 +143,22 @@ export class AdminsController {
     @Body() dto: CreateAdminDto,
   ) {
     return { success: true, data: await this.admins.create(actor, dto) };
+  }
+
+  @Patch(':id/permissions')
+  @ApiOperation({
+    summary:
+      'Replace manager panel restrictions without expanding the base role',
+  })
+  async setPermissions(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SetAdminPermissionsDto,
+  ) {
+    return {
+      success: true,
+      data: await this.admins.setPermissions(actor, id, dto),
+    };
   }
 
   @Patch(':id/block')

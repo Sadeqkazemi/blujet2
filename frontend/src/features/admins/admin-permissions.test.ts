@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { deriveUsernameFromEmail, rolePermissionPreset } from './admin-permissions';
+import {
+  deriveUsernameFromEmail,
+  enabledPermissionKeys,
+  permissionStateFromKeys,
+  rolePermissionPreset,
+} from './admin-permissions';
 
 describe('admin-permissions', () => {
   it('derives username from email local part', () => {
     expect(deriveUsernameFromEmail('z.karimi@blujet.example')).toBe('z.karimi');
     expect(deriveUsernameFromEmail('ab@x.co')).toMatch(/^admin\./);
+  });
+
+  it('round-trips an explicit permission selection', () => {
+    const state = permissionStateFromKeys(
+      ['reports', 'finance'],
+      'FINANCE_MANAGER',
+    );
+    expect(enabledPermissionKeys(state)).toEqual(['reports', 'finance']);
+    expect(state.refunds).toBe(false);
   });
 
   it('presets IT manager permissions per design', () => {

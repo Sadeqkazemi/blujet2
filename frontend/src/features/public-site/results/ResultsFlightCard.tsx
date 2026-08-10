@@ -3,7 +3,15 @@ import type { StoredLocale } from '../../../hooks/useLocale';
 import { faDigits, localeMoney } from '../../../lib/fa-format';
 import { formatJalaliDate } from '../../../lib/jalali';
 import { publicCabinLabel } from '../../../lib/flight-definition';
-import type { CabinClass, SearchFlightResult } from '../../../types/public-site';
+import type {
+  CabinClass,
+  SearchFlightResult,
+} from '../../../types/public-site';
+import {
+  passengerTotalIrr,
+  seatCountForMix,
+  type PassengerMix,
+} from '../checkout/checkout-types';
 import type { ResultsCopy } from './results-copy';
 import {
   flightAirlineLabel,
@@ -30,6 +38,7 @@ type Props = {
   lockBusyKey: string | null;
   saveBusyKey: string | null;
   showGoldLock: boolean;
+  passengerMix: PassengerMix;
   onToggle: () => void;
   onBuy: (cabin: CabinClass) => void;
   onLock: (cabin: CabinClass) => void;
@@ -51,6 +60,7 @@ export default function ResultsFlightCard({
   lockBusyKey,
   saveBusyKey,
   showGoldLock,
+  passengerMix,
   onToggle,
   onBuy,
   onLock,
@@ -64,7 +74,7 @@ export default function ResultsFlightCard({
   useEffect(() => {
     const next = primaryCabin(flight);
     if (next) setSelectedCabinClass(next.cabin);
-  }, [flight.flightInstanceId, flight.cabins]);
+  }, [flight]);
 
   const cabin =
     flight.cabins.find((c) => c.cabin === selectedCabinClass) ?? defaultCabin;
@@ -76,21 +86,45 @@ export default function ResultsFlightCard({
   const airline = flightAirlineLabel(flight.flightNo);
   const dep = formatFlightClock(flight.departureAt, locale, originTz);
   const arr = formatFlightClock(flight.arrivalAt, locale, destTz);
-  const dur = formatDuration(flightDurationMinutes(flight.departureAt, flight.arrivalAt), locale);
+  const dur = formatDuration(
+    flightDurationMinutes(flight.departureAt, flight.arrivalAt),
+    locale,
+  );
   const stops = stopLabel(Boolean(flight.connection), locale);
-  const priceIrr = BigInt(cabin.priceIrr);
+  const priceIrr = passengerTotalIrr(cabin.priceIrr, passengerMix);
   const { baseIrr, taxIrr } = priceBreakdown(priceIrr);
+  const seatDemand = seatCountForMix(passengerMix);
+  const canBook = cabin.seatsLeft >= seatDemand;
   const lowSeats = cabin.seatsLeft > 0 && cabin.seatsLeft <= 3;
   const key = `${flight.flightInstanceId}:${cabin.cabin}`;
   const dateShort =
     locale === 'en'
-      ? new Date(flight.departureAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      ? new Date(flight.departureAt).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+        })
       : formatJalaliDate(flight.departureAt);
 
   return (
-    <div data-testid="result-card" style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 14, overflow: 'hidden' }}>
+    <div
+      data-testid="result-card"
+      style={{
+        background: '#fff',
+        border: '1px solid #eef1f5',
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}
+    >
       {isAiPick && (
-        <div style={{ background: 'linear-gradient(90deg,#1668c4,#0d3b66)', color: '#fff', padding: '6px 15px', fontSize: 13.5, fontWeight: 800 }}>
+        <div
+          style={{
+            background: 'linear-gradient(90deg,#1668c4,#0d3b66)',
+            color: '#fff',
+            padding: '6px 15px',
+            fontSize: 13.5,
+            fontWeight: 800,
+          }}
+        >
           ✨ {copy.aiRecoLabel}
         </div>
       )}
@@ -105,7 +139,16 @@ export default function ResultsFlightCard({
         }}
       >
         {!isMobile && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: 96, flex: 'none' }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+              width: 96,
+              flex: 'none',
+            }}
+          >
             <div
               style={{
                 width: 58,
@@ -119,20 +162,57 @@ export default function ResultsFlightCard({
                 fontSize: 21,
               }}
             >
-              ✈
+              <span
+                style={{
+                  display: 'inline-block',
+                  transform: isRTL ? 'scaleX(-1)' : undefined,
+                }}
+              >
+                ✈
+              </span>
             </div>
-            <span style={{ fontSize: 13.5, color: '#16202e', fontWeight: 700, textAlign: 'center' }}>{airline}</span>
+            <span
+              style={{
+                fontSize: 13.5,
+                color: '#16202e',
+                fontWeight: 700,
+                textAlign: 'center',
+              }}
+            >
+              {airline}
+            </span>
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 14 : 25, flex: 1, minWidth: isMobile ? 0 : 280 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? 14 : 25,
+            flex: 1,
+            minWidth: isMobile ? 0 : 280,
+          }}
+        >
           <div style={{ textAlign: 'center', minWidth: 70 }}>
-            <div style={{ fontSize: isMobile ? 17 : 19, fontWeight: 800 }}>{dep}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }}>{flight.originCode}</div>
+            <div style={{ fontSize: isMobile ? 17 : 19, fontWeight: 800 }}>
+              {dep}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }}>
+              {flight.originCode}
+            </div>
           </div>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#6b7787', marginBottom: 6 }}>{dur}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center' }}>
+            <div style={{ fontSize: 13, color: '#6b7787', marginBottom: 6 }}>
+              {dur}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                justifyContent: 'center',
+              }}
+            >
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
               <span style={{ color: '#c2cad4', fontSize: 14.5 }}>✈</span>
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
@@ -153,8 +233,12 @@ export default function ResultsFlightCard({
             </div>
           </div>
           <div style={{ textAlign: 'center', minWidth: 70 }}>
-            <div style={{ fontSize: isMobile ? 17 : 19, fontWeight: 800 }}>{arr}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }}>{flight.destCode}</div>
+            <div style={{ fontSize: isMobile ? 17 : 19, fontWeight: 800 }}>
+              {arr}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#5a6678' }}>
+              {flight.destCode}
+            </div>
           </div>
         </div>
 
@@ -175,12 +259,27 @@ export default function ResultsFlightCard({
               paddingLeft: isRTL ? 21 : 0,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap' }}>
-              <span style={{ fontSize: 19, fontWeight: 900, color: '#1668c4' }}>{localeMoney(cabin.priceIrr, locale)}</span>
-              <span style={{ fontSize: 11, color: '#6b7585' }}>{copy.toman}</span>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 4,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ fontSize: 19, fontWeight: 900, color: '#1668c4' }}>
+                {localeMoney(priceIrr.toString(), locale)}
+              </span>
+              <span style={{ fontSize: 11, color: '#6b7585' }}>
+                {copy.toman}
+              </span>
             </div>
             {lowSeats && (
-              <span style={{ fontSize: 12.5, color: '#d9730d', fontWeight: 600 }}>{copy.lowSeatsLabel}</span>
+              <span
+                style={{ fontSize: 12.5, color: '#d9730d', fontWeight: 600 }}
+              >
+                {copy.lowSeatsLabel}
+              </span>
             )}
             <button
               type="button"
@@ -224,7 +323,7 @@ export default function ResultsFlightCard({
               marginBottom: 14,
             }}
           >
-            {localeMoney(cabin.priceIrr, locale)} {copy.toman}
+            {localeMoney(priceIrr.toString(), locale)} {copy.toman}
           </button>
         )}
       </div>
@@ -251,7 +350,14 @@ export default function ResultsFlightCard({
               padding: 14,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                marginBottom: 6,
+              }}
+            >
               <span
                 style={{
                   width: 24,
@@ -268,7 +374,11 @@ export default function ResultsFlightCard({
               >
                 ✈
               </span>
-              <span style={{ fontSize: 14.5, fontWeight: 800, color: '#16202e' }}>{copy.flightDetailsLabel}</span>
+              <span
+                style={{ fontSize: 14.5, fontWeight: 800, color: '#16202e' }}
+              >
+                {copy.flightDetailsLabel}
+              </span>
               <span
                 style={{
                   marginRight: 'auto',
@@ -284,32 +394,85 @@ export default function ResultsFlightCard({
               </span>
             </div>
             <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 18 }}>
-              {copy.outboundLabel}: {cityName(flight.originCode)} {copy.routeArrow} {cityName(flight.destCode)}
+              {copy.outboundLabel}: {cityName(flight.originCode)}{' '}
+              {copy.routeArrow} {cityName(flight.destCode)}
             </div>
             <div style={{ display: 'flex', gap: 13 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 4 }}>
-                <span style={{ width: 11, height: 11, border: '2px solid #1668c4', borderRadius: '50%' }} />
-                <span style={{ flex: 1, width: 2, background: '#d4e3f5', minHeight: 54 }} />
-                <span style={{ width: 11, height: 11, background: '#1668c4', borderRadius: '50%' }} />
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  paddingTop: 4,
+                }}
+              >
+                <span
+                  style={{
+                    width: 11,
+                    height: 11,
+                    border: '2px solid #1668c4',
+                    borderRadius: '50%',
+                  }}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    width: 2,
+                    background: '#d4e3f5',
+                    minHeight: 54,
+                  }}
+                />
+                <span
+                  style={{
+                    width: 11,
+                    height: 11,
+                    background: '#1668c4',
+                    borderRadius: '50%',
+                  }}
+                />
               </div>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 13 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 13,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 800 }}>{dep}</div>
                     <div style={{ fontSize: 13, color: '#6b7787' }}>
                       {copy.originAirportLabel} · {flight.originCode}
                     </div>
                   </div>
-                  <div style={{ fontSize: 13, color: '#6b7787' }}>{dateShort}</div>
+                  <div style={{ fontSize: 13, color: '#6b7787' }}>
+                    {dateShort}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
                     <div style={{ fontSize: 17, fontWeight: 800 }}>{arr}</div>
                     <div style={{ fontSize: 13, color: '#6b7787' }}>
                       {copy.destAirportLabel} · {flight.destCode}
                     </div>
                   </div>
-                  <div style={{ fontSize: 13, color: '#6b7787' }}>{dateShort}</div>
+                  <div style={{ fontSize: 13, color: '#6b7787' }}>
+                    {dateShort}
+                  </div>
                 </div>
               </div>
             </div>
@@ -329,7 +492,14 @@ export default function ResultsFlightCard({
                 [copy.baggageLabel, '20 kg'],
                 [copy.cabinLabel, cabinLabel],
               ].map(([label, value]) => (
-                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5 }}>
+                <div
+                  key={label}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: 13.5,
+                  }}
+                >
                   <span style={{ color: '#6b7787' }}>{label}</span>
                   <span style={{ fontWeight: 600, color: '#16202e' }} dir="ltr">
                     {value}
@@ -351,10 +521,24 @@ export default function ResultsFlightCard({
               flexDirection: 'column',
             }}
           >
-            <div style={{ fontSize: 14.5, fontWeight: 800, color: '#16202e', marginBottom: 18 }}>{copy.priceDetailsLabel}</div>
+            <div
+              style={{
+                fontSize: 14.5,
+                fontWeight: 800,
+                color: '#16202e',
+                marginBottom: 18,
+              }}
+            >
+              {copy.priceDetailsLabel}
+            </div>
             {hasMultipleCabins && (
               <div
-                style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  marginBottom: 14,
+                }}
                 data-testid="cabin-selector"
               >
                 {flight.cabins.map((opt) => {
@@ -368,7 +552,9 @@ export default function ResultsFlightCard({
                       style={{
                         padding: '6px 12px',
                         borderRadius: 10,
-                        border: active ? '1.5px solid #1668c4' : '1px solid #d5e1f0',
+                        border: active
+                          ? '1.5px solid #1668c4'
+                          : '1px solid #d5e1f0',
                         background: active ? '#eef4fb' : '#fff',
                         color: active ? '#1668c4' : '#5a6678',
                         fontSize: 12.5,
@@ -383,15 +569,32 @@ export default function ResultsFlightCard({
                 })}
               </div>
             )}
-            <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 12 }}>{copy.adultPaxLabel}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13.5 }}>
+            <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 12 }}>
+              {copy.adultPaxLabel} × {passengerMix.adults}
+              {passengerMix.children
+                ? ` · کودک × ${passengerMix.children}`
+                : ''}
+              {passengerMix.infants ? ` · نوزاد × ${passengerMix.infants}` : ''}
+            </div>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 9,
+                fontSize: 13.5,
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7787' }}>{copy.basePriceLabel}</span>
-                <span style={{ fontWeight: 600, color: '#16202e' }}>{localeMoney(baseIrr.toString(), locale)}</span>
+                <span style={{ fontWeight: 600, color: '#16202e' }}>
+                  {localeMoney(baseIrr.toString(), locale)}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7787' }}>{copy.taxesFeesLabel}</span>
-                <span style={{ fontWeight: 600, color: '#16202e' }}>{localeMoney(taxIrr.toString(), locale)}</span>
+                <span style={{ fontWeight: 600, color: '#16202e' }}>
+                  {localeMoney(taxIrr.toString(), locale)}
+                </span>
               </div>
             </div>
             <div
@@ -404,8 +607,12 @@ export default function ResultsFlightCard({
                 borderTop: '1px solid #eef1f5',
               }}
             >
-              <span style={{ fontWeight: 700, color: '#16202e' }}>{copy.totalLabel}</span>
-              <span style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>{localeMoney(cabin.priceIrr, locale)}</span>
+              <span style={{ fontWeight: 700, color: '#16202e' }}>
+                {copy.totalLabel}
+              </span>
+              <span style={{ fontSize: 18, fontWeight: 900, color: '#1668c4' }}>
+                {localeMoney(priceIrr.toString(), locale)}
+              </span>
             </div>
             <div
               style={{
@@ -424,7 +631,7 @@ export default function ResultsFlightCard({
             </div>
             <button
               type="button"
-              disabled={cabin.seatsLeft === 0}
+              disabled={!canBook}
               onClick={() => onBuy(cabin.cabin)}
               style={{
                 marginTop: 14,
@@ -438,9 +645,9 @@ export default function ResultsFlightCard({
                 fontSize: 15.5,
                 fontWeight: 800,
                 border: 'none',
-                cursor: cabin.seatsLeft === 0 ? 'not-allowed' : 'pointer',
+                cursor: canBook ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit',
-                opacity: cabin.seatsLeft === 0 ? 0.5 : 1,
+                opacity: canBook ? 1 : 0.5,
               }}
             >
               {copy.buyTicketLabel}
@@ -490,7 +697,9 @@ export default function ResultsFlightCard({
                   fontFamily: 'inherit',
                 }}
               >
-                {lockBusyKey === key ? copy.aiAnalyzing : `🔒 ${copy.priceLock}`}
+                {lockBusyKey === key
+                  ? copy.aiAnalyzing
+                  : `🔒 ${copy.priceLock}`}
               </button>
             )}
             <button

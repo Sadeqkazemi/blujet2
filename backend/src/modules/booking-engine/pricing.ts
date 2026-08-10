@@ -100,7 +100,12 @@ export async function resolveFareClass(
   const usageRows = await manager
     .createQueryBuilder(Booking, 'b')
     .select('b.fareClassCode', 'fareClassCode')
-    .addSelect('COUNT(*)', 'count')
+    .addSelect('COUNT(p.id)', 'count')
+    .innerJoin(
+      'passengers',
+      'p',
+      'p."bookingId" = b.id AND p."seatCode" IS NOT NULL',
+    )
     .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
     .andWhere('b.cabin = :cabin', { cabin })
     .andWhere('b.fareClassCode IS NOT NULL')

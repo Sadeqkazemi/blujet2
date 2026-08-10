@@ -9,6 +9,9 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { Booking } from './booking.entity';
+import { bigintTransformer } from '../transformers/bigint.transformer';
+
+export type PassengerType = 'ADULT' | 'CHILD' | 'INFANT';
 
 @Index('passengers_nationalIdHash_idx', ['nationalIdHash'])
 @Entity('passengers')
@@ -45,6 +48,21 @@ export class Passenger {
 
   @Column({ type: 'text', nullable: true })
   seatCode!: string | null;
+
+  @Column({ type: 'text', default: 'ADULT' })
+  passengerType!: PassengerType;
+
+  @Column({ type: 'date', default: '1970-01-01' })
+  birthDate!: string;
+
+  @Column({ type: 'boolean', default: true })
+  occupiesSeat!: boolean;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  fareIrr!: bigint;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  taxIrr!: bigint;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   deletedAt!: Date | null;

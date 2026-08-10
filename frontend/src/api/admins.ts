@@ -19,8 +19,23 @@ export function createAdmin(dto: {
   delivery: 'sms' | 'email';
   stepUpChallengeId: string;
   stepUpCode: string;
+  permissions?: string[];
 }) {
   return apiPost<{ id: string }>('/admins', dto);
+}
+
+export function updateAdminPermissions(
+  id: string,
+  dto: {
+    permissions: string[];
+    stepUpChallengeId: string;
+    stepUpCode: string;
+  },
+) {
+  return apiPatch<{ id: string; permissions: string[] }>(
+    `/admins/${id}/permissions`,
+    dto,
+  );
 }
 
 export function blockAdmin(id: string) {
@@ -31,23 +46,34 @@ export function unblockAdmin(id: string) {
   return apiPatch<{ id: string; isActive: boolean }>(`/admins/${id}/unblock`);
 }
 
-export function resetAdminPassword(id: string, dto: { password?: string; delivery?: 'sms' | 'email' }) {
+export function resetAdminPassword(
+  id: string,
+  dto: { password?: string; delivery?: 'sms' | 'email' },
+) {
   return apiPost<{ tempPassword: string }>(`/admins/${id}/reset-password`, dto);
 }
 
-export function changeOwnPassword(currentPassword: string, newPassword: string) {
-  return apiPost<{ changed: boolean }>('/auth/change-password', { currentPassword, newPassword });
+export function changeOwnPassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  return apiPost<{ changed: boolean }>('/auth/change-password', {
+    currentPassword,
+    newPassword,
+  });
 }
 
-export function fetchSystemEvents(query: {
-  actor?: string;
-  action?: string;
-  resource?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  page?: number;
-  limit?: number;
-} = {}) {
+export function fetchSystemEvents(
+  query: {
+    actor?: string;
+    action?: string;
+    resource?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  } = {},
+) {
   const params = new URLSearchParams();
   if (query.actor) params.set('actor', query.actor);
   if (query.action) params.set('action', query.action);

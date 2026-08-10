@@ -2739,3 +2739,20 @@ than relying on any cascade.
   `1787126400000-V4LoanScheduleHardening`,
   `1787212800000-V4LoanWalletCreditLedger`,
   `1787299200000-V4LoanInitiationLifecycle`.
+
+## Passenger fare snapshots (2026-08-10)
+
+`passengers` stores the immutable purchase-time classification and fare inputs:
+
+- `passengerType text NOT NULL` (`ADULT|CHILD|INFANT`)
+- `birthDate date NOT NULL`
+- `occupiesSeat boolean NOT NULL`
+- `fareIrr bigint NOT NULL`
+- `taxIrr bigint NOT NULL`
+
+`seatCode` remains nullable and is null only for a lap infant. Availability and commitment checks count occupied seats, while receipts and extras may count all travellers according to their billing unit.
+## Manager panel permission restrictions
+
+- `users.panelPermissions jsonb NULL` stores an optional array of coarse manager-panel permission keys.
+- `NULL` means the account follows its role defaults (backward compatibility). An empty array is an explicit restriction to unmapped/common surfaces only.
+- These keys are subtractive. They do not replace role-based authorization and cannot expand a user's role.

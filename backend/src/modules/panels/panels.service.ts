@@ -21,6 +21,10 @@ import {
 import { PERMISSION_CATALOG } from '../it-manager/permission-catalog';
 import { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { ErrorCode } from '../../common/errors';
+import {
+  permissionForNavKey,
+  permissionForRequestPath,
+} from './manager-panel-permissions';
 
 @Injectable()
 export class PanelsService {
@@ -46,7 +50,18 @@ export class PanelsService {
       return [...byKey.values()];
     }
     if (user.role !== 'EMPLOYEE') {
-      const items = PANEL_NAV[user.role] ?? [];
+      const persisted = await this.userRepo.findOne({
+        where: { id: user.id },
+        select: { panelPermissions: true },
+      });
+      const restrictions = persisted?.panelPermissions;
+      const roleItems = PANEL_NAV[user.role] ?? [];
+      const items = Array.isArray(restrictions)
+        ? roleItems.filter((item) => {
+            const permission = permissionForNavKey(item.key);
+            return permission === null || restrictions.includes(permission);
+          })
+        : roleItems;
       if (user.role === 'SITE_ADMIN') {
         return items.filter(
           (item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key),
@@ -84,6 +99,28 @@ export class PanelsService {
     // EMPLOYEE gets the tab now.
     items.push({ key: 'referrals', labelFa: 'ارجاعات', implemented: true });
     return items;
+  }
+
+  async assertCustomPermissionForRequest(
+    user: AuthenticatedUser,
+    requestPath: string,
+  ): Promise<void> {
+    if (user.role === 'EMPLOYEE') return;
+    const required = permissionForRequestPath(requestPath);
+    if (!required) return;
+    const persisted = await this.userRepo.findOne({
+      where: { id: user.id },
+      select: { panelPermissions: true },
+    });
+    if (
+      Array.isArray(persisted?.panelPermissions) &&
+      !persisted.panelPermissions.includes(required)
+    ) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'دسترسی این بخش برای حساب شما فعال نیست.',
+      });
+    }
   }
 
   /** Dashboard context for پنل کارمند.dc.html — dept label + granted perm chips. */

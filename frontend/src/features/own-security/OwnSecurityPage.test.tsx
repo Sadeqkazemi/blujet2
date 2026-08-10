@@ -19,6 +19,7 @@ const MANAGED: AdminRow[] = [
     isActive: true,
     online: false,
     managedByCaller: true,
+    permissions: null,
   },
 ];
 
@@ -37,7 +38,9 @@ describe('OwnSecurityPage', () => {
   it('validates the confirm field, then changes the own password via the real endpoint', async () => {
     mockCeo();
     vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue(MANAGED);
-    const changeSpy = vi.spyOn(adminsApi, 'changeOwnPassword').mockResolvedValue({ changed: true });
+    const changeSpy = vi
+      .spyOn(adminsApi, 'changeOwnPassword')
+      .mockResolvedValue({ changed: true });
 
     render(<OwnSecurityPage />);
     const user = userEvent.setup();
@@ -45,20 +48,31 @@ describe('OwnSecurityPage', () => {
     await user.type(screen.getByLabelText('رمز عبور جدید'), 'Next@123456');
     await user.type(screen.getByLabelText('تکرار رمز عبور جدید'), 'MISMATCH');
     await user.click(screen.getByRole('button', { name: 'ثبت رمز عبور جدید' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('تکرار رمز عبور جدید مطابقت ندارد.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'تکرار رمز عبور جدید مطابقت ندارد.',
+    );
     expect(changeSpy).not.toHaveBeenCalled();
 
     await user.clear(screen.getByLabelText('تکرار رمز عبور جدید'));
-    await user.type(screen.getByLabelText('تکرار رمز عبور جدید'), 'Next@123456');
+    await user.type(
+      screen.getByLabelText('تکرار رمز عبور جدید'),
+      'Next@123456',
+    );
     await user.click(screen.getByRole('button', { name: 'ثبت رمز عبور جدید' }));
-    await waitFor(() => expect(changeSpy).toHaveBeenCalledWith('Blujet@1404', 'Next@123456'));
-    expect(await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(changeSpy).toHaveBeenCalledWith('Blujet@1404', 'Next@123456'),
+    );
+    expect(
+      await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓'),
+    ).toBeInTheDocument();
   });
 
   it('resets a managed manager password and shows the one-time temp password', async () => {
     mockCeo();
     vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue(MANAGED);
-    vi.spyOn(adminsApi, 'resetAdminPassword').mockResolvedValue({ tempPassword: 'Zx-9Q1-77' });
+    vi.spyOn(adminsApi, 'resetAdminPassword').mockResolvedValue({
+      tempPassword: 'Zx-9Q1-77',
+    });
 
     render(<OwnSecurityPage />);
     expect(await screen.findByText('مدیر IT')).toBeInTheDocument();
@@ -72,7 +86,11 @@ describe('OwnSecurityPage', () => {
     mockCeo();
     vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue(MANAGED);
     render(<OwnSecurityPage />);
-    expect(await screen.findByText('تغییر رمز عبور و مدیریت امنیت حساب مدیریت اجرایی')).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        'تغییر رمز عبور و مدیریت امنیت حساب مدیریت اجرایی',
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText('مدیریت رمز سایر مدیران')).toBeInTheDocument();
     expect(screen.getByText('itadmin')).toBeInTheDocument();
   });

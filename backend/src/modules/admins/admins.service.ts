@@ -20,6 +20,10 @@ import { StepUpService } from '../auth/step-up.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
 import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
+import {
+  MANAGER_PANEL_PERMISSION_KEYS,
+  type ManagerPanelPermissionKey,
+} from '../panels/manager-panel-permissions';
 
 const ROLE_LABEL_FA: Partial<Record<Role, string>> = {
   SENIOR_MANAGER: 'مدیر ارشد',
@@ -135,6 +139,7 @@ export class AdminsService {
         isActive: u.isActive,
         online: (activeCountByUserId.get(u.id) ?? 0) > 0,
         managedByCaller: managed.includes(u.role) && u.id !== actor.id,
+        permissions: u.panelPermissions,
       };
     });
   }
@@ -150,6 +155,7 @@ export class AdminsService {
       delivery: 'sms' | 'email';
       stepUpChallengeId: string;
       stepUpCode: string;
+      permissions?: string[];
     },
   ) {
     await this.stepUp.verify(
@@ -187,6 +193,7 @@ export class AdminsService {
         mustChangePassword: true,
         twoFactorEnabled: true,
         isActive: true,
+        panelPermissions: dto.permissions ?? null,
         updatedAt: new Date(),
       }),
     );
@@ -217,7 +224,50 @@ export class AdminsService {
       fullName: user.fullName,
       username: user.username,
       role: user.role,
+      permissions: user.panelPermissions,
     };
+  }
+
+  async setPermissions(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: {
+      permissions: string[];
+      stepUpChallengeId: string;
+      stepUpCode: string;
+    },
+  ) {
+    await this.stepUp.verify(
+      actor,
+      dto.stepUpChallengeId,
+      dto.stepUpCode,
+      'ADMIN_ROLE_CHANGE',
+    );
+    const target = await this.getManagedOrThrow(actor, id);
+    const allowed = new Set<string>(MANAGER_PANEL_PERMISSION_KEYS);
+    if (dto.permissions.some((permission) => !allowed.has(permission))) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'Unknown manager panel permission.',
+      });
+    }
+    const permissions = [
+      ...new Set(dto.permissions as ManagerPanelPermissionKey[]),
+    ];
+    await this.userRepo.update(
+      { id },
+      { panelPermissions: permissions, updatedAt: new Date() },
+    );
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SECURITY',
+      action: 'تغییر سطح دسترسی پنل مدیر',
+      detail: `دسترسی‌های «${target.fullName}» توسط ${actor.fullName} به‌روزرسانی شد.`,
+      entityType: 'User',
+      entityId: id,
+    });
+    return { id, permissions };
   }
 
   async setBlocked(actor: AuthenticatedUser, id: string, blocked: boolean) {

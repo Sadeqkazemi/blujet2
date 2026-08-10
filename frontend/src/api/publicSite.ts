@@ -21,7 +21,10 @@ import type {
   SeatMapResult,
   UserProfile,
 } from '../types/public-site';
-import type { ClubCardRequestView, ClubMembershipView } from '../types/club-membership';
+import type {
+  ClubCardRequestView,
+  ClubMembershipView,
+} from '../types/club-membership';
 
 export function fetchAirports() {
   return apiGet<Airport[]>('/search/airports');
@@ -32,7 +35,11 @@ export function searchFlights(origin: string, dest: string, date: string) {
   return apiGet<SearchFlightResult[]>(`/search/flights?${q.toString()}`);
 }
 
-export function fetchSearchAdvisory(origin: string, dest: string, date: string) {
+export function fetchSearchAdvisory(
+  origin: string,
+  dest: string,
+  date: string,
+) {
   const q = new URLSearchParams({ origin, dest, date });
   return apiGet<SearchAdvisoryResult>(`/search/advisory?${q.toString()}`);
 }
@@ -51,9 +58,11 @@ export function fetchSeatMap(flightInstanceId: string) {
 
 export interface CreateBookingPassenger {
   fullName: string;
+  passengerType: 'ADULT' | 'CHILD' | 'INFANT';
+  birthDate: string;
   nationalId?: string;
   mobile?: string;
-  seatCode: string;
+  seatCode?: string;
 }
 
 export function createBooking(dto: {
@@ -117,7 +126,11 @@ export function lookupBookingByPnrAndLastName(pnr: string, lastName: string) {
   return apiPost<BookingDetail>('/manage-booking/lookup', { pnr, lastName });
 }
 
-export function submitAnonymousRefund(pnr: string, lastName: string, iban: string) {
+export function submitAnonymousRefund(
+  pnr: string,
+  lastName: string,
+  iban: string,
+) {
   return apiPost<RefundRequestView>('/manage-booking/refund', {
     pnr,
     lastName,
@@ -135,7 +148,9 @@ export function topupWallet(amountIrr: number) {
 }
 
 export function fetchClubPoints() {
-  return apiGet<{ isMember: boolean; level: string | null; balance: number }>('/my/club-points');
+  return apiGet<{ isMember: boolean; level: string | null; balance: number }>(
+    '/my/club-points',
+  );
 }
 
 export function fetchClubMembership() {
@@ -207,7 +222,11 @@ export function fetchBankAccounts() {
   return apiGet<SavedBankAccount[]>('/my/bank-accounts');
 }
 
-export function createBankAccount(dto: { cardNo: string; sheba: string; bankName?: string }) {
+export function createBankAccount(dto: {
+  cardNo: string;
+  sheba: string;
+  bankName?: string;
+}) {
   return apiPost<SavedBankAccount>('/my/bank-accounts', dto);
 }
 
@@ -230,7 +249,10 @@ export function fetchMyIdentity() {
 export function uploadIdentityIdCard(file: File) {
   const form = new FormData();
   form.append('file', file);
-  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>('/my/identity/id-card', form);
+  return apiPostForm<{ id: string; fileName: string; sizeBytes: number }>(
+    '/my/identity/id-card',
+    form,
+  );
 }
 
 export function submitIdentityVerification() {
