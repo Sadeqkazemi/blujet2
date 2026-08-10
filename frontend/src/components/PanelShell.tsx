@@ -150,21 +150,6 @@ export default function PanelShell() {
     if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
       items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
     }
-    // Frontend-only commercial menu — backend panel-nav has no aircraft key yet.
-    if (
-      (user?.role === 'COMMERCIAL_MANAGER' || user?.role === 'SENIOR_MANAGER') &&
-      !items.some((i) => i.key === 'aircraft')
-    ) {
-      const flightsIdx = items.findIndex((i) => i.key === 'flights');
-      const aircraftItem: PanelNavItem = {
-        key: 'aircraft',
-        labelFa: 'تعریف هواپیما',
-        implemented: true,
-      };
-      items = [...items];
-      if (flightsIdx >= 0) items.splice(flightsIdx + 1, 0, aircraftItem);
-      else items.push(aircraftItem);
-    }
     return items;
   }, [nav, user?.role, user?.isSuperAdmin]);
 

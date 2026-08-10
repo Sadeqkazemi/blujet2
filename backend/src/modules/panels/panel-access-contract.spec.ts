@@ -1,8 +1,21 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ALL_PANEL_KEYS, PANEL_ACCESS_TOGGLE_RIGHTS } from './panel-nav.config';
+import {
+  ALL_PANEL_KEYS,
+  PANEL_ACCESS_TOGGLE_RIGHTS,
+  PANEL_NAV,
+} from './panel-nav.config';
 import { PanelsService } from './panels.service';
 
 describe('operations panel access contract', () => {
+  it('publishes the aircraft catalog in commercial and senior navigation', () => {
+    expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
+      'aircraft',
+    );
+    expect(PANEL_NAV.SENIOR_MANAGER?.map((item) => item.key)).toContain(
+      'aircraft',
+    );
+  });
+
   it('is controllable by CEO and senior manager', () => {
     expect(ALL_PANEL_KEYS).toContain('OPERATIONS');
     expect(PANEL_ACCESS_TOGGLE_RIGHTS.CEO).toContain('OPERATIONS');
