@@ -379,7 +379,6 @@ export class CommitmentsService {
       // commitment while the instance is being cancelled (and vice versa).
       const locked = await manager
         .createQueryBuilder(FlightInstance, 'fi')
-        .leftJoinAndSelect('fi.flight', 'flight')
         .setLock('pessimistic_write')
         .where('fi.id = :id', { id: instanceId })
         .getOne();
@@ -390,6 +389,8 @@ export class CommitmentsService {
         });
       }
 
+      // The row lock targets FlightInstance only; reuse the already-loaded required flight relation.
+      locked.flight = instance.flight;
       await this.assertCapacity(manager, locked, dto.cabin, dto.seats);
 
       const entity = await manager.save(
@@ -474,7 +475,6 @@ export class CommitmentsService {
     const created = await this.dataSource.transaction(async (manager) => {
       const locked = await manager
         .createQueryBuilder(FlightInstance, 'fi')
-        .leftJoinAndSelect('fi.flight', 'flight')
         .setLock('pessimistic_write')
         .where('fi.id = :id', { id: instanceId })
         .getOne();
@@ -485,6 +485,8 @@ export class CommitmentsService {
         });
       }
 
+      // The row lock targets FlightInstance only; reuse the already-loaded required flight relation.
+      locked.flight = instance.flight;
       await this.assertCapacity(manager, locked, dto.cabin, dto.seats);
 
       const entity = await manager.save(
