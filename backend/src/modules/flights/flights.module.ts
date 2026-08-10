@@ -17,14 +17,17 @@ import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
+import { PriceLock } from '../../database/entities/price-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
 import { FlightReview } from '../../database/entities/flight-review.entity';
+import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
 import { FlightWorkflowService } from './flight-workflow.service';
+import { ScheduleTemplateService } from './schedule-template.service';
 import { AircraftService } from './aircraft.service';
 import { CommitmentsService } from './commitments.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -53,9 +56,11 @@ import { AuthModule } from '../auth/auth.module';
       Booking,
       Passenger,
       SeatLock,
+      PriceLock,
       FarePricingProposal,
       FlightChargeRule,
       FlightReview,
+      FlightScheduleTemplate,
       AuditLog,
     ]),
     PanelsModule,
@@ -69,6 +74,7 @@ import { AuthModule } from '../auth/auth.module';
     FlightsService,
     FlightDefinitionService,
     FlightWorkflowService,
+    ScheduleTemplateService,
     AircraftService,
     CommitmentsService,
   ],

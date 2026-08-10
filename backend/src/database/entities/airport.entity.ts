@@ -33,4 +33,8 @@ export class Airport {
    */
   @Column({ type: 'boolean', default: true })
   active!: boolean;
+
+  /** True for non-Iran destinations (DXB/IST/NJF, …). Used by destination stats. */
+  @Column({ type: 'boolean', default: false })
+  isInternational!: boolean;
 }

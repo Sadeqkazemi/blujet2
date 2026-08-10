@@ -2717,3 +2717,25 @@ than relying on any cascade.
 - Commercial flight lifecycle views reuse `flight_reviews`, `audit_logs`,
   `fare_pricing_proposals`, and `flight_instances.aiSuggestion`; no duplicate
   history or AI-decision table is added.
+
+## Phase 72 — V4 gaps
+
+- `flight_schedule_templates` — seasonal template with airports, aircraft,
+  weekdays, IRR prices, cabin capacity snapshot, idempotencyKey, status.
+- `flight_instances.scheduleTemplateId` — nullable link to template.
+- `bank_loan_applications` — bankReferenceId, requestedAmountIrr, bankStatus,
+  statusSummary (non-sensitive), webhook event id, optional walletCreditReference;
+  unique(`userId`,`idempotencyKey`); unique partial `walletCreditReference`;
+  `lastWebhookOccurredAt` for replay protection.
+- `bank_loan_webhook_events` — append-only audit; unique(`provider`,`eventId`);
+  redacted payload; processingResult (`APPLIED` / `DUPLICATE` / `IGNORED_*`).
+- `airports.isInternational` — used by destination stats (DXB/IST/NJF seeded true).
+- `bank_loan_wallet_credits` — payout ledger keyed by `creditReference`
+  (atomic claim via INSERT ON CONFLICT DO NOTHING).
+- `bank_loan_applications` initiation lifecycle: `INITIATING` status,
+  `initiationStartedAt` / `initiationLeaseUntil` for safe bank-create retry
+  with the same bank-scoped idempotency key.
+- Migrations: `1787040000000-V4ScheduleTemplatesLoansDestStats`,
+  `1787126400000-V4LoanScheduleHardening`,
+  `1787212800000-V4LoanWalletCreditLedger`,
+  `1787299200000-V4LoanInitiationLifecycle`.

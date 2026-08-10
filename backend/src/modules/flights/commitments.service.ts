@@ -13,7 +13,11 @@ import { CharterCommitment } from '../../database/entities/charter-commitment.en
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
-import { CabinClass, CommitmentStatus } from '../../database/enums';
+import {
+  CabinClass,
+  CommitmentStatus,
+  FlightInstanceStatus,
+} from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AuditService } from '../audit/audit.service';
@@ -371,15 +375,23 @@ export class CommitmentsService {
     );
 
     const created = await this.dataSource.transaction(async (manager) => {
-      // Row-lock the instance so two concurrent commitment creations for
-      // the same cabin can't both pass the capacity check.
-      await manager
+      // Shared lock with schedule-template deactivate — prevents creating a
+      // commitment while the instance is being cancelled (and vice versa).
+      const locked = await manager
         .createQueryBuilder(FlightInstance, 'fi')
         .setLock('pessimistic_write')
         .where('fi.id = :id', { id: instanceId })
         .getOne();
+      if (!locked || locked.status === FlightInstanceStatus.CANCELLED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پرواز لغو شده و قابل تعهد نیست.',
+        });
+      }
 
-      await this.assertCapacity(manager, instance, dto.cabin, dto.seats);
+      // The row lock targets FlightInstance only; reuse the already-loaded required flight relation.
+      locked.flight = instance.flight;
+      await this.assertCapacity(manager, locked, dto.cabin, dto.seats);
 
       const entity = await manager.save(
         manager.create(CharterCommitment, {
@@ -461,13 +473,21 @@ export class CommitmentsService {
     );
 
     const created = await this.dataSource.transaction(async (manager) => {
-      await manager
+      const locked = await manager
         .createQueryBuilder(FlightInstance, 'fi')
         .setLock('pessimistic_write')
         .where('fi.id = :id', { id: instanceId })
         .getOne();
+      if (!locked || locked.status === FlightInstanceStatus.CANCELLED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پرواز لغو شده و قابل تعهد نیست.',
+        });
+      }
 
-      await this.assertCapacity(manager, instance, dto.cabin, dto.seats);
+      // The row lock targets FlightInstance only; reuse the already-loaded required flight relation.
+      locked.flight = instance.flight;
+      await this.assertCapacity(manager, locked, dto.cabin, dto.seats);
 
       const entity = await manager.save(
         manager.create(AgencySeatCommitment, {

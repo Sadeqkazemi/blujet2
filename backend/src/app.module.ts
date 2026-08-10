@@ -48,6 +48,7 @@ import { CustomerReferralsModule } from './modules/customer-referrals/customer-r
 import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
+import { LoansModule } from './modules/loans/loans.module';
 
 @Module({
   imports: [
@@ -125,6 +126,7 @@ import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
     WebservicePricingModule,
     CustomersModule,
     TravelCostsModule,
+    LoansModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

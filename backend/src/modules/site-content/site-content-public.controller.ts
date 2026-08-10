@@ -19,6 +19,16 @@ export class SiteContentPublicController {
     return { success: true, data: await this.content.getPublicHome(loc) };
   }
 
+  @Get('destination-stats')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({
+    summary:
+      'آمار مقاصد فعال داخلی/بین‌المللی از کاتالوگ فرودگاه و پروازهای منتشرشده',
+  })
+  async destinationStats() {
+    return { success: true, data: await this.content.getDestinationStats() };
+  }
+
   @Get('media/:fileId')
   @Throttle({ default: { limit: 240, ttl: 60_000 } })
   @ApiOperation({ summary: 'دریافت تصویر محتوای سایت' })

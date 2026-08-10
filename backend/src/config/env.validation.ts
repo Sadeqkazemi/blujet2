@@ -61,6 +61,20 @@ class EnvironmentVariables {
   @IsOptional()
   @IsNumberString()
   AUTH_SANDBOX_OTP?: string;
+
+  /** Bank loan HTTP adapter — optional; endpoints degrade when unset. */
+  @IsOptional()
+  BANK_LOAN_API_BASE_URL?: string;
+
+  @IsOptional()
+  BANK_LOAN_API_KEY?: string;
+
+  @IsOptional()
+  BANK_LOAN_WEBHOOK_SECRET?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  BANK_LOAN_TIMEOUT_MS?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

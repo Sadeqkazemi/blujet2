@@ -3469,3 +3469,48 @@ See `docs/features/flight-approval-workflow.md`.
 - Low-sales responses may include `suggestedPriceIrr`, `reasonFa`, `factorsFa`,
   `confidence`, and `generatedAt`. Missing fields mean no current ML suggestion;
   consumers must show a graceful advisory-unavailable state.
+
+## Phase 72 — V4 backend gaps (schedule templates, bank loans, destination stats)
+
+See `docs/features/v4-backend-gaps.md`. Does **not** change OPERATIONS_MANAGER
+panel or MD-80 seat maps. Commercial → CEO pricing register path unchanged.
+
+### Seasonal schedule templates
+
+| Method | Path | Roles | Notes |
+|--------|------|-------|-------|
+| POST | `/flights/schedule-templates/preview` | COMMERCIAL/SENIOR/EMPLOYEE+`fl_manage` | Preview occurrences (no persist) |
+| POST | `/flights/schedule-templates` | same | Create + materialize; `idempotencyKey` required |
+| GET | `/flights/schedule-templates` | + `fl_view` | Paginated list |
+| GET | `/flights/schedule-templates/:id` | + `fl_view` | Detail + instanceCount |
+| POST | `/flights/schedule-templates/:id/deactivate` | + `fl_manage` | Cancel future unsold instances; keep sold history |
+
+Amounts are IRR integer strings. Cabin capacities are read from the aircraft
+definition (MD-80 maps are never rewritten).
+
+### Bank loans (adapter only)
+
+| Method | Path | Roles | Notes |
+|--------|------|-------|-------|
+| POST | `/me/loan-applications` | USER | Create via bank API; idempotent |
+| GET | `/me/loan-applications` | USER | Own list |
+| GET | `/me/loan-applications/:id` | USER | Own detail + `displayStatus` |
+| POST | `/me/loan-applications/:id/sync` | USER | Poll bank status |
+| GET | `/admin/loan-applications` | SITE_ADMIN | Read-only list |
+| GET | `/admin/loan-applications/:id` | SITE_ADMIN | Read-only detail |
+| POST | `/webhooks/bank-loans` | public + HMAC | Header `X-Bank-Signature: sha256=<hex>` |
+
+Env: `BANK_LOAN_API_BASE_URL`, `BANK_LOAN_API_KEY`, `BANK_LOAN_WEBHOOK_SECRET`,
+`BANK_LOAN_TIMEOUT_MS`. No hard-coded bank name/URL. No local mock bank
+responses — tests mock the provider at the HTTP/provider boundary.
+
+Bank status → displayStatus: SUBMITTED/PENDING→awaiting_bank,
+UNDER_REVIEW→under_review, APPROVED→approved, REJECTED→rejected,
+DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
+
+### Destination stats
+
+| Method | Path | Auth | Notes |
+|--------|------|------|-------|
+| GET | `/site-content/destination-stats` | public | `{ activeDestinations, domesticDestinations, internationalDestinations }` from catalog ∩ published flights; zeros valid |
+| GET | `/site-content/home` | public | Also includes `destinationStats` |

@@ -14,7 +14,13 @@ import { SiteDestinationHighlight } from '../../database/entities/site-destinati
 import { SiteRouteHighlight } from '../../database/entities/site-route-highlight.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { BlogPost } from '../../database/entities/blog-post.entity';
-import { BlogPostStatus, type SiteContentBlockKey } from '../../database/enums';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import {
+  BlogPostStatus,
+  FlightDefinitionStatus,
+  FlightInstanceStatus,
+  type SiteContentBlockKey,
+} from '../../database/enums';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -41,7 +47,7 @@ const BLOCK_DEFAULTS: Record<
   HERO_BANNER: {
     enabled: true,
     title: 'پرواز بعدی‌ات را با blujet رزرو کن',
-    subtitle: 'بیش از ۲۰۰ مقصد با بهترین قیمت',
+    subtitle: 'مقاصد داخلی و بین‌المللی با بهترین قیمت',
     buttonText: 'مشاهده پیشنهادهای ویژه',
     badgeText: '',
   },
@@ -75,7 +81,7 @@ const BLOCK_LOCALE_DEFAULTS: Record<
   en: {
     HERO_BANNER: {
       title: 'Book your next flight with blujet',
-      subtitle: 'Over 200 destinations at the best prices',
+      subtitle: 'Domestic and international destinations at the best prices',
       buttonText: 'View special offers',
       badgeText: '',
     },
@@ -96,7 +102,7 @@ const BLOCK_LOCALE_DEFAULTS: Record<
   ar: {
     HERO_BANNER: {
       title: 'احجز رحلتك القادمة مع blujet',
-      subtitle: 'أكثر من 200 وجهة بأفضل الأسعار',
+      subtitle: 'وجهات داخلية ودولية بأفضل الأسعار',
       buttonText: 'عرض العروض الخاصة',
       badgeText: '',
     },
@@ -133,8 +139,58 @@ export class SiteContentService {
     private readonly airportRepo: Repository<Airport>,
     @InjectRepository(BlogPost)
     private readonly blogPostRepo: Repository<BlogPost>,
+    @InjectRepository(FlightInstance)
+    private readonly instanceRepo: Repository<FlightInstance>,
     private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Active destinations = distinct dest airports that appear on sellable
+   * published flight instances, intersected with the active airport catalog.
+   * Zeros are valid when nothing is published.
+   */
+  async getDestinationStats() {
+    const rows = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .innerJoin('fi.flight', 'f')
+      .innerJoin('f.route', 'r')
+      .innerJoin(Airport, 'a', 'a.code = r.destCode AND a.active = true')
+      .select('a.code', 'code')
+      .addSelect('a.isInternational', 'isInternational')
+      .where('fi.status = :scheduled', {
+        scheduled: FlightInstanceStatus.SCHEDULED,
+      })
+      .andWhere(
+        '(fi.definitionStatus IN (:...sellable) OR (fi.definitionStatus = :rev AND fi.approvedSnapshot IS NOT NULL))',
+        {
+          sellable: [
+            FlightDefinitionStatus.PUBLISHED,
+            FlightDefinitionStatus.APPROVED,
+          ],
+          rev: FlightDefinitionStatus.PENDING_REVISION,
+        },
+      )
+      .andWhere('fi.departureAt > NOW()')
+      .groupBy('a.code')
+      .addGroupBy('a.isInternational')
+      .getRawMany<{ code: string; isInternational: boolean | string }>();
+
+    let domestic = 0;
+    let international = 0;
+    for (const r of rows) {
+      const intl =
+        r.isInternational === true ||
+        r.isInternational === 'true' ||
+        r.isInternational === 't';
+      if (intl) international += 1;
+      else domestic += 1;
+    }
+    return {
+      activeDestinations: domestic + international,
+      domesticDestinations: domestic,
+      internationalDestinations: international,
+    };
+  }
 
   private async assertImageFile(actorId: string, fileId: string) {
     const file = await this.storedFileRepo.findOneBy({ id: fileId });
@@ -532,12 +588,14 @@ export class SiteContentService {
   }
 
   async getPublicHome(locale: 'fa' | 'en' | 'ar' = 'fa') {
-    const [blocks, destinations, routes, airports] = await Promise.all([
-      this.listBlocks(),
-      this.listDestinations(),
-      this.listRoutes(),
-      this.airportRepo.find(),
-    ]);
+    const [blocks, destinations, routes, airports, destinationStats] =
+      await Promise.all([
+        this.listBlocks(),
+        this.listDestinations(),
+        this.listRoutes(),
+        this.airportRepo.find(),
+        this.getDestinationStats(),
+      ]);
     const airportMap = new Map(airports.map((a) => [a.code, a.cityFa]));
 
     const localizedBlocks = blocks.map((block) => {
@@ -567,6 +625,7 @@ export class SiteContentService {
         toCityFa: airportMap.get(r.toAirportCode) ?? r.toAirportCode,
         priceIrr: r.priceIrr,
       })),
+      destinationStats,
     };
   }
 
