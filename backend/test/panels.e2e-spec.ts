@@ -55,6 +55,7 @@ describe('Panels (e2e)', () => {
       'dashboard',
       'agencies',
       'flights',
+      'aircraft',
       'reports',
       'staff',
       'clubrules',
@@ -106,6 +107,7 @@ describe('Panels (e2e)', () => {
       'vip',
       'survey',
       'reservation',
+      'aircraft',
       'panels',
       'security',
     ]);
