@@ -44,7 +44,11 @@ import {
 } from '../../common/money';
 import type { Irr } from '../../common/money';
 import { RedisService } from '../../redis/redis.service';
-import { FlightDefinitionStatus, type CabinClass } from '../../database/enums';
+import {
+  FlightDefinitionStatus,
+  FlightInstanceStatus,
+  type CabinClass,
+} from '../../database/enums';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -783,7 +787,8 @@ export class FlightsService {
     const analyzable = upcoming.filter((item) => {
       if (item.basePriceIrr == null) return false;
       if (item.departureAt > futureCutoff) return true;
-      const occupancy = item.capacity > 0 ? (sold.get(item.id) ?? 0) / item.capacity : 0;
+      const occupancy =
+        item.capacity > 0 ? (sold.get(item.id) ?? 0) / item.capacity : 0;
       return item.departureAt <= lowSalesWindowEnd && occupancy < 0.6;
     });
     if (analyzable.length === 0) return { analyzed: 0, available: true };
@@ -1332,16 +1337,6 @@ export class FlightsService {
       contractPriceIrr?: Irr;
     },
   ) {
-    const instance = await this.instanceRepo
-      .createQueryBuilder('fi')
-      .where('fi.id = :id', { id: instanceId })
-      .getOne();
-    if (!instance) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'پرواز یافت نشد.',
-      });
-    }
     const agency = await this.agencyProfileRepo.findOneBy({
       userId: dto.agencyId,
     });
@@ -1351,36 +1346,57 @@ export class FlightsService {
         message: 'آژانس یافت نشد.',
       });
     }
-    if (!instance.agencySeatsAllocated) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message:
-          'ابتدا سهمیه کلی آژانس‌ها برای این پرواز را از بخش نرخ‌گذاری تعیین کنید.',
-      });
-    }
 
-    const existingTotal = await this.activeAllotmentsTotal(instanceId);
-    if (existingTotal + dto.seatsAllocated > instance.agencySeatsAllocated) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: `مجموع سهمیه‌های تخصیص‌یافته به آژانس‌ها (${existingTotal + dto.seatsAllocated}) از سقف کلی این پرواز (${instance.agencySeatsAllocated}) بیشتر است.`,
-      });
-    }
+    const created = await this.dataSource.transaction(async (manager) => {
+      // Shared lock with schedule-template deactivate.
+      const instance = await manager
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.id = :id', { id: instanceId })
+        .getOne();
+      if (!instance) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پرواز یافت نشد.',
+        });
+      }
+      if (instance.status === FlightInstanceStatus.CANCELLED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پرواز لغو شده و قابل تخصیص سهمیه نیست.',
+        });
+      }
+      if (!instance.agencySeatsAllocated) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message:
+            'ابتدا سهمیه کلی آژانس‌ها برای این پرواز را از بخش نرخ‌گذاری تعیین کنید.',
+        });
+      }
 
-    const created = await this.allotmentRepo.save(
-      this.allotmentRepo.create({
-        agencyId: dto.agencyId,
-        flightInstanceId: instanceId,
-        seatsAllocated: dto.seatsAllocated,
-        type: dto.type ?? 'HARD',
-        releaseAt:
-          dto.type === 'SOFT' && dto.releaseAt
-            ? new Date(dto.releaseAt)
-            : undefined,
-        contractPriceIrr: dto.contractPriceIrr,
-        createdById: actor.id,
-      }),
-    );
+      const existingTotal = await this.activeAllotmentsTotal(instanceId);
+      if (existingTotal + dto.seatsAllocated > instance.agencySeatsAllocated) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `مجموع سهمیه‌های تخصیص‌یافته به آژانس‌ها (${existingTotal + dto.seatsAllocated}) از سقف کلی این پرواز (${instance.agencySeatsAllocated}) بیشتر است.`,
+        });
+      }
+
+      return manager.save(
+        manager.create(AgencyAllotment, {
+          agencyId: dto.agencyId,
+          flightInstanceId: instanceId,
+          seatsAllocated: dto.seatsAllocated,
+          type: dto.type ?? 'HARD',
+          releaseAt:
+            dto.type === 'SOFT' && dto.releaseAt
+              ? new Date(dto.releaseAt)
+              : undefined,
+          contractPriceIrr: dto.contractPriceIrr,
+          createdById: actor.id,
+        }),
+      );
+    });
 
     await this.audit.record({
       actorId: actor.id,

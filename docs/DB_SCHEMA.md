@@ -2730,5 +2730,8 @@ than relying on any cascade.
 - `bank_loan_webhook_events` — append-only audit; unique(`provider`,`eventId`);
   redacted payload; processingResult (`APPLIED` / `DUPLICATE` / `IGNORED_*`).
 - `airports.isInternational` — used by destination stats (DXB/IST/NJF seeded true).
+- `bank_loan_wallet_credits` — payout ledger keyed by `creditReference`
+  (atomic claim via INSERT ON CONFLICT DO NOTHING).
 - Migrations: `1787040000000-V4ScheduleTemplatesLoansDestStats`,
-  `1787126400000-V4LoanScheduleHardening`.
+  `1787126400000-V4LoanScheduleHardening`,
+  `1787212800000-V4LoanWalletCreditLedger`.

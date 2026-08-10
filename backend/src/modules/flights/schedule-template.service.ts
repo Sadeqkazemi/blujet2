@@ -231,14 +231,41 @@ export class ScheduleTemplateService {
     }));
   }
 
-  private advisoryLockKeys(
-    flightNoBase: string,
-    aircraftId: string,
+  /** Independent advisory lock keypair for a resource kind. */
+  private advisoryLockPair(
+    kind: 'flightNo' | 'aircraft',
+    value: string,
   ): [number, number] {
     const digest = createHash('sha256')
-      .update(`schedule-template:${flightNoBase}:${aircraftId}`)
+      .update(`schedule-template:${kind}:${value}`)
       .digest();
     return [digest.readInt32BE(0), digest.readInt32BE(4)];
+  }
+
+  /**
+   * Acquire flightNo + aircraft locks in deterministic order to avoid deadlock
+   * when concurrent creates share one resource but not the other.
+   */
+  private async acquireScheduleLocks(
+    manager: EntityManager,
+    flightNoBase: string,
+    aircraftDefinitionId: string,
+  ) {
+    const flightLock = this.advisoryLockPair('flightNo', flightNoBase);
+    const aircraftLock = this.advisoryLockPair(
+      'aircraft',
+      aircraftDefinitionId,
+    );
+    const ordered = [flightLock, aircraftLock].sort((a, b) =>
+      a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1],
+    );
+    const seen = new Set<string>();
+    for (const [k1, k2] of ordered) {
+      const key = `${k1}:${k2}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [k1, k2]);
+    }
   }
 
   async create(actor: AuthenticatedUser, dto: CreateScheduleTemplateDto) {
@@ -263,16 +290,12 @@ export class ScheduleTemplateService {
       return this.toView(existing.id);
     }
 
-    const [lockA, lockB] = this.advisoryLockKeys(
-      dto.flightNoBase,
-      dto.aircraftDefinitionId,
-    );
-
     const templateId = await this.dataSource.transaction(async (manager) => {
-      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
-        lockA,
-        lockB,
-      ]);
+      await this.acquireScheduleLocks(
+        manager,
+        dto.flightNoBase,
+        dto.aircraftDefinitionId,
+      );
 
       const raced = await manager.findOne(FlightScheduleTemplate, {
         where: { idempotencyKey: dto.idempotencyKey },
@@ -534,15 +557,19 @@ export class ScheduleTemplateService {
       template.deactivatedAt = now;
       await manager.save(template);
 
-      const future = await manager.find(FlightInstance, {
-        where: {
-          scheduleTemplateId: id,
-          status: FlightInstanceStatus.SCHEDULED,
-        },
-      });
-      const futureIds = future
-        .filter((fi) => fi.departureAt.getTime() > now.getTime())
-        .map((fi) => fi.id);
+      // Lock instances in id order so commitment/allotment creators
+      // (who also take pessimistic_write on the same rows) serialize safely.
+      const future = await manager
+        .createQueryBuilder(FlightInstance, 'fi')
+        .setLock('pessimistic_write')
+        .where('fi.scheduleTemplateId = :id', { id })
+        .andWhere('fi.status = :scheduled', {
+          scheduled: FlightInstanceStatus.SCHEDULED,
+        })
+        .andWhere('fi.departureAt > :now', { now })
+        .orderBy('fi.id', 'ASC')
+        .getMany();
+      const futureIds = future.map((fi) => fi.id);
       if (futureIds.length === 0) return;
 
       const blocked = await this.committedInstanceIds(manager, futureIds);

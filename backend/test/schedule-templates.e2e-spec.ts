@@ -52,17 +52,19 @@ describe('Seasonal schedule templates (e2e)', () => {
     const dest = await dataSource
       .getRepository(Airport)
       .findOneByOrFail({ code: 'MHD' });
-    const aircraft = await dataSource
+    const aircraftList = await dataSource
       .getRepository(AircraftDefinition)
       .createQueryBuilder('a')
       .where("a.code <> 'MD-80'")
-      .orderBy('a.createdAt', 'ASC')
-      .getOne();
+      .orderBy('a.code', 'ASC')
+      .getMany();
     const fallback = await dataSource
       .getRepository(AircraftDefinition)
       .createQueryBuilder('a')
       .getOneOrFail();
-    return { origin, dest, aircraft: aircraft ?? fallback };
+    const aircraft = aircraftList[0] ?? fallback;
+    const aircraftB = aircraftList[1] ?? aircraftList[0] ?? fallback;
+    return { origin, dest, aircraft, aircraftB };
   }
 
   /** Unique local clock so aircraft overlap checks don't hit seed/history. */
@@ -306,5 +308,155 @@ describe('Seasonal schedule templates (e2e)', () => {
       .findOneByOrFail({ id: freeFi.id });
     expect(refreshedProtected.status).toBe('SCHEDULED');
     expect(refreshedFree.status).toBe('CANCELLED');
+  });
+
+  it('concurrent same aircraft + different flightNo does not deadlock', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 71;
+    const slot = uniqueSlot(stamp);
+    const base = {
+      originAirportId: origin.id,
+      destinationAirportId: dest.id,
+      aircraftDefinitionId: aircraft.id,
+      departureTime: slot.departureTime,
+      durationMinutes: 90,
+      startDate: slot.startDate,
+      endDate: slot.endDate,
+      weekdays: [1, 3],
+      agencyPriceIrr: '33000000',
+      legalCeilingIrr: '38000000',
+    };
+    const [a, b] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          ...base,
+          flightNoBase: `FA${stamp % 1000000}`,
+          idempotencyKey: `fa-${stamp}`,
+        }),
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          ...base,
+          flightNoBase: `FB${stamp % 1000000}`,
+          idempotencyKey: `fb-${stamp}`,
+        }),
+    ]);
+    const statuses = [a.status, b.status].sort();
+    expect(statuses).toEqual([201, 409]);
+  });
+
+  it('concurrent same flightNo + different aircraft does not deadlock', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const { origin, dest, aircraft, aircraftB } = await airportsAndAircraft();
+    if (aircraft.id === aircraftB.id) {
+      // Seed may only have one non-MD-80 definition — still prove serialization.
+    }
+    const stamp = Date.now() + 91;
+    const slot = uniqueSlot(stamp);
+    const flightNo = `FX${stamp % 1000000}`;
+    const base = {
+      originAirportId: origin.id,
+      destinationAirportId: dest.id,
+      flightNoBase: flightNo,
+      departureTime: slot.departureTime,
+      durationMinutes: 90,
+      startDate: slot.startDate,
+      endDate: slot.endDate,
+      weekdays: [2, 4],
+      agencyPriceIrr: '33000000',
+      legalCeilingIrr: '38000000',
+    };
+    const [a, b] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          ...base,
+          aircraftDefinitionId: aircraft.id,
+          idempotencyKey: `fx-a-${stamp}`,
+        }),
+      request(app.getHttpServer())
+        .post('/flights/schedule-templates')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          ...base,
+          aircraftDefinitionId: aircraftB.id,
+          idempotencyKey: `fx-b-${stamp}`,
+        }),
+    ]);
+    const statuses = [a.status, b.status].sort();
+    // Same flightNo + overlapping times → one success, one conflict (or both
+    // conflict if aircraft ids collide and another race wins first).
+    expect(statuses[0]).toBeGreaterThanOrEqual(201);
+    expect([201, 409]).toContain(a.status);
+    expect([201, 409]).toContain(b.status);
+    expect(statuses.filter((s) => s === 201).length).toBeLessThanOrEqual(1);
+  });
+
+  it('race: deactivate vs commitment never leaves cancelled+committed', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 111;
+    const slot = uniqueSlot(stamp);
+    const created = await request(app.getHttpServer())
+      .post('/flights/schedule-templates')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        originAirportId: origin.id,
+        destinationAirportId: dest.id,
+        flightNoBase: `RC${stamp % 1000000}`,
+        aircraftDefinitionId: aircraft.id,
+        departureTime: slot.departureTime,
+        durationMinutes: 90,
+        startDate: slot.startDate,
+        endDate: slot.endDate,
+        weekdays: [1, 2, 3, 4, 5],
+        agencyPriceIrr: '32000000',
+        legalCeilingIrr: '37000000',
+        idempotencyKey: `race-${stamp}`,
+      });
+    expect(created.status).toBe(201);
+    const fi = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('fi')
+      .where('fi.scheduleTemplateId = :id', { id: created.body.data.id })
+      .orderBy('fi.departureAt', 'ASC')
+      .getOne();
+    expect(fi).toBeTruthy();
+    if (!fi) throw new Error('missing instance');
+
+    const [deact, commit] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/flights/schedule-templates/${created.body.data.id}/deactivate`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({}),
+      request(app.getHttpServer())
+        .post(`/flights/${fi.id}/commitments`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ cabin: 'ECONOMY', seats: 1, contractPriceIrr: '500000000' }),
+    ]);
+    expect(deact.status).toBe(200);
+    expect([201, 409]).toContain(commit.status);
+
+    const refreshed = await dataSource
+      .getRepository(FlightInstance)
+      .findOneByOrFail({ id: fi.id });
+    const activeCommit = await dataSource
+      .getRepository(CharterCommitment)
+      .findOne({
+        where: { flightInstanceId: fi.id, status: 'ACTIVE' },
+      });
+    if (refreshed.status === 'CANCELLED') {
+      expect(activeCommit).toBeNull();
+      expect(commit.status).toBe(409);
+    } else {
+      expect(refreshed.status).toBe('SCHEDULED');
+      expect(activeCommit).not.toBeNull();
+      expect(commit.status).toBe(201);
+    }
   });
 });

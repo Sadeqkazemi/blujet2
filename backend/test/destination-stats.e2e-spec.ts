@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 

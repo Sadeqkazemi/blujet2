@@ -20,15 +20,22 @@ import { loginAsCustomer } from './helpers/login.helper';
 
 class FakeBank implements BankLoanProvider {
   created = 0;
+  delayMs = 0;
+  keysSeen: string[] = [];
   createApplication(req: {
     idempotencyKey: string;
     requestedAmountIrr: string;
   }) {
     this.created += 1;
-    return Promise.resolve({
-      bankReferenceId: `BANK-${req.idempotencyKey}-${this.created}`,
+    this.keysSeen.push(req.idempotencyKey);
+    const payload = {
+      bankReferenceId: `BANK-${req.idempotencyKey.slice(0, 16)}-${this.created}`,
       bankStatus: 'SUBMITTED' as const,
       summary: { status: 'SUBMITTED' },
+    };
+    if (this.delayMs <= 0) return Promise.resolve(payload);
+    return new Promise((resolve) => {
+      setTimeout(() => resolve(payload), this.delayMs);
     });
   }
   getStatus(bankReferenceId: string) {
@@ -256,6 +263,124 @@ describe('Bank loans adapter (e2e)', () => {
       .set('Authorization', `Bearer ${b.accessToken}`);
     expect(own.status).toBe(200);
     expect(own.body.data.id).toBe(createdB.body.data.id);
+  });
+
+  it('concurrent same-user idempotency reserves once and calls bank once', async () => {
+    fake.delayMs = 120;
+    const { accessToken } = await loginAsCustomer(app, '09138880016');
+    const key = `loan-conc-idem-${Date.now()}`;
+    const body = { requestedAmountIrr: '550000000', idempotencyKey: key };
+    const [a, b] = await Promise.all([
+      request(app.getHttpServer())
+        .post('/me/loan-applications')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(body),
+      request(app.getHttpServer())
+        .post('/me/loan-applications')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(body),
+    ]);
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+    expect(a.body.data.id).toBe(b.body.data.id);
+    expect(fake.created).toBe(1);
+    expect(fake.keysSeen[0]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('concurrent identical eventId yields one APPLIED and one DUPLICATE', async () => {
+    const { accessToken, userId } = await loginAsCustomer(app, '09138880017');
+    const key = `loan-evt-race-${Date.now()}`;
+    const amount = '610000000';
+    const created = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: amount, idempotencyKey: key });
+    expect(created.status).toBe(201);
+    const before = await walletTopups(userId!);
+    const payload = {
+      eventId: `evt-same-${key}`,
+      bankReferenceId: created.body.data.bankReferenceId,
+      status: 'DISBURSED',
+      walletCreditIrr: amount,
+      walletCreditReference: `cred-evt-${key}`,
+      occurredAt: new Date().toISOString(),
+    };
+    const [w1, w2] = await Promise.all([
+      postWebhook(payload),
+      postWebhook(payload),
+    ]);
+    expect(w1.status).toBe(200);
+    expect(w2.status).toBe(200);
+    const outcomes = [w1.body.data.result, w2.body.data.result].sort();
+    expect(outcomes).toEqual(['APPLIED', 'DUPLICATE']);
+    expect((await walletTopups(userId!)) - before).toBe(1);
+    const events = await dataSource.getRepository(BankLoanWebhookEvent).count({
+      where: { eventId: payload.eventId },
+    });
+    expect(events).toBe(1);
+  });
+
+  it('same creditReference across two loans credits wallet only once', async () => {
+    const a = await loginAsCustomer(app, '09138880018');
+    const b = await loginAsCustomer(app, '09138880019');
+    const stamp = Date.now();
+    const amount = '620000000';
+    const creditRef = `cred-shared-${stamp}`;
+    const createdA = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${a.accessToken}`)
+      .send({
+        requestedAmountIrr: amount,
+        idempotencyKey: `loan-a-${stamp}`,
+      });
+    const createdB = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${b.accessToken}`)
+      .send({
+        requestedAmountIrr: amount,
+        idempotencyKey: `loan-b-${stamp}`,
+      });
+    expect(createdA.status).toBe(201);
+    expect(createdB.status).toBe(201);
+    const beforeA = await walletTopups(a.userId!);
+    const beforeB = await walletTopups(b.userId!);
+
+    const [wa, wb] = await Promise.all([
+      postWebhook({
+        eventId: `evt-a-${stamp}`,
+        bankReferenceId: createdA.body.data.bankReferenceId,
+        status: 'DISBURSED',
+        walletCreditIrr: amount,
+        walletCreditReference: creditRef,
+        occurredAt: new Date().toISOString(),
+      }),
+      postWebhook({
+        eventId: `evt-b-${stamp}`,
+        bankReferenceId: createdB.body.data.bankReferenceId,
+        status: 'DISBURSED',
+        walletCreditIrr: amount,
+        walletCreditReference: creditRef,
+        occurredAt: new Date().toISOString(),
+      }),
+    ]);
+    expect(wa.status).toBe(200);
+    expect(wb.status).toBe(200);
+    expect(wa.body.data.result).not.toBe('error');
+    expect(wb.body.data.result).not.toBe('error');
+
+    const afterA = await walletTopups(a.userId!);
+    const afterB = await walletTopups(b.userId!);
+    expect(afterA - beforeA + (afterB - beforeB)).toBe(1);
+
+    const loanA = await dataSource
+      .getRepository(BankLoanApplication)
+      .findOneByOrFail({ id: createdA.body.data.id });
+    const loanB = await dataSource
+      .getRepository(BankLoanApplication)
+      .findOneByOrFail({ id: createdB.body.data.id });
+    const refs = [loanA.walletCreditReference, loanB.walletCreditReference];
+    expect(refs.filter((r) => r === creditRef)).toHaveLength(1);
+    expect(refs.filter((r) => r == null)).toHaveLength(1);
   });
 
   it('stale webhook cannot rollback DISBURSED/REJECTED', async () => {

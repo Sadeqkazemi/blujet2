@@ -44,6 +44,7 @@ import { FlightReview } from './entities/flight-review.entity';
 import { FlightScheduleTemplate } from './entities/flight-schedule-template.entity';
 import { BankLoanApplication } from './entities/bank-loan-application.entity';
 import { BankLoanWebhookEvent } from './entities/bank-loan-webhook-event.entity';
+import { BankLoanWalletCredit } from './entities/bank-loan-wallet-credit.entity';
 import { InternalService } from './entities/internal-service.entity';
 import { JobApplication } from './entities/job-application.entity';
 import { JobPosting } from './entities/job-posting.entity';
@@ -150,6 +151,7 @@ export const dataSourceOptions: DataSourceOptions = {
     FlightScheduleTemplate,
     BankLoanApplication,
     BankLoanWebhookEvent,
+    BankLoanWalletCredit,
     InternalService,
     JobApplication,
     JobPosting,

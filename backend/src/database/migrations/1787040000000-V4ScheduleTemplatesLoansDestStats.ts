@@ -6,9 +6,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * - bank_loan_applications
  * - airports.isInternational (for destination stats)
  */
-export class V4ScheduleTemplatesLoansDestStats1787040000000
-  implements MigrationInterface
-{
+export class V4ScheduleTemplatesLoansDestStats1787040000000 implements MigrationInterface {
   name = 'V4ScheduleTemplatesLoansDestStats1787040000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
