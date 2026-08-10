@@ -9,6 +9,7 @@ import {
   ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
+  Unique,
 } from 'typeorm';
 import { BankLoanStatus } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
@@ -20,9 +21,7 @@ import { User } from './user.entity';
   ['userId', 'idempotencyKey'],
   { unique: true },
 )
-@Index('bank_loan_applications_bankReferenceId_key', ['bankReferenceId'], {
-  unique: true,
-})
+@Unique('bank_loan_applications_bankReferenceId_key', ['bankReferenceId'])
 @Index(
   'bank_loan_applications_walletCreditReference_key',
   ['walletCreditReference'],
@@ -32,6 +31,7 @@ import { User } from './user.entity';
   },
 )
 @Index('bank_loan_applications_userId_createdAt_idx', ['userId', 'createdAt'])
+@Index('bank_loan_applications_initiationLeaseUntil_idx', ['initiationLeaseUntil'])
 @Entity('bank_loan_applications')
 export class BankLoanApplication {
   @PrimaryColumn({
