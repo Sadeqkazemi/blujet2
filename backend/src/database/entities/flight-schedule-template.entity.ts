@@ -9,6 +9,7 @@ import {
   ManyToOne,
   PrimaryColumn,
   UpdateDateColumn,
+  Unique,
 } from 'typeorm';
 import { FlightScheduleTemplateStatus } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
@@ -17,9 +18,7 @@ import { Airport } from './airport.entity';
 import { AircraftDefinition } from './aircraft-definition.entity';
 import { User } from './user.entity';
 
-@Index('flight_schedule_templates_idempotencyKey_key', ['idempotencyKey'], {
-  unique: true,
-})
+@Unique('flight_schedule_templates_idempotencyKey_key', ['idempotencyKey'])
 @Index('flight_schedule_templates_status_idx', ['status'])
 @Entity('flight_schedule_templates')
 export class FlightScheduleTemplate {
