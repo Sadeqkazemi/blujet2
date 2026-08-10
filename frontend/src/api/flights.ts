@@ -203,3 +203,33 @@ export function deleteFareRule(instanceId: string, ruleId: string) {
     `/flights/${instanceId}/fare-rules/${ruleId}`,
   );
 }
+
+export function previewScheduleTemplate(
+  payload: import('../types/schedule-templates').ScheduleTemplatePayload,
+) {
+  return apiPost<import('../types/schedule-templates').ScheduleTemplatePreview>(
+    '/flights/schedule-templates/preview',
+    payload,
+  );
+}
+
+export function createScheduleTemplate(
+  payload: import('../types/schedule-templates').ScheduleTemplatePayload & { idempotencyKey: string },
+) {
+  return apiPost<import('../types/schedule-templates').ScheduleTemplateRow>(
+    '/flights/schedule-templates',
+    payload,
+  );
+}
+
+export function fetchScheduleTemplates(page = 1, pageSize = 20) {
+  return apiGet<import('../types/schedule-templates').ScheduleTemplateList>(
+    `/flights/schedule-templates?page=${page}&pageSize=${pageSize}`,
+  );
+}
+
+export function deactivateScheduleTemplate(id: string) {
+  return apiPost<import('../types/schedule-templates').ScheduleTemplateRow>(
+    `/flights/schedule-templates/${id}/deactivate`,
+  );
+}

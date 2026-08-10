@@ -18,6 +18,12 @@ const STR: Record<StoredLocale, {
   youLabel: string;
   placeholder: string;
   sendBtn: string;
+  newMessage: string;
+  recipient: string;
+  subject: string;
+  subjectPlaceholder: string;
+  validation: string;
+  cancel: string;
 }> = {
   fa: {
     heading: 'کارتابل و پیام‌ها',
@@ -29,6 +35,8 @@ const STR: Record<StoredLocale, {
     youLabel: 'شما',
     placeholder: 'پیام خود را بنویسید…',
     sendBtn: 'ارسال',
+    newMessage: 'پیام جدید', recipient: 'گیرنده', subject: 'موضوع',
+    subjectPlaceholder: 'موضوع پیام', validation: 'لطفاً گیرنده، موضوع و متن پیام را کامل کنید.', cancel: 'انصراف',
   },
   en: {
     heading: 'Inbox & Messages',
@@ -40,6 +48,8 @@ const STR: Record<StoredLocale, {
     youLabel: 'You',
     placeholder: 'Write your message…',
     sendBtn: 'Send',
+    newMessage: 'New message', recipient: 'Recipient', subject: 'Subject',
+    subjectPlaceholder: 'Message subject', validation: 'Complete the recipient, subject and message.', cancel: 'Cancel',
   },
   ar: {
     heading: 'الوارد والرسائل',
@@ -51,6 +61,8 @@ const STR: Record<StoredLocale, {
     youLabel: 'أنت',
     placeholder: 'اكتب رسالتك…',
     sendBtn: 'إرسال',
+    newMessage: 'رسالة جديدة', recipient: 'المستلم', subject: 'الموضوع',
+    subjectPlaceholder: 'موضوع الرسالة', validation: 'أكمل المستلم والموضوع ونص الرسالة.', cancel: 'إلغاء',
   },
 };
 
@@ -60,6 +72,9 @@ export default function AgencyInboxPage() {
   const [messages, setMessages] = useState<AgencyMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState('');
+  const [subject, setSubject] = useState('');
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   function reload() {
@@ -73,11 +88,17 @@ export default function AgencyInboxPage() {
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
-    if (!body.trim()) return;
+    if (!body.trim() || !subject.trim()) {
+      setValidationError(t.validation);
+      return;
+    }
     setSending(true);
+    setValidationError(null);
     try {
-      await postInboxMessage(body.trim());
+      await postInboxMessage(`${t.subject}: ${subject.trim()}\n\n${body.trim()}`);
       setBody('');
+      setSubject('');
+      setComposeOpen(false);
       reload();
     } catch {
       setError(t.sendErrorFallback);
@@ -91,6 +112,10 @@ export default function AgencyInboxPage() {
 
   return (
     <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div><h1 className="text-lg font-black text-ink">{t.heading}</h1><p className="mt-1 text-xs text-muted">{t.subtitle}</p></div>
+        <button type="button" onClick={() => setComposeOpen(true)} className="rounded-lg bg-accent px-4 py-2.5 text-xs font-black text-white">+ {t.newMessage}</button>
+      </div>
       <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-white p-5">
         {messages.length === 0 ? (
           <p className="py-4 text-center text-xs text-muted">{t.empty}</p>
@@ -114,21 +139,25 @@ export default function AgencyInboxPage() {
         )}
       </div>
 
-      <form onSubmit={onSend} className="flex gap-2">
-        <input
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={t.placeholder}
-          className="flex-1 rounded-lg border border-border bg-white px-3.5 py-2.5 text-sm outline-none focus:border-accent"
-        />
-        <button
-          type="submit"
-          disabled={sending || !body.trim()}
-          className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-        >
-          {t.sendBtn}
-        </button>
-      </form>
+      {composeOpen && <form onSubmit={onSend} className="rounded-2xl border border-[#d6e4f8] bg-white p-5 shadow-sm" data-testid="agency-compose-message">
+        <h2 className="mb-4 text-sm font-black text-ink">{t.newMessage}</h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-bold text-muted">{t.recipient}
+            <select className="mt-1.5 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm" defaultValue="commercial"><option value="commercial">blujet · {t.subtitle}</option></select>
+          </label>
+          <label className="text-xs font-bold text-muted">{t.subject}
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t.subjectPlaceholder} className="mt-1.5 h-11 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-accent" />
+          </label>
+          <label className="text-xs font-bold text-muted sm:col-span-2">{t.placeholder}
+            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.placeholder} rows={5} className="mt-1.5 w-full rounded-lg border border-border p-3 text-sm outline-none focus:border-accent" />
+          </label>
+        </div>
+        {validationError && <p role="alert" className="mt-3 text-xs text-danger">{validationError}</p>}
+        <div className="mt-4 flex gap-2">
+          <button type="submit" disabled={sending} className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">{t.sendBtn}</button>
+          <button type="button" onClick={() => { setComposeOpen(false); setValidationError(null); }} className="rounded-lg border border-border px-5 py-2.5 text-sm font-bold text-muted">{t.cancel}</button>
+        </div>
+      </form>}
     </div>
   );
 }

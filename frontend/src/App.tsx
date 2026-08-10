@@ -82,6 +82,7 @@ import CareersAdminPage from './features/careers/CareersAdminPage';
 import BlogAdminPage from './features/blog/BlogAdminPage';
 import MediaAdminPage from './features/site-content/MediaAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
+import AdminLoansPage from './features/loans/AdminLoansPage';
 import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
 
 export default function App() {
@@ -151,6 +152,9 @@ export default function App() {
               </Route>
               <Route path="club" element={<TabGate tabKey="club" />}>
                 <Route index element={<ClubRouter />} />
+              </Route>
+              <Route path="loans" element={<TabGate tabKey="loans" />}>
+                <Route index element={<AdminLoansPage />} />
               </Route>
               <Route path="vip" element={<TabGate tabKey="vip" />}>
                 <Route index element={<ClubPage />} />

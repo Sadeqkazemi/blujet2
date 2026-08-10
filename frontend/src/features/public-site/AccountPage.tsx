@@ -50,6 +50,7 @@ import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccou
 import AccountReferralTab from './AccountReferralTab';
 import AccountIdentityTab from './AccountIdentityTab';
 import AccountRefundsTab from './AccountRefundsTab';
+import AccountLoansTab from './AccountLoansTab';
 import AccountSidebar from './account/AccountSidebar';
 import AccountProfileTab from './account/AccountProfileTab';
 import AccountInfoTab from './account/AccountInfoTab';
@@ -1072,6 +1073,8 @@ export default function AccountPage() {
             </form>
           </div>
         )}
+
+        {tab === 'loans' && <AccountLoansTab />}
 
         {tab === 'club' && (
           clubMembership === null ? (
