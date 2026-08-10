@@ -8,6 +8,7 @@ const TERMINAL: ReadonlySet<BankLoanStatus> = new Set([
 ]);
 
 const RANK: Record<BankLoanStatus, number> = {
+  INITIATING: 5,
   SUBMITTED: 10,
   PENDING: 20,
   UNDER_REVIEW: 30,

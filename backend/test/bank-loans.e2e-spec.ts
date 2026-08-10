@@ -1,13 +1,18 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  ServiceUnavailableException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
-import { createHmac } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ErrorCode } from '../src/common/errors';
 import { BankLoanApplication } from '../src/database/entities/bank-loan-application.entity';
 import { BankLoanWebhookEvent } from '../src/database/entities/bank-loan-webhook-event.entity';
 import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
@@ -16,11 +21,14 @@ import {
   BankLoanHttpAdapter,
 } from '../src/modules/loans/bank-loan.http.adapter';
 import type { BankLoanProvider } from '../src/modules/loans/bank-loan.types';
+import { bankScopedIdempotencyKey } from '../src/modules/loans/loan-idempotency';
 import { loginAsCustomer } from './helpers/login.helper';
 
 class FakeBank implements BankLoanProvider {
   created = 0;
   delayMs = 0;
+  /** Fail this many create calls with retryable bank errors. */
+  failTimes = 0;
   keysSeen: string[] = [];
   createApplication(req: {
     idempotencyKey: string;
@@ -28,11 +36,21 @@ class FakeBank implements BankLoanProvider {
   }) {
     this.created += 1;
     this.keysSeen.push(req.idempotencyKey);
+    // Stable bank reference for a given bank-scoped idempotency key.
     const payload = {
-      bankReferenceId: `BANK-${req.idempotencyKey.slice(0, 16)}-${this.created}`,
+      bankReferenceId: `BANK-${req.idempotencyKey.slice(0, 24)}`,
       bankStatus: 'SUBMITTED' as const,
       summary: { status: 'SUBMITTED' },
     };
+    if (this.failTimes > 0) {
+      this.failTimes -= 1;
+      return Promise.reject(
+        new ServiceUnavailableException({
+          code: ErrorCode.INTERNAL_ERROR,
+          message: 'ارتباط با بانک برقرار نشد. لطفاً بعداً تلاش کنید.',
+        }),
+      );
+    }
     if (this.delayMs <= 0) return Promise.resolve(payload);
     return new Promise((resolve) => {
       setTimeout(() => resolve(payload), this.delayMs);
@@ -280,11 +298,19 @@ describe('Bank loans adapter (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .send(body),
     ]);
-    expect(a.status).toBe(201);
-    expect(b.status).toBe(201);
+    expect([201, 202]).toContain(a.status);
+    expect([201, 202]).toContain(b.status);
     expect(a.body.data.id).toBe(b.body.data.id);
     expect(fake.created).toBe(1);
     expect(fake.keysSeen[0]).toMatch(/^[a-f0-9]{64}$/);
+    // At least the winner finishes with a bank reference; never a silent
+    // incomplete 201 with null bankReferenceId.
+    const statuses = [a, b];
+    for (const res of statuses) {
+      if (res.status === 201) {
+        expect(res.body.data.bankReferenceId).toBeTruthy();
+      }
+    }
   });
 
   it('concurrent identical eventId yields one APPLIED and one DUPLICATE', async () => {
@@ -417,5 +443,143 @@ describe('Bank loans adapter (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(got.body.data.displayStatus).toBe('disbursed');
     expect(got.body.data.bankStatus).toBe('DISBURSED');
+  });
+
+  it('same user/key with different amount returns 409 IDEMPOTENCY_PAYLOAD_MISMATCH', async () => {
+    const { accessToken } = await loginAsCustomer(app, '09138880020');
+    const key = `loan-mismatch-${Date.now()}`;
+    const first = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: '500000000', idempotencyKey: key });
+    expect(first.status).toBe(201);
+
+    const second = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: '600000000', idempotencyKey: key });
+    expect(second.status).toBe(409);
+    expect(second.body.error?.code).toBe(
+      ErrorCode.IDEMPOTENCY_PAYLOAD_MISMATCH,
+    );
+    expect(second.body.data?.id).toBeUndefined();
+  });
+
+  it('stale INITIATING reservation is reclaimed safely with same bank key', async () => {
+    const { accessToken, userId } = await loginAsCustomer(app, '09138880021');
+    expect(userId).toBeTruthy();
+    const key = `loan-reclaim-${Date.now()}`;
+    const amount = '510000000';
+    const id = randomUUID();
+    const past = new Date(Date.now() - 60_000);
+    await dataSource.query(
+      `
+      INSERT INTO "bank_loan_applications"
+        ("id", "userId", "idempotencyKey", "requestedAmountIrr", "bankStatus",
+         "initiationStartedAt", "initiationLeaseUntil", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, 'INITIATING', $5, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      `,
+      [id, userId, key, amount, past],
+    );
+
+    const recovered = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: amount, idempotencyKey: key });
+    expect(recovered.status).toBe(201);
+    expect(recovered.body.data.id).toBe(id);
+    expect(recovered.body.data.bankReferenceId).toBeTruthy();
+    expect(fake.created).toBe(1);
+    expect(fake.keysSeen[0]).toBe(bankScopedIdempotencyKey(userId!, key));
+  });
+
+  it('bank timeout then retry uses the same bank-scoped idempotency key', async () => {
+    fake.failTimes = 1;
+    const { accessToken, userId } = await loginAsCustomer(app, '09138880022');
+    const key = `loan-timeout-${Date.now()}`;
+    const amount = '520000000';
+    const expectedBankKey = bankScopedIdempotencyKey(userId!, key);
+
+    const first = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: amount, idempotencyKey: key });
+    expect(first.status).toBe(503);
+    expect(first.body.error?.code).toBe(ErrorCode.LOAN_BANK_RETRYABLE);
+    expect(fake.keysSeen[0]).toBe(expectedBankKey);
+
+    const retry = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ requestedAmountIrr: amount, idempotencyKey: key });
+    expect(retry.status).toBe(201);
+    expect(retry.body.data.bankReferenceId).toBeTruthy();
+    expect(fake.created).toBe(2);
+    expect(fake.keysSeen[1]).toBe(expectedBankKey);
+    expect(fake.keysSeen[0]).toBe(fake.keysSeen[1]);
+  });
+
+  it('concurrent create during long bank call does not return incomplete 201', async () => {
+    fake.delayMs = 2_500;
+    process.env.BANK_LOAN_INIT_WAIT_MS = '400';
+    await app.close();
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideProvider(BANK_LOAN_PROVIDER)
+      .useValue(fake)
+      .overrideProvider(BankLoanHttpAdapter)
+      .useValue(fake)
+      .compile();
+    app = moduleFixture.createNestApplication({
+      bufferLogs: true,
+      rawBody: true,
+    });
+    const logger = app.get(Logger);
+    app.useLogger(logger);
+    app.use(cookieParser());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter(logger));
+    await app.init();
+
+    const { accessToken } = await loginAsCustomer(app, '09138880023');
+    const key = `loan-long-${Date.now()}`;
+    const body = { requestedAmountIrr: '530000000', idempotencyKey: key };
+
+    const slow = request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(body);
+    await new Promise((r) => setTimeout(r, 50));
+    const peer = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(body);
+
+    // Never a successful create without bankReferenceId.
+    if (peer.status === 201) {
+      expect(peer.body.data.bankReferenceId).toBeTruthy();
+    } else {
+      expect([202, 503]).toContain(peer.status);
+      if (peer.status === 202) {
+        expect(peer.body.data.bankReferenceId).toBeNull();
+        expect(peer.body.data.displayStatus).toBe('processing');
+      }
+    }
+
+    const winner = await slow;
+    if (winner.status === 201) {
+      expect(winner.body.data.bankReferenceId).toBeTruthy();
+    } else {
+      expect([202, 503]).toContain(winner.status);
+    }
+    expect(fake.created).toBe(1);
+    delete process.env.BANK_LOAN_INIT_WAIT_MS;
   });
 });

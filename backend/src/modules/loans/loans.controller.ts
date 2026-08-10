@@ -5,9 +5,11 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -28,9 +30,11 @@ export class LoansController {
   async create(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateLoanApplicationDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    const data = await this.loans.create(actor, dto);
-    return { success: true, data };
+    const result = await this.loans.create(actor, dto);
+    res.status(result.statusCode);
+    return { success: true, data: result.data };
   }
 
   @Get('me/loan-applications')

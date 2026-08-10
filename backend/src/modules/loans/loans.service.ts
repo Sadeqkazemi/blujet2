@@ -1,7 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
+  HttpStatus,
+  Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,7 +21,6 @@ import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AuditService } from '../audit/audit.service';
 import { BANK_LOAN_PROVIDER } from './bank-loan.http.adapter';
-import { Inject } from '@nestjs/common';
 import {
   mapBankStatusToDisplay,
   parseBankStatus,
@@ -37,6 +40,11 @@ function asJsonSummary(
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export type LoanCreateResult = {
+  statusCode: typeof HttpStatus.CREATED | typeof HttpStatus.ACCEPTED;
+  data: Record<string, unknown>;
+};
 
 @Injectable()
 export class LoansService {
@@ -80,36 +88,136 @@ export class LoansService {
     };
   }
 
+  private initiationLeaseMs(): number {
+    const raw = this.config.get<string>('BANK_LOAN_TIMEOUT_MS') ?? '5000';
+    const timeout = Number(raw);
+    const base = Number.isFinite(timeout) && timeout >= 500 ? timeout : 5000;
+    return Math.max(base * 3, 15_000);
+  }
+
+  private leaseTimestamps(): { startedAt: Date; leaseUntil: Date } {
+    const startedAt = new Date();
+    return {
+      startedAt,
+      leaseUntil: new Date(startedAt.getTime() + this.initiationLeaseMs()),
+    };
+  }
+
+  private assertAmountMatches(
+    row: BankLoanApplication,
+    requestedAmountIrr: string,
+  ) {
+    if (row.requestedAmountIrr !== BigInt(requestedAmountIrr)) {
+      throw new ConflictException({
+        code: ErrorCode.IDEMPOTENCY_PAYLOAD_MISMATCH,
+        message: 'کلید تکراری با مبلغ متفاوت است.',
+      });
+    }
+  }
+
+  private hasActiveLease(row: BankLoanApplication, now = new Date()): boolean {
+    if (row.bankReferenceId) return false;
+    if (!row.initiationLeaseUntil) return false;
+    return row.initiationLeaseUntil.getTime() > now.getTime();
+  }
+
+  private isReclaimable(row: BankLoanApplication, now = new Date()): boolean {
+    if (row.bankReferenceId) return false;
+    if (row.userId == null) return false;
+    if (row.bankStatus === 'FAILED') return true;
+    if (row.bankStatus === 'INITIATING' || row.bankStatus === 'SUBMITTED') {
+      return !this.hasActiveLease(row, now);
+    }
+    return !row.bankReferenceId && !this.hasActiveLease(row, now);
+  }
+
   /**
-   * Atomically reserve (userId, idempotencyKey) before any bank call.
-   * Returns the new row id when this caller won the reservation; null if
-   * another request already holds the key.
+   * Atomically reserve (userId, idempotencyKey) in INITIATING with a lease
+   * before any bank call.
    */
-  private async reserveIdempotencySlot(
+  private async reserveInitiatingSlot(
     userId: string,
     idempotencyKey: string,
     requestedAmountIrr: string,
   ): Promise<string | null> {
     const id = randomUUID();
+    const { startedAt, leaseUntil } = this.leaseTimestamps();
     const rows: Array<{ id: string }> = await this.dataSource.query(
       `
       INSERT INTO "bank_loan_applications"
-        ("id", "userId", "idempotencyKey", "requestedAmountIrr", "bankStatus", "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, 'SUBMITTED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ("id", "userId", "idempotencyKey", "requestedAmountIrr", "bankStatus",
+         "initiationStartedAt", "initiationLeaseUntil", "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, 'INITIATING', $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT ("userId", "idempotencyKey") DO NOTHING
       RETURNING "id"
       `,
-      [id, userId, idempotencyKey, requestedAmountIrr],
+      [id, userId, idempotencyKey, requestedAmountIrr, startedAt, leaseUntil],
     );
     return rows[0]?.id ?? null;
   }
 
-  /** Wait until the winning request finishes the bank round-trip. */
-  private async awaitReservedApplication(
+  /** Reclaim a stale/failed initiation so we can retry with the same bank key. */
+  private async reclaimInitiationLease(
+    id: string,
+    userId: string,
+  ): Promise<boolean> {
+    const { startedAt, leaseUntil } = this.leaseTimestamps();
+    const rows: Array<{ id: string }> = await this.dataSource.query(
+      `
+      UPDATE "bank_loan_applications"
+      SET "bankStatus" = 'INITIATING',
+          "initiationStartedAt" = $3,
+          "initiationLeaseUntil" = $4,
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = $1
+        AND "userId" = $2
+        AND "bankReferenceId" IS NULL
+        AND (
+          "bankStatus" = 'FAILED'
+          OR "initiationLeaseUntil" IS NULL
+          OR "initiationLeaseUntil" <= CURRENT_TIMESTAMP
+        )
+      RETURNING "id"
+      `,
+      [id, userId, startedAt, leaseUntil],
+    );
+    return rows.length > 0;
+  }
+
+  private async expireInitiationLease(id: string, userId: string) {
+    await this.dataSource.query(
+      `
+      UPDATE "bank_loan_applications"
+      SET "initiationLeaseUntil" = CURRENT_TIMESTAMP,
+          "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = $1 AND "userId" = $2 AND "bankReferenceId" IS NULL
+      `,
+      [id, userId],
+    );
+  }
+
+  /**
+   * Wait for an in-flight initiation. Never returns a "ready" row without
+   * bankReferenceId — times out as processing (202) instead.
+   */
+  private async waitForBankResult(
     userId: string,
     idempotencyKey: string,
-  ): Promise<BankLoanApplication> {
-    for (let i = 0; i < 80; i++) {
+    requestedAmountIrr: string,
+  ): Promise<
+    | { kind: 'ready'; row: BankLoanApplication }
+    | { kind: 'processing'; row: BankLoanApplication }
+    | { kind: 'stale'; row: BankLoanApplication }
+  > {
+    const configuredWait = Number(
+      this.config.get<string>('BANK_LOAN_INIT_WAIT_MS') ?? '',
+    );
+    const maxWait =
+      Number.isFinite(configuredWait) && configuredWait >= 200
+        ? configuredWait
+        : Math.min(this.initiationLeaseMs(), 2_000);
+    const deadline = Date.now() + maxWait;
+    while (Date.now() < deadline) {
       const row = await this.loanRepo.findOne({
         where: { userId, idempotencyKey },
       });
@@ -119,51 +227,41 @@ export class LoansService {
           message: 'درخواست یافت نشد.',
         });
       }
-      if (row.bankReferenceId || row.bankStatus === 'FAILED') {
-        return row;
+      this.assertAmountMatches(row, requestedAmountIrr);
+      if (row.bankReferenceId) {
+        return { kind: 'ready', row };
       }
-      await sleep(25);
+      if (this.isReclaimable(row)) {
+        return { kind: 'stale', row };
+      }
+      await sleep(40);
     }
-    const late = await this.loanRepo.findOneOrFail({
+    const late = await this.loanRepo.findOne({
       where: { userId, idempotencyKey },
     });
-    return late;
-  }
-
-  async create(
-    actor: AuthenticatedUser,
-    dto: {
-      requestedAmountIrr: string;
-      idempotencyKey: string;
-    },
-  ) {
-    if (
-      !/^\d+$/.test(dto.requestedAmountIrr) ||
-      BigInt(dto.requestedAmountIrr) <= 0n
-    ) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: 'مبلغ درخواستی نامعتبر است.',
+    if (!late || late.userId !== userId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست یافت نشد.',
       });
     }
-
-    const reservedId = await this.reserveIdempotencySlot(
-      actor.id,
-      dto.idempotencyKey,
-      dto.requestedAmountIrr,
-    );
-
-    if (!reservedId) {
-      const existing = await this.awaitReservedApplication(
-        actor.id,
-        dto.idempotencyKey,
-      );
-      return this.serialize(existing);
+    this.assertAmountMatches(late, requestedAmountIrr);
+    if (late.bankReferenceId) {
+      return { kind: 'ready', row: late };
     }
+    if (this.isReclaimable(late)) {
+      return { kind: 'stale', row: late };
+    }
+    return { kind: 'processing', row: late };
+  }
 
+  private async completeBankInitiation(
+    reservedId: string,
+    actor: AuthenticatedUser,
+    dto: { requestedAmountIrr: string; idempotencyKey: string },
+    bankKey: string,
+  ): Promise<LoanCreateResult> {
     const correlationId = randomUUID();
-    const bankKey = bankScopedIdempotencyKey(actor.id, dto.idempotencyKey);
-
     let bankRes: Awaited<ReturnType<BankLoanProvider['createApplication']>>;
     try {
       bankRes = await this.bank.createApplication({
@@ -173,10 +271,20 @@ export class LoansService {
         customerExternalId: actor.id,
       });
     } catch (err) {
-      await this.loanRepo.update(
-        { id: reservedId, userId: actor.id },
-        { bankStatus: 'FAILED', lastSyncedAt: new Date() },
-      );
+      // Keep INITIATING + expired lease so the same bankScoped key can retry.
+      await this.expireInitiationLease(reservedId, actor.id);
+      if (
+        err instanceof ServiceUnavailableException ||
+        (typeof err === 'object' &&
+          err != null &&
+          'name' in err &&
+          (err as { name?: string }).name === 'AbortError')
+      ) {
+        throw new ServiceUnavailableException({
+          code: ErrorCode.LOAN_BANK_RETRYABLE,
+          message: 'ارتباط با بانک کامل نشد؛ با همان کلید دوباره تلاش کنید.',
+        });
+      }
       throw err;
     }
 
@@ -195,6 +303,7 @@ export class LoansService {
       locked.bankStatus = bankRes.bankStatus;
       locked.statusSummary = asJsonSummary(bankRes.summary);
       locked.lastSyncedAt = new Date();
+      locked.initiationLeaseUntil = null;
       await manager.save(locked);
 
       await this.maybeCreditWallet(
@@ -222,7 +331,101 @@ export class LoansService {
       },
     });
 
-    return this.serialize(saved);
+    return { statusCode: HttpStatus.CREATED, data: this.serialize(saved) };
+  }
+
+  async create(
+    actor: AuthenticatedUser,
+    dto: {
+      requestedAmountIrr: string;
+      idempotencyKey: string;
+    },
+  ): Promise<LoanCreateResult> {
+    if (
+      !/^\d+$/.test(dto.requestedAmountIrr) ||
+      BigInt(dto.requestedAmountIrr) <= 0n
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مبلغ درخواستی نامعتبر است.',
+      });
+    }
+
+    const bankKey = bankScopedIdempotencyKey(actor.id, dto.idempotencyKey);
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const existing = await this.loanRepo.findOne({
+        where: { userId: actor.id, idempotencyKey: dto.idempotencyKey },
+      });
+
+      if (existing) {
+        this.assertAmountMatches(existing, dto.requestedAmountIrr);
+
+        if (existing.bankReferenceId) {
+          return {
+            statusCode: HttpStatus.CREATED,
+            data: this.serialize(existing),
+          };
+        }
+
+        if (this.hasActiveLease(existing)) {
+          const waited = await this.waitForBankResult(
+            actor.id,
+            dto.idempotencyKey,
+            dto.requestedAmountIrr,
+          );
+          if (waited.kind === 'ready') {
+            return {
+              statusCode: HttpStatus.CREATED,
+              data: this.serialize(waited.row),
+            };
+          }
+          if (waited.kind === 'processing') {
+            return {
+              statusCode: HttpStatus.ACCEPTED,
+              data: this.serialize(waited.row),
+            };
+          }
+          // stale — fall through to reclaim
+        }
+
+        if (this.isReclaimable(existing)) {
+          const claimed = await this.reclaimInitiationLease(
+            existing.id,
+            actor.id,
+          );
+          if (claimed) {
+            return this.completeBankInitiation(
+              existing.id,
+              actor,
+              dto,
+              bankKey,
+            );
+          }
+          continue;
+        }
+
+        return {
+          statusCode: HttpStatus.ACCEPTED,
+          data: this.serialize(existing),
+        };
+      }
+
+      const reservedId = await this.reserveInitiatingSlot(
+        actor.id,
+        dto.idempotencyKey,
+        dto.requestedAmountIrr,
+      );
+      if (!reservedId) {
+        continue;
+      }
+      return this.completeBankInitiation(reservedId, actor, dto, bankKey);
+    }
+
+    throw new ServiceUnavailableException({
+      code: ErrorCode.LOAN_BANK_RETRYABLE,
+      message: 'درخواست وام در حال پردازش است؛ لطفاً کمی بعد دوباره تلاش کنید.',
+    });
   }
 
   async listMine(actor: AuthenticatedUser, page = 1, pageSize = 20) {

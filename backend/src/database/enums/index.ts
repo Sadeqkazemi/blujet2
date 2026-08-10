@@ -141,6 +141,8 @@ export type FlightScheduleTemplateStatus =
  * underwriting decisions made by blujet.
  */
 export const BankLoanStatus = {
+  /** Local reservation before/during bank create — never a bank-reported status. */
+  INITIATING: 'INITIATING',
   SUBMITTED: 'SUBMITTED',
   PENDING: 'PENDING',
   UNDER_REVIEW: 'UNDER_REVIEW',

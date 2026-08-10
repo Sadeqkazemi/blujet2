@@ -2,6 +2,7 @@ import { canTransitionBankStatus } from './loan-status.transitions';
 
 describe('canTransitionBankStatus', () => {
   it('allows same status and forward progress', () => {
+    expect(canTransitionBankStatus('INITIATING', 'SUBMITTED')).toBe(true);
     expect(canTransitionBankStatus('PENDING', 'PENDING')).toBe(true);
     expect(canTransitionBankStatus('PENDING', 'APPROVED')).toBe(true);
     expect(canTransitionBankStatus('APPROVED', 'DISBURSED')).toBe(true);

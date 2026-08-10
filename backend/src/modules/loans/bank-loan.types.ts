@@ -2,6 +2,7 @@ import type { BankLoanStatus } from '../../database/enums';
 
 /** Display statuses for customer / admin UI — never invent bank decisions. */
 export type LoanDisplayStatus =
+  | 'processing'
   | 'awaiting_bank'
   | 'under_review'
   | 'approved'
@@ -15,6 +16,8 @@ export function mapBankStatusToDisplay(
   status: BankLoanStatus,
 ): LoanDisplayStatus {
   switch (status) {
+    case 'INITIATING':
+      return 'processing';
     case 'SUBMITTED':
     case 'PENDING':
       return 'awaiting_bank';

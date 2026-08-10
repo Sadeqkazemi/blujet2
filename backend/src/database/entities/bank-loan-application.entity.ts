@@ -91,6 +91,14 @@ export class BankLoanApplication {
   @Column({ type: 'text', nullable: true })
   walletCreditReference!: string | null;
 
+  /** When local bank-create initiation began (INITIATING). */
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  initiationStartedAt!: Date | null;
+
+  /** Soft lease: another request may reclaim after this instant. */
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  initiationLeaseUntil!: Date | null;
+
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
 

@@ -2732,6 +2732,10 @@ than relying on any cascade.
 - `airports.isInternational` — used by destination stats (DXB/IST/NJF seeded true).
 - `bank_loan_wallet_credits` — payout ledger keyed by `creditReference`
   (atomic claim via INSERT ON CONFLICT DO NOTHING).
+- `bank_loan_applications` initiation lifecycle: `INITIATING` status,
+  `initiationStartedAt` / `initiationLeaseUntil` for safe bank-create retry
+  with the same bank-scoped idempotency key.
 - Migrations: `1787040000000-V4ScheduleTemplatesLoansDestStats`,
   `1787126400000-V4LoanScheduleHardening`,
-  `1787212800000-V4LoanWalletCreditLedger`.
+  `1787212800000-V4LoanWalletCreditLedger`,
+  `1787299200000-V4LoanInitiationLifecycle`.
