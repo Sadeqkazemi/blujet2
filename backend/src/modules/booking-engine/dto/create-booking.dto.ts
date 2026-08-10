@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsOptional,
@@ -12,10 +13,13 @@ import {
   Max,
   Min,
   ValidateNested,
+  ValidateIf,
 } from 'class-validator';
 import { CabinClass } from '../../../database/enums';
 
 const CABIN_CLASSES = Object.values(CabinClass);
+const PASSENGER_TYPES = ['ADULT', 'CHILD', 'INFANT'] as const;
+export type BookingPassengerType = (typeof PASSENGER_TYPES)[number];
 
 export class BookingPassengerDto {
   @ApiProperty({ example: 'علی رضایی' })
@@ -32,9 +36,32 @@ export class BookingPassengerDto {
   @IsString()
   mobile?: string;
 
-  @ApiProperty({ example: '4A', description: 'صندلی انتخابی این مسافر' })
+  @ApiProperty({
+    enum: PASSENGER_TYPES,
+    example: 'ADULT',
+    required: false,
+    default: 'ADULT',
+  })
+  @IsIn(PASSENGER_TYPES)
+  passengerType: BookingPassengerType = 'ADULT';
+
+  @ApiProperty({
+    example: '1990-05-20',
+    description: 'ISO birth date',
+    required: false,
+    default: '1970-01-01',
+  })
+  @IsDateString({ strict: true })
+  birthDate = '1970-01-01';
+
+  @ApiProperty({
+    example: '4A',
+    required: false,
+    description: 'Required for adults/children; omitted for a lap infant',
+  })
+  @ValidateIf((value: BookingPassengerDto) => value.passengerType !== 'INFANT')
   @IsString()
-  seatCode: string;
+  seatCode?: string;
 }
 
 export class BookingExtraSelectionDto {

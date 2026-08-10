@@ -141,6 +141,23 @@ export default function PassengerStep({
   savedPassengers: SavedPassenger[];
 }) {
   const t = CHECKOUT_COPY[locale];
+  const passengerLabel = (passenger: PassengerFormDraft, index: number) => {
+    if (passenger.passengerType === 'CHILD') {
+      return locale === 'en'
+        ? `Child ${index + 1}`
+        : locale === 'ar'
+          ? `طفل ${index + 1}`
+          : `کودک ${index + 1}`;
+    }
+    if (passenger.passengerType === 'INFANT') {
+      return locale === 'en'
+        ? `Infant ${index + 1}`
+        : locale === 'ar'
+          ? `رضيع ${index + 1}`
+          : `نوزاد ${index + 1}`;
+    }
+    return t.adultLabel(index + 1);
+  };
   const [openSavedFor, setOpenSavedFor] = useState<number | null>(null);
   const savedOptions = useMemo(
     () => resolveCheckoutSavedPassengers(savedPassengers, locale),
@@ -165,7 +182,9 @@ export default function PassengerStep({
         <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-[#eef4fb] text-[#1668c4]">
           👤
         </span>
-        <h2 className="m-0 text-[15.5px] font-extrabold text-[#0d2640]">{t.enterPax}</h2>
+        <h2 className="m-0 text-[15.5px] font-extrabold text-[#0d2640]">
+          {t.enterPax}
+        </h2>
       </div>
 
       {passengers.map((p, i) => (
@@ -176,7 +195,12 @@ export default function PassengerStep({
         >
           <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex flex-wrap items-center gap-3.5">
-              <span className="text-[13px] font-extrabold text-[#0d2640]">{t.adultLabel(i + 1)}</span>
+              <span
+                className="text-[13px] font-extrabold text-[#0d2640]"
+                data-testid={`checkout-pax-type-${i}`}
+              >
+                {passengerLabel(p, i)}
+              </span>
               <DocRadio
                 active={p.docType === 'NATIONAL_ID'}
                 label={t.nationalId}
@@ -224,9 +248,13 @@ export default function PassengerStep({
               className="mb-3 rounded-[11px] border border-[#dce8f7] bg-[#f6faff] px-3 py-2.5"
               data-testid={`checkout-saved-panel-${i}`}
             >
-              <div className="mb-2 text-[11px] font-bold text-[#0d2640]">{t.selectSaved}</div>
+              <div className="mb-2 text-[11px] font-bold text-[#0d2640]">
+                {t.selectSaved}
+              </div>
               {savedOptions.length === 0 ? (
-                <p className="m-0 text-[11.5px] text-[#5a6678]">{t.savedEmpty}</p>
+                <p className="m-0 text-[11.5px] text-[#5a6678]">
+                  {t.savedEmpty}
+                </p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {savedOptions.map((s) => (
@@ -250,7 +278,9 @@ export default function PassengerStep({
               data-testid={`checkout-pax-first-${i}`}
               dir="ltr"
               value={p.firstNameLatin}
-              onChange={(e) => update(i, { firstNameLatin: latinOnly(e.target.value) })}
+              onChange={(e) =>
+                update(i, { firstNameLatin: latinOnly(e.target.value) })
+              }
               placeholder={t.firstNameLatin}
               className={inputCls}
             />
@@ -258,14 +288,20 @@ export default function PassengerStep({
               data-testid={`checkout-pax-last-${i}`}
               dir="ltr"
               value={p.lastNameLatin}
-              onChange={(e) => update(i, { lastNameLatin: latinOnly(e.target.value) })}
+              onChange={(e) =>
+                update(i, { lastNameLatin: latinOnly(e.target.value) })
+              }
               placeholder={t.lastNameLatin}
               className={inputCls}
             />
             <select
               data-testid={`checkout-pax-gender-${i}`}
               value={p.gender}
-              onChange={(e) => update(i, { gender: e.target.value as PassengerFormDraft['gender'] })}
+              onChange={(e) =>
+                update(i, {
+                  gender: e.target.value as PassengerFormDraft['gender'],
+                })
+              }
               className={`${inputCls} text-[#5a6678]`}
             >
               <option value="">{t.gender}</option>
@@ -277,20 +313,29 @@ export default function PassengerStep({
           {p.docType === 'NATIONAL_ID' ? (
             <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
               <div>
-                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">{t.nationalId}</div>
+                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
+                  {t.nationalId}
+                </div>
                 <input
                   data-testid={`checkout-pax-nid-${i}`}
                   dir="ltr"
                   value={p.nationalId}
                   onChange={(e) =>
-                    update(i, { nationalId: normalizeIranMobile(e.target.value).slice(0, 10) })
+                    update(i, {
+                      nationalId: normalizeIranMobile(e.target.value).slice(
+                        0,
+                        10,
+                      ),
+                    })
                   }
                   placeholder="0012345678"
                   className={`${inputCls} font-mono text-[13px]`}
                 />
               </div>
               <div>
-                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">{t.dateOfBirth}</div>
+                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
+                  {t.dateOfBirth}
+                </div>
                 <JalaliDobSelects
                   locale={locale}
                   day={p.birthDay}
@@ -305,18 +350,24 @@ export default function PassengerStep({
           ) : (
             <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
               <div>
-                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">{t.passportNo}</div>
+                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
+                  {t.passportNo}
+                </div>
                 <input
                   data-testid={`checkout-pax-passport-${i}`}
                   dir="ltr"
                   value={p.passportNo}
-                  onChange={(e) => update(i, { passportNo: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    update(i, { passportNo: e.target.value.toUpperCase() })
+                  }
                   placeholder="K12345678"
                   className={`${inputCls} font-mono text-[13px]`}
                 />
               </div>
               <div>
-                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">{t.dateOfBirth}</div>
+                <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
+                  {t.dateOfBirth}
+                </div>
                 <JalaliDobSelects
                   locale={locale}
                   day={p.birthDay}
@@ -343,7 +394,7 @@ export default function PassengerStep({
 
       <button
         type="button"
-        onClick={() => onChange([...passengers, emptyPassenger('')])}
+        onClick={() => onChange([...passengers, emptyPassenger('', 'ADULT')])}
         data-testid="checkout-add-pax"
         className="inline-flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] border-[#1668c4] px-[18px] py-[11px] text-[12.5px] font-bold text-[#1668c4]"
       >

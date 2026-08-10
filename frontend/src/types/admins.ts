@@ -9,6 +9,7 @@ export interface AdminRow {
   isActive: boolean;
   online: boolean;
   managedByCaller: boolean;
+  permissions: string[] | null;
 }
 
 export type AdminCreatableRole =

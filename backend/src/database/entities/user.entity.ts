@@ -56,6 +56,9 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isSuperAdmin!: boolean;
 
+  @Column({ type: 'jsonb', nullable: true })
+  panelPermissions!: string[] | null;
+
   @Column({ type: 'text', nullable: true })
   twoFactorSecret!: string | null;
 

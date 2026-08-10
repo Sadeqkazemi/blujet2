@@ -17,17 +17,10 @@ export interface SearchCabinOption {
 
 /** Derived presentation status from backend toPublishStatus(). */
 export type SearchFlightPublishStatus =
-  | 'DRAFT'
-  | 'PENDING_APPROVAL'
-  | 'PUBLISHED'
-  | 'REJECTED';
+  'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'REJECTED';
 
 export type SearchFlightDefinitionStatus =
-  | 'DRAFT'
-  | 'PENDING_CEO'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'PENDING_REVISION';
+  'DRAFT' | 'PENDING_CEO' | 'APPROVED' | 'REJECTED' | 'PENDING_REVISION';
 
 export interface SearchFlightResult {
   flightInstanceId: string;
@@ -96,11 +89,17 @@ export interface SeatMapResult {
   seats: SeatMapCell[];
 }
 
-export type BookingStatus = 'DRAFT' | 'HELD' | 'PAID' | 'TICKETED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED';
+export type BookingStatus =
+  'DRAFT' | 'HELD' | 'PAID' | 'TICKETED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED';
 
 export interface BookingPassengerView {
   fullName: string;
   seatCode: string | null;
+  passengerType: 'ADULT' | 'CHILD' | 'INFANT';
+  birthDate: string;
+  occupiesSeat: boolean;
+  fareIrr: string;
+  taxIrr: string;
 }
 
 export interface BookingDetail {
@@ -223,7 +222,8 @@ export interface CustomerReferralDashboard {
   invites: CustomerReferralInvite[];
 }
 
-export type CustomerIdentityStatus = 'NOT_STARTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type CustomerIdentityStatus =
+  'NOT_STARTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface CustomerIdentityView {
   status: CustomerIdentityStatus;
@@ -308,5 +308,7 @@ export interface UserProfile {
   emailVerifiedAt: string | null;
   completionPct: number;
   profileIncomplete: boolean;
-  missingProfileFields: ('fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail')[];
+  missingProfileFields: (
+    'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail'
+  )[];
 }

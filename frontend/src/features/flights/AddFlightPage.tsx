@@ -275,6 +275,16 @@ export default function AddFlightPage({
   );
 
   const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
+  const fareAdultToman = BigInt(tomanDigitsOnly(fareForm.priceToman) || "0");
+  const fareIsCharterOnly =
+    fareForm.allowedChannels.includes("CHARTER") &&
+    !fareForm.allowedChannels.includes("SYSTEM");
+  const infantFareToman = formatTomanGrouped(
+    ((fareAdultToman * 1_000n) / 10_000n).toString(),
+  );
+  const childFareToman = formatTomanGrouped(
+    ((fareAdultToman * (fareIsCharterOnly ? 10_000n : 5_000n)) / 10_000n).toString(),
+  );
 
   const cabinCapacityError = useMemo(() => {
     if (!showValidation) return null;
@@ -1045,6 +1055,24 @@ export default function AddFlightPage({
                       }
                       testId="fare-tax-money"
                     />
+                    <div data-testid="fare-infant-auto">
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        نرخ نوزاد (خودکار، ۱۰٪)
+                      </label>
+                      <div className="flex h-10 items-center justify-between rounded-[9px] border border-[#28344c] bg-[#0f1726] px-3 font-num text-[11.5px] text-[#e7ecf3]">
+                        <span>تومان</span>
+                        <span>{infantFareToman || "۰"}</span>
+                      </div>
+                    </div>
+                    <div data-testid="fare-child-auto">
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        نرخ کودک (خودکار، {fareIsCharterOnly ? "۱۰۰٪" : "۵۰٪"})
+                      </label>
+                      <div className="flex h-10 items-center justify-between rounded-[9px] border border-[#28344c] bg-[#0f1726] px-3 font-num text-[11.5px] text-[#e7ecf3]">
+                        <span>تومان</span>
+                        <span>{childFareToman || "۰"}</span>
+                      </div>
+                    </div>
                     <div>
                       <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
                         ظرفیت اختصاصی (صندلی)

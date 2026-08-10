@@ -81,6 +81,11 @@ export default function ResultsPage() {
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
+  const passengerMix = {
+    adults: Math.max(1, Number(params.get('adults') || 1)),
+    children: Math.max(0, Number(params.get('children') || 0)),
+    infants: Math.max(0, Number(params.get('infants') || 0)),
+  };
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
@@ -90,22 +95,33 @@ export default function ResultsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const [fStops, setFStops] = useState<'all' | 'direct' | 'one'>('all');
-  const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>('all');
+  const [fTime, setFTime] = useState<'all' | 'morning' | 'noon' | 'evening'>(
+    'all',
+  );
   const [fAirline, setFAirline] = useState('all');
   const [sort, setSort] = useState<'cheap' | 'fast' | 'early'>('cheap');
-  const [aiState, setAiState] = useState<'idle' | 'loading' | 'done' | 'unavailable' | 'error'>('idle');
+  const [aiState, setAiState] = useState<
+    'idle' | 'loading' | 'done' | 'unavailable' | 'error'
+  >('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
   const [aiVisible, setAiVisible] = useState(true);
   const [pendingCheckoutPath, setPendingCheckoutPath] = useState<string | null>(null);
 
-  const [club, setClub] = useState<{ isMember: boolean; level: string | null } | null>(null);
+  const [club, setClub] = useState<{
+    isMember: boolean;
+    level: string | null;
+  } | null>(null);
   const [lockBusyKey, setLockBusyKey] = useState<string | null>(null);
   const [saveBusyKey, setSaveBusyKey] = useState<string | null>(null);
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
-  const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(null);
+  const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(
+    null,
+  );
 
   useEffect(() => {
-    fetchAirports().then(setAirports).catch(() => setAirports([]));
+    fetchAirports()
+      .then(setAirports)
+      .catch(() => setAirports([]));
   }, []);
 
   useEffect(() => {
@@ -118,7 +134,11 @@ export default function ResultsPage() {
       .then((c) => setClub({ isMember: c.isMember, level: c.level }))
       .catch(() => setClub(null));
     fetchSavedFlights()
-      .then((rows) => setSavedKeys(new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`))))
+      .then((rows) =>
+        setSavedKeys(
+          new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`)),
+        ),
+      )
       .catch(() => setSavedKeys(new Set()));
   }, [status]);
 
@@ -155,9 +175,15 @@ export default function ResultsPage() {
     };
   }, [origin, dest, date, copy.searchError, searchNonce]);
 
-  useEffect(() => onSearchResultsInvalidate(() => setSearchNonce((n) => n + 1)), []);
+  useEffect(
+    () => onSearchResultsInvalidate(() => setSearchNonce((n) => n + 1)),
+    [],
+  );
 
-  const airportMap = useMemo(() => new Map(airports.map((a) => [a.code, a])), [airports]);
+  const airportMap = useMemo(
+    () => new Map(airports.map((a) => [a.code, a])),
+    [airports],
+  );
   const cityName = (code: string) =>
     airportCityName(code, locale, airportMap.get(code)?.cityFa);
   const cityLabel = (code: string) =>
@@ -168,7 +194,8 @@ export default function ResultsPage() {
 
   const airlines = useMemo(() => {
     const set = new Set<string>();
-    for (const r of effectiveResults ?? []) set.add(flightAirlineLabel(r.flightNo));
+    for (const r of effectiveResults ?? [])
+      set.add(flightAirlineLabel(r.flightNo));
     return Array.from(set).sort();
   }, [effectiveResults]);
 
@@ -176,15 +203,22 @@ export default function ResultsPage() {
     let list = [...(effectiveResults ?? [])];
     if (fStops === 'direct') list = list.filter((f) => !f.connection);
     if (fStops === 'one') list = list.filter((f) => Boolean(f.connection));
-    if (fTime !== 'all') list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
-    if (fAirline !== 'all') list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
+    if (fTime !== 'all')
+      list = list.filter((f) => depHourBucket(f.departureAt) === fTime);
+    if (fAirline !== 'all')
+      list = list.filter((f) => flightAirlineLabel(f.flightNo) === fAirline);
     return sortFlights(list, sort);
   }, [effectiveResults, fStops, fTime, fAirline, sort]);
 
   const resultsPager = usePagination(filteredResults);
 
   const aiPickId = useMemo(() => {
-    if (!advisory || advisory.recommendation !== 'buy' || filteredResults.length === 0) return null;
+    if (
+      !advisory ||
+      advisory.recommendation !== 'buy' ||
+      filteredResults.length === 0
+    )
+      return null;
     return filteredResults[0]?.flightInstanceId ?? null;
   }, [advisory, filteredResults]);
 
@@ -249,7 +283,11 @@ export default function ResultsPage() {
     }
   }
 
-  function applyEditSearch(nextOrigin: string, nextDest: string, nextDate: string) {
+  function applyEditSearch(
+    nextOrigin: string,
+    nextDest: string,
+    nextDate: string,
+  ) {
     if (nextOrigin === nextDest) return;
     const next = new URLSearchParams(params);
     next.set('origin', nextOrigin);
@@ -269,9 +307,27 @@ export default function ResultsPage() {
   if (!origin || !dest || !date) {
     return (
       <PublicPageShell>
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '40px 26px', textAlign: 'center' }}>
-          <h1 style={{ fontSize: 18, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.emptyTitle}</h1>
-          <p style={{ fontSize: 14, color: '#6b7b94', marginBottom: 24 }}>{copy.emptySub}</p>
+        <div
+          style={{
+            maxWidth: 720,
+            margin: '0 auto',
+            padding: '40px 26px',
+            textAlign: 'center',
+          }}
+        >
+          <h1
+            style={{
+              fontSize: 18,
+              fontWeight: 900,
+              color: '#0d2640',
+              marginBottom: 8,
+            }}
+          >
+            {copy.emptyTitle}
+          </h1>
+          <p style={{ fontSize: 14, color: '#6b7b94', marginBottom: 24 }}>
+            {copy.emptySub}
+          </p>
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -296,7 +352,11 @@ export default function ResultsPage() {
 
   const dateLabel =
     locale === 'en'
-      ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
       : formatJalaliDate(`${date}T12:00:00Z`);
 
   return (
@@ -332,7 +392,9 @@ export default function ResultsPage() {
           >
             {locale === 'en' ? '←' : '→'}
           </button>
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>{copy.searchResultsLabel}</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>
+            {copy.searchResultsLabel}
+          </span>
         </div>
       )}
 
@@ -349,7 +411,13 @@ export default function ResultsPage() {
             gap: 14,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? 12 : 16,
+            }}
+          >
             <div
               style={{
                 width: isMobile ? 44 : 52,
@@ -367,8 +435,22 @@ export default function ResultsPage() {
               ✈
             </div>
             <div style={{ lineHeight: 1.45, flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <h2 style={{ fontSize: isMobile ? 16 : 18, fontWeight: 900, color: '#0d2640', margin: '0 0 6px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: 900,
+                    color: '#0d2640',
+                    margin: '0 0 6px',
+                  }}
+                >
                   {copy.selectDepartureLabel}
                 </h2>
                 {isMobile && (
@@ -404,13 +486,33 @@ export default function ResultsPage() {
                   flexWrap: 'wrap',
                 }}
               >
-                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(origin)}</span>
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>
+                  {cityLabel(origin)}
+                </span>
                 <span style={{ color: '#1668c4' }}>{copy.routeArrow}</span>
-                <span style={{ color: '#0d2640', fontWeight: 800 }}>{cityLabel(dest)}</span>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />
+                <span style={{ color: '#0d2640', fontWeight: 800 }}>
+                  {cityLabel(dest)}
+                </span>
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: '#cbd6e4',
+                  }}
+                />
                 <span>{dateLabel}</span>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#cbd6e4' }} />
-                <span style={{ color: '#7a8696' }}>{copy.onePassengerEconomy}</span>
+                <span
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: '50%',
+                    background: '#cbd6e4',
+                  }}
+                />
+                <span style={{ color: '#7a8696' }}>
+                  {copy.onePassengerEconomy}
+                </span>
               </div>
             </div>
           </div>
@@ -466,7 +568,9 @@ export default function ResultsPage() {
         />
       )}
 
-      <div style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 39px' }}>
+      <div
+        style={{ maxWidth: 1320, margin: '0 auto', padding: '16px 26px 39px' }}
+      >
         <div
           style={{
             display: 'flex',
@@ -478,9 +582,21 @@ export default function ResultsPage() {
           }}
         >
           <span style={{ fontSize: 13.5, color: '#5a6678' }}>
-            {copy.flightsCount(filteredResults.length, resultsPager.page, resultsPager.totalPages)}
+            {copy.flightsCount(
+              filteredResults.length,
+              resultsPager.page,
+              resultsPager.totalPages,
+            )}
           </span>
-          <div style={{ display: 'flex', background: '#fff', border: '1px solid #eef1f5', borderRadius: 12, overflow: 'hidden' }}>
+          <div
+            style={{
+              display: 'flex',
+              background: '#fff',
+              border: '1px solid #eef1f5',
+              borderRadius: 12,
+              overflow: 'hidden',
+            }}
+          >
             {(
               [
                 ['cheap', copy.sortCheap],
@@ -527,7 +643,16 @@ export default function ResultsPage() {
               padding: '11px 14px',
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 13,
+                fontWeight: 800,
+                color: '#0d2640',
+              }}
+            >
               ☰ {copy.filterLabel}
             </span>
             <button
@@ -537,7 +662,10 @@ export default function ResultsPage() {
               style={{
                 padding: '8px 14px',
                 borderRadius: 9,
-                border: fStops === 'direct' ? '1.5px solid #1668c4' : '1.5px solid #eef1f5',
+                border:
+                  fStops === 'direct'
+                    ? '1.5px solid #1668c4'
+                    : '1.5px solid #eef1f5',
                 background: fStops === 'direct' ? '#eef4fb' : '#fff',
                 color: fStops === 'direct' ? '#1668c4' : '#5a6678',
                 fontSize: 13,
@@ -549,7 +677,15 @@ export default function ResultsPage() {
               {copy.nonstopLabel}
             </button>
             <span style={{ width: 1, height: 22, background: '#eef1f5' }} />
-            <div style={{ display: 'flex', background: '#f4f7fb', border: '1px solid #eef1f5', borderRadius: 10, overflow: 'hidden' }}>
+            <div
+              style={{
+                display: 'flex',
+                background: '#f4f7fb',
+                border: '1px solid #eef1f5',
+                borderRadius: 10,
+                overflow: 'hidden',
+              }}
+            >
               {(
                 [
                   ['all', copy.all],
@@ -605,14 +741,33 @@ export default function ResultsPage() {
         )}
 
         {isMobile && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-            <span data-testid="f-stops-all" onClick={() => setFStops('all')} style={chipStyle(fStops === 'all')}>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              marginBottom: 14,
+            }}
+          >
+            <span
+              data-testid="f-stops-all"
+              onClick={() => setFStops('all')}
+              style={chipStyle(fStops === 'all')}
+            >
               {copy.all}
             </span>
-            <span data-testid="f-stops-direct" onClick={() => setFStops('direct')} style={chipStyle(fStops === 'direct')}>
+            <span
+              data-testid="f-stops-direct"
+              onClick={() => setFStops('direct')}
+              style={chipStyle(fStops === 'direct')}
+            >
               {copy.direct}
             </span>
-            <span data-testid="f-stops-one" onClick={() => setFStops('one')} style={chipStyle(fStops === 'one')}>
+            <span
+              data-testid="f-stops-one"
+              onClick={() => setFStops('one')}
+              style={chipStyle(fStops === 'one')}
+            >
               {copy.oneStop}
             </span>
           </div>
@@ -640,39 +795,60 @@ export default function ResultsPage() {
           </div>
         )}
 
-        {effectiveResults !== null && effectiveResults.length === 0 && !searchError && (
-          <div
-            data-testid="empty-results"
-            style={{
-              background: '#fff',
-              border: '1px solid #eef1f5',
-              borderRadius: 18,
-              padding: '64px 24px',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', marginBottom: 9 }}>{copy.noResultsTitle}</div>
-            <div style={{ fontSize: 13.5, color: '#8a96a6', lineHeight: 2, maxWidth: 380, margin: '0 auto' }}>{copy.noResultsSub}</div>
-            <button
-              type="button"
-              onClick={() => setEditOpen(true)}
+        {effectiveResults !== null &&
+          effectiveResults.length === 0 &&
+          !searchError && (
+            <div
+              data-testid="empty-results"
               style={{
-                marginTop: 24,
-                padding: '12px 26px',
-                background: '#1668c4',
-                color: '#fff',
-                borderRadius: 11,
-                fontSize: 13.5,
-                fontWeight: 800,
-                border: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
+                background: '#fff',
+                border: '1px solid #eef1f5',
+                borderRadius: 18,
+                padding: '64px 24px',
+                textAlign: 'center',
               }}
             >
-              {copy.editSearchLabel}
-            </button>
-          </div>
-        )}
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 900,
+                  color: '#0d2640',
+                  marginBottom: 9,
+                }}
+              >
+                {copy.noResultsTitle}
+              </div>
+              <div
+                style={{
+                  fontSize: 13.5,
+                  color: '#8a96a6',
+                  lineHeight: 2,
+                  maxWidth: 380,
+                  margin: '0 auto',
+                }}
+              >
+                {copy.noResultsSub}
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                style={{
+                  marginTop: 24,
+                  padding: '12px 26px',
+                  background: '#1668c4',
+                  color: '#fff',
+                  borderRadius: 11,
+                  fontSize: 13.5,
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {copy.editSearchLabel}
+              </button>
+            </div>
+          )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           {resultsPager.pageItems.map((r) => {
@@ -694,8 +870,15 @@ export default function ResultsPage() {
                 savedKeys={savedKeys}
                 lockBusyKey={lockBusyKey}
                 saveBusyKey={saveBusyKey}
-                showGoldLock={Boolean(club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''))}
-                onToggle={() => setExpandedId((id) => (id === r.flightInstanceId ? null : r.flightInstanceId))}
+                showGoldLock={Boolean(
+                  club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''),
+                )}
+                passengerMix={passengerMix}
+                onToggle={() =>
+                  setExpandedId((id) =>
+                    id === r.flightInstanceId ? null : r.flightInstanceId,
+                  )
+                }
                 onBuy={(c) => {
                   const cabinOpt = r.cabins.find((x) => x.cabin === c);
                   const flight = {
@@ -716,6 +899,7 @@ export default function ResultsPage() {
                       cabin: c,
                       selectedSeats: [],
                       flight,
+                      passengerMix,
                     }),
                   );
                   const q = new URLSearchParams({
@@ -723,6 +907,9 @@ export default function ResultsPage() {
                     cabin: c,
                     origin: r.originCode,
                     dest: r.destCode,
+                    adults: String(passengerMix.adults),
+                    children: String(passengerMix.children),
+                    infants: String(passengerMix.infants),
                   });
                   const checkoutPath = `/checkout/new?${q.toString()}`;
                   if (status !== 'authenticated') {
@@ -738,58 +925,86 @@ export default function ResultsPage() {
           })}
         </div>
 
-        {effectiveResults !== null && effectiveResults.length > 0 && filteredResults.length === 0 && (
-          <div
-            style={{
-              background: '#fff',
-              border: '1px solid #eef1f5',
-              borderRadius: 14,
-              padding: '54px 24px',
-              textAlign: 'center',
-            }}
-          >
-            <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0d2640', margin: '0 0 8px' }}>{copy.noResultsTitle}</h3>
-            <p style={{ fontSize: 13.5, color: '#5a6678', lineHeight: 1.9, margin: '0 auto 22px', maxWidth: 380 }}>{copy.noFlightsForFilters}</p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={clearFilters}
+        {effectiveResults !== null &&
+          effectiveResults.length > 0 &&
+          filteredResults.length === 0 && (
+            <div
+              style={{
+                background: '#fff',
+                border: '1px solid #eef1f5',
+                borderRadius: 14,
+                padding: '54px 24px',
+                textAlign: 'center',
+              }}
+            >
+              <h3
                 style={{
-                  height: 46,
-                  padding: '0 22px',
-                  borderRadius: 12,
-                  background: '#1668c4',
-                  color: '#fff',
-                  fontSize: 14,
+                  fontSize: 17.5,
                   fontWeight: 800,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
+                  color: '#0d2640',
+                  margin: '0 0 8px',
                 }}
               >
-                {copy.clearFilters}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditOpen(true)}
+                {copy.noResultsTitle}
+              </h3>
+              <p
                 style={{
-                  height: 46,
-                  padding: '0 22px',
-                  borderRadius: 12,
-                  border: '1.5px solid #e6eaf0',
+                  fontSize: 13.5,
                   color: '#5a6678',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  background: '#fff',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
+                  lineHeight: 1.9,
+                  margin: '0 auto 22px',
+                  maxWidth: 380,
                 }}
               >
-                {copy.changeSearch}
-              </button>
+                {copy.noFlightsForFilters}
+              </p>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  justifyContent: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  style={{
+                    height: 46,
+                    padding: '0 22px',
+                    borderRadius: 12,
+                    background: '#1668c4',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 800,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {copy.clearFilters}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  style={{
+                    height: 46,
+                    padding: '0 22px',
+                    borderRadius: 12,
+                    border: '1.5px solid #e6eaf0',
+                    color: '#5a6678',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    background: '#fff',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {copy.changeSearch}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         <Pagination
           page={resultsPager.page}
@@ -855,8 +1070,26 @@ export default function ResultsPage() {
             {realLockResult.kind === 'not-gold' && (
               <>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>🔒</div>
-                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.smartFareLock}</h2>
-                <p style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 16 }}>{copy.fareLockGoldOnly}</p>
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 900,
+                    color: '#0d2640',
+                    marginBottom: 8,
+                  }}
+                >
+                  {copy.smartFareLock}
+                </h2>
+                <p
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                    color: '#5a6678',
+                    marginBottom: 16,
+                  }}
+                >
+                  {copy.fareLockGoldOnly}
+                </p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     type="button"
@@ -899,15 +1132,32 @@ export default function ResultsPage() {
             {realLockResult.kind === 'success' && (
               <>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.yourPriceLocked}</h2>
-                <p style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 8 }}>
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 900,
+                    color: '#0d2640',
+                    marginBottom: 8,
+                  }}
+                >
+                  {copy.yourPriceLocked}
+                </h2>
+                <p
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                    color: '#5a6678',
+                    marginBottom: 8,
+                  }}
+                >
                   {copy.lockRateUntil(
                     localeMoney(realLockResult.lock.lockedPriceIrr, locale),
                     formatJalaliDateTime(realLockResult.lock.expiresAt),
                   )}
                 </p>
                 <p style={{ fontSize: 11, color: '#8a96a6', marginBottom: 16 }}>
-                  {copy.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)} {copy.toman}
+                  {copy.fee}: {localeMoney(realLockResult.lock.feeIrr, locale)}{' '}
+                  {copy.toman}
                 </p>
                 <button
                   type="button"
@@ -932,8 +1182,25 @@ export default function ResultsPage() {
             {realLockResult.kind === 'error' && (
               <>
                 <div style={{ fontSize: 28, marginBottom: 8 }}>⚠</div>
-                <h2 style={{ fontSize: 15, fontWeight: 900, color: '#0d2640', marginBottom: 8 }}>{copy.lockFailedTitle}</h2>
-                <p role="alert" style={{ fontSize: 12, lineHeight: 1.8, color: '#5a6678', marginBottom: 16 }}>
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 900,
+                    color: '#0d2640',
+                    marginBottom: 8,
+                  }}
+                >
+                  {copy.lockFailedTitle}
+                </h2>
+                <p
+                  role="alert"
+                  style={{
+                    fontSize: 12,
+                    lineHeight: 1.8,
+                    color: '#5a6678',
+                    marginBottom: 16,
+                  }}
+                >
                   {realLockResult.message}
                 </p>
                 <button

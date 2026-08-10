@@ -21,6 +21,10 @@ export class PanelAccessGuard implements CanActivate {
     if (user.isSuperAdmin) return true;
 
     await this.panels.assertPanelEnabledForSelf(user.role);
+    await this.panels.assertCustomPermissionForRequest(
+      user,
+      request.originalUrl,
+    );
     return true;
   }
 }

@@ -3514,3 +3514,16 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 |--------|------|------|-------|
 | GET | `/site-content/destination-stats` | public | `{ activeDestinations, domesticDestinations, internationalDestinations }` from catalog ∩ published flights; zeros valid |
 | GET | `/site-content/home` | public | Also includes `destinationStats` |
+
+## Passenger-aware public booking (2026-08-10)
+
+- `GET /search/flights` additionally accepts `adults` (minimum 1), `children`, and `infants`. Each cabin keeps `priceIrr` as the adult unit fare and adds `totalPriceIrr` for that passenger mix.
+- `POST /bookings` passengers additionally send `passengerType: ADULT|CHILD|INFANT`, ISO `birthDate`, and optional `seatCode`. A seat is required for adults/children and omitted for lap infants.
+- The server classifies age at `FlightInstance.departureAt`: infant `<2`, child `2..11`, adult `>=12`. A type mismatch and more lap infants than adults return `VALIDATION_FAILED`.
+- Public SYSTEM fares use adult 100%, child 50%, infant 10%; CHARTER child fares use 100%. Payment re-price repeats the same passenger-aware calculation.
+## Manager panel permission restrictions
+
+- `POST /admins` accepts `permissions` as an optional list of manager-panel permission keys.
+- `PATCH /admins/:id/permissions` replaces that list and requires the existing `ADMIN_ROLE_CHANGE` step-up challenge.
+- A `null` permission list preserves the role's legacy/default access. An explicit list can only restrict the account's existing role; it never grants access that the role guard does not already allow.
+- The restriction is enforced both in `GET /panels/nav` and by `PanelAccessGuard` for mapped management APIs. Known keys are: `flights`, `agencies`, `reports`, `finance`, `refunds`, `club`, `content`, `support`, `admins`, and `settings`.

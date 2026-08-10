@@ -5,6 +5,7 @@ import {
   fetchAdmins,
   resetAdminPassword,
   unblockAdmin,
+  updateAdminPermissions,
 } from '../../api/admins';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
@@ -28,7 +29,9 @@ import {
 } from '../panel/panel-theme';
 import {
   deriveUsernameFromEmail,
+  enabledPermissionKeys,
   PERM_DEFS,
+  permissionStateFromKeys,
   rolePermissionPreset,
   type PermKey,
   type PermState,
@@ -66,12 +69,23 @@ function formatRelativeFa(iso: string | null): string {
 function generatePassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#%';
   let out = '';
-  for (let i = 0; i < 10; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  const unbiasedLimit = Math.floor(256 / chars.length) * chars.length;
+  while (out.length < 10) {
+    const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+    for (const value of randomBytes) {
+      if (value >= unbiasedLimit) continue;
+      out += chars[value % chars.length];
+      if (out.length === 10) break;
+    }
+  }
   return out;
 }
 
 function RoleBadge({ label, role }: { label: string; role: string }) {
-  const style = ROLE_BADGE[role] ?? { color: '#9fb0c7', bg: 'rgba(159,176,199,.16)' };
+  const style = ROLE_BADGE[role] ?? {
+    color: '#9fb0c7',
+    bg: 'rgba(159,176,199,.16)',
+  };
   return (
     <span
       className="inline-block rounded-[18px] px-2.5 py-1 text-[11px] font-bold"
@@ -154,7 +168,9 @@ function DeliveryCards({
 
   return (
     <div>
-      {label ? <div className={`mb-2 text-[11px] ${panelMuted}`}>{label}</div> : null}
+      {label ? (
+        <div className={`mb-2 text-[11px] ${panelMuted}`}>{label}</div>
+      ) : null}
       <div className={`flex gap-2 ${compact ? 'flex-wrap' : ''}`}>
         {options.map((opt) => {
           const selected = value === opt.id;
@@ -176,9 +192,13 @@ function DeliveryCards({
                   selected ? 'border-[#3b82f6]' : 'border-[#28344c]'
                 }`}
               >
-                {selected ? <span className="h-[9px] w-[9px] rounded-full bg-[#3b82f6]" /> : null}
+                {selected ? (
+                  <span className="h-[9px] w-[9px] rounded-full bg-[#3b82f6]" />
+                ) : null}
               </span>
-              <span className={`text-[11.5px] font-bold ${panelText}`}>{opt.label}</span>
+              <span className={`text-[11.5px] font-bold ${panelText}`}>
+                {opt.label}
+              </span>
             </button>
           );
         })}
@@ -206,23 +226,48 @@ function PermissionsList({
       } ${boxed ? '' : 'border-b border-[#1a2436] px-[3px] py-[11px] last:border-b-0'}`}
     >
       <div className="leading-snug">
-        <div className={`font-semibold ${panelText} ${boxed ? 'text-xs' : 'text-[12.5px]'}`}>{pd.label}</div>
-        <div className={`text-[10.5px] ${panelMuted} ${boxed ? '' : 'text-[11px]'}`}>{pd.desc}</div>
+        <div
+          className={`font-semibold ${panelText} ${boxed ? 'text-xs' : 'text-[12.5px]'}`}
+        >
+          {pd.label}
+        </div>
+        <div
+          className={`text-[10.5px] ${panelMuted} ${boxed ? '' : 'text-[11px]'}`}
+        >
+          {pd.desc}
+        </div>
       </div>
-      <PermToggle on={perms[pd.key]} onChange={() => onToggle(pd.key)} large={largeToggles} label={pd.label} />
+      <PermToggle
+        on={perms[pd.key]}
+        onChange={() => onToggle(pd.key)}
+        large={largeToggles}
+        label={pd.label}
+      />
     </div>
   ));
 
   if (boxed) {
     return (
-      <div className="rounded-[13px] border border-[#28344c] bg-[#18223a] px-[11px] py-[5px]">{inner}</div>
+      <div className="rounded-[13px] border border-[#28344c] bg-[#18223a] px-[11px] py-[5px]">
+        {inner}
+      </div>
     );
   }
   return <div className="flex flex-col gap-[3px]">{inner}</div>;
 }
 
 const RefreshIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
     <path d="M21 2v6h-6" />
     <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
     <path d="M3 22v-6h6" />
@@ -244,7 +289,9 @@ export default function PanelAdminsPage() {
     password: '',
     delivery: 'sms' as 'sms' | 'email',
   });
-  const [addPerms, setAddPerms] = useState<PermState>(() => rolePermissionPreset('IT_MANAGER'));
+  const [addPerms, setAddPerms] = useState<PermState>(() =>
+    rolePermissionPreset('IT_MANAGER'),
+  );
   const [addError, setAddError] = useState(false);
   const [detailPerms, setDetailPerms] = useState<PermState | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -258,7 +305,9 @@ export default function PanelAdminsPage() {
     fetchAdmins()
       .then((data) => {
         setRows(data);
-        setSelected((prev) => (prev ? (data.find((r) => r.id === prev.id) ?? null) : null));
+        setSelected((prev) =>
+          prev ? (data.find((r) => r.id === prev.id) ?? null) : null,
+        );
       })
       .catch(() => setError('خطا در دریافت فهرست مدیران.'));
   }
@@ -289,7 +338,14 @@ export default function PanelAdminsPage() {
 
   function openDetail(row: AdminRow) {
     setSelected(row);
-    setDetailPerms(rolePermissionPreset(row.role as AdminCreatableRole));
+    setDetailPerms(
+      row.permissions === null
+        ? rolePermissionPreset(row.role as AdminCreatableRole)
+        : permissionStateFromKeys(
+            row.permissions,
+            row.role as AdminCreatableRole,
+          ),
+    );
     setNewPass('');
     setCpSuggested('');
     setResetDelivery('sms');
@@ -305,9 +361,20 @@ export default function PanelAdminsPage() {
     const username = deriveUsernameFromEmail(email);
     try {
       const fields = await stepUp.confirm();
-      await createAdmin({ fullName, email, username, role, password, delivery, ...fields });
+      await createAdmin({
+        fullName,
+        email,
+        username,
+        role,
+        password,
+        delivery,
+        permissions: enabledPermissionKeys(addPerms),
+        ...fields,
+      });
       setAddOpen(false);
-      setNotice(`مدیر جدید افزوده شد و رمز عبور از طریق ${delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`);
+      setNotice(
+        `مدیر جدید افزوده شد و رمز عبور از طریق ${delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`,
+      );
       reload();
     } catch (err) {
       if (err instanceof Error && err.message === 'CANCELLED') return;
@@ -319,10 +386,34 @@ export default function PanelAdminsPage() {
     try {
       if (row.isActive) await blockAdmin(row.id);
       else await unblockAdmin(row.id);
-      setNotice(row.isActive ? `ورود «${row.fullName}» مسدود شد.` : `ورود «${row.fullName}» فعال شد.`);
+      setNotice(
+        row.isActive
+          ? `ورود «${row.fullName}» مسدود شد.`
+          : `ورود «${row.fullName}» فعال شد.`,
+      );
       reload();
     } catch {
       setError('خطا در تغییر وضعیت ورود.');
+    }
+  }
+
+  async function onSavePermissions(row: AdminRow, perms: PermState) {
+    try {
+      const fields = await stepUp.confirm();
+      await updateAdminPermissions(row.id, {
+        permissions: enabledPermissionKeys(perms),
+        ...fields,
+      });
+      setNotice('سطح دسترسی با موفقیت ذخیره و از سمت سرور اعمال شد.');
+      setSelected(null);
+      reload();
+    } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') return;
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : 'خطا در ذخیره سطح دسترسی.',
+      );
     }
   }
 
@@ -336,7 +427,9 @@ export default function PanelAdminsPage() {
       setNewPass('');
       setCpSuggested('');
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : 'خطا در بازنشانی رمز.');
+      setError(
+        err instanceof ApiRequestError ? err.message : 'خطا در بازنشانی رمز.',
+      );
     }
   }
 
@@ -344,7 +437,9 @@ export default function PanelAdminsPage() {
   if (!rows) return <p className={`text-sm ${panelMuted}`}>در حال بارگذاری…</p>;
 
   if (selected && detailPerms) {
-    const rolePreset = rolePermissionPreset(selected.role as AdminCreatableRole);
+    const rolePreset = rolePermissionPreset(
+      selected.role as AdminCreatableRole,
+    );
 
     return (
       <div className="flex flex-col gap-[15px]">
@@ -353,7 +448,15 @@ export default function PanelAdminsPage() {
           onClick={() => setSelected(null)}
           className={`inline-flex w-max items-center gap-1.5 text-xs ${panelMuted2} transition hover:text-white`}
         >
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
             <path d="M9 6l6 6-6 6" />
           </svg>
           بازگشت به فهرست ادمین‌ها
@@ -364,8 +467,12 @@ export default function PanelAdminsPage() {
             {panelInitials(selected.fullName)}
           </span>
           <div className="min-w-0 leading-snug">
-            <div className="text-lg font-black text-white">{selected.fullName}</div>
-            <div className={`font-num ltr text-[11.5px] ${panelMuted2}`}>{selected.email ?? '—'}</div>
+            <div className="text-lg font-black text-white">
+              {selected.fullName}
+            </div>
+            <div className={`font-num ltr text-[11.5px] ${panelMuted2}`}>
+              {selected.email ?? '—'}
+            </div>
           </div>
           <span className="mr-auto">
             <RoleBadge label={selected.roleLabelFa} role={selected.role} />
@@ -379,16 +486,15 @@ export default function PanelAdminsPage() {
           </p>
           <PermissionsList
             perms={detailPerms}
-            onToggle={(key) => setDetailPerms((p) => ({ ...p!, [key]: !p![key] }))}
+            onToggle={(key) =>
+              setDetailPerms((p) => ({ ...p!, [key]: !p![key] }))
+            }
             largeToggles
           />
           <div className="mt-5 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => {
-                setNotice('سطح دسترسی ذخیره شد. دسترسی‌های عملیاتی بر اساس نقش «' + selected.roleLabelFa + '» اعمال می‌شود.');
-                setSelected(null);
-              }}
+              onClick={() => void onSavePermissions(selected, detailPerms)}
               className={`flex h-[46px] items-center justify-center px-[21px] text-[12.5px] font-extrabold ${panelBtnPrimary}`}
             >
               ذخیره سطح دسترسی
@@ -407,26 +513,37 @@ export default function PanelAdminsPage() {
         </div>
 
         <div className={`${panelCard} p-[15px]`}>
-          <h3 className={`mb-1 text-[13.5px] ${panelTitle}`}>امنیت و دسترسی ورود</h3>
+          <h3 className={`mb-1 text-[13.5px] ${panelTitle}`}>
+            امنیت و دسترسی ورود
+          </h3>
           <p className={`mb-4 text-[11.5px] ${panelMuted}`}>
-            رمز عبور این مدیر را تغییر دهید یا ورود او به پنل را مسدود/فعال کنید.
+            رمز عبور این مدیر را تغییر دهید یا ورود او به پنل را مسدود/فعال
+            کنید.
           </p>
 
           <div className="mb-[18px] flex items-center justify-between gap-2.5 rounded-[11px] bg-[#0f1726] px-[13px] py-[11px]">
             <div className="leading-snug">
-              <div className={`text-xs font-bold ${panelText}`}>وضعیت ورود به پنل</div>
-              <div className={`text-[10.5px] ${panelMuted}`}>نقش: {selected.roleLabelFa}</div>
+              <div className={`text-xs font-bold ${panelText}`}>
+                وضعیت ورود به پنل
+              </div>
+              <div className={`text-[10.5px] ${panelMuted}`}>
+                نقش: {selected.roleLabelFa}
+              </div>
             </div>
             <span
               className={`rounded-2xl px-[11px] py-1.5 text-[11px] font-extrabold ${
-                selected.isActive ? 'bg-[rgba(52,211,153,.16)] text-[#34d399]' : 'bg-[rgba(248,113,113,.16)] text-[#f87171]'
+                selected.isActive
+                  ? 'bg-[rgba(52,211,153,.16)] text-[#34d399]'
+                  : 'bg-[rgba(248,113,113,.16)] text-[#f87171]'
               }`}
             >
               {selected.isActive ? 'فعال' : 'مسدود'}
             </span>
           </div>
 
-          <label className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>تغییر رمز عبور</label>
+          <label className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+            تغییر رمز عبور
+          </label>
           <div className="mb-[11px] flex flex-wrap gap-2">
             <input
               dir="ltr"
@@ -456,7 +573,9 @@ export default function PanelAdminsPage() {
           {cpSuggested ? (
             <div className="mb-[11px] flex flex-wrap items-center gap-2 rounded-[10px] border border-[rgba(59,130,246,.3)] bg-[rgba(59,130,246,.08)] px-3 py-2">
               <span className={`text-[11px] ${panelMuted}`}>پیشنهاد:</span>
-              <span className="font-num ltr text-[12.5px] font-bold text-white">{cpSuggested}</span>
+              <span className="font-num ltr text-[12.5px] font-bold text-white">
+                {cpSuggested}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -471,7 +590,12 @@ export default function PanelAdminsPage() {
           ) : null}
 
           <div className="mb-5">
-            <DeliveryCards value={resetDelivery} onChange={setResetDelivery} label="ارسال از طریق:" compact />
+            <DeliveryCards
+              value={resetDelivery}
+              onChange={setResetDelivery}
+              label="ارسال از طریق:"
+              compact
+            />
           </div>
 
           {selected.managedByCaller && (
@@ -482,20 +606,29 @@ export default function PanelAdminsPage() {
                 selected.isActive ? 'bg-[#f87171]' : 'bg-[#16a34a]'
               }`}
             >
-              {selected.isActive ? 'مسدودسازی ورود به پنل' : 'فعال‌سازی ورود به پنل'}
+              {selected.isActive
+                ? 'مسدودسازی ورود به پنل'
+                : 'فعال‌سازی ورود به پنل'}
             </button>
           )}
         </div>
 
         {tempPassword && (
-          <PanelModal title="بازنشانی رمز عبور" onClose={() => setTempPassword(null)}>
+          <PanelModal
+            title="بازنشانی رمز عبور"
+            onClose={() => setTempPassword(null)}
+          >
             <p className={`mb-3 text-xs ${panelMuted}`}>
               رمز موقت تولیدشده — فقط همین یک بار نمایش داده می‌شود:
             </p>
             <div className="font-num mb-4 rounded-[11px] bg-[#0f1726] p-3 text-center text-base font-black text-[#34d399]">
               {tempPassword}
             </div>
-            <button type="button" onClick={() => setTempPassword(null)} className={`w-full py-2.5 ${panelBtnPrimary}`}>
+            <button
+              type="button"
+              onClick={() => setTempPassword(null)}
+              className={`w-full py-2.5 ${panelBtnPrimary}`}
+            >
               تأیید
             </button>
           </PanelModal>
@@ -516,7 +649,16 @@ export default function PanelAdminsPage() {
             onClick={openAddModal}
             className="flex items-center gap-1.5 rounded-[9px] bg-panel-accent px-[11px] py-[7px] text-[11.5px] font-bold text-white transition hover:brightness-110"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              aria-hidden
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             افزودن مدیر / ادمین
@@ -535,7 +677,9 @@ export default function PanelAdminsPage() {
           </div>
 
           {rows.length === 0 ? (
-            <p className={`py-[22px] text-center text-[11.5px] ${panelMuted}`}>هنوز اطلاعاتی وارد نشده است.</p>
+            <p className={`py-[22px] text-center text-[11.5px] ${panelMuted}`}>
+              هنوز اطلاعاتی وارد نشده است.
+            </p>
           ) : (
             rowsPager.pageItems.map((r) => (
               <button
@@ -549,19 +693,33 @@ export default function PanelAdminsPage() {
                     {panelInitials(r.fullName)}
                   </span>
                   <div className="min-w-0 leading-snug">
-                    <div className={`text-xs font-semibold ${panelText}`}>{r.fullName}</div>
-                    <div className={`font-num ltr text-[10.5px] ${panelMuted}`}>{r.email ?? '—'}</div>
+                    <div className={`text-xs font-semibold ${panelText}`}>
+                      {r.fullName}
+                    </div>
+                    <div className={`font-num ltr text-[10.5px] ${panelMuted}`}>
+                      {r.email ?? '—'}
+                    </div>
                   </div>
                 </div>
                 <div className="md:block">
                   <RoleBadge label={r.roleLabelFa} role={r.role} />
                 </div>
-                <div className={`font-num text-xs ${panelMuted2}`}>{formatRelativeFa(r.lastLoginAt)}</div>
+                <div className={`font-num text-xs ${panelMuted2}`}>
+                  {formatRelativeFa(r.lastLoginAt)}
+                </div>
                 <div>
                   <StatusDot row={r} />
                 </div>
                 <span className={`hidden justify-end ${panelMuted} md:flex`}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden
+                  >
                     <path d="M15 6l-6 6 6 6" />
                   </svg>
                 </span>
@@ -589,7 +747,17 @@ export default function PanelAdminsPage() {
                 onClick={() => void onSubmitAdd()}
                 className={`flex h-[46px] flex-1 items-center justify-center gap-1.5 text-[12.5px] font-extrabold ${panelBtnPrimary}`}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
                 افزودن و تعیین دسترسی
@@ -607,26 +775,36 @@ export default function PanelAdminsPage() {
           <div className="flex flex-col gap-[13px]">
             <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2">
               <div>
-                <label htmlFor="pa-name" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                <label
+                  htmlFor="pa-name"
+                  className={`mb-2 block text-[11.5px] font-bold ${panelText}`}
+                >
                   نام و نام خانوادگی <span className="text-[#f87171]">*</span>
                 </label>
                 <input
                   id="pa-name"
                   value={addForm.fullName}
-                  onChange={(e) => setAddForm((f) => ({ ...f, fullName: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, fullName: e.target.value }))
+                  }
                   placeholder="مثلاً نیما رضوی"
                   className={`h-[46px] w-full px-[11px] text-xs ${panelInput} ${addError && !addForm.fullName.trim() ? 'border-[#f87171]' : ''}`}
                 />
               </div>
               <div>
-                <label htmlFor="pa-email" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+                <label
+                  htmlFor="pa-email"
+                  className={`mb-2 block text-[11.5px] font-bold ${panelText}`}
+                >
                   ایمیل سازمانی <span className="text-[#f87171]">*</span>
                 </label>
                 <input
                   id="pa-email"
                   dir="ltr"
                   value={addForm.email}
-                  onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, email: e.target.value }))
+                  }
                   placeholder="name@aseman.ir"
                   className={`font-num ltr h-[46px] w-full px-[11px] text-left text-xs ${panelInput} ${addError && !addForm.email.trim() ? 'border-[#f87171]' : ''}`}
                 />
@@ -634,13 +812,18 @@ export default function PanelAdminsPage() {
             </div>
 
             <div>
-              <label htmlFor="pa-role" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+              <label
+                htmlFor="pa-role"
+                className={`mb-2 block text-[11.5px] font-bold ${panelText}`}
+              >
                 نقش / سطح دسترسی
               </label>
               <select
                 id="pa-role"
                 value={addForm.role}
-                onChange={(e) => pickAddRole(e.target.value as AdminCreatableRole)}
+                onChange={(e) =>
+                  pickAddRole(e.target.value as AdminCreatableRole)
+                }
                 className={`h-[46px] w-full cursor-pointer px-[11px] text-xs ${panelInput}`}
               >
                 {CREATABLE_ROLES.map((role) => (
@@ -650,12 +833,16 @@ export default function PanelAdminsPage() {
                 ))}
               </select>
               <p className={`mt-[7px] text-[11px] ${panelMuted}`}>
-                با انتخاب نقش، دسترسی‌های پیش‌فرض آن اعمال می‌شود و می‌توانید آن‌ها را تغییر دهید.
+                با انتخاب نقش، دسترسی‌های پیش‌فرض آن اعمال می‌شود و می‌توانید
+                آن‌ها را تغییر دهید.
               </p>
             </div>
 
             <div>
-              <label htmlFor="pa-pass" className={`mb-2 block text-[11.5px] font-bold ${panelText}`}>
+              <label
+                htmlFor="pa-pass"
+                className={`mb-2 block text-[11.5px] font-bold ${panelText}`}
+              >
                 رمز عبور ورود <span className="text-[#f87171]">*</span>
               </label>
               <div className="flex gap-2">
@@ -663,13 +850,17 @@ export default function PanelAdminsPage() {
                   id="pa-pass"
                   dir="ltr"
                   value={addForm.password}
-                  onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
+                  onChange={(e) =>
+                    setAddForm((f) => ({ ...f, password: e.target.value }))
+                  }
                   placeholder="حداقل ۶ کاراکتر"
                   className={`font-num ltr h-[46px] min-w-0 flex-1 px-[11px] text-left text-[12.5px] ${panelInput} ${addError && addForm.password.length < 6 ? 'border-[#f87171]' : ''}`}
                 />
                 <button
                   type="button"
-                  onClick={() => setAddForm((f) => ({ ...f, password: generatePassword() }))}
+                  onClick={() =>
+                    setAddForm((f) => ({ ...f, password: generatePassword() }))
+                  }
                   className={`flex h-[46px] shrink-0 items-center gap-1.5 px-[13px] text-[11.5px] font-bold ${panelBtnGhost}`}
                 >
                   <RefreshIcon />
@@ -686,7 +877,10 @@ export default function PanelAdminsPage() {
             <PermissionsList perms={addPerms} onToggle={toggleAddPerm} boxed />
 
             {addError ? (
-              <p role="alert" className="text-[11.5px] font-semibold text-[#f87171]">
+              <p
+                role="alert"
+                className="text-[11.5px] font-semibold text-[#f87171]"
+              >
                 نام، ایمیل و رمز عبور (حداقل ۶ کاراکتر) الزامی است.
               </p>
             ) : null}

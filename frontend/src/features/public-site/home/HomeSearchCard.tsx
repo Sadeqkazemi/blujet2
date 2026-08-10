@@ -92,7 +92,9 @@ function TripRadio({
 }) {
   const activeColor = isMobile ? '#fff' : '#16202e';
   const inactiveColor = isMobile ? 'rgba(255,255,255,.68)' : '#5a6678';
-  const inactiveBorder = isMobile ? '2px solid rgba(255,255,255,.4)' : '2px solid #c5cedb';
+  const inactiveBorder = isMobile
+    ? '2px solid rgba(255,255,255,.4)'
+    : '2px solid #c5cedb';
   return (
     <span
       className={active ? 'home-trip-active' : 'home-trip-inactive'}
@@ -119,7 +121,16 @@ function TripRadio({
           justifyContent: 'center',
         }}
       >
-        {active && <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#1668c4' }} />}
+        {active && (
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: '#1668c4',
+            }}
+          />
+        )}
       </span>
       {label}
     </span>
@@ -171,7 +182,8 @@ function AirportCell({
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+        setOpen(false);
     }
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
@@ -234,7 +246,16 @@ function AirportCell({
       };
 
   return (
-    <div ref={rootRef} className={className} style={{ flex: compact ? undefined : '1.5 1 165px', minWidth: compact ? 0 : 165, position: 'relative', ...fieldStyle }}>
+    <div
+      ref={rootRef}
+      className={className}
+      style={{
+        flex: compact ? undefined : '1.5 1 165px',
+        minWidth: compact ? 0 : 165,
+        position: 'relative',
+        ...fieldStyle,
+      }}
+    >
       <div
         data-testid={testId}
         onClick={toggleOpen}
@@ -248,7 +269,17 @@ function AirportCell({
           opacity: disabled ? 0.45 : 1,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 11,
+            color: '#9aa4b2',
+            fontWeight: 600,
+            marginBottom: 3,
+          }}
+        >
           <PinIcon />
           {label}
         </div>
@@ -270,7 +301,12 @@ function AirportCell({
         <>
           <div
             onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: isMobile ? 238 : 38, background: isMobile ? 'rgba(13,38,64,.55)' : undefined }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: isMobile ? 238 : 38,
+              background: isMobile ? 'rgba(13,38,64,.55)' : undefined,
+            }}
           />
           <div
             onMouseDown={(e) => e.stopPropagation()}
@@ -299,8 +335,24 @@ function AirportCell({
                 marginBottom: 9,
               }}
             />
-            <div style={{ fontSize: isMobile ? '12.5px' : '10.5px', color: '#9aa4b2', fontWeight: 700, margin: '0 4px 6px' }}>{cityListLabel}</div>
-            <div style={{ maxHeight: isMobile ? '50vh' : 220, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <div
+              style={{
+                fontSize: isMobile ? '12.5px' : '10.5px',
+                color: '#9aa4b2',
+                fontWeight: 700,
+                margin: '0 4px 6px',
+              }}
+            >
+              {cityListLabel}
+            </div>
+            <div
+              style={{
+                maxHeight: isMobile ? '50vh' : 220,
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
               {filtered.map((a) => (
                 <div
                   key={a.id}
@@ -310,7 +362,14 @@ function AirportCell({
                     setQuery('');
                   }}
                   data-testid={`airport-option-${a.code}`}
-                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 7px', borderRadius: 9, cursor: 'pointer' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '8px 7px',
+                    borderRadius: 9,
+                    cursor: 'pointer',
+                  }}
                 >
                   <span
                     style={{
@@ -328,20 +387,52 @@ function AirportCell({
                     <PlaneIcon size={15} />
                   </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: isMobile ? '13.5px' : '12.5px', fontWeight: 700, color: '#16202e' }}>
+                    <div
+                      style={{
+                        fontSize: isMobile ? '13.5px' : '12.5px',
+                        fontWeight: 700,
+                        color: '#16202e',
+                      }}
+                    >
                       {airportCityName(a.code, locale, a.cityFa)}
                     </div>
-                    <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: isMobile ? 11.5 : 10.5, color: '#9aa4b2' }}>
+                    <div
+                      style={{
+                        marginTop: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: isMobile ? 11.5 : 10.5,
+                        color: '#9aa4b2',
+                      }}
+                    >
                       {a.airportNameFa || `${cityListLabel} · ${a.code}`}
                     </div>
                   </div>
-                  <span dir="ltr" style={{ borderRadius: 7, background: '#eef4fb', padding: '3px 7px', color: '#1668c4', fontSize: 10.5, fontWeight: 800 }}>
+                  <span
+                    dir="ltr"
+                    style={{
+                      borderRadius: 7,
+                      background: '#eef4fb',
+                      padding: '3px 7px',
+                      color: '#1668c4',
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                    }}
+                  >
                     {a.code}
                   </span>
                 </div>
               ))}
               {filtered.length === 0 && (
-                <div style={{ padding: 15, textAlign: 'center', fontSize: isMobile ? '13.5px' : '11.5px', color: '#9aa4b2' }}>
+                <div
+                  style={{
+                    padding: 15,
+                    textAlign: 'center',
+                    fontSize: isMobile ? '13.5px' : '11.5px',
+                    color: '#9aa4b2',
+                  }}
+                >
                   {cityEmptyLabel}
                 </div>
               )}
@@ -394,10 +485,18 @@ export default function HomeSearchCard({
   const panelBg = isMobile ? 'linear-gradient(135deg,#0d2640,#16406e)' : '#fff';
   const svcTrackBg = isMobile ? 'rgba(255,255,255,.14)' : '#eef1f5';
   const fieldCardExtra: React.CSSProperties = isMobile
-    ? { background: '#fff', borderRadius: 12, boxShadow: '0 8px 20px -14px rgba(0,0,0,.4)' }
+    ? {
+        background: '#fff',
+        borderRadius: 12,
+        boxShadow: '0 8px 20px -14px rgba(0,0,0,.4)',
+      }
     : {};
   const fieldBoxBg = isMobile ? '#fff' : 'transparent';
-  const searchBtnRadius = isMobile ? '13px' : isRTL ? '13px 0 0 13px' : '0 13px 13px 0';
+  const searchBtnRadius = isMobile
+    ? '13px'
+    : isRTL
+      ? '13px 0 0 13px'
+      : '0 13px 13px 0';
 
   const cabinLabel = cabin === 'economy' ? t.cabinEconomy : t.cabinBusiness;
   const paxParts = [
@@ -430,8 +529,30 @@ export default function HomeSearchCard({
       setError(t.sameCity);
       return;
     }
+    if (infants > adults) {
+      setError(
+        locale === 'en'
+          ? 'Each adult can accompany only one lap infant.'
+          : locale === 'ar'
+            ? 'يمكن لكل بالغ مرافقة رضيع واحد فقط دون مقعد.'
+            : 'هر بزرگسال فقط می‌تواند یک نوزاد بدون صندلی همراه داشته باشد.',
+      );
+      return;
+    }
     setError(null);
-    navigate(`/results?origin=${origin}&dest=${dest}&date=${dateIso.slice(0, 10)}`);
+    const query = new URLSearchParams({
+      origin,
+      dest,
+      date: dateIso.slice(0, 10),
+      adults: String(adults),
+      children: String(children),
+      infants: String(infants),
+      cabin: cabin === 'business' ? 'BUSINESS' : 'ECONOMY',
+    });
+    if (tripType === 'round' && returnIso) {
+      query.set('returnDate', returnIso.slice(0, 10));
+    }
+    navigate(`/results?${query.toString()}`);
   }
 
   const tabs: { id: TopTab; label: string }[] = [
@@ -441,7 +562,14 @@ export default function HomeSearchCard({
   ];
 
   return (
-    <div style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '0 26px 18px' : '0 26px 26px', position: 'relative' }}>
+    <div
+      style={{
+        maxWidth: 1180,
+        margin: '0 auto',
+        padding: isMobile ? '0 26px 18px' : '0 26px 26px',
+        position: 'relative',
+      }}
+    >
       <style>{`
         @media (max-width: 767px) {
           #search-card { margin-top: -46px !important; }
@@ -515,7 +643,14 @@ export default function HomeSearchCard({
           overflow: 'visible',
         }}
       >
-        <div style={{ display: 'flex', borderBottom: '1px solid #eef1f5', borderRadius: '18px 18px 0 0', overflow: 'hidden' }}>
+        <div
+          style={{
+            display: 'flex',
+            borderBottom: '1px solid #eef1f5',
+            borderRadius: '18px 18px 0 0',
+            overflow: 'hidden',
+          }}
+        >
           {tabs.map((tab) => {
             const active = topTab === tab.id;
             return (
@@ -533,7 +668,9 @@ export default function HomeSearchCard({
                   color: active ? '#0d2640' : '#8a96a6',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: active ? '3px solid #1668c4' : '3px solid transparent',
+                  borderBottom: active
+                    ? '3px solid #1668c4'
+                    : '3px solid transparent',
                   fontFamily: 'inherit',
                 }}
               >
@@ -543,11 +680,34 @@ export default function HomeSearchCard({
           })}
         </div>
 
-        <div className="home-search-panel" style={{ padding: 16, background: panelBg, borderRadius: '0 0 17px 17px' }}>
+        <div
+          className="home-search-panel"
+          style={{
+            padding: 16,
+            background: panelBg,
+            borderRadius: '0 0 17px 17px',
+          }}
+        >
           {topTab === 'book' && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, gap: 10, flexWrap: 'wrap' }}>
-                <div className="home-svc-track" style={{ display: 'inline-flex', background: svcTrackBg, borderRadius: 11, padding: 3 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  marginBottom: 18,
+                  gap: 10,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div
+                  className="home-svc-track"
+                  style={{
+                    display: 'inline-flex',
+                    background: svcTrackBg,
+                    borderRadius: 11,
+                    padding: 3,
+                  }}
+                >
                   {(['domestic', 'intl'] as ServiceType[]).map((svc) => {
                     const active = service === svc;
                     return (
@@ -566,14 +726,34 @@ export default function HomeSearchCard({
                           cursor: 'pointer',
                           border: 'none',
                           fontFamily: 'inherit',
-                          color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678',
+                          color: active
+                            ? '#1668c4'
+                            : isMobile
+                              ? '#fff'
+                              : '#5a6678',
                           fontWeight: active ? 700 : 500,
                           background: active ? '#fff' : 'transparent',
-                          boxShadow: active ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
+                          boxShadow: active
+                            ? '0 2px 6px rgba(13,38,102,.12)'
+                            : 'none',
                         }}
                       >
-                        <span className="home-svc-icon" style={{ display: 'flex', color: active ? '#1668c4' : isMobile ? '#fff' : '#5a6678' }}>
-                          {svc === 'domestic' ? <DomesticFlightIcon size={18} /> : <IntlFlightIcon size={18} />}
+                        <span
+                          className="home-svc-icon"
+                          style={{
+                            display: 'flex',
+                            color: active
+                              ? '#1668c4'
+                              : isMobile
+                                ? '#fff'
+                                : '#5a6678',
+                          }}
+                        >
+                          {svc === 'domestic' ? (
+                            <DomesticFlightIcon size={18} />
+                          ) : (
+                            <IntlFlightIcon size={18} />
+                          )}
                         </span>
                         {svc === 'domestic' ? t.svcDomestic : t.svcIntl}
                       </button>
@@ -582,14 +762,48 @@ export default function HomeSearchCard({
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: isMobile ? 14 : 25, marginBottom: 20, alignItems: 'center', flexWrap: 'wrap' }}>
-                <TripRadio active={tripType === 'one'} label={t.tripOneWay} onClick={() => setTripType('one')} isMobile={isMobile} />
-                <TripRadio active={tripType === 'round'} label={t.tripRoundTrip} onClick={() => setTripType('round')} isMobile={isMobile} />
-                <TripRadio active={tripType === 'multi'} label={t.tripMultiCity} onClick={() => setTripType('multi')} isMobile={isMobile} />
+              <div
+                style={{
+                  display: 'flex',
+                  gap: isMobile ? 14 : 25,
+                  marginBottom: 20,
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <TripRadio
+                  active={tripType === 'one'}
+                  label={t.tripOneWay}
+                  onClick={() => setTripType('one')}
+                  isMobile={isMobile}
+                />
+                <TripRadio
+                  active={tripType === 'round'}
+                  label={t.tripRoundTrip}
+                  onClick={() => setTripType('round')}
+                  isMobile={isMobile}
+                />
+                <TripRadio
+                  active={tripType === 'multi'}
+                  label={t.tripMultiCity}
+                  onClick={() => setTripType('multi')}
+                  isMobile={isMobile}
+                />
               </div>
 
               {error && (
-                <p style={{ marginBottom: 12, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>{error}</p>
+                <p
+                  style={{
+                    marginBottom: 12,
+                    borderRadius: 10,
+                    background: '#fef2f2',
+                    padding: 10,
+                    fontSize: 12,
+                    color: '#e5484d',
+                  }}
+                >
+                  {error}
+                </p>
               )}
 
               <div
@@ -751,39 +965,190 @@ export default function HomeSearchCard({
                     ...fieldCardExtra,
                   }}
                 >
-                  <div onClick={() => setPaxOpen((v) => !v)} style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+                  <div
+                    onClick={() => setPaxOpen((v) => !v)}
+                    style={{
+                      cursor: 'pointer',
+                      padding: '5px 13px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      height: '100%',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 11,
+                        color: '#9aa4b2',
+                        fontWeight: 600,
+                        marginBottom: 3,
+                      }}
+                    >
                       <UserIcon />
                       {t.lblPaxClass}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#16202e', whiteSpace: 'nowrap' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#16202e',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {paxSummary}
                       <span style={{ color: '#9aa4b2', fontSize: 10 }}>▾</span>
                     </div>
                   </div>
                   {paxOpen && (
                     <>
-                      <div onClick={() => setPaxOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 38 }} />
-                      <div style={{ position: 'absolute', top: 74, [isRTL ? 'right' : 'left']: 0, width: 312, maxWidth: '88vw', background: '#fff', border: '1px solid #e6eaf0', borderRadius: 14, boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)', padding: '5px 15px 15px', zIndex: 40 }}>
+                      <div
+                        onClick={() => setPaxOpen(false)}
+                        style={{ position: 'fixed', inset: 0, zIndex: 38 }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 74,
+                          [isRTL ? 'right' : 'left']: 0,
+                          width: 312,
+                          maxWidth: '88vw',
+                          background: '#fff',
+                          border: '1px solid #e6eaf0',
+                          borderRadius: 14,
+                          boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+                          padding: '5px 15px 15px',
+                          zIndex: 40,
+                        }}
+                      >
                         {[
-                          { label: t.lblAdults, sub: t.lblAdultsAge, val: adults, dec: () => setAdults((n) => Math.max(1, n - 1)), inc: () => setAdults((n) => n + 1) },
-                          { label: t.lblChildren, sub: t.lblChildrenAge, val: children, dec: () => setChildren((n) => Math.max(0, n - 1)), inc: () => setChildren((n) => n + 1) },
-                          { label: t.lblInfants, sub: t.lblInfantsAge, val: infants, dec: () => setInfants((n) => Math.max(0, n - 1)), inc: () => setInfants((n) => n + 1) },
+                          {
+                            label: t.lblAdults,
+                            sub: t.lblAdultsAge,
+                            val: adults,
+                            dec: () => setAdults((n) => Math.max(1, n - 1)),
+                            inc: () => setAdults((n) => n + 1),
+                          },
+                          {
+                            label: t.lblChildren,
+                            sub: t.lblChildrenAge,
+                            val: children,
+                            dec: () => setChildren((n) => Math.max(0, n - 1)),
+                            inc: () => setChildren((n) => n + 1),
+                          },
+                          {
+                            label: t.lblInfants,
+                            sub: t.lblInfantsAge,
+                            val: infants,
+                            dec: () => setInfants((n) => Math.max(0, n - 1)),
+                            inc: () => setInfants((n) => n + 1),
+                          },
                         ].map((row, i) => (
-                          <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < 2 ? '1px solid #f2f4f7' : undefined }}>
+                          <div
+                            key={row.label}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '11px 0',
+                              borderBottom:
+                                i < 2 ? '1px solid #f2f4f7' : undefined,
+                            }}
+                          >
                             <div>
-                              <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#16202e' }}>{row.label}</div>
-                              <div style={{ fontSize: '10.5px', color: '#9aa4b2' }}>{row.sub}</div>
+                              <div
+                                style={{
+                                  fontSize: '12.5px',
+                                  fontWeight: 600,
+                                  color: '#16202e',
+                                }}
+                              >
+                                {row.label}
+                              </div>
+                              <div
+                                style={{ fontSize: '10.5px', color: '#9aa4b2' }}
+                              >
+                                {row.sub}
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                              <span onClick={row.dec} style={{ width: 32, height: 32, borderRadius: 8, border: '1.5px solid #d5dde7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1668c4', fontSize: 18, cursor: 'pointer', userSelect: 'none' }}>−</span>
-                              <span style={{ width: 22, textAlign: 'center', fontWeight: 700, fontSize: '13.5px' }}>{formatToman(row.val, locale)}</span>
-                              <span onClick={row.inc} style={{ width: 32, height: 32, borderRadius: 8, border: '1.5px solid #d5dde7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1668c4', fontSize: 16, cursor: 'pointer', userSelect: 'none' }}>+</span>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 11,
+                              }}
+                            >
+                              <span
+                                onClick={row.dec}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  border: '1.5px solid #d5dde7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#1668c4',
+                                  fontSize: 18,
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                −
+                              </span>
+                              <span
+                                style={{
+                                  width: 22,
+                                  textAlign: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '13.5px',
+                                }}
+                              >
+                                {formatToman(row.val, locale)}
+                              </span>
+                              <span
+                                onClick={row.inc}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 8,
+                                  border: '1.5px solid #d5dde7',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#1668c4',
+                                  fontSize: 16,
+                                  cursor: 'pointer',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                +
+                              </span>
                             </div>
                           </div>
                         ))}
-                        <div style={{ borderTop: '1px solid #eef1f5', marginTop: 6, paddingTop: 11 }}>
-                          <div style={{ fontSize: '11.5px', color: '#8a96a6', fontWeight: 600, marginBottom: 10 }}>{t.lblCabinClass}</div>
+                        <div
+                          style={{
+                            borderTop: '1px solid #eef1f5',
+                            marginTop: 6,
+                            paddingTop: 11,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: '11.5px',
+                              color: '#8a96a6',
+                              fontWeight: 600,
+                              marginBottom: 10,
+                            }}
+                          >
+                            {t.lblCabinClass}
+                          </div>
                           <div style={{ display: 'flex', gap: 7 }}>
                             {(['economy', 'business'] as Cabin[]).map((c) => (
                               <span
@@ -794,7 +1159,10 @@ export default function HomeSearchCard({
                                   textAlign: 'center',
                                   padding: '7px 0',
                                   borderRadius: 9,
-                                  border: cabin === c ? '1.5px solid #1668c4' : '1.5px solid #e2e7ee',
+                                  border:
+                                    cabin === c
+                                      ? '1.5px solid #1668c4'
+                                      : '1.5px solid #e2e7ee',
                                   background: cabin === c ? '#eef4fb' : '#fff',
                                   color: cabin === c ? '#1668c4' : '#5a6678',
                                   fontSize: '11.5px',
@@ -802,12 +1170,29 @@ export default function HomeSearchCard({
                                   cursor: 'pointer',
                                 }}
                               >
-                                {c === 'economy' ? t.cabinEconomy : t.cabinBusiness}
+                                {c === 'economy'
+                                  ? t.cabinEconomy
+                                  : t.cabinBusiness}
                               </span>
                             ))}
                           </div>
                         </div>
-                        <div onClick={() => setPaxOpen(false)} style={{ marginTop: 16, height: 44, borderRadius: 10, background: '#1668c4', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12.5px', cursor: 'pointer' }}>
+                        <div
+                          onClick={() => setPaxOpen(false)}
+                          style={{
+                            marginTop: 16,
+                            height: 44,
+                            borderRadius: 10,
+                            background: '#1668c4',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: '12.5px',
+                            cursor: 'pointer',
+                          }}
+                        >
                           {t.btnConfirm}
                         </div>
                       </div>
@@ -826,20 +1211,72 @@ export default function HomeSearchCard({
                       ...fieldCardExtra,
                     }}
                   >
-                    <div onClick={() => setClassBoxOpen((v) => !v)} style={{ cursor: 'pointer', padding: '5px 13px', display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>
+                    <div
+                      onClick={() => setClassBoxOpen((v) => !v)}
+                      style={{
+                        cursor: 'pointer',
+                        padding: '5px 13px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        height: '100%',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          fontSize: 11,
+                          color: '#9aa4b2',
+                          fontWeight: 600,
+                          marginBottom: 3,
+                        }}
+                      >
                         <PlaneIcon size={14} />
                         {t.lblFlightType}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 700, color: '#16202e', whiteSpace: 'nowrap' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: '#16202e',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
                         {cabinLabel}
-                        <span style={{ color: '#9aa4b2', fontSize: 10 }}>▾</span>
+                        <span style={{ color: '#9aa4b2', fontSize: 10 }}>
+                          ▾
+                        </span>
                       </div>
                     </div>
                     {classBoxOpen && (
                       <>
-                        <div onClick={() => setClassBoxOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 38 }} />
-                        <div style={{ position: 'absolute', top: 74, [isRTL ? 'right' : 'left']: 0, width: 190, maxWidth: '80vw', background: '#fff', border: '1px solid #e6eaf0', borderRadius: 14, boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)', padding: 10, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div
+                          onClick={() => setClassBoxOpen(false)}
+                          style={{ position: 'fixed', inset: 0, zIndex: 38 }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: 74,
+                            [isRTL ? 'right' : 'left']: 0,
+                            width: 190,
+                            maxWidth: '80vw',
+                            background: '#fff',
+                            border: '1px solid #e6eaf0',
+                            borderRadius: 14,
+                            boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+                            padding: 10,
+                            zIndex: 40,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 6,
+                          }}
+                        >
                           {(['economy', 'business'] as Cabin[]).map((c) => (
                             <span
                               key={c}
@@ -850,7 +1287,10 @@ export default function HomeSearchCard({
                               style={{
                                 padding: '9px 10px',
                                 borderRadius: 9,
-                                border: cabin === c ? '1.5px solid #1668c4' : '1.5px solid #e2e7ee',
+                                border:
+                                  cabin === c
+                                    ? '1.5px solid #1668c4'
+                                    : '1.5px solid #e2e7ee',
                                 background: cabin === c ? '#eef4fb' : '#fff',
                                 color: cabin === c ? '#1668c4' : '#5a6678',
                                 fontSize: '12.5px',
@@ -858,7 +1298,9 @@ export default function HomeSearchCard({
                                 cursor: 'pointer',
                               }}
                             >
-                              {c === 'economy' ? t.cabinEconomy : t.cabinBusiness}
+                              {c === 'economy'
+                                ? t.cabinEconomy
+                                : t.cabinBusiness}
                             </span>
                           ))}
                         </div>
@@ -898,9 +1340,31 @@ export default function HomeSearchCard({
               </div>
 
               {!isMobile && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 18 }}>
-                  <span style={{ fontSize: '11.5px', color: '#5a6678', fontWeight: 600 }}>{t.lblFlightType}</span>
-                  <div style={{ display: 'inline-flex', background: '#eef1f5', borderRadius: 10, padding: 3 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    marginTop: 18,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '11.5px',
+                      color: '#5a6678',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {t.lblFlightType}
+                  </span>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      background: '#eef1f5',
+                      borderRadius: 10,
+                      padding: 3,
+                    }}
+                  >
                     {(['economy', 'business'] as Cabin[]).map((c) => (
                       <span
                         key={c}
@@ -912,7 +1376,10 @@ export default function HomeSearchCard({
                           fontWeight: cabin === c ? 700 : 500,
                           color: cabin === c ? '#1668c4' : '#5a6678',
                           background: cabin === c ? '#fff' : 'transparent',
-                          boxShadow: cabin === c ? '0 2px 6px rgba(13,38,102,.12)' : 'none',
+                          boxShadow:
+                            cabin === c
+                              ? '0 2px 6px rgba(13,38,102,.12)'
+                              : 'none',
                           cursor: 'pointer',
                         }}
                       >
@@ -922,27 +1389,129 @@ export default function HomeSearchCard({
                   </div>
                 </div>
               )}
-
             </>
           )}
 
           {topTab === 'manage' && (
             <div style={{ padding: '6px 2px 4px' }}>
-              <div className="home-panel-muted" style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.manageIntro}</div>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 11 }}>
-                <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
-                  <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblBookingCode}</div>
-                  <input value={pnr} onChange={(ev) => setPnr(ev.target.value)} placeholder={t.phBookingCode} style={{ width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', background: 'transparent' }} />
+              <div
+                className="home-panel-muted"
+                style={{
+                  fontSize: '12.5px',
+                  color: isMobile ? '#cfe0f5' : '#5a6678',
+                  marginBottom: 16,
+                  lineHeight: 1.9,
+                }}
+              >
+                {t.manageIntro}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: 11,
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    background: fieldBoxBg,
+                    borderRadius: 12,
+                    padding: '13px 15px',
+                    boxShadow: isMobile
+                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
+                      : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#9aa4b2',
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {t.lblBookingCode}
+                  </div>
+                  <input
+                    value={pnr}
+                    onChange={(ev) => setPnr(ev.target.value)}
+                    placeholder={t.phBookingCode}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      border: 'none',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#16202e',
+                      background: 'transparent',
+                    }}
+                  />
                 </div>
-                <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
-                  <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblLastName}</div>
-                  <input value={lastName} onChange={(ev) => setLastName(ev.target.value)} placeholder={t.phLastName} style={{ width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', background: 'transparent' }} />
+                <div
+                  style={{
+                    flex: 1,
+                    background: fieldBoxBg,
+                    borderRadius: 12,
+                    padding: '13px 15px',
+                    boxShadow: isMobile
+                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
+                      : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#9aa4b2',
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {t.lblLastName}
+                  </div>
+                  <input
+                    value={lastName}
+                    onChange={(ev) => setLastName(ev.target.value)}
+                    placeholder={t.phLastName}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      border: 'none',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#16202e',
+                      background: 'transparent',
+                    }}
+                  />
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => navigate(`/manage-booking${pnr ? `?pnr=${encodeURIComponent(pnr)}` : ''}`)}
-                style={{ marginTop: 14, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 12, background: '#1668c4', color: '#fff', fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                onClick={() =>
+                  navigate(
+                    `/manage-booking${pnr ? `?pnr=${encodeURIComponent(pnr)}` : ''}`,
+                  )
+                }
+                style={{
+                  marginTop: 14,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 48,
+                  borderRadius: 12,
+                  background: '#1668c4',
+                  color: '#fff',
+                  fontSize: '13.5px',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 {t.btnViewBooking}
               </button>
@@ -951,21 +1520,118 @@ export default function HomeSearchCard({
 
           {topTab === 'checkin' && (
             <div style={{ padding: '6px 2px 4px' }}>
-              <div className="home-panel-muted" style={{ fontSize: '12.5px', color: isMobile ? '#cfe0f5' : '#5a6678', marginBottom: 16, lineHeight: 1.9 }}>{t.checkinIntro}</div>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 11 }}>
-                <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
-                  <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblFlightNo}</div>
-                  <input value={flightNo} onChange={(ev) => setFlightNo(ev.target.value)} placeholder={t.phFlightNo} style={{ width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', background: 'transparent' }} />
+              <div
+                className="home-panel-muted"
+                style={{
+                  fontSize: '12.5px',
+                  color: isMobile ? '#cfe0f5' : '#5a6678',
+                  marginBottom: 16,
+                  lineHeight: 1.9,
+                }}
+              >
+                {t.checkinIntro}
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  gap: 11,
+                }}
+              >
+                <div
+                  style={{
+                    flex: 1,
+                    background: fieldBoxBg,
+                    borderRadius: 12,
+                    padding: '13px 15px',
+                    boxShadow: isMobile
+                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
+                      : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#9aa4b2',
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {t.lblFlightNo}
+                  </div>
+                  <input
+                    value={flightNo}
+                    onChange={(ev) => setFlightNo(ev.target.value)}
+                    placeholder={t.phFlightNo}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      border: 'none',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#16202e',
+                      background: 'transparent',
+                    }}
+                  />
                 </div>
-                <div style={{ flex: 1, background: fieldBoxBg, borderRadius: 12, padding: '13px 15px', boxShadow: isMobile ? '0 8px 20px -12px rgba(0,0,0,.3)' : 'none' }}>
-                  <div style={{ fontSize: 11, color: '#9aa4b2', fontWeight: 600, marginBottom: 3 }}>{t.lblFlightDate}</div>
-                  <input placeholder={t.phFlightDate} style={{ width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#16202e', background: 'transparent' }} />
+                <div
+                  style={{
+                    flex: 1,
+                    background: fieldBoxBg,
+                    borderRadius: 12,
+                    padding: '13px 15px',
+                    boxShadow: isMobile
+                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
+                      : 'none',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#9aa4b2',
+                      fontWeight: 600,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {t.lblFlightDate}
+                  </div>
+                  <input
+                    placeholder={t.phFlightDate}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      border: 'none',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#16202e',
+                      background: 'transparent',
+                    }}
+                  />
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => navigate('/flight-status')}
-                style={{ marginTop: 14, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 12, background: '#1668c4', color: '#fff', fontSize: '13.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{
+                  marginTop: 14,
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 48,
+                  borderRadius: 12,
+                  background: '#1668c4',
+                  color: '#fff',
+                  fontSize: '13.5px',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
               >
                 {t.btnViewStatus}
               </button>
@@ -976,17 +1642,45 @@ export default function HomeSearchCard({
 
       {!isMobile && (
         <div style={{ marginTop: 36 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 15 }}>
-            <span style={{ fontSize: '14.5px', color: '#0d2640', fontWeight: 800, whiteSpace: 'nowrap' }}>{t.popularRoutesTitle}</span>
-            <span style={{ fontSize: '11.5px', color: '#5a6678' }}>{t.popularRoutesSub}</span>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+              marginBottom: 15,
+            }}
+          >
+            <span
+              style={{
+                fontSize: '14.5px',
+                color: '#0d2640',
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.popularRoutesTitle}
+            </span>
+            <span style={{ fontSize: '11.5px', color: '#5a6678' }}>
+              {t.popularRoutesSub}
+            </span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5,1fr)',
+              gap: 10,
+            }}
+          >
             {popularRoutes.map((r) => (
               <button
                 type="button"
                 key={`${r.fromCode}-${r.toCode}`}
                 data-testid={`popular-route-${r.toCode}`}
-                onClick={() => navigate(`/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`)}
+                onClick={() =>
+                  navigate(
+                    `/results?origin=${r.fromCode}&dest=${r.toCode}&date=${TODAY_ISO}`,
+                  )
+                }
                 style={{
                   textAlign: isRTL ? 'right' : 'left',
                   background: '#fff',
@@ -1001,15 +1695,41 @@ export default function HomeSearchCard({
                   gap: 10,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 7 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#16202e', whiteSpace: 'nowrap' }}>
-                    {cityName(r.fromCode)} <span style={{ color: '#b9c2cf', fontWeight: 600 }}>{locale === 'en' ? '→' : '←'}</span> {cityName(r.toCode)}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 7,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: '#16202e',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {cityName(r.fromCode)}{' '}
+                    <span style={{ color: '#b9c2cf', fontWeight: 600 }}>
+                      {locale === 'en' ? '→' : '←'}
+                    </span>{' '}
+                    {cityName(r.toCode)}
                   </span>
                   <PlaneIcon />
                 </div>
                 <div style={{ fontSize: 11, color: '#9aa4b2' }}>
                   {t.fromPrice}{' '}
-                  <span style={{ fontSize: '13.5px', fontWeight: 800, color: '#1668c4' }}>{formatToman(r.tomanPrice, locale)}</span>{' '}
+                  <span
+                    style={{
+                      fontSize: '13.5px',
+                      fontWeight: 800,
+                      color: '#1668c4',
+                    }}
+                  >
+                    {formatToman(r.tomanPrice, locale)}
+                  </span>{' '}
                   {t.toman}
                 </div>
               </button>
@@ -1019,18 +1739,82 @@ export default function HomeSearchCard({
       )}
 
       {isMobile && (
-        <div style={{ marginTop: 30, position: 'relative', borderRadius: 18, overflow: 'hidden', minHeight: 150, boxShadow: '0 14px 34px -22px rgba(13,38,102,.4)', background: 'linear-gradient(100deg,#0d2666 0%,#1668c4 60%,#3f8ede 100%)' }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(100deg,rgba(13,38,102,.92) 10%,rgba(22,104,196,.55) 60%,rgba(22,104,196,.15) 100%)' }} />
+        <div
+          style={{
+            marginTop: 30,
+            position: 'relative',
+            borderRadius: 18,
+            overflow: 'hidden',
+            minHeight: 150,
+            boxShadow: '0 14px 34px -22px rgba(13,38,102,.4)',
+            background:
+              'linear-gradient(100deg,#0d2666 0%,#1668c4 60%,#3f8ede 100%)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(100deg,rgba(13,38,102,.92) 10%,rgba(22,104,196,.55) 60%,rgba(22,104,196,.15) 100%)',
+            }}
+          />
           <div style={{ position: 'relative', zIndex: 2, padding: 20 }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ffffff22', color: '#fff', padding: '4px 10px', borderRadius: 20, fontSize: '10.5px', fontWeight: 700, marginBottom: 11 }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#ffffff22',
+                color: '#fff',
+                padding: '4px 10px',
+                borderRadius: 20,
+                fontSize: '10.5px',
+                fontWeight: 700,
+                marginBottom: 11,
+              }}
+            >
               {t.airlineBadge}
             </div>
-            <div style={{ fontSize: '16.5px', fontWeight: 800, color: '#fff', marginBottom: 7, lineHeight: 1.5 }}>{t.airlineTitle}</div>
-            <p style={{ fontSize: 12, color: '#cfe0f5', margin: '0 0 15px', lineHeight: 1.8, maxWidth: 280 }}>{t.airlineSub}</p>
+            <div
+              style={{
+                fontSize: '16.5px',
+                fontWeight: 800,
+                color: '#fff',
+                marginBottom: 7,
+                lineHeight: 1.5,
+              }}
+            >
+              {t.airlineTitle}
+            </div>
+            <p
+              style={{
+                fontSize: 12,
+                color: '#cfe0f5',
+                margin: '0 0 15px',
+                lineHeight: 1.8,
+                maxWidth: 280,
+              }}
+            >
+              {t.airlineSub}
+            </p>
             <button
               type="button"
               onClick={() => navigate('/destinations')}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: '#0d2640', padding: '9px 18px', borderRadius: 11, fontSize: '12.5px', fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#fff',
+                color: '#0d2640',
+                padding: '9px 18px',
+                borderRadius: 11,
+                fontSize: '12.5px',
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
             >
               {t.airlineBtn} <span>{locale === 'en' ? '→' : '←'}</span>
             </button>

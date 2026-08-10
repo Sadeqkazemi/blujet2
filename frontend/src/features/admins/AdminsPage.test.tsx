@@ -17,6 +17,7 @@ const ROWS: AdminRow[] = [
     isActive: true,
     online: true,
     managedByCaller: true,
+    permissions: null,
   },
 ];
 
@@ -34,7 +35,9 @@ describe('AdminsPage', () => {
     const user = userEvent.setup();
     await user.click(screen.getByText('سحر کاظمی'));
     expect(await screen.findByText('امنیت و دسترسی ورود')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'مسدودسازی ورود به پنل' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'مسدودسازی ورود به پنل' }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'تولید رمز موقت' }));
     await waitFor(() => expect(resetSpy).toHaveBeenCalledWith('a1', {}));
@@ -49,12 +52,22 @@ describe('AdminsPage', () => {
     await screen.findByText('سحر کاظمی');
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'افزودن مدیر / ادمین' }));
+    await user.click(
+      screen.getByRole('button', { name: 'افزودن مدیر / ادمین' }),
+    );
     await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'مدیر تازه');
-    await user.type(screen.getByLabelText('ایمیل سازمانی'), 'new@blujet.example');
+    await user.type(
+      screen.getByLabelText('ایمیل سازمانی'),
+      'new@blujet.example',
+    );
     await user.type(screen.getByLabelText('نام کاربری'), 'new.admin');
-    await user.type(screen.getByLabelText('رمز عبور ورود (حداقل ۶ کاراکتر)'), '123');
-    await user.click(screen.getByRole('button', { name: 'افزودن و تعیین دسترسی' }));
+    await user.type(
+      screen.getByLabelText('رمز عبور ورود (حداقل ۶ کاراکتر)'),
+      '123',
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'افزودن و تعیین دسترسی' }),
+    );
 
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(createSpy).not.toHaveBeenCalled();
@@ -63,8 +76,14 @@ describe('AdminsPage', () => {
   it('shows the design empty-state copy when there are no managers', async () => {
     vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue([]);
     render(<AdminsPage />);
-    expect(await screen.findByText('هنوز اطلاعاتی وارد نشده است.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'مدیران', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('کاربران مدیریتی، افزودن و تعیین سطوح دسترسی')).toBeInTheDocument();
+    expect(
+      await screen.findByText('هنوز اطلاعاتی وارد نشده است.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'مدیران', level: 1 }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('کاربران مدیریتی، افزودن و تعیین سطوح دسترسی'),
+    ).toBeInTheDocument();
   });
 });

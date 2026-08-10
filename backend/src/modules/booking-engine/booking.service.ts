@@ -55,6 +55,10 @@ import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import type { CreateAllotmentBookingDto } from '../agency-portal/dto/create-allotment-booking.dto';
+import {
+  passengerFareRows,
+  validatePassengerManifest,
+} from './passenger-fares';
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -204,6 +208,11 @@ export class BookingService {
       passengers: b.passengers.map((p) => ({
         fullName: p.fullName,
         seatCode: p.seatCode,
+        passengerType: p.passengerType,
+        birthDate: p.birthDate,
+        occupiesSeat: p.occupiesSeat,
+        fareIrr: p.fareIrr,
+        taxIrr: p.taxIrr,
       })),
     };
   }
@@ -247,6 +256,7 @@ export class BookingService {
       });
     }
     assertSellableForSale(instance);
+    validatePassengerManifest(dto.passengers, instance.departureAt);
     const now = new Date();
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
@@ -270,7 +280,9 @@ export class BookingService {
     const seatsByCode = new Map(
       enumerateSeats(map).map((s) => [s.seatCode, s]),
     );
-    const requestedCodes = dto.passengers.map((p) => p.seatCode);
+    const requestedCodes = dto.passengers.flatMap((p) =>
+      p.seatCode ? [p.seatCode] : [],
+    );
     if (new Set(requestedCodes).size !== requestedCodes.length) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -377,7 +389,6 @@ export class BookingService {
     // both are included in the stored total so ledger/refunds/reporting — which
     // all read priceIrr as-is — never need to recompute; taxIrr and
     // chargeSnapshot are stored for receipt display and audit.
-    const passengerCount = BigInt(dto.passengers.length);
     const unitCharges = await calculateActiveCharges(
       this.bookingRepo.manager,
       instance.id,
@@ -386,10 +397,17 @@ export class BookingService {
       instance.departureAt,
     );
     const chargePerPax = BigInt(unitCharges.totalChargesIrr);
-    const taxIrr: Irr =
-      (fareClass?.taxIrr ?? 0n) * passengerCount +
-      chargePerPax * passengerCount;
-    const priceIrr: Irr = unitPriceIrr * passengerCount + taxIrr + extrasIrr;
+    const fareRows = passengerFareRows(
+      dto.passengers,
+      unitPriceIrr,
+      (fareClass?.taxIrr ?? 0n) + chargePerPax,
+      instance.charterSeats >= instance.capacity ? 'CHARTER' : 'SYSTEM',
+    );
+    const occupiedSeatCount = fareRows.filter((row) => row.occupiesSeat).length;
+    const taxIrr: Irr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
+    const priceIrr: Irr =
+      fareRows.reduce((sum, row) => sum + row.fareIrr + row.taxIrr, 0n) +
+      extrasIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
       .select(['u.id', 'u.phone'])
@@ -444,7 +462,7 @@ export class BookingService {
         0,
         cabinCapacity - takenInCabin - committedInCabin,
       );
-      if (dto.passengers.length > availableInCabin) {
+      if (occupiedSeatCount > availableInCabin) {
         throw new ConflictException({
           code: ErrorCode.POOL_EXHAUSTED,
           message: `ظرفیت غیرمتعهد کابین ${cabinLabelFa(dto.cabin)} برای این پرواز تکمیل شده است.`,
@@ -462,7 +480,7 @@ export class BookingService {
         instance.charterSeats -
         (instance.agencySeatsAllocated ?? 0);
       const publicPoolUsed = counts.SYSTEM + counts.MANAGERIAL;
-      if (publicPoolUsed + dto.passengers.length > publicPoolLimit) {
+      if (publicPoolUsed + occupiedSeatCount > publicPoolLimit) {
         throw new ConflictException({
           code: ErrorCode.POOL_EXHAUSTED,
           message: 'ظرفیت فروش عمومی این پرواز تکمیل شده است.',
@@ -489,14 +507,20 @@ export class BookingService {
         }),
       );
 
-      const passengerEntities = dto.passengers.map((p) => {
+      const passengerEntities = fareRows.map((row) => {
+        const p = row.passenger;
         const nationalId = p.nationalId
           ? normalizeNationalId(p.nationalId)
           : undefined;
         return tx.create(Passenger, {
           bookingId: created.id,
           fullName: p.fullName,
-          seatCode: p.seatCode,
+          seatCode: p.seatCode ?? null,
+          passengerType: p.passengerType,
+          birthDate: p.birthDate,
+          occupiesSeat: row.occupiesSeat,
+          fareIrr: row.fareIrr,
+          taxIrr: row.taxIrr,
           nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
           nationalIdHash: nationalId ? hashPii(nationalId) : null,
           mobileEnc: p.mobile ? encryptPii(p.mobile) : null,
@@ -668,6 +692,7 @@ export class BookingService {
       });
     }
     assertSellableForSale(instance);
+    validatePassengerManifest(dto.passengers, instance.departureAt);
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
       (instance.saleEndsAt && instance.saleEndsAt < now)
@@ -690,8 +715,8 @@ export class BookingService {
     const seatsByCode = new Map(
       enumerateSeats(map).map((seat) => [seat.seatCode, seat]),
     );
-    const requestedCodes = dto.passengers.map(
-      (passenger) => passenger.seatCode,
+    const requestedCodes = dto.passengers.flatMap((passenger) =>
+      passenger.seatCode ? [passenger.seatCode] : [],
     );
     if (new Set(requestedCodes).size !== requestedCodes.length) {
       throw new BadRequestException({
@@ -700,8 +725,10 @@ export class BookingService {
       });
     }
     for (const passenger of dto.passengers) {
-      const seat = seatsByCode.get(passenger.seatCode);
-      if (!seat || seat.cabin !== dto.cabin) {
+      const seat = passenger.seatCode
+        ? seatsByCode.get(passenger.seatCode)
+        : undefined;
+      if (passenger.seatCode && (!seat || seat.cabin !== dto.cabin)) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
           message: `صندلی ${passenger.seatCode} برای کلاس انتخابی معتبر نیست.`,
@@ -726,7 +753,6 @@ export class BookingService {
     const unitPriceIrr =
       allotment.contractPriceIrr ??
       (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
-    const passengerCount = BigInt(dto.passengers.length);
     const unitCharges = await calculateActiveCharges(
       this.bookingRepo.manager,
       instance.id,
@@ -735,10 +761,18 @@ export class BookingService {
       instance.departureAt,
     );
     const chargePerPax = BigInt(unitCharges.totalChargesIrr);
-    const taxIrr =
-      (fareClass?.taxIrr ?? 0n) * passengerCount +
-      chargePerPax * passengerCount;
-    const priceIrr = unitPriceIrr * passengerCount + taxIrr;
+    const fareRows = passengerFareRows(
+      dto.passengers,
+      unitPriceIrr,
+      (fareClass?.taxIrr ?? 0n) + chargePerPax,
+      instance.charterSeats >= instance.capacity ? 'CHARTER' : 'SYSTEM',
+    );
+    const occupiedSeatCount = fareRows.filter((row) => row.occupiesSeat).length;
+    const taxIrr: Irr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
+    const priceIrr: Irr = fareRows.reduce(
+      (sum, row) => sum + row.fareIrr + row.taxIrr,
+      0n,
+    );
     const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
 
     const transactionResult = await this.bookingRepo.manager.transaction(
@@ -801,10 +835,7 @@ export class BookingService {
             { now: new Date() },
           )
           .getCount();
-        if (
-          usedSeats + dto.passengers.length >
-          lockedAllotment.seatsAllocated
-        ) {
+        if (usedSeats + occupiedSeatCount > lockedAllotment.seatsAllocated) {
           throw new ConflictException({
             code: ErrorCode.POOL_EXHAUSTED,
             message: 'ظرفیت سهمیه این آژانس تکمیل شده است.',
@@ -858,7 +889,7 @@ export class BookingService {
           }),
         );
         await tx.save(
-          dto.passengers.map((passenger) => {
+          fareRows.map(({ passenger, occupiesSeat, fareIrr, taxIrr }) => {
             const nationalId = passenger.nationalId
               ? normalizeNationalId(passenger.nationalId)
               : undefined;
@@ -866,6 +897,11 @@ export class BookingService {
               bookingId: created.id,
               fullName: passenger.fullName,
               seatCode: passenger.seatCode,
+              passengerType: passenger.passengerType,
+              birthDate: passenger.birthDate,
+              occupiesSeat,
+              fareIrr,
+              taxIrr,
               nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
               nationalIdHash: nationalId ? hashPii(nationalId) : null,
               mobileEnc: passenger.mobile ? encryptPii(passenger.mobile) : null,
@@ -973,7 +1009,6 @@ export class BookingService {
           booking.flightInstanceId,
           booking.cabin,
         );
-    const bookingPassengerCount = BigInt(booking.passengers.length);
     let currentTaxIrr: Irr = 0n;
     let currentPriceIrr: Irr = booking.priceIrr;
     let currentChargeSnapshot = booking.chargeSnapshot;
@@ -991,11 +1026,23 @@ export class BookingService {
         booking.flightInstance.departureAt,
       );
       const chargePerPax = BigInt(unitCharges.totalChargesIrr);
-      currentTaxIrr =
-        (currentFareClass?.taxIrr ?? 0n) * bookingPassengerCount +
-        chargePerPax * bookingPassengerCount;
+      const fareRows = passengerFareRows(
+        booking.passengers.map((passenger) => ({
+          fullName: passenger.fullName,
+          passengerType: passenger.passengerType,
+          birthDate: passenger.birthDate,
+          seatCode: passenger.seatCode ?? undefined,
+        })),
+        unitFare,
+        (currentFareClass?.taxIrr ?? 0n) + chargePerPax,
+        booking.flightInstance.charterSeats >= booking.flightInstance.capacity
+          ? 'CHARTER'
+          : booking.channel,
+      );
+      currentTaxIrr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
       currentPriceIrr =
-        unitFare * bookingPassengerCount + currentTaxIrr + booking.extrasIrr;
+        fareRows.reduce((sum, row) => sum + row.fareIrr + row.taxIrr, 0n) +
+        booking.extrasIrr;
       currentChargeSnapshot = unitCharges;
     }
 

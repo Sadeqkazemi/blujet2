@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BeforeInsert,
+  Check,
   Column,
   Entity,
   Index,
@@ -9,8 +10,15 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { Booking } from './booking.entity';
+import { bigintTransformer } from '../transformers/bigint.transformer';
+
+export type PassengerType = 'ADULT' | 'CHILD' | 'INFANT';
 
 @Index('passengers_nationalIdHash_idx', ['nationalIdHash'])
+@Check(
+  'passengers_passengerType_check',
+  `"passengerType" IN ('ADULT','CHILD','INFANT')`,
+)
 @Entity('passengers')
 export class Passenger {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'passengers_pkey' })
@@ -45,6 +53,21 @@ export class Passenger {
 
   @Column({ type: 'text', nullable: true })
   seatCode!: string | null;
+
+  @Column({ type: 'text', default: 'ADULT' })
+  passengerType: PassengerType = 'ADULT';
+
+  @Column({ type: 'date', default: '1970-01-01' })
+  birthDate = '1970-01-01';
+
+  @Column({ type: 'boolean', default: true })
+  occupiesSeat = true;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  fareIrr = 0n;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  taxIrr = 0n;
 
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   deletedAt!: Date | null;
