@@ -36,13 +36,23 @@ export class BookingPassengerDto {
   @IsString()
   mobile?: string;
 
-  @ApiProperty({ enum: PASSENGER_TYPES, example: 'ADULT' })
+  @ApiProperty({
+    enum: PASSENGER_TYPES,
+    example: 'ADULT',
+    required: false,
+    default: 'ADULT',
+  })
   @IsIn(PASSENGER_TYPES)
-  passengerType: BookingPassengerType;
+  passengerType: BookingPassengerType = 'ADULT';
 
-  @ApiProperty({ example: '1990-05-20', description: 'ISO birth date' })
+  @ApiProperty({
+    example: '1990-05-20',
+    description: 'ISO birth date',
+    required: false,
+    default: '1970-01-01',
+  })
   @IsDateString({ strict: true })
-  birthDate: string;
+  birthDate = '1970-01-01';
 
   @ApiProperty({
     example: '4A',
