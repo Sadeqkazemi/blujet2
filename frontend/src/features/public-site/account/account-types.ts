@@ -3,6 +3,7 @@ export type TabKey =
   | 'account-info'
   | 'trips'
   | 'wallet'
+  | 'loans'
   | 'club'
   | 'saved'
   | 'price-locks'

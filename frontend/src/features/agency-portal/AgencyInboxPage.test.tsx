@@ -39,10 +39,12 @@ describe('AgencyInboxPage', () => {
     expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
 
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /پیام جدید/ }));
+    await user.type(screen.getByPlaceholderText('موضوع پیام'), 'تسویه فاکتور');
     await user.type(screen.getByPlaceholderText('پیام خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
     await user.click(screen.getByRole('button', { name: 'ارسال' }));
 
-    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('حتماً تا پنجشنبه پرداخت می‌شود.'));
+    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('موضوع: تسویه فاکتور\n\nحتماً تا پنجشنبه پرداخت می‌شود.'));
   });
 
   it('renders translated heading, placeholder, and send button in English', async () => {
@@ -50,7 +52,9 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue(MESSAGES);
     render(<AgencyInboxPage />);
 
-    expect(await screen.findByPlaceholderText('Write your message…')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /New message/ }));
+    expect(screen.getByPlaceholderText('Write your message…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
   });
 

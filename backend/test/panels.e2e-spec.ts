@@ -211,6 +211,7 @@ describe('Panels (e2e)', () => {
       'reports',
       'customers',
       'club',
+      'loans',
       'refund',
       'cartable',
       'tickets',

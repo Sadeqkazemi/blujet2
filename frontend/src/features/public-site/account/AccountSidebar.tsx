@@ -97,6 +97,12 @@ const NAV_ICONS: Record<TabKey, React.ReactNode> = {
       <path d="M21 11h-4a2 2 0 0 0 0 4h4Z" />
     </svg>
   ),
+  loans: (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="6" width="18" height="13" rx="2" />
+      <path d="M3 10h18M7 15h4" />
+    </svg>
+  ),
   club: (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 8.5 7 12l5-7 5 7 4-3.5-1.8 9.5a1 1 0 0 1-1 .8H5.8a1 1 0 0 1-1-.8Z" />

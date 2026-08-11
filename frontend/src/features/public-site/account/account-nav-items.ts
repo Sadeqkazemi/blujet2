@@ -58,6 +58,14 @@ export const ACCOUNT_NAV_ITEMS: AccountNavItem[] = [
     showInMobileMenu: true,
   },
   {
+    key: 'loans',
+    group: 'primary',
+    label: { fa: 'وام و اعتبارات', en: 'Loans & Credit', ar: 'القروض والائتمان' },
+    showInSidebar: true,
+    showInMobileSidebar: true,
+    showInMobileMenu: true,
+  },
+  {
     key: 'club',
     group: 'primary',
     label: { fa: 'امتیاز و باشگاه مشتریان', en: 'Points & Loyalty Club', ar: 'النقاط ونادي الولاء' },
