@@ -1,5 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import type { CheckoutWizardStep } from './checkout-types';
 import { CHECKOUT_COPY } from './checkout-copy';
 
@@ -101,5 +101,5 @@ export default function CheckoutStepBar({
 
 export function stepNumberLabel(step: CheckoutProgressStep, locale: StoredLocale): string {
   const idx = STEP_ORDER.indexOf(step) + 1;
-  return locale === 'en' ? String(idx) : faDigits(idx);
+  return localeDigits(idx, locale);
 }

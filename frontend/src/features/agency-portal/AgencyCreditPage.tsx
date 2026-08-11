@@ -7,8 +7,8 @@ import {
   payInvoice,
   requestCreditIncrease,
 } from '../../api/agency-portal';
-import { faMoney, parseTomanToRial } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
+import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
 import { ApiRequestError } from '../../api/envelope';
 import Modal from '../../components/Modal';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -260,15 +260,15 @@ export default function AgencyCreditPage() {
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditLimitLabel}</div>
-          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.limitIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-ink">{localeMoney(credit.limitIrr, locale)} {t.toman}</div>
         </div>
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditUsedLabel}</div>
-          <div className="mt-1 text-lg font-black text-ink">{faMoney(credit.usedIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-ink">{localeMoney(credit.usedIrr, locale)} {t.toman}</div>
         </div>
         <div className="rounded-xl border border-border bg-white p-4">
           <div className="text-[11px] text-muted">{t.creditRemainingLabel}</div>
-          <div className="mt-1 text-lg font-black text-accent">{faMoney(credit.remainingIrr)} {t.toman}</div>
+          <div className="mt-1 text-lg font-black text-accent">{localeMoney(credit.remainingIrr, locale)} {t.toman}</div>
         </div>
       </div>
 
@@ -296,8 +296,8 @@ export default function AgencyCreditPage() {
                       <td className="py-2.5">
                         <span className="ltr">{inv.invoiceNo}</span>
                       </td>
-                      <td className="py-2.5">{formatJalaliDate(inv.dueAt)}</td>
-                      <td className="py-2.5 font-bold">{faMoney(inv.amountIrr)} {t.toman}</td>
+                      <td className="py-2.5">{formatLocaleDate(inv.dueAt, locale)}</td>
+                      <td className="py-2.5 font-bold">{localeMoney(inv.amountIrr, locale)} {t.toman}</td>
                       <td className="py-2.5">
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
                           {st.label[locale]}
@@ -331,7 +331,7 @@ export default function AgencyCreditPage() {
               const st = CREDIT_REQUEST_STATUS[r.status];
               return (
                 <div key={r.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
-                  <span className="font-bold">{faMoney(r.requestedLimitIrr)} {t.toman}</span>
+                  <span className="font-bold">{localeMoney(r.requestedLimitIrr, locale)} {t.toman}</span>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>{st.label[locale]}</span>
                 </div>
               );
@@ -350,11 +350,11 @@ export default function AgencyCreditPage() {
               <div key={entry.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
                 <div>
                   <div className="font-bold">{LEDGER_LABEL[entry.type][locale]}</div>
-                  <div className="text-[10px] text-muted">{formatJalaliDateTime(entry.occurredAt)}</div>
+                  <div className="text-[10px] text-muted">{formatLocaleDateTime(entry.occurredAt, locale)}</div>
                 </div>
                 <span className={`font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
                   {Number(entry.signedAmountIrr) < 0 ? '+' : '−'}
-                  {faMoney(Math.abs(Number(entry.signedAmountIrr)))}
+                  {localeMoney(Math.abs(Number(entry.signedAmountIrr)), locale)}
                 </span>
               </div>
             ))}

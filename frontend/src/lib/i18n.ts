@@ -19,7 +19,7 @@ const DICT = {
   navTravelInfo: { fa: 'اطلاعات سفر', en: 'Travel Info', ar: 'معلومات السفر' },
   navSupport: { fa: 'پشتیبانی', en: 'Support', ar: 'الدعم' },
   menuTitle: { fa: 'منو', en: 'Menu', ar: 'القائمة' },
-  btnLoginSignup: { fa: 'ورود / ثبت‌نام', en: 'Log in / Sign up', ar: 'ورود / تسجيل الدخول' },
+  btnLoginSignup: { fa: 'ورود / ثبت‌نام', en: 'Log in / Sign up', ar: 'تسجيل الدخول / إنشاء حساب' },
   btnLoginOnly: { fa: 'ورود', en: 'Log in', ar: 'تسجيل الدخول' },
   btnJoinClub: { fa: 'عضویت باشگاه', en: 'Join Club', ar: 'الانضمام إلى النادي' },
   loginDrawerTitle: { fa: 'ورود', en: 'Log in', ar: 'تسجيل الدخول' },
@@ -72,7 +72,7 @@ const DICT = {
   },
   badgeTrust: { fa: 'نماد اعتماد الکترونیکی', en: 'e-Trust Seal', ar: 'رمز الثقة الإلكترونية' },
   badgeGuild: { fa: 'انجمن صنفی دفاتر خدمات مسافرتی', en: 'Travel Agencies Guild', ar: 'اتحاد وكالات السفر' },
-  badgeSamandehi: { fa: 'ساماندهی', en: 'Samandehi Registered', ar: 'ساماندهی' },
+  badgeSamandehi: { fa: 'ساماندهی', en: 'Samandehi Registered', ar: 'مسجل رسميًا' },
   badgeIata: { fa: 'عضو IATA', en: 'IATA Member', ar: 'عضو IATA' },
 } satisfies Record<string, Record<StoredLocale, string>>;
 

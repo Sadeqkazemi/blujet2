@@ -2,7 +2,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, formatToman } from '../../../lib/fa-format';
+import { formatToman } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SearchCabinOption, SearchFlightResult } from '../../../types/public-site';
 
 dayjs.extend(utc);
@@ -26,7 +27,7 @@ export function depHourBucket(iso: string): 'morning' | 'noon' | 'evening' {
 export function formatFlightClock(iso: string, locale: StoredLocale, timeZone?: string): string {
   const d = timeZone ? dayjs(iso).tz(timeZone) : dayjs(iso);
   const raw = d.format('HH:mm');
-  return locale === 'en' ? raw : faDigits(raw);
+  return localeDigits(raw, locale);
 }
 
 export function flightDurationMinutes(departureAt: string, arrivalAt: string): number {

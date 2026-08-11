@@ -16,7 +16,7 @@ import {
   latinDigits,
   localeMoney,
 } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type {
   CustomerRefundRule,
@@ -460,9 +460,5 @@ function TrackingCard({ row, locale }: { row: RefundRequestView; locale: StoredL
 }
 
 function formatDate(value: string, locale: StoredLocale) {
-  if (locale !== 'en') return formatJalaliDateTime(value);
-  return new Intl.DateTimeFormat('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
+  return formatLocaleDateTime(value, locale);
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchClubPoints, fetchMyProfile } from '../../api/publicSite';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -125,7 +125,7 @@ export default function PublicHeader() {
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const notifications = NOTIFICATIONS[locale];
   const notifCount = notifications.length;
-  const notifCountLabel = locale === 'fa' ? faDigits(notifCount) : String(notifCount);
+  const notifCountLabel = localeDigits(notifCount, locale);
   const logoutCopy = LOGOUT_COPY[locale];
 
   function requestSignOut() {
@@ -629,7 +629,7 @@ export default function PublicHeader() {
                             {club?.isMember && (
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, background: 'rgba(255,255,255,.1)', borderRadius: 10, padding: '7px 11px' }}>
                                 <span style={{ fontSize: 13, color: '#aac4e2' }}>{t('pointsLabel')}</span>
-                                <span style={{ fontSize: '13.5px', fontWeight: 800 }}>{locale === 'fa' ? faDigits(club.balance) : club.balance}</span>
+                                <span style={{ fontSize: '13.5px', fontWeight: 800 }}>{localeDigits(club.balance, locale)}</span>
                               </div>
                             )}
                           </div>

@@ -2,28 +2,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fetchPriceCalendar } from "../api/publicSite";
 import type { StoredLocale } from "../hooks/useLocale";
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../lib/jalali";
-import { faDigits } from "../lib/fa-format";
+import {
+  calendarForLocale,
+  calendarOffset,
+  formatLocaleDate,
+  localeDigits,
+  localeMonthYear,
+  localeWeekdayLong,
+  localeWeekdays,
+} from "../lib/locale-format";
 import {
   formatPriceCalendarPrice,
   isPriceCalendarEmpty,
   priceCalendarCopy,
 } from "../lib/price-calendar";
-
-const WEEKDAYS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
-const MONTH_NAMES = [
-  "فروردین",
-  "اردیبهشت",
-  "خرداد",
-  "تیر",
-  "مرداد",
-  "شهریور",
-  "مهر",
-  "آبان",
-  "آذر",
-  "دی",
-  "بهمن",
-  "اسفند",
-];
 
 interface Cell {
   date: number;
@@ -34,9 +26,10 @@ interface Cell {
 function buildMonthCells(
   viewMonth: ReturnType<typeof dayjs>,
   minIso: string | null,
+  locale: StoredLocale,
 ): (Cell | null)[] {
   const start = viewMonth.startOf("month");
-  const offset = (start.day() + 1) % 7;
+  const offset = calendarOffset(start, locale);
   const daysInMonth = viewMonth.daysInMonth();
   const cells: (Cell | null)[] = Array.from({ length: offset }, () => null);
   for (let d = 1; d <= daysInMonth; d++) {
@@ -65,6 +58,8 @@ interface JalaliDatePickerProps {
   compact?: boolean;
   /** Full-height single-line trigger for standard form fields. */
   singleLine?: boolean;
+  /** fa uses Jalali; en/ar use Gregorian with locale-specific digits. */
+  locale?: StoredLocale;
   /** Mobile flight-search mode: load real fares into the month grid. */
   priceCalendar?: {
     origin: string;
@@ -86,8 +81,11 @@ export default function JalaliDatePicker({
   theme = "light",
   compact = false,
   singleLine = false,
+  locale: localeProp,
   priceCalendar,
 }: JalaliDatePickerProps) {
+  const locale = localeProp ?? priceCalendar?.locale ?? "fa";
+  const calendarSystem = calendarForLocale(locale);
   const [open, setOpen] = useState(false);
   const [draftIso, setDraftIso] = useState<string | null>(
     value ? value.slice(0, 10) : null,
@@ -96,7 +94,7 @@ export default function JalaliDatePicker({
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesError, setPricesError] = useState(false);
   const [viewMonth, setViewMonth] = useState(() =>
-    value ? dayjs(value).calendar("jalali") : dayjs().calendar("jalali"),
+    value ? dayjs(value).calendar(calendarSystem) : dayjs().calendar(calendarSystem),
   );
   const [popupPos, setPopupPos] = useState<{
     top?: number;
@@ -109,8 +107,13 @@ export default function JalaliDatePicker({
   const popupRef = useRef<HTMLDivElement>(null);
   const priceCacheRef = useRef(new Map<string, Record<string, string>>());
   const minIso = minDate ?? null;
-  const cells = buildMonthCells(viewMonth, minIso);
+  const cells = buildMonthCells(viewMonth, minIso, locale);
   const monthKey = `${viewMonth.year()}-${viewMonth.month()}`;
+
+  useEffect(() => {
+    const source = value ? dayjs(value) : dayjs();
+    setViewMonth(source.calendar(calendarSystem));
+  }, [calendarSystem, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -148,7 +151,7 @@ export default function JalaliDatePicker({
   useEffect(() => {
     if (!open || !priceCalendar) return;
 
-    const visibleCells = buildMonthCells(viewMonth, minDate ?? null).filter(
+    const visibleCells = buildMonthCells(viewMonth, minDate ?? null, locale).filter(
       (cell): cell is Cell => cell !== null,
     );
     const cacheKey = `${priceCalendar.origin}-${priceCalendar.dest}-${monthKey}`;
@@ -161,7 +164,7 @@ export default function JalaliDatePicker({
     }
 
     // The endpoint returns ±3 days. One center per seven-day chunk covers
-    // the visible Jalali month without inventing any unavailable fare.
+    // the visible calendar month without inventing any unavailable fare.
     const centers: string[] = [];
     for (let index = 0; index < visibleCells.length; index += 7) {
       const chunk = visibleCells.slice(index, index + 7);
@@ -197,7 +200,7 @@ export default function JalaliDatePicker({
     return () => {
       cancelled = true;
     };
-  }, [open, monthKey, minDate, priceCalendar, viewMonth]);
+  }, [open, monthKey, minDate, priceCalendar, viewMonth, locale]);
 
   const selectedIsoDay = priceCalendar
     ? draftIso
@@ -206,15 +209,15 @@ export default function JalaliDatePicker({
       : null;
 
   const displayValue = value
-    ? faDigits(dayjs(value).calendar("jalali").format("YYYY/MM/DD"))
+    ? formatLocaleDate(value, locale)
     : placeholder;
 
   const weekdaySub =
     subLabel ??
     (value
-      ? faDigits(dayjs(value).calendar("jalali").format("dddd")) +
+      ? localeWeekdayLong(dayjs(value).calendar(calendarSystem), locale) +
         " " +
-        faDigits(String(dayjs(value).calendar("jalali").year()))
+        localeDigits(String(dayjs(value).calendar(calendarSystem).year()), locale)
       : label);
 
   const dark = theme === "dark";
@@ -235,7 +238,7 @@ export default function JalaliDatePicker({
         data-testid={testId}
         onClick={() => {
           setDraftIso(value ? value.slice(0, 10) : null);
-          if (value) setViewMonth(dayjs(value).calendar("jalali"));
+          if (value) setViewMonth(dayjs(value).calendar(calendarSystem));
           setOpen((v) => !v);
         }}
         style={{
@@ -386,13 +389,13 @@ export default function JalaliDatePicker({
                   fontWeight: 700,
                 }}
               >
-                {priceCalendar.locale === "en" ? "Gregorian" : priceCalendar.locale === "ar" ? "ميلادي" : "تقویم میلادی"}
+                {locale === "en" ? "Gregorian calendar" : locale === "ar" ? "التقويم الميلادي" : "تقویم شمسی"}
               </span>
             )}
             <span
               data-testid={testId ? `${testId}-today` : undefined}
               onClick={() => {
-                const today = dayjs().calendar("jalali");
+                const today = dayjs().calendar(calendarSystem);
                 const iso = toIsoDateOnly(today);
                 if (minIso && iso < minIso.slice(0, 10)) return;
                 setViewMonth(today);
@@ -413,7 +416,7 @@ export default function JalaliDatePicker({
                 cursor: "pointer",
               }}
             >
-              تاریخ امروز
+              {locale === "en" ? "Today" : locale === "ar" ? "اليوم" : "تاریخ امروز"}
             </span>
           </div>
 
@@ -451,7 +454,7 @@ export default function JalaliDatePicker({
                 color: dark ? "#e7ecf3" : "#0d2640",
               }}
             >
-              {MONTH_NAMES[viewMonth.month()]} {faDigits(viewMonth.year())}
+              {localeMonthYear(viewMonth, locale)}
             </div>
             <span
               data-testid={testId ? `${testId}-next-month` : undefined}
@@ -481,7 +484,7 @@ export default function JalaliDatePicker({
               marginBottom: 6,
             }}
           >
-            {WEEKDAYS.map((w) => (
+            {localeWeekdays[locale].map((w) => (
               <span
                 key={w}
                 style={{
@@ -552,7 +555,7 @@ export default function JalaliDatePicker({
                     cursor: c.disabled ? "not-allowed" : "pointer",
                   }}
                 >
-                  {faDigits(c.date)}
+                  {localeDigits(c.date, locale)}
                   {priceCalendar && hasPrice && (
                     <small
                       data-testid={testId ? `${testId}-price-${c.iso}` : undefined}
@@ -601,7 +604,7 @@ export default function JalaliDatePicker({
                   : pricesError
                     ? priceCalendarCopy(priceCalendar.locale).error
                     : draftIso
-                      ? faDigits(dayjs(isoDateAtNoon(draftIso)).calendar("jalali").format("YYYY/MM/DD"))
+                      ? formatLocaleDate(isoDateAtNoon(draftIso), locale)
                       : ""}
               </span>
               <button

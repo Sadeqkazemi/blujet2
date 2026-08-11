@@ -1,5 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import { CHECKOUT_COPY } from './checkout-copy';
 import { extraTitle, passengerFullName, type ExtraServiceState, type PassengerFormDraft } from './checkout-types';
 
@@ -42,9 +42,9 @@ export default function ReviewStep({
           const doc = p.docType === 'PASSPORT' ? p.passportNo || t.passport : p.nationalId || t.nationalId;
           const birth =
             p.birthDay && p.birthMonth && p.birthYear
-              ? `${locale === 'en' ? p.birthYear : faDigits(p.birthYear)}/${
-                  locale === 'en' ? p.birthMonth : faDigits(p.birthMonth)
-                }/${locale === 'en' ? p.birthDay : faDigits(p.birthDay)}`
+              ? `${localeDigits(p.birthYear, locale)}/${
+                  localeDigits(p.birthMonth, locale)
+                }/${localeDigits(p.birthDay, locale)}`
               : t.noneSelected;
           return (
             <div

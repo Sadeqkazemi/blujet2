@@ -1,5 +1,5 @@
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import type { ActiveSession } from '../../types/public-site';
 
 const STR: Record<
@@ -92,7 +92,7 @@ export default function AccountSecuritySessions({ sessions, busyId, onRevoke }: 
                 <div style={{ fontSize: 12.5, fontWeight: 700 }}>{s.deviceLabel}</div>
                 <div style={{ fontSize: 10.5, color: '#9aa4b2' }}>
                   {s.ip ? `${t.ipPrefix}: ${s.ip}` : '—'} ·{' '}
-                  {s.isCurrent ? t.now : formatJalaliDateTime(s.createdAt)}
+                  {s.isCurrent ? t.now : formatLocaleDateTime(s.createdAt, locale)}
                 </div>
               </div>
               {s.isCurrent ? (

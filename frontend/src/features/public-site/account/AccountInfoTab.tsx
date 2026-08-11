@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatJalaliDate } from '../../../lib/jalali';
+import { formatLocaleDate } from '../../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { UserProfile } from '../../../types/public-site';
 
@@ -145,7 +145,7 @@ export default function AccountInfoTab({
     { label: t.nationalIdLabel, value: fieldValue(profile?.nationalId ?? profileForm.nationalId), dir: 'ltr' as const },
     {
       label: t.birthDateLabel,
-      value: profile?.birthDate ? formatJalaliDate(profile.birthDate) : fieldValue(profileForm.birthDate),
+      value: profile?.birthDate ? formatLocaleDate(profile.birthDate, locale) : fieldValue(profileForm.birthDate),
       dir: 'ltr' as const,
     },
     { label: t.passportLabel, value: fieldValue(profile?.passportNo ?? profileForm.passportNo), dir: 'ltr' as const },

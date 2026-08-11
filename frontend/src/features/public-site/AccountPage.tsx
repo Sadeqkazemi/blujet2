@@ -36,8 +36,9 @@ import {
 import { ApiRequestError } from '../../api/envelope';
 import { fetchMySupportTickets } from '../../api/support-tickets';
 import { changeOwnPassword, setPassword } from '../../api/auth';
-import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
+import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail, PriceLock, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
@@ -573,7 +574,7 @@ export default function AccountPage() {
         setProfileForm({
           fullName: p.fullName ?? '',
           nationalId: p.nationalId ?? '',
-          birthDate: p.birthDate ? formatJalaliDate(p.birthDate) : '',
+          birthDate: p.birthDate ? formatLocaleDate(p.birthDate, locale) : '',
           passportNo: p.passportNo ?? '',
         });
       })
@@ -950,7 +951,7 @@ export default function AccountPage() {
             }}
           >
             <span style={{ fontSize: 12.5, color: '#8a6a1f' }}>
-              {t.bannerText(faDigits(profile.completionPct))}
+              {t.bannerText(localeDigits(profile.completionPct, locale))}
             </span>
             <div style={{ display: 'flex', gap: 10 }}>
               <button
@@ -1022,7 +1023,7 @@ export default function AccountPage() {
                       {b.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {b.destCode}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
-                      {b.flightNo} · {formatJalaliDateTime(b.departureAt)} · {t.pnrLabel} <span dir="ltr">{b.pnr}</span>
+                      {b.flightNo} · {formatLocaleDateTime(b.departureAt, locale)} · {t.pnrLabel} <span dir="ltr">{b.pnr}</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1047,7 +1048,7 @@ export default function AccountPage() {
             <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', borderRadius: 18, padding: '22px 24px', color: '#fff' }}>
               <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>{t.walletBalanceHeading}</div>
               <div data-testid="wallet-balance" style={{ fontSize: 26, fontWeight: 900 }}>
-                {wallet ? faMoney(wallet.balanceIrr) : '—'} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.toman}</span>
+                {wallet ? localeMoney(wallet.balanceIrr, locale) : '—'} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.toman}</span>
               </div>
             </div>
             <form onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -1120,14 +1121,14 @@ export default function AccountPage() {
                       {l.flight.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {l.flight.destCode}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
-                      {l.flight.flightNo} · {formatJalaliDateTime(l.flight.departureAt)} · {CABIN_LABEL[l.cabin]?.[locale] ?? l.cabin}
+                      {l.flight.flightNo} · {formatLocaleDateTime(l.flight.departureAt, locale)} · {CABIN_LABEL[l.cabin]?.[locale] ?? l.cabin}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#3f546b', marginTop: 4 }}>
-                      {t.lockedRatePrefix}{faMoney(l.lockedPriceIrr)} {t.toman}{t.feePrefix}{faMoney(l.feeIrr)} {t.toman}
+                      {t.lockedRatePrefix}{localeMoney(l.lockedPriceIrr, locale)} {t.toman}{t.feePrefix}{localeMoney(l.feeIrr, locale)} {t.toman}
                     </div>
                     {l.status === 'ACTIVE' && (
                       <div style={{ fontSize: 11, color: '#9a7d22', marginTop: 4 }}>
-                        {t.validUntilPrefix}{formatJalaliDateTime(l.expiresAt)}{t.validUntilSuffix}
+                        {t.validUntilPrefix}{formatLocaleDateTime(l.expiresAt, locale)}{t.validUntilSuffix}
                       </div>
                     )}
                   </div>
@@ -1243,7 +1244,7 @@ export default function AccountPage() {
                         <div style={{ fontSize: 11, color: '#8a96a6', marginTop: 4 }}>
                           {t.ticketsTrackingLabel}: <span className="font-num" dir="ltr">{tk.trackingCode}</span>
                           {' · '}
-                          {formatJalaliDateTime(tk.createdAt)}
+                          {formatLocaleDateTime(tk.createdAt, locale)}
                         </div>
                       </div>
                       <span style={{ fontSize: 10.5, fontWeight: 800, background: '#eef4fb', color: '#1668c4', padding: '5px 12px', borderRadius: 14 }}>
@@ -1260,7 +1261,7 @@ export default function AccountPage() {
                           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
                             {tk.history.map((h, i) => (
                               <li key={`${h.step}-${i}`} style={{ fontSize: 11.5, color: '#5a6678' }}>
-                                <span style={{ color: '#8a96a6' }}>{formatJalaliDateTime(h.at)}</span>
+                                <span style={{ color: '#8a96a6' }}>{formatLocaleDateTime(h.at, locale)}</span>
                                 {' — '}
                                 {h.labelFa}
                               </li>

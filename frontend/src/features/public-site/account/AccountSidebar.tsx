@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AuthUser } from '../../../types/auth';
-import { faDigits } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { TabKey } from './account-types';
 import { sidebarAccountNavItems } from './account-nav-items';
@@ -345,7 +345,7 @@ export default function AccountSidebar({
           <div style={{ lineHeight: 1.35, minWidth: 0 }}>
             <div style={{ fontSize: 9.5, color: '#aac4e2', whiteSpace: 'nowrap' }}>{t.loyaltyPoints}</div>
             <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2, whiteSpace: 'nowrap' }}>
-              {faDigits(club?.balance ?? 0)}
+              {localeDigits(club?.balance ?? 0, locale)}
             </div>
           </div>
           <button

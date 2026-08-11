@@ -1,5 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import {
   buildMd80Seats,
@@ -209,7 +209,7 @@ function SeatButton({
 function RowNum({ n, locale }: { n: number; locale: StoredLocale }) {
   return (
     <span className="w-5 flex-none text-center text-[10px] font-semibold text-[#6b7b94]">
-      {locale === 'en' ? n : faDigits(n)}
+      {localeDigits(n, locale)}
     </span>
   );
 }
@@ -307,7 +307,7 @@ export default function Md80SeatMap({
           <AmenityIcon kind="galley" locale={locale} />
         </div>
         <div className="mb-2 text-center text-[9px] font-bold tracking-wide text-[#8a96a6]">
-          {locale === 'en' ? 'FRONT · MD-80' : 'جلو هواپیما · MD-80'}
+          {locale === 'en' ? 'FRONT · MD-80' : locale === 'ar' ? 'مقدمة الطائرة · MD-80' : 'جلو هواپیما · MD-80'}
         </div>
 
         {md80Rows().map((row) => {
@@ -425,7 +425,7 @@ export default function Md80SeatMap({
           </div>
         </div>
         <div className="mt-1 text-center text-[9px] font-bold tracking-wide text-[#8a96a6]">
-          {locale === 'en' ? 'REAR · MD-80' : 'عقب هواپیما · MD-80'}
+          {locale === 'en' ? 'REAR · MD-80' : locale === 'ar' ? 'مؤخرة الطائرة · MD-80' : 'عقب هواپیما · MD-80'}
         </div>
       </div>
     </div>

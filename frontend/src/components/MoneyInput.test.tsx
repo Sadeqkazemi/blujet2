@@ -71,4 +71,30 @@ describe("JalaliDatePicker dark panel", () => {
     expect(popup).toBeInTheDocument();
     expect(popup.getBoundingClientRect().left).toBeGreaterThanOrEqual(0);
   });
+
+  it("shows Gregorian dates in English and Arabic", () => {
+    const value = "2026-08-11T12:00:00.000Z";
+    const { rerender } = render(
+      <JalaliDatePicker
+        locale="en"
+        label="Date"
+        value={value}
+        onChange={() => undefined}
+        testId="localized-date"
+      />,
+    );
+    expect(screen.getByTestId("localized-date")).toHaveTextContent("2026/08/11");
+    expect(screen.getByTestId("localized-date")).not.toHaveTextContent("1405");
+
+    rerender(
+      <JalaliDatePicker
+        locale="ar"
+        label="التاريخ"
+        value={value}
+        onChange={() => undefined}
+        testId="localized-date"
+      />,
+    );
+    expect(screen.getByTestId("localized-date")).toHaveTextContent("٢٠٢٦/٠٨/١١");
+  });
 });

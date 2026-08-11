@@ -14,14 +14,14 @@ interface Tr {
 }
 
 const STATS: { value: Tr; label: Tr }[] = [
-  { value: { fa: '۴.۸M', en: '4.8M', ar: '۴.۸M' }, label: { fa: 'مسافر سالانه', en: 'Passengers per year', ar: 'مسافر سنويًا' } },
-  { value: { fa: '۳۲۰+', en: '320+', ar: '۳۲۰+' }, label: { fa: 'مسیر پروازی', en: 'Flight routes', ar: 'مسار طيران' } },
-  { value: { fa: '۴۵', en: '45', ar: '۴۵' }, label: { fa: 'ایرلاین طرف قرارداد', en: 'Partner airlines', ar: 'شركة طيران شريكة' } },
-  { value: { fa: '۲۴/۷', en: '24/7', ar: '۲۴/۷' }, label: { fa: 'پشتیبانی', en: 'Support', ar: 'الدعم' } },
+  { value: { fa: '۴.۸M', en: '4.8M', ar: '٤٫٨M' }, label: { fa: 'مسافر سالانه', en: 'Passengers per year', ar: 'مسافر سنويًا' } },
+  { value: { fa: '۳۲۰+', en: '320+', ar: '٣٢٠+' }, label: { fa: 'مسیر پروازی', en: 'Flight routes', ar: 'مسار طيران' } },
+  { value: { fa: '۴۵', en: '45', ar: '٤٥' }, label: { fa: 'ایرلاین طرف قرارداد', en: 'Partner airlines', ar: 'شركة طيران شريكة' } },
+  { value: { fa: '۲۴/۷', en: '24/7', ar: '٢٤/٧' }, label: { fa: 'پشتیبانی', en: 'Support', ar: 'الدعم' } },
 ];
 
 const VALUES: { icon: string; title: Tr; desc: Tr; bg: string; color: string }[] = [
-  { icon: '◎', title: { fa: 'شفافیت', en: 'Transparency', ar: 'الشفافية' }, desc: { fa: 'بدون هزینهٔ پنهان؛ قیمت نهایی همان است که می‌بینید.', en: 'No hidden fees — the final price is what you see.', ar: 'بدون رسوم خفية؛ السعر النهائي هو ما تراه.' }, bg: '#eef4fb', color: '#1668c4' },
+  { icon: '◎', title: { fa: 'شفافیت', en: 'Transparency', ar: 'الشفافية' }, desc: { fa: 'بدون هزینهٔ پنهان؛ قیمت نهایی همان است که می‌بینید.', en: 'No hidden fees — the final price is what you see.', ar: 'من دون رسوم خفية؛ السعر النهائي هو ما تراه.' }, bg: '#eef4fb', color: '#1668c4' },
   { icon: '⚡', title: { fa: 'سرعت', en: 'Speed', ar: 'السرعة' }, desc: { fa: 'خرید بلیط در کمتر از دو دقیقه و صدور آنی.', en: 'Ticket purchase in under two minutes with instant issuance.', ar: 'شراء التذكرة في أقل من دقيقتين مع إصدار فوري.' }, bg: '#fff7e6', color: '#caa53a' },
   { icon: '🛡', title: { fa: 'اعتماد', en: 'Trust', ar: 'الثقة' }, desc: { fa: 'درگاه پرداخت امن و حفاظت کامل از اطلاعات مسافران.', en: 'A secure payment gateway with full protection of passenger data.', ar: 'بوابة دفع آمنة وحماية كاملة لبيانات المسافرين.' }, bg: '#e8f5ee', color: '#1f8a5b' },
 ];

@@ -300,15 +300,18 @@ export default function HomeSearchPage() {
   const extra = HOME_EXTRA[locale];
   const e = ERR[locale];
   const [airports, setAirports] = useState<Airport[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
   const [appLinks, setAppLinks] = useState<{ id: AppLinkId; url: string }[]>([]);
 
   useEffect(() => {
     fetchAirports()
-      .then(setAirports)
-      .catch(() => setLoadError(e.airports));
+      .then((items) => {
+        setAirports(items);
+        setLoadError(false);
+      })
+      .catch(() => setLoadError(true));
     fetchPublicHomeContent(locale)
       .then(setHomeContent)
       .catch(() => {
@@ -427,7 +430,7 @@ export default function HomeSearchPage() {
   return (
     <PublicPageShell beforeHeader={announcementBar}>
       {loadError && (
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 26px 0', color: '#e5484d', fontSize: 13 }}>{loadError}</div>
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '12px 26px 0', color: '#e5484d', fontSize: 13 }}>{e.airports}</div>
       )}
 
       <section style={{ background: '#f6f8fb' }}>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { downloadSalesExport, fetchSales } from '../../api/agency-portal';
-import { faDigits, faMoney, faPercent } from '../../lib/fa-format';
-import { formatJalaliDate } from '../../lib/jalali';
+import { formatLocalePercent, localeMoney } from '../../lib/fa-format';
+import { formatLocaleDate, localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencySalesReport } from '../../types/agency-portal';
 
@@ -150,10 +150,10 @@ export default function AgencySalesPage() {
   if (!data) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   const kpis = [
-    { label: t.kpiTotalSales, value: faMoney(data.summary.totalSalesIrr) },
-    { label: t.kpiTicketsIssued, value: faDigits(data.summary.ticketsIssued) },
-    { label: t.kpiAvgFare, value: faMoney(data.summary.avgFareIrr) },
-    { label: t.kpiRefundRate, value: faPercent(data.summary.refundRatePct) },
+    { label: t.kpiTotalSales, value: localeMoney(data.summary.totalSalesIrr, locale) },
+    { label: t.kpiTicketsIssued, value: localeDigits(data.summary.ticketsIssued, locale) },
+    { label: t.kpiAvgFare, value: localeMoney(data.summary.avgFareIrr, locale) },
+    { label: t.kpiRefundRate, value: formatLocalePercent(data.summary.refundRatePct, locale) },
   ];
 
   async function onExport() {
@@ -218,8 +218,8 @@ export default function AgencySalesPage() {
                   <tr key={f.flightNo} className="border-b border-border/60">
                     <td className="ltr py-2.5">{f.flightNo}</td>
                     <td className="ltr py-2.5">{f.route}</td>
-                    <td className="py-2.5">{faDigits(f.ticketsCount)}</td>
-                    <td className="py-2.5 font-bold">{faMoney(f.salesIrr)} {t.toman}</td>
+                    <td className="py-2.5">{localeDigits(f.ticketsCount, locale)}</td>
+                    <td className="py-2.5 font-bold">{localeMoney(f.salesIrr, locale)} {t.toman}</td>
                   </tr>
                 ))}
               </tbody>
@@ -251,8 +251,8 @@ export default function AgencySalesPage() {
                     <td className="ltr py-2.5">
                       {t2.flightNo} — {t2.route}
                     </td>
-                    <td className="py-2.5">{formatJalaliDate(t2.departureAt)}</td>
-                    <td className="py-2.5 font-bold">{faMoney(t2.priceIrr)} {t.toman}</td>
+                    <td className="py-2.5">{formatLocaleDate(t2.departureAt, locale)}</td>
+                    <td className="py-2.5 font-bold">{localeMoney(t2.priceIrr, locale)} {t.toman}</td>
                     <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
                   </tr>
                 ))}

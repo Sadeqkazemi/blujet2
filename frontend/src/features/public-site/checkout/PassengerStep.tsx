@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, normalizeIranMobile } from '../../../lib/fa-format';
+import { normalizeIranMobile } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
+import { dayjs } from '../../../lib/jalali';
 import type { SavedPassenger } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
 import {
@@ -83,10 +85,10 @@ function JalaliDobSelects({
   const t = CHECKOUT_COPY[locale];
   const days = Array.from({ length: 31 }, (_, i) => String(i + 1));
   // fa: Jalali years; en/ar: Gregorian — matches تکمیل خرید.dc.html
-  const years =
-    locale === 'fa'
-      ? Array.from({ length: 80 }, (_, i) => String(1405 - i))
-      : Array.from({ length: 60 }, (_, i) => String(1946 + i));
+  const currentYear = locale === 'fa'
+    ? Number(dayjs().calendar('jalali').format('YYYY'))
+    : new Date().getUTCFullYear();
+  const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
   return (
     <div className="grid grid-cols-[1fr_1.2fr_1fr] overflow-hidden rounded-[10px] border-[1.5px] border-[#e2e7ee] bg-white">
       <select
@@ -97,7 +99,7 @@ function JalaliDobSelects({
         <option value="">{t.day}</option>
         {days.map((d) => (
           <option key={d} value={d}>
-            {locale === 'en' ? d : faDigits(d)}
+            {localeDigits(d, locale)}
           </option>
         ))}
       </select>
@@ -121,7 +123,7 @@ function JalaliDobSelects({
         <option value="">{t.year}</option>
         {years.map((y) => (
           <option key={y} value={y}>
-            {locale === 'en' ? y : faDigits(y)}
+            {localeDigits(y, locale)}
           </option>
         ))}
       </select>

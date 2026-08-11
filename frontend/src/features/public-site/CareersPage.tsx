@@ -4,7 +4,7 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import { fetchActiveJobs } from '../../api/careers';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import type { JobSummary, JobType } from '../../types/careers';
 import { jobPostingImageUrl } from './site-content-shared';
 
@@ -69,7 +69,7 @@ const STR: Record<
 };
 
 function formatCount(n: number, locale: StoredLocale): string {
-  return locale === 'en' ? String(n) : faDigits(n);
+  return localeDigits(n, locale);
 }
 
 /** Same horizontal rhythm as the homepage public shell. */

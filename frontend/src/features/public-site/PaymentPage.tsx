@@ -4,7 +4,8 @@ import { fetchClubPoints, fetchMyBooking, fetchWallet, payBooking } from '../../
 import { ApiRequestError } from '../../api/envelope';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { faDigits, localeMoney } from '../../lib/fa-format';
+import { localeMoney } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import type { BookingDetail, PayResultPriceChanged } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import CheckoutStepBar from './checkout/CheckoutStepBar';
@@ -23,7 +24,7 @@ function formatHoldClock(seconds: number, locale: StoredLocale): string {
   const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
   const ss = String(seconds % 60).padStart(2, '0');
   const raw = `${mm}:${ss}`;
-  return locale === 'en' ? raw : faDigits(raw);
+  return localeDigits(raw, locale);
 }
 
 function bookingToFlight(booking: BookingDetail): FlightSnapshot {
@@ -215,7 +216,7 @@ function PaymentPricingAside({
   const paxLabel =
     locale === 'en'
       ? t.ticketPrice(paxCount)
-      : t.ticketPrice(paxCount).replace(String(paxCount), faDigits(paxCount));
+      : t.ticketPrice(paxCount).replace(String(paxCount), localeDigits(paxCount, locale));
 
   return (
     <aside
@@ -501,10 +502,10 @@ export default function PaymentPage() {
   const priceDisplay = localeMoney(booking.priceIrr, locale);
   const walletDisplay =
     walletBalanceIrr !== null ? localeMoney(walletBalanceIrr, locale) : '—';
-  const clubDisplay = locale === 'en' ? String(clubBalance) : faDigits(clubBalance);
-  const earnDisplay = locale === 'en' ? String(earnPoints) : faDigits(earnPoints);
+  const clubDisplay = localeDigits(clubBalance, locale);
+  const earnDisplay = localeDigits(earnPoints, locale);
   const afterDisplay =
-    locale === 'en' ? String(clubBalance + earnPoints) : faDigits(clubBalance + earnPoints);
+    localeDigits(clubBalance + earnPoints, locale);
   const paxCount = Math.max(1, booking.passengers.length);
   const flight = bookingToFlight(booking);
 

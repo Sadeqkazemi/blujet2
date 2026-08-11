@@ -4,7 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { ApiRequestError } from '../../api/envelope';
-import { faDigits, latinDigits } from '../../lib/fa-format';
+import { latinDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 
 /**
  * ورود و ثبت‌نام مشتریان — matches uploaded design + design-reference-v2
@@ -49,7 +50,7 @@ function useCountdown() {
 
 function fmtTimer(s: number, locale: StoredLocale) {
   const raw = `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  return locale === 'fa' ? faDigits(raw) : raw;
+  return localeDigits(raw, locale);
 }
 
 const STR: Record<
@@ -311,7 +312,7 @@ export default function CustomerLoginPage() {
   const phoneHintColor = phone === '' ? '#9aa7b8' : phoneValid ? '#1f8a5b' : '#d64545';
   const title = phase === 'otp' ? t.titleOtp : isLogin ? t.titleLogin : t.titleSignup;
   const subtitle = phase === 'otp' ? t.subtitleOtp : isLogin ? t.subtitleLogin : t.subtitleSignup;
-  const displayPhone = locale === 'en' ? phone : faDigits(phone);
+  const displayPhone = localeDigits(phone, locale);
 
   const pillLink: React.CSSProperties = {
     display: 'inline-flex',
@@ -680,7 +681,7 @@ export default function CustomerLoginPage() {
               </div>
               {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
                 <p data-testid="signin-dev-otp-hint" style={{ margin: 0, fontSize: 11, color: '#6b7585', textAlign: 'center' }}>
-                  {locale === 'en' ? 'Dev OTP code: 123456' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
+                  {locale === 'en' ? 'Dev OTP code: 123456' : locale === 'ar' ? 'رمز الاختبار: ١٢٣٤٥٦' : 'کد توسعه (OTP): ۱۲۳۴۵۶'}
                 </p>
               )}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>

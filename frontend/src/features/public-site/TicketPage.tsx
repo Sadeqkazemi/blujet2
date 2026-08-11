@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { fetchBookingByPnr } from '../../api/publicSite';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import type { BookingDetail } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import TicketBarcode from '../../components/public/TicketBarcode';
@@ -70,12 +70,7 @@ const STR: Record<
 };
 
 function formatDeparture(value: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(value),
-    );
-  }
-  return formatJalaliDateTime(value);
+  return formatLocaleDateTime(value, locale);
 }
 
 export default function TicketPage() {

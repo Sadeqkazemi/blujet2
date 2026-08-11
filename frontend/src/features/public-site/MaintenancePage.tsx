@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -25,7 +25,7 @@ const STR: Record<
     title: 'سایت در حال تعمیر و نگهداری است',
     body: 'برای بهبود سرویس و ارتقای سامانه، سایت به‌طور موقت در دسترس نیست. کمی بعد دوباره در خدمت شما خواهیم بود. از صبوری شما سپاسگزاریم.',
     etaLabel: 'زمان تقریبی بازگشت:',
-    etaValue: `حدود ${faDigits(2)} ساعت آینده`,
+    etaValue: `حدود ${localeDigits(2, 'fa')} ساعت آینده`,
     supportLabel: 'پشتیبانی',
   },
   en: {
@@ -33,7 +33,7 @@ const STR: Record<
     title: 'The site is under maintenance',
     body: "We're temporarily offline to improve our service and upgrade the system. We'll be back shortly. Thank you for your patience.",
     etaLabel: 'Estimated return:',
-    etaValue: `in about ${faDigits(2)} hours`,
+    etaValue: `in about ${localeDigits(2, 'en')} hours`,
     supportLabel: 'Support',
   },
   ar: {
@@ -41,7 +41,7 @@ const STR: Record<
     title: 'الموقع قيد الصيانة',
     body: 'الموقع غير متاح مؤقتًا لتحسين الخدمة وتطوير النظام. سنعود قريبًا لخدمتكم. شكرًا لصبركم.',
     etaLabel: 'الوقت التقريبي للعودة:',
-    etaValue: `خلال ${faDigits(2)} ساعات تقريبًا`,
+    etaValue: `خلال ${localeDigits(2, 'ar')} ساعات تقريبًا`,
     supportLabel: 'الدعم الفني',
   },
 };
@@ -231,7 +231,7 @@ export default function MaintenancePage() {
               flexWrap: 'wrap',
             }}
           >
-            <span dir="ltr">{faDigits('021-91000000')}</span>
+            <span dir="ltr">{localeDigits('021-91000000', locale)}</span>
             <span>·</span>
             <span dir="ltr">support@blujet.ir</span>
           </div>

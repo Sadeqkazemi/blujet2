@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { applyToJob, fetchJobDetail } from '../../api/careers';
-import { parseJalaliDateToIso } from '../../lib/jalali';
+import { dayjs } from '../../lib/jalali';
+import { localeDigits, parseLocaleDateToIso } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import type {
@@ -59,18 +60,28 @@ const PROVINCES = [
   'یزد',
 ];
 
-const LANG_OPTIONS = ['انگلیسی', 'عربی', 'فرانسوی', 'آلمانی', 'ترکی استانبولی', 'اسپانیایی', 'روسی', 'چینی'];
-const LEVEL_OPTIONS = ['مبتدی', 'متوسط', 'پیشرفته', 'زبان مادری'];
-const DEGREE_OPTIONS = [
-  'زیر دیپلم',
-  'دیپلم',
-  'کاردانی',
-  'کارشناسی',
-  'کارشناسی ارشد',
-  'دکتری',
-];
-/** Jalali years for work experience pickers (recent ~50 years). */
-const WORK_YEAR_OPTIONS = Array.from({ length: 50 }, (_, i) => String(1404 - i));
+const LANG_OPTIONS: Record<StoredLocale, string[]> = {
+  fa: ['انگلیسی', 'عربی', 'فرانسوی', 'آلمانی', 'ترکی استانبولی', 'اسپانیایی', 'روسی', 'چینی'],
+  en: ['English', 'Arabic', 'French', 'German', 'Turkish', 'Spanish', 'Russian', 'Chinese'],
+  ar: ['الإنجليزية', 'العربية', 'الفرنسية', 'الألمانية', 'التركية', 'الإسبانية', 'الروسية', 'الصينية'],
+};
+const LEVEL_OPTIONS: Record<StoredLocale, string[]> = {
+  fa: ['مبتدی', 'متوسط', 'پیشرفته', 'زبان مادری'],
+  en: ['Beginner', 'Intermediate', 'Advanced', 'Native'],
+  ar: ['مبتدئ', 'متوسط', 'متقدم', 'لغة أم'],
+};
+const DEGREE_OPTIONS: Record<StoredLocale, string[]> = {
+  fa: ['زیر دیپلم', 'دیپلم', 'کاردانی', 'کارشناسی', 'کارشناسی ارشد', 'دکتری'],
+  en: ['Below diploma', 'Diploma', 'Associate', 'Bachelor', 'Master', 'Doctorate'],
+  ar: ['أقل من الثانوية', 'الثانوية', 'دبلوم مشارك', 'بكالوريوس', 'ماجستير', 'دكتوراه'],
+};
+
+function workYearOptions(locale: StoredLocale): string[] {
+  const currentYear = locale === 'fa'
+    ? Number(dayjs().calendar('jalali').format('YYYY'))
+    : new Date().getUTCFullYear();
+  return Array.from({ length: 50 }, (_, i) => String(currentYear - i));
+}
 
 const EMPTY_EDU: EducationEntry = { major: '', degree: '', courses: '', otherCourses: '' };
 const EMPTY_WORK: WorkEntry = { company: '', position: '', fromYear: '', toYear: '', reason: '' };
@@ -222,7 +233,7 @@ const STR: Record<
     lastName: 'Last name',
     nationalId: 'National ID',
     fatherName: "Father's name",
-    birthDate: 'Date of birth (e.g. 1378/05/21)',
+    birthDate: 'Date of birth (e.g. 1999/08/12)',
     birthProvince: 'Province of birth',
     birthCity: 'City of birth',
     gender: 'Gender:',
@@ -287,7 +298,7 @@ const STR: Record<
     lastName: 'اسم العائلة',
     nationalId: 'الرقم الوطني',
     fatherName: 'اسم الأب',
-    birthDate: 'تاريخ الميلاد (مثال: ۱۳۷۸/۰۵/۲۱)',
+    birthDate: 'تاريخ الميلاد (مثال: ١٩٩٩/٠٨/١٢)',
     birthProvince: 'محافظة الميلاد',
     birthCity: 'مدينة الميلاد',
     gender: 'الجنس:',
@@ -531,7 +542,7 @@ export default function CareersApplyPage() {
     setError(null);
     setSubmitting(true);
     try {
-      const isoBirthDate = birthDate.trim() ? parseJalaliDateToIso(birthDate.trim()) : null;
+      const isoBirthDate = birthDate.trim() ? parseLocaleDateToIso(birthDate.trim(), locale) : null;
       await applyToJob(jobId, {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -963,7 +974,7 @@ export default function CareersApplyPage() {
                     }}
                   >
                     <option value="">{t.eduDegreePick}</option>
-                    {DEGREE_OPTIONS.map((d) => (
+                    {DEGREE_OPTIONS[locale].map((d) => (
                       <option key={d} value={d}>
                         {d}
                       </option>
@@ -1051,9 +1062,9 @@ export default function CareersApplyPage() {
                     }}
                   >
                     <option value="">{t.workFrom}</option>
-                    {WORK_YEAR_OPTIONS.map((y) => (
+                    {workYearOptions(locale).map((y) => (
                       <option key={`from-${y}`} value={y}>
-                        {y}
+                        {localeDigits(y, locale)}
                       </option>
                     ))}
                   </select>
@@ -1069,9 +1080,9 @@ export default function CareersApplyPage() {
                     }}
                   >
                     <option value="">{t.workTo}</option>
-                    {WORK_YEAR_OPTIONS.map((y) => (
+                    {workYearOptions(locale).map((y) => (
                       <option key={`to-${y}`} value={y}>
-                        {y}
+                        {localeDigits(y, locale)}
                       </option>
                     ))}
                   </select>
@@ -1133,7 +1144,7 @@ export default function CareersApplyPage() {
                   }}
                 >
                   <option value="">{t.langPick}</option>
-                  {LANG_OPTIONS.map((lo) => (
+                  {LANG_OPTIONS[locale].map((lo) => (
                     <option key={lo} value={lo}>
                       {lo}
                     </option>
@@ -1149,7 +1160,7 @@ export default function CareersApplyPage() {
                   }}
                 >
                   <option value="">{t.levelPick}</option>
-                  {LEVEL_OPTIONS.map((lv) => (
+                  {LEVEL_OPTIONS[locale].map((lv) => (
                     <option key={lv} value={lv}>
                       {lv}
                     </option>

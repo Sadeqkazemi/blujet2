@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchAirports } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits } from '../../../lib/fa-format';
 import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
-import { dayjs, formatJalaliDate, toIsoDateOnly } from '../../../lib/jalali';
+import { dayjs, toIsoDateOnly } from '../../../lib/jalali';
+import {
+  calendarForLocale,
+  calendarOffset,
+  formatLocaleDate,
+  localeDigits,
+  localeMonthYear,
+  localeWeekdays,
+} from '../../../lib/locale-format';
 import type { Airport } from '../../../types/public-site';
 import type { ResultsCopy } from './results-copy';
-
-const WEEKDAYS_FA = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
-const WEEKDAYS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const MONTH_NAMES_FA = [
-  'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-  'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
-];
 
 type Props = {
   open: boolean;
@@ -32,20 +32,13 @@ function airportDisplayLabel(airport: Airport, locale: StoredLocale) {
 }
 
 function formatDateDisplay(isoDay: string, locale: StoredLocale) {
-  if (locale === 'en') {
-    return new Date(`${isoDay}T12:00:00Z`).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-  return formatJalaliDate(`${isoDay}T12:00:00Z`);
+  return formatLocaleDate(`${isoDay}T12:00:00Z`, locale);
 }
 
 function buildCalendarCells(viewMonth: ReturnType<typeof dayjs>, selectedIso: string, locale: StoredLocale): CalCell[] {
   const today = dayjs().startOf('day');
   const start = viewMonth.startOf('month');
-  const offset = locale === 'en' ? start.day() : (start.day() + 1) % 7;
+  const offset = calendarOffset(start, locale);
   const daysInMonth = viewMonth.daysInMonth();
   const cells: CalCell[] = [];
 
@@ -58,7 +51,7 @@ function buildCalendarCells(viewMonth: ReturnType<typeof dayjs>, selectedIso: st
     const iso = toIsoDateOnly(day);
     const disabled = day.isBefore(today, 'day');
     cells.push({
-      label: locale === 'en' ? String(d) : faDigits(d),
+      label: localeDigits(d, locale),
       iso,
       disabled,
       selected: iso === selectedIso,
@@ -254,7 +247,7 @@ export default function ResultsEditSearchModal({
   const [calTarget, setCalTarget] = useState<'departure' | 'return'>('departure');
   const [applying, setApplying] = useState(false);
   const [viewMonth, setViewMonth] = useState(() =>
-    dayjs(`${date}T12:00:00Z`).calendar(locale === 'en' ? 'gregory' : 'jalali'),
+    dayjs(`${date}T12:00:00Z`).calendar(calendarForLocale(locale)),
   );
 
   useEffect(() => {
@@ -265,15 +258,12 @@ export default function ResultsEditSearchModal({
     setTripType('oneway');
     setCalOpen(false);
     setApplying(false);
-    setViewMonth(dayjs(`${date}T12:00:00Z`).calendar(locale === 'en' ? 'gregory' : 'jalali'));
+    setViewMonth(dayjs(`${date}T12:00:00Z`).calendar(calendarForLocale(locale)));
     fetchAirports().then(setAirports).catch(() => setAirports([]));
   }, [open, origin, dest, date, locale]);
 
-  const weekdays = locale === 'en' ? WEEKDAYS_EN : WEEKDAYS_FA;
-  const calTitle =
-    locale === 'en'
-      ? viewMonth.format('MMMM YYYY')
-      : `${MONTH_NAMES_FA[viewMonth.month()]} ${faDigits(viewMonth.year())}`;
+  const weekdays = localeWeekdays[locale];
+  const calTitle = localeMonthYear(viewMonth, locale);
   const selectedIso = calTarget === 'departure' ? draftDate : draftReturnDate || draftDate;
   const calCells = buildCalendarCells(viewMonth, selectedIso, locale);
   const calTargetLabel = calTarget === 'departure' ? copy.departureDateLabel : copy.returnDateLabel;
@@ -282,7 +272,7 @@ export default function ResultsEditSearchModal({
     () =>
       [1, 2, 3, 4, 5].map((n) => ({
         value: String(n),
-        label: locale === 'en' ? String(n) : locale === 'ar' ? String(n) : faDigits(n),
+        label: localeDigits(n, locale),
       })),
     [locale],
   );
@@ -300,7 +290,7 @@ export default function ResultsEditSearchModal({
     setCalTarget(target);
     setCalOpen(true);
     const iso = target === 'departure' ? draftDate : draftReturnDate || draftDate;
-    setViewMonth(dayjs(`${iso}T12:00:00Z`).calendar(locale === 'en' ? 'gregory' : 'jalali'));
+    setViewMonth(dayjs(`${iso}T12:00:00Z`).calendar(calendarForLocale(locale)));
   }
 
   function handleApply() {

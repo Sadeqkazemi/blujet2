@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, localeMoney } from '../../../lib/fa-format';
-import { formatJalaliDate } from '../../../lib/jalali';
+import { localeMoney } from '../../../lib/fa-format';
+import { formatLocaleDate, localeDigits } from '../../../lib/locale-format';
 import { publicCabinLabel } from '../../../lib/flight-definition';
 import type {
   CabinClass,
@@ -97,13 +97,7 @@ export default function ResultsFlightCard({
   const canBook = cabin.seatsLeft >= seatDemand;
   const lowSeats = cabin.seatsLeft > 0 && cabin.seatsLeft <= 3;
   const key = `${flight.flightInstanceId}:${cabin.cabin}`;
-  const dateShort =
-    locale === 'en'
-      ? new Date(flight.departureAt).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-        })
-      : formatJalaliDate(flight.departureAt);
+  const dateShort = formatLocaleDate(flight.departureAt, locale);
 
   return (
     <div
@@ -639,7 +633,7 @@ export default function ResultsFlightCard({
                 textAlign: 'center',
               }}
             >
-              {copy.seatsRemainingLabel}: {faDigits(cabin.seatsLeft)}
+              {copy.seatsRemainingLabel}: {localeDigits(cabin.seatsLeft, locale)}
             </div>
             <button
               type="button"

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -88,7 +88,7 @@ export default function NotFoundPage() {
                 color: 'transparent',
               }}
             >
-              {locale === 'en' ? '404' : faDigits(404)}
+              {localeDigits(404, locale)}
             </div>
             <svg
               viewBox="0 0 320 80"
@@ -221,7 +221,7 @@ export default function NotFoundPage() {
           </div>
 
           <div style={{ marginTop: 30, fontSize: 12, color: '#9aa4b2' }}>
-            {t.errorCodeLabel}: {locale === 'en' ? '404' : faDigits(404)} — {t.errorCodeSuffix}
+            {t.errorCodeLabel}: {localeDigits(404, locale)} — {t.errorCodeSuffix}
           </div>
         </div>
       </main>

@@ -77,7 +77,7 @@ describe('AgencyDashboardPage', () => {
 
     expect(await screen.findByText('Sales this month')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Last 6 months sales chart' })).toBeInTheDocument();
-    expect(screen.getByText('Ordibehesht')).toBeInTheDocument();
+    expect(screen.getByText('May')).toBeInTheDocument();
     expect(screen.getByText('View statement')).toBeInTheDocument();
   });
 
