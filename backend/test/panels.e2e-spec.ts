@@ -11,7 +11,7 @@ describe('Panels (e2e)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
 
-  // Fresh app per test — avoids leaking the shared login-route throttle budget across tests.
+  // Fresh app per test â€” avoids leaking the shared login-route throttle budget across tests.
   beforeEach(async () => {
     app = await createTestApp();
     dataSource = app.get(DataSource);
@@ -44,7 +44,7 @@ describe('Panels (e2e)', () => {
     expect(keys).not.toContain('settings');
   });
 
-  it('returns the confirmed tab set for Commercial Manager (includes webservice + flights)', async () => {
+  it('returns the confirmed tab set for Commercial Manager (includes webservice, flights, and routes)', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -55,6 +55,7 @@ describe('Panels (e2e)', () => {
       'dashboard',
       'agencies',
       'flights',
+      'routes',
       'aircraft',
       'reports',
       'staff',
@@ -158,8 +159,8 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([
-      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+      { key: 'dashboard', labelFa: 'Ø¯Ø§Ø´Ø¨ÙˆØ±Ø¯', implemented: true },
+      { key: 'referrals', labelFa: 'Ø§Ø±Ø¬Ø§Ø¹Ø§Øª', implemented: true },
     ]);
   });
 
@@ -170,10 +171,10 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([
-      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
-      { key: 'agencies', labelFa: 'مدیریت آژانس‌ها', implemented: true },
-      { key: 'cartable', labelFa: 'کارتابل', implemented: true },
-      { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
+      { key: 'dashboard', labelFa: 'Ø¯Ø§Ø´Ø¨ÙˆØ±Ø¯', implemented: true },
+      { key: 'agencies', labelFa: 'Ù…Ø¯ÛŒØ±ÛŒØª Ø¢Ú˜Ø§Ù†Ø³â€ŒÙ‡Ø§', implemented: true },
+      { key: 'cartable', labelFa: 'Ú©Ø§Ø±ØªØ§Ø¨Ù„', implemented: true },
+      { key: 'referrals', labelFa: 'Ø§Ø±Ø¬Ø§Ø¹Ø§Øª', implemented: true },
     ]);
     expect(res.body.data.map((t: { key: string }) => t.key)).not.toContain(
       'flights',
@@ -263,7 +264,7 @@ describe('Panels (e2e)', () => {
       .set('Authorization', `Bearer ${finance.accessToken}`);
     expect(after.status).toBe(403);
 
-    // Cleanup — re-enable so other tests/manual runs aren't affected.
+    // Cleanup â€” re-enable so other tests/manual runs aren't affected.
     await request(app.getHttpServer())
       .patch('/panels/access/FINANCE')
       .set('Authorization', `Bearer ${ceo.accessToken}`)
@@ -318,3 +319,4 @@ describe('Panels (e2e)', () => {
       .send({ enabled: true });
   });
 });
+
