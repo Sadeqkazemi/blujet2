@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useCareersEnabled } from '../../hooks/useCareersEnabled';
+import { useSocialLinks } from '../../hooks/useSocialLinks';
 import { useT } from '../../lib/i18n';
+import { SocialIcon, socialBrandColor } from './SocialIcon';
 
 function AppStoreIcon({ size = 15 }: { size?: number }) {
   return (
@@ -146,6 +148,31 @@ export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
   const careersEnabled = useCareersEnabled();
+  const socialLinks = useSocialLinks();
+
+  const socialRow = socialLinks.length ? (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      style={{ justifyContent: isMobile ? 'center' : 'flex-start' }}
+      data-testid="footer-social-links"
+    >
+      {socialLinks.map((link) => (
+        <a
+          key={link.id}
+          href={link.url}
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label={link.name}
+          title={link.name}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 transition hover:bg-white/10"
+          style={{ color: socialBrandColor(link.id) }}
+          data-testid={`footer-social-${link.id}`}
+        >
+          <SocialIcon id={link.id} size={18} />
+        </a>
+      ))}
+    </div>
+  ) : null;
 
   const serviceLinks = [
     { to: '/results', label: t('footerBookFlight') },
@@ -194,6 +221,7 @@ export default function PublicFooter() {
               </Link>
               <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>{t('footerTagline')}</p>
               <DownloadButtons />
+              {socialRow}
               <TrustBadges />
             </div>
             <FooterLinkColumn title={t('footerColServices')} links={serviceLinks} />
@@ -219,6 +247,7 @@ export default function PublicFooter() {
             </div>
             <p style={{ fontSize: '12.5px', lineHeight: 1.8, margin: '0 auto 16px', maxWidth: 270, color: '#aebfd4' }}>{t('footerTagline')}</p>
             <DownloadButtons compact />
+            {socialRow}
             <TrustBadges compact />
           </div>
           <div style={{ marginTop: 22, borderTop: '1px solid #ffffff14' }}>

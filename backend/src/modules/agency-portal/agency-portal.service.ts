@@ -581,7 +581,6 @@ export class AgencyPortalService {
   }
 
   async seatRequestOptions(actor: AuthenticatedUser) {
-    if (await this.isUatSandboxAgencyActor(actor)) return [];
     await this.getOwnProfileOrThrow(actor);
     const instances = await this.flightInstanceRepo.find({
       where: {

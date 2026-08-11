@@ -30,7 +30,7 @@ export class BookingController {
 
   @Post()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'رزرو صندلی و شروع نگهداری ۱۰ دقیقه‌ای (HELD)' })
+  @ApiOperation({ summary: 'رزرو صندلی و شروع نگهداری ۱۵ دقیقه‌ای (HELD)' })
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateBookingDto,

@@ -268,6 +268,12 @@ export default function AddFlightPage({
       ),
     [cabinRows],
   );
+  const agencyCommittedSeats = agencySummary?.agencySeats ?? 0;
+  const charterCommittedSeats = Number(latinDigits(charter)) || 0;
+  const publicSaleSeats =
+    agencySummary?.freeSeats ??
+    Math.max(0, capacity - charterCommittedSeats - agencyCommittedSeats);
+  const agencyCommittedRevenueIrr = agencySummary?.agencyRevenueIrr ?? "0";
 
   const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
   const fareAdultToman = BigInt(tomanDigitsOnly(fareForm.priceToman) || "0");
@@ -1387,6 +1393,32 @@ export default function AddFlightPage({
                   </svg>
                   {aiLoading ? "در حال تحلیل…" : "پیشنهاد قیمت هوش مصنوعی"}
                 </button>
+              </div>
+              <div
+                className="mb-[13px] grid grid-cols-1 gap-[13px] sm:grid-cols-2"
+                data-testid="commercial-pricing-capacity-summary"
+              >
+                <div className="rounded-xl border border-[#33415c] bg-[#0f1726] p-4">
+                  <div className="text-[11px] font-bold text-[#9fb0c7]">
+                    صندلی فروخته‌شده به آژانس‌ها
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
+                    <strong className="font-num text-xl text-[#c4b5fd]" data-testid="pricing-agency-seats">
+                      {faDigits(agencyCommittedSeats)} صندلی
+                    </strong>
+                    <span className="font-num text-xs font-bold text-[#e7ecf3]" data-testid="pricing-agency-revenue">
+                      {faMoney(agencyCommittedRevenueIrr)} تومان
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-[#1f5a4a] bg-[rgba(16,185,129,.06)] p-4">
+                  <div className="text-[11px] font-bold text-[#9fb0c7]">
+                    ظرفیت آزاد قابل فروش در سامانه
+                  </div>
+                  <strong className="mt-2 block font-num text-xl text-[#34d399]" data-testid="pricing-public-seats">
+                    {faDigits(publicSaleSeats)} صندلی
+                  </strong>
+                </div>
               </div>
               <div className="mb-[13px] grid grid-cols-1 gap-[13px] sm:grid-cols-2">
                 <MoneyInput

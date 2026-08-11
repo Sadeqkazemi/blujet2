@@ -20,6 +20,8 @@ export default function PricingSidebar({
   canBack,
   busy,
   error,
+  disabled = false,
+  disabledHint,
   /** When true, omit primary CTA (mobile sticky bar owns it). */
   hideActions = false,
 }: {
@@ -33,6 +35,8 @@ export default function PricingSidebar({
   canBack: boolean;
   busy?: boolean;
   error?: string | null;
+  disabled?: boolean;
+  disabledHint?: string | null;
   hideActions?: boolean;
 }) {
   const t = CHECKOUT_COPY[locale];
@@ -106,13 +110,22 @@ export default function PricingSidebar({
 
           <button
             type="button"
-            disabled={busy}
+            disabled={busy || disabled}
             onClick={onNext}
             data-testid="checkout-next"
             className="flex h-14 items-center justify-center rounded-[14px] bg-[#1668c4] text-[15px] font-extrabold text-white shadow-[0_12px_24px_-12px_rgba(22,104,196,.55)] disabled:opacity-60"
           >
             {busy ? t.loading : nextLabel}
           </button>
+
+          {disabledHint && (
+            <div
+              className="mt-2.5 rounded-[10px] border border-[#efd59c] bg-[#fff9eb] px-3.5 py-2.5 text-xs font-semibold leading-relaxed text-[#9a6818]"
+              data-testid="checkout-disabled-hint"
+            >
+              {disabledHint}
+            </div>
+          )}
 
           {canBack && onBack && (
             <button

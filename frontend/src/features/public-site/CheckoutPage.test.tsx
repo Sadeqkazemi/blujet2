@@ -158,6 +158,45 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-saved-chip-saved-1')).toHaveTextContent('سارا احمدی');
   });
 
+  it('lets a guest complete passenger details, then opens the inline login modal', async () => {
+    mockAuth('unauthenticated');
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
+    const next = screen.getByTestId('checkout-next');
+    expect(next).toBeDisabled();
+    expect(screen.getByTestId('checkout-disabled-hint')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
+    await userEvent.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
+    await userEvent.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
+    await userEvent.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    const selects = screen.getAllByRole('combobox');
+    await userEvent.selectOptions(selects[1]!, '1');
+    await userEvent.selectOptions(selects[2]!, '1');
+    await userEvent.selectOptions(selects[3]!, '1370');
+
+    expect(next).toBeEnabled();
+    await userEvent.click(next);
+    expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
+  });
+
   it('mobile layout shows flight route + passenger form above pricing', async () => {
     vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
     mockAuth();
