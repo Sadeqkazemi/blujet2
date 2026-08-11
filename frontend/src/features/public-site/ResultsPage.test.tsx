@@ -111,6 +111,10 @@ function renderPage(
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
     signOut: vi.fn(),
+    requestOtp: vi.fn().mockResolvedValue('challenge-1'),
+    verifyOtp: vi.fn().mockResolvedValue(
+      mockAuthUser({ id: 'u1', fullName: 'کاربر تست', role: 'USER' }),
+    ),
   });
   return render(
     <MemoryRouter initialEntries={[`/results?${search}`]}>
@@ -301,13 +305,45 @@ describe('ResultsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
 
     const dialog = screen.getByRole('dialog', { name: 'برای ادامه وارد شوید' });
-    expect(dialog).toHaveTextContent('لطفاً برای تکمیل رزرو این پرواز وارد شوید یا یک حساب رایگان بسازید.');
-    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ثبت‌نام' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('ورود با شماره موبایل');
+    expect(dialog).toHaveTextContent('برای ادامه رزرو، شماره موبایل خود را تأیید کنید.');
+    expect(screen.getByTestId('desktop-guest-otp-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
     expect(sessionStorage.getItem('blujet_checkout_draft')).toContain('fi-1');
 
     await userEvent.click(screen.getByRole('button', { name: 'بستن پنجره ورود' }));
     expect(screen.queryByRole('dialog', { name: 'برای ادامه وارد شوید' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the existing login-or-signup choice on mobile results', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01',
+      true,
+    );
+    await screen.findByTestId('result-card');
+    await userEvent.click(screen.getByTestId('mobile-expand-flight'));
+
+    const buy = screen.getByRole('button', { name: /خرید بلیط/ });
+    await userEvent.click(buy);
+
+    expect(screen.queryByTestId('desktop-guest-otp-modal')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت‌نام' })).toBeInTheDocument();
+  });
+
+  it('flips the route airplane in Persian RTL results', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+
+    expect(await screen.findByTestId('route-airplane-icon')).toHaveStyle({
+      transform: 'scaleX(-1)',
+    });
   });
 
   it('dismisses the AI radar with its close button on mobile results', async () => {
@@ -542,7 +578,7 @@ describe('ResultsPage', () => {
       expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
     });
 
-    it('shows the login choice before checkout for a guest', async () => {
+    it('shows the desktop phone and OTP login before checkout for a guest', async () => {
       mockLocale('fa');
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
@@ -554,13 +590,8 @@ describe('ResultsPage', () => {
       await expandFirstCard();
       await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
 
-      expect(await screen.findByRole('dialog')).toHaveTextContent(
-        'برای ادامه وارد شوید',
-      );
-      expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'ثبت‌نام' }),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId('desktop-guest-otp-modal')).toBeInTheDocument();
+      expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
     });
 
     it('calls createPriceLock with cabin COMFORT when COMFORT is selected', async () => {

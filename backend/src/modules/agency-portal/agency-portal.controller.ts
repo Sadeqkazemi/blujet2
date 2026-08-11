@@ -22,6 +22,7 @@ import { AgencyPortalService } from './agency-portal.service';
 import {
   PostInboxMessageDto,
   RequestCreditIncreaseDto,
+  RequestAgencySeatsDto,
   RequestWebserviceDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
@@ -152,6 +153,25 @@ export class AgencyPortalController {
   @ApiOperation({ summary: 'سهمیه‌های صندلی تخصیص‌یافته به خودِ آژانس' })
   async allotments(@CurrentUser() actor: AuthenticatedUser) {
     return { success: true, data: await this.portal.allotments(actor) };
+  }
+
+  @Get('seat-request-options')
+  @ApiOperation({
+    summary: 'مسیرها و پروازهای زمان‌بندی‌شده قابل درخواست توسط آژانس',
+  })
+  async seatRequestOptions(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.portal.seatRequestOptions(actor) };
+  }
+
+  @Post('seat-requests')
+  @ApiOperation({
+    summary: 'ثبت درخواست خرید صندلی و ارجاع واقعی به مدیر بازرگانی',
+  })
+  async requestSeats(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: RequestAgencySeatsDto,
+  ) {
+    return { success: true, data: await this.portal.requestSeats(actor, dto) };
   }
 
   @Post('allotments/:allotmentId/bookings')

@@ -5,13 +5,20 @@
 // exact tab (seatsInfoBanner, allocatedLabel, soldLabel, remainingLabel);
 // AR has no counterpart there and is hand-translated.
 import { useEffect, useState } from 'react';
-import { createAllotmentBooking, fetchAllotments } from '../../api/agency-portal';
+import {
+  createAllotmentBooking,
+  fetchAllotments,
+  fetchSeatRequestOptions,
+  requestAgencySeats,
+} from '../../api/agency-portal';
 import { fetchSeatMap } from '../../api/publicSite';
 import { faDigits } from '../../lib/fa-format';
 import { publicCabinLabel } from '../../lib/flight-definition';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
+import type { AgencySeatRequestOption } from '../../types/agency-portal';
+import { airportCityLabel } from '../../lib/airport-cities';
 import type { CabinClass, SeatMapResult } from '../../types/public-site';
 
 const STR: Record<
@@ -98,6 +105,13 @@ export default function AgencySeatsPage() {
   const { locale } = useLocale();
   const t = STR[locale];
   const [rows, setRows] = useState<AgencyAllotmentRow[] | null>(null);
+  const [requestOptions, setRequestOptions] = useState<AgencySeatRequestOption[] | null>(null);
+  const [originCode, setOriginCode] = useState('');
+  const [destCode, setDestCode] = useState('');
+  const [requestFlightId, setRequestFlightId] = useState('');
+  const [requestedSeats, setRequestedSeats] = useState(1);
+  const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([]);
+  const [termMonths, setTermMonths] = useState<3 | 6 | 12>(3);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [seatMap, setSeatMap] = useState<SeatMapResult | null>(null);
@@ -116,11 +130,53 @@ export default function AgencySeatsPage() {
   }
 
   useEffect(() => {
-    fetchAllotments()
-      .then(setRows)
+    Promise.all([fetchAllotments(), fetchSeatRequestOptions()])
+      .then(([allotments, options]) => {
+        setRows(allotments);
+        setRequestOptions(options);
+      })
       .catch(() => setError(t.errorFallback));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const origins = Array.from(new Set((requestOptions ?? []).map((row) => row.originCode)));
+  const destinations = Array.from(
+    new Set(
+      (requestOptions ?? [])
+        .filter((row) => !originCode || row.originCode === originCode)
+        .map((row) => row.destCode),
+    ),
+  );
+  const matchingFlights = (requestOptions ?? []).filter(
+    (row) => row.originCode === originCode && row.destCode === destCode,
+  );
+  const requestFlight = matchingFlights.find((row) => row.flightInstanceId === requestFlightId) ?? null;
+
+  async function submitSeatRequest() {
+    if (!requestFlight || requestedSeats < 1) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await requestAgencySeats({
+        flightInstanceId: requestFlight.flightInstanceId,
+        seats: requestedSeats,
+        preferredWeekdays,
+        termMonths,
+      });
+      setNotice(
+        locale === 'en'
+          ? 'Your seat request was sent to the commercial manager.'
+          : locale === 'ar'
+            ? 'تم إرسال طلب المقاعد إلى المدير التجاري.'
+            : 'درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.',
+      );
+      setRequestedSeats(1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t.errorFallback);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function openSale(row: AgencyAllotmentRow) {
     setError(null);
@@ -174,6 +230,157 @@ export default function AgencySeatsPage() {
 
   return (
     <div>
+      <section
+        className="mb-5 rounded-2xl border border-[#e1e8f2] bg-white p-5 shadow-sm"
+        data-testid="agency-seat-request-panel"
+      >
+        <div className="mb-4">
+          <h2 className="text-base font-black text-[#0d2640]">
+            {locale === 'en' ? 'Request allocated seats' : locale === 'ar' ? 'طلب مقاعد مخصصة' : 'درخواست صندلی اختصاصی'}
+          </h2>
+          <p className="mt-1 text-[11px] leading-5 text-[#7d8ba0]">
+            {locale === 'en'
+              ? 'Choose an active route and flight; the request will be sent to the commercial manager.'
+              : locale === 'ar'
+                ? 'اختر المسار والرحلة النشطة لإرسال الطلب إلى المدير التجاري.'
+                : 'مبدأ و مقصد از مسیرهای فعال مدیر بازرگانی بارگذاری می‌شود؛ سپس پرواز و تعداد صندلی را انتخاب کنید.'}
+          </p>
+        </div>
+
+        <div
+          className={`grid gap-3 ${matchingFlights.length > 1 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
+        >
+          <label className="text-[11px] font-bold text-[#3f546b]">
+            {locale === 'en' ? 'Origin' : locale === 'ar' ? 'المغادرة' : 'مبدأ'}
+            <select
+              value={originCode}
+              onChange={(event) => {
+                setOriginCode(event.target.value);
+                setDestCode('');
+                setRequestFlightId('');
+              }}
+              className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
+              data-testid="agency-request-origin"
+            >
+              <option value="">—</option>
+              {origins.map((code) => <option key={code} value={code}>{airportCityLabel(code, locale)}</option>)}
+            </select>
+          </label>
+          <label className="text-[11px] font-bold text-[#3f546b]">
+            {locale === 'en' ? 'Destination' : locale === 'ar' ? 'الوجهة' : 'مقصد'}
+            <select
+              value={destCode}
+              disabled={!originCode}
+              onChange={(event) => {
+                const nextDest = event.target.value;
+                setDestCode(nextDest);
+                const firstFlight = (requestOptions ?? []).find(
+                  (row) => row.originCode === originCode && row.destCode === nextDest,
+                );
+                setRequestFlightId(firstFlight?.flightInstanceId ?? '');
+              }}
+              className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none disabled:bg-[#f4f6f9]"
+              data-testid="agency-request-destination"
+            >
+              <option value="">—</option>
+              {destinations.map((code) => <option key={code} value={code}>{airportCityLabel(code, locale)}</option>)}
+            </select>
+          </label>
+          <label
+            className={`text-[11px] font-bold text-[#3f546b] ${matchingFlights.length <= 1 ? 'hidden' : ''}`}
+          >
+            {locale === 'en' ? 'Flight' : locale === 'ar' ? 'الرحلة' : 'پرواز'}
+            <select
+              value={requestFlightId}
+              disabled={!destCode}
+              onChange={(event) => setRequestFlightId(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none disabled:bg-[#f4f6f9]"
+              data-testid="agency-request-flight"
+            >
+              <option value="">—</option>
+              {matchingFlights.map((row) => (
+                <option key={row.flightInstanceId} value={row.flightInstanceId}>
+                  {row.flightNo} · {formatJalaliDateTime(row.departureAt)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {requestFlight && (
+          <div className="mt-4 rounded-2xl border border-[#d6e4f8] bg-[#f8fbff] p-4" data-testid="agency-request-flight-detail">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="font-black text-[#0d2640]">
+                  {airportCityLabel(requestFlight.originCode, locale)} ← {airportCityLabel(requestFlight.destCode, locale)}
+                </div>
+                <div className="mt-1 text-[11px] text-[#7d8ba0]" dir="ltr">
+                  {requestFlight.flightNo} · {requestFlight.aircraftType}
+                </div>
+              </div>
+              <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-2 md:max-w-[520px]">
+                {[
+                  [locale === 'en' ? 'Capacity' : 'ظرفیت کل', requestFlight.capacity],
+                  [locale === 'en' ? 'Allocated' : 'تخصیص‌یافته', requestFlight.agencyAllocated],
+                  [locale === 'en' ? 'Available' : 'قابل درخواست', requestFlight.availableToRequest],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="rounded-xl bg-white p-3 text-center">
+                    <div className="text-[10px] text-[#7d8ba0]">{label}</div>
+                    <div className="mt-1 text-lg font-black text-[#1668c4]">{faDigits(value as number)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-[1fr_1.4fr_1fr]">
+              <label className="text-[11px] font-bold text-[#3f546b]">
+                {locale === 'en' ? 'Seats needed' : 'تعداد صندلی مورد نیاز'}
+                <input
+                  type="number"
+                  min={1}
+                  max={requestFlight.availableToRequest}
+                  value={requestedSeats}
+                  onChange={(event) => setRequestedSeats(Math.max(1, Number(event.target.value) || 1))}
+                  className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
+                  data-testid="agency-request-seat-count"
+                />
+              </label>
+              <fieldset className="text-[11px] font-bold text-[#3f546b]">
+                <legend>{locale === 'en' ? 'Preferred days' : 'روزهای ترجیحی'}</legend>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {[['شنبه', 6], ['یکشنبه', 0], ['دوشنبه', 1], ['سه‌شنبه', 2], ['چهارشنبه', 3], ['پنجشنبه', 4]].map(([label, day]) => {
+                    const selected = preferredWeekdays.includes(day as number);
+                    return <button key={String(day)} type="button" onClick={() => setPreferredWeekdays(selected ? preferredWeekdays.filter((v) => v !== day) : [...preferredWeekdays, day as number])} className={`rounded-lg border px-3 py-2 ${selected ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8] bg-white'}`}>{label}</button>;
+                  })}
+                </div>
+              </fieldset>
+              <label className="text-[11px] font-bold text-[#3f546b]">
+                {locale === 'en' ? 'Purchase term' : 'دوره خرید'}
+                <select value={termMonths} onChange={(event) => setTermMonths(Number(event.target.value) as 3 | 6 | 12)} className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none">
+                  <option value={3}>{locale === 'en' ? '3 months' : 'سه‌ماهه'}</option>
+                  <option value={6}>{locale === 'en' ? '6 months' : 'شش‌ماهه'}</option>
+                  <option value={12}>{locale === 'en' ? '12 months' : 'یک‌ساله'}</option>
+                </select>
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={busy || requestedSeats > requestFlight.availableToRequest || requestFlight.availableToRequest < 1}
+              onClick={() => void submitSeatRequest()}
+              className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white disabled:opacity-50"
+              data-testid="agency-submit-seat-request"
+            >
+              {locale === 'en' ? 'Send request to commercial manager' : locale === 'ar' ? 'إرسال الطلب إلى المدير التجاري' : 'ارسال درخواست به مدیر بازرگانی'}
+            </button>
+          </div>
+        )}
+
+        {requestOptions?.length === 0 && (
+          <p className="rounded-xl bg-[#f7f9fc] p-4 text-center text-xs text-[#7d8ba0]">
+            {locale === 'en' ? 'No scheduled flight route is available.' : 'هنوز مسیر پروازی زمان‌بندی‌شده‌ای برای درخواست وجود ندارد.'}
+          </p>
+        )}
+      </section>
+
       <div className="mb-5 rounded-xl border border-[#d6e4f8] bg-[#f2f7fd] p-4 text-xs leading-6 text-[#3f546b]">
         {t.infoBanner}
       </div>

@@ -214,7 +214,17 @@ export default function ResultsFlightCard({
               }}
             >
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
-              <span style={{ color: '#c2cad4', fontSize: 14.5 }}>✈</span>
+              <span
+                data-testid="route-airplane-icon"
+                style={{
+                  color: '#c2cad4',
+                  fontSize: 14.5,
+                  display: 'inline-block',
+                  transform: isRTL ? 'scaleX(-1)' : undefined,
+                }}
+              >
+                ✈
+              </span>
               <span style={{ flex: 1, height: 1.5, background: '#e0e5ec' }} />
             </div>
             <div style={{ marginTop: 8 }}>
@@ -303,6 +313,7 @@ export default function ResultsFlightCard({
         ) : (
           <button
             type="button"
+            data-testid="mobile-expand-flight"
             onClick={onToggle}
             style={{
               width: '100%',
@@ -370,6 +381,7 @@ export default function ResultsFlightCard({
                   justifyContent: 'center',
                   fontSize: 13,
                   flex: 'none',
+                  transform: isRTL ? 'scaleX(-1)' : undefined,
                 }}
               >
                 ✈

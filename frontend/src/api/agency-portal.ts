@@ -14,6 +14,8 @@ import type {
   AgencyMessage,
   AgencyProfile,
   AgencySalesReport,
+  AgencySeatRequestOption,
+  AgencySeatRequestResult,
   AgencyWebserviceRequest,
 } from '../types/agency-portal';
 
@@ -81,6 +83,19 @@ export function uploadDocument(file: File, docType: AgencyDocumentType) {
 
 export function fetchAllotments() {
   return apiGet<AgencyAllotmentRow[]>('/agency-portal/allotments');
+}
+
+export function fetchSeatRequestOptions() {
+  return apiGet<AgencySeatRequestOption[]>('/agency-portal/seat-request-options');
+}
+
+export function requestAgencySeats(dto: {
+  flightInstanceId: string;
+  seats: number;
+  preferredWeekdays?: number[];
+  termMonths?: 3 | 6 | 12;
+}) {
+  return apiPost<AgencySeatRequestResult>('/agency-portal/seat-requests', dto);
 }
 
 export function createAllotmentBooking(

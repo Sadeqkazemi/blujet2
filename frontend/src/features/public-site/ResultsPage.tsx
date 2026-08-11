@@ -430,6 +430,7 @@ export default function ResultsPage() {
                 justifyContent: 'center',
                 fontSize: isMobile ? 18 : 22,
                 flex: 'none',
+                transform: isRTL ? 'scaleX(-1)' : undefined,
               }}
             >
               ✈
@@ -1017,7 +1018,12 @@ export default function ResultsPage() {
       <ResultsGuestAuthModal
         locale={locale}
         open={pendingCheckoutPath !== null}
+        desktopOtp={!isMobile}
         onClose={() => setPendingCheckoutPath(null)}
+        onAuthenticated={() => {
+          if (!pendingCheckoutPath) return;
+          navigate(pendingCheckoutPath);
+        }}
         onLogin={() => {
           if (!pendingCheckoutPath) return;
           navigate('/signin', { state: { from: pendingCheckoutPath } });

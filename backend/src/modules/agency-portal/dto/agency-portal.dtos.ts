@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+} from 'class-validator';
 import {
   IsIrrAmount,
   MinIrrAmount,
@@ -61,4 +69,27 @@ export class RequestWebserviceDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class RequestAgencySeatsDto {
+  @ApiProperty({ example: 'flight-instance-id' })
+  @IsString()
+  @MinLength(1)
+  flightInstanceId: string;
+
+  @ApiProperty({ example: 20, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  seats: number;
+
+  @ApiPropertyOptional({ example: [0, 6], type: [Number] })
+  @IsOptional()
+  @IsIn([0, 1, 2, 3, 4, 5, 6], { each: true })
+  preferredWeekdays?: number[];
+
+  @ApiPropertyOptional({ enum: [3, 6, 12], example: 3 })
+  @IsOptional()
+  @IsIn([3, 6, 12])
+  termMonths?: 3 | 6 | 12;
 }

@@ -27,6 +27,21 @@ describe('passenger pricing helpers', () => {
     ).toBe('CHILD_AGE_INVALID');
   });
 
+  it('requires the adult passenger to be fully 12 on the departure date', () => {
+    expect(
+      validatePassengerAges(
+        [{ passengerType: 'ADULT', birthDate: '2014-08-11' }],
+        '2026-08-10T10:00:00.000Z',
+      ),
+    ).toBe('ADULT_TOO_YOUNG');
+    expect(
+      validatePassengerAges(
+        [{ passengerType: 'ADULT', birthDate: '2014-08-10' }],
+        '2026-08-10T10:00:00.000Z',
+      ),
+    ).toBeNull();
+  });
+
   it('allows an under-two passenger on a child fare with a dedicated seat', () => {
     expect(
       validatePassengerAges(

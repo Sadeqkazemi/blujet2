@@ -15,6 +15,11 @@ import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { User } from '../../database/entities/user.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
+import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
+import { CommitmentStatus, FlightInstanceStatus } from '../../database/enums';
+import { randomUUID } from 'node:crypto';
 import { isActiveUatSandboxAgency } from '../../database/temporary-panel-accounts';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
@@ -63,6 +68,12 @@ export class AgencyPortalService {
     private readonly passengerRepo: Repository<Passenger>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(AgencySeatCommitment)
+    private readonly agencySeatCommitmentRepo: Repository<AgencySeatCommitment>,
+    @InjectRepository(CharterCommitment)
+    private readonly charterCommitmentRepo: Repository<CharterCommitment>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
@@ -567,6 +578,165 @@ export class AgencyPortalService {
         };
       }),
     );
+  }
+
+  async seatRequestOptions(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
+    await this.getOwnProfileOrThrow(actor);
+    const instances = await this.flightInstanceRepo.find({
+      where: {
+        departureAt: MoreThanOrEqual(new Date()),
+        status: FlightInstanceStatus.SCHEDULED,
+      },
+      relations: { flight: { route: true } },
+      order: { departureAt: 'ASC' },
+      take: 200,
+    });
+
+    const instanceIds = instances.map((instance) => instance.id);
+    if (instanceIds.length === 0) return [];
+
+    const [agencyRows, charterRows, soldRows] = await Promise.all([
+      this.agencySeatCommitmentRepo
+        .createQueryBuilder('commitment')
+        .select('commitment."flightInstanceId"', 'flightInstanceId')
+        .addSelect('COALESCE(SUM(commitment.seats), 0)', 'total')
+        .addSelect(
+          'COALESCE(SUM(CASE WHEN commitment."agencyId" = :agencyId THEN commitment.seats ELSE 0 END), 0)',
+          'own',
+        )
+        .where('commitment."flightInstanceId" IN (:...instanceIds)', {
+          instanceIds,
+          agencyId: actor.id,
+        })
+        .andWhere('commitment.status = :status', {
+          status: CommitmentStatus.ACTIVE,
+        })
+        .groupBy('commitment."flightInstanceId"')
+        .getRawMany<{ flightInstanceId: string; total: string; own: string }>(),
+      this.charterCommitmentRepo
+        .createQueryBuilder('commitment')
+        .select('commitment."flightInstanceId"', 'flightInstanceId')
+        .addSelect('COALESCE(SUM(commitment.seats), 0)', 'total')
+        .where('commitment."flightInstanceId" IN (:...instanceIds)', {
+          instanceIds,
+        })
+        .andWhere('commitment.status = :status', {
+          status: CommitmentStatus.ACTIVE,
+        })
+        .groupBy('commitment."flightInstanceId"')
+        .getRawMany<{ flightInstanceId: string; total: string }>(),
+      this.passengerRepo
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .select('booking."flightInstanceId"', 'flightInstanceId')
+        .addSelect('COUNT(passenger.id)', 'total')
+        .where('booking."flightInstanceId" IN (:...instanceIds)', {
+          instanceIds,
+        })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+        })
+        .andWhere('passenger."occupiesSeat" = TRUE')
+        .groupBy('booking."flightInstanceId"')
+        .getRawMany<{ flightInstanceId: string; total: string }>(),
+    ]);
+
+    const agencyByInstance = new Map(
+      agencyRows.map((row) => [row.flightInstanceId, row]),
+    );
+    const charterByInstance = new Map(
+      charterRows.map((row) => [row.flightInstanceId, Number(row.total)]),
+    );
+    const soldByInstance = new Map(
+      soldRows.map((row) => [row.flightInstanceId, Number(row.total)]),
+    );
+
+    return instances.map((instance) => {
+      const agency = agencyByInstance.get(instance.id);
+      const allocated = Number(agency?.total ?? 0);
+      const ownAllocated = Number(agency?.own ?? 0);
+      const committed = allocated + (charterByInstance.get(instance.id) ?? 0);
+      const sold = soldByInstance.get(instance.id) ?? 0;
+      return {
+        flightInstanceId: instance.id,
+        flightNo: instance.flight.flightNo,
+        originCode: instance.flight.route.originCode,
+        destCode: instance.flight.route.destCode,
+        departureAt: instance.departureAt,
+        aircraftType:
+          instance.aircraftTypeOverride ?? instance.flight.aircraftType,
+        capacity: instance.capacity,
+        agencyAllocated: allocated,
+        ownAllocated,
+        availableToRequest: Math.max(instance.capacity - committed - sold, 0),
+        pricePerSeatIrr: instance.basePriceIrr,
+        definitionStatus: instance.definitionStatus,
+      };
+    });
+  }
+
+  async requestSeats(
+    actor: AuthenticatedUser,
+    dto: {
+      flightInstanceId: string;
+      seats: number;
+      preferredWeekdays?: number[];
+      termMonths?: 3 | 6 | 12;
+    },
+  ) {
+    await this.assertAgencyPortalWritable(actor);
+    const profile = await this.getOwnProfileOrThrow(actor);
+    const options = await this.seatRequestOptions(actor);
+    const option = options.find(
+      (row) => row.flightInstanceId === dto.flightInstanceId,
+    );
+    if (!option) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مسیر یا پرواز فعال و قابل درخواست یافت نشد.',
+      });
+    }
+    if (dto.seats > option.availableToRequest) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تعداد صندلی درخواستی بیشتر از ظرفیت آزاد این پرواز است.',
+      });
+    }
+
+    const requestId = randomUUID();
+    const weekdays = dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
+    const term = dto.termMonths ? `${dto.termMonths} ماه` : 'تک‌پرواز';
+    const description = `آژانس «${profile.managerName}» برای پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
+    const recipientCount = await this.cartable.createTasksForRoles(
+      ['COMMERCIAL_MANAGER'],
+      {
+        category: 'AGENCY',
+        title: `درخواست خرید ${dto.seats} صندلی · ${option.flightNo}`,
+        description,
+        senderId: actor.id,
+        senderLabelFa: profile.managerName,
+        sourceType: 'AGENCY_REQUEST',
+        sourceId: requestId,
+      },
+    );
+    if (recipientCount === 0) {
+      throw new BadRequestException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مدیر بازرگانی فعالی برای دریافت درخواست یافت نشد.',
+      });
+    }
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: 'ثبت درخواست خرید صندلی آژانس',
+      detail: description,
+      entityType: 'AgencySeatRequest',
+      entityId: requestId,
+      metadata: { ...dto, flightNo: option.flightNo },
+    });
+    return { id: requestId, status: 'SUBMITTED', recipientCount, ...dto };
   }
 
   // ── Phase 23: real webservice (B2B API) purchase requests ──────────────
