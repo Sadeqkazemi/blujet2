@@ -44,7 +44,7 @@ describe('Panels (e2e)', () => {
     expect(keys).not.toContain('settings');
   });
 
-  it('returns the confirmed tab set for Commercial Manager (includes webservice + flights)', async () => {
+  it('returns the confirmed tab set for Commercial Manager (includes webservice, flights, and routes)', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const res = await request(app.getHttpServer())
       .get('/panels/nav')
@@ -55,6 +55,7 @@ describe('Panels (e2e)', () => {
       'dashboard',
       'agencies',
       'flights',
+      'routes',
       'aircraft',
       'reports',
       'staff',
