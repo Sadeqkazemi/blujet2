@@ -124,8 +124,20 @@ export default function ScheduleTemplatesTab() {
         <label className="text-xs font-bold text-panel-muted">تعداد صندلی<input readOnly value={selectedAircraft ? faDigits(selectedAircraft.totalCapacity) : ''} placeholder="پس از انتخاب هواپیما" className={`${INPUT_CLASS} cursor-not-allowed opacity-80`} /></label>
         <label className="text-xs font-bold text-panel-muted">ساعت پرواز<input type="time" value={form.departureTime} onChange={(e) => setForm({ ...form, departureTime: e.target.value })} className={INPUT_CLASS} /></label>
         <label className="text-xs font-bold text-panel-muted">مدت پرواز (دقیقه)<input inputMode="numeric" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: e.target.value })} className={INPUT_CLASS} /></label>
-        <JalaliDatePicker label="شروع فصل" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} theme="dark" singleLine />
-        <JalaliDatePicker label="پایان فصل" value={form.endDate} minDate={form.startDate ?? undefined} onChange={(v) => setForm({ ...form, endDate: v })} theme="dark" singleLine />
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 p-3" data-testid="schedule-start-date-field">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-black text-panel-ink">تاریخ شروع پروازها</span>
+            <span className="font-num text-[11px] text-accent">{form.startDate ? formatJalaliDate(toIsoDateOnly(dayjs(form.startDate))) : 'انتخاب نشده'}</span>
+          </div>
+          <JalaliDatePicker label="شروع بازه" value={form.startDate} onChange={(v) => setForm({ ...form, startDate: v })} theme="dark" singleLine />
+        </div>
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 p-3" data-testid="schedule-end-date-field">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <span className="text-xs font-black text-panel-ink">تاریخ پایان پروازها</span>
+            <span className="font-num text-[11px] text-accent">{form.endDate ? formatJalaliDate(toIsoDateOnly(dayjs(form.endDate))) : 'انتخاب نشده'}</span>
+          </div>
+          <JalaliDatePicker label="پایان بازه" value={form.endDate} minDate={form.startDate ?? undefined} onChange={(v) => setForm({ ...form, endDate: v })} theme="dark" singleLine />
+        </div>
         <div className="md:col-span-3"><div className="mb-2 text-xs font-bold text-panel-muted">روزهای پرواز</div><div className="flex flex-wrap gap-2">{WEEKDAYS.map(([day, label]) => <button key={day} type="button" onClick={() => toggleWeekday(day)} className={`rounded-lg border px-3 py-2 text-xs font-bold ${form.weekdays.includes(day) ? 'border-accent bg-accent text-white' : 'border-panel-border text-panel-muted'}`}>{label}</button>)}</div></div>
         <label className="text-xs font-bold text-panel-muted">قیمت آژانس (تومان)<input inputMode="numeric" value={form.agencyPriceToman} onChange={(e) => setForm({ ...form, agencyPriceToman: e.target.value })} className={INPUT_CLASS} /></label>
         <label className="text-xs font-bold text-panel-muted">سقف قانونی (تومان)<input inputMode="numeric" value={form.legalCeilingToman} onChange={(e) => setForm({ ...form, legalCeilingToman: e.target.value })} className={INPUT_CLASS} /></label>

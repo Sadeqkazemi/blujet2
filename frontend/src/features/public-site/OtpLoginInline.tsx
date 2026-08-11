@@ -77,9 +77,11 @@ const STR: Record<
 export default function OtpLoginInline({
   onAuthenticated,
   embedded = false,
+  showHeader = true,
 }: {
   onAuthenticated?: () => void;
   embedded?: boolean;
+  showHeader?: boolean;
 } = {}) {
   const { requestOtp, verifyOtp } = useAuth();
   const { locale } = useLocale();
@@ -147,12 +149,16 @@ export default function OtpLoginInline({
     <div
       className={
         embedded
-          ? 'mx-auto w-full max-w-sm bg-white px-1 pb-1 pt-2'
-          : 'mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 shadow-sm'
+          ? 'mx-auto w-full max-w-sm bg-white px-1 pb-1 pt-2 font-sans'
+          : 'mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 font-sans shadow-sm'
       }
     >
-      <h2 className="mb-1 text-sm font-extrabold text-[#0d2640]">{t.otpTitle}</h2>
-      <p className="mb-4 text-xs text-[#6b7b94]">{t.otpSub}</p>
+      {showHeader && (
+        <>
+          <h2 className="mb-1 text-sm font-extrabold text-[#0d2640]">{t.otpTitle}</h2>
+          <p className="mb-4 text-xs text-[#6b7b94]">{t.otpSub}</p>
+        </>
+      )}
       {error && <p className="mb-3 rounded-lg bg-red-50 p-2.5 text-xs text-red-600">{error}</p>}
       {!challengeId ? (
         <form

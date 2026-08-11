@@ -238,11 +238,15 @@ function PaymentPricingAside({
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3.5 py-2.5 text-[13px] text-[#5a6678]">
           <span>{paxLabel}</span>
-          <span className="font-bold text-[#16202e]">{localeMoney(ticketIrr, locale)}</span>
+          <span className="font-bold text-[#16202e]" data-testid="payment-ticket-amount">
+            {localeMoney(ticketIrr, locale)}
+          </span>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]">
           <span>{t.taxesFees}</span>
-          <span className="font-bold text-[#16202e]">{localeMoney(taxesIrr, locale)}</span>
+          <span className="font-bold text-[#16202e]" data-testid="payment-tax-amount">
+            {localeMoney(taxesIrr, locale)}
+          </span>
         </div>
       </div>
 
@@ -497,7 +501,12 @@ export default function PaymentPage() {
   const holdExpired =
     booking.status === 'HELD' && holdSecs <= 0 && Boolean(booking.holdExpiresAt);
   const holdUrgent = holdSecs <= 120;
-  const taxesIrr = Math.round(Number(booking.priceIrr) * 0.084);
+  // The backend snapshots fare, tax and charges when the HELD booking is
+  // created. Payment must display that immutable snapshot instead of
+  // calculating a new tax rate in the browser.
+  const taxesIrr = Number(
+    booking.taxIrr ?? Math.round(Number(booking.priceIrr) * 0.084),
+  );
   const ticketIrr = Number(booking.priceIrr) - taxesIrr;
   const priceDisplay = localeMoney(booking.priceIrr, locale);
   const walletDisplay =

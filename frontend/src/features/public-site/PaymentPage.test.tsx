@@ -14,7 +14,8 @@ const BOOKING: BookingDetail = {
   status: 'HELD',
   cabin: 'ECONOMY',
   priceIrr: '380000000',
-  holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+  taxIrr: '17000000',
+  holdExpiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
   flightInstanceId: 'fi-1',
   flightNo: 'BJ-100',
   originCode: 'THR',
@@ -52,6 +53,8 @@ describe('PaymentPage', () => {
     expect(await screen.findByTestId('pay-submit')).toBeInTheDocument();
     expect(screen.getByTestId('hold-timer')).toBeInTheDocument();
     expect(screen.getByTestId('payment-method-GATEWAY')).toBeInTheDocument();
+    expect(screen.getByTestId('payment-tax-amount')).toHaveTextContent('۱٬۷۰۰٬۰۰۰');
+    expect(screen.getByTestId('payment-ticket-amount')).toHaveTextContent('۳۶٬۳۰۰٬۰۰۰');
   });
 
   it('pays successfully and navigates to the ticket page', async () => {

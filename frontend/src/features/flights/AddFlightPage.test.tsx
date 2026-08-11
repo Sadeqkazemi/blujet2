@@ -61,6 +61,10 @@ describe("AddFlightPage", () => {
     expect(screen.getByText("قیمت‌گذاری")).toBeInTheDocument();
     expect(screen.getByTestId("charge-rules-section")).toBeInTheDocument();
     expect(screen.getByTestId("cabin-capacity-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("commercial-pricing-capacity-summary")).toBeInTheDocument();
+    expect(screen.getByTestId("pricing-agency-seats")).toBeInTheDocument();
+    expect(screen.getByTestId("pricing-agency-revenue")).toBeInTheDocument();
+    expect(screen.getByTestId("pricing-public-seats")).toBeInTheDocument();
     expect(
       screen.getByText("هنوز کلاس نرخی برای این پرواز تعریف نشده است."),
     ).toBeInTheDocument();

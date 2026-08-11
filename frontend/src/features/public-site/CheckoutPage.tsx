@@ -98,6 +98,7 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
 
   // Load held booking (legacy /payment-bound path)
   useEffect(() => {
@@ -356,6 +357,10 @@ export default function CheckoutPage() {
         setError(ageError);
         return;
       }
+      if (status !== 'authenticated') {
+        setLoginOpen(true);
+        return;
+      }
       setStep('extras');
       return;
     }
@@ -433,9 +438,7 @@ export default function CheckoutPage() {
   async function submitBooking() {
     if (!draft) return;
     if (status !== 'authenticated') {
-      navigate('/signin', {
-        state: { from: location.pathname + location.search },
-      });
+      setLoginOpen(true);
       return;
     }
     if (passengers.some((p) => !isPassengerComplete(p))) {
@@ -516,24 +519,6 @@ export default function CheckoutPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  // Auth gate for wizard — design requires login before passenger entry
-  if (isWizard && status === 'loading') {
-    return (
-      <PublicPageShell>
-        <p className="p-8 text-sm text-[#6b7b94]">{t.loading}</p>
-      </PublicPageShell>
-    );
-  }
-  if (isWizard && status === 'unauthenticated') {
-    return (
-      <PublicPageShell>
-        <div className="p-6">
-          <OtpLoginInline />
-        </div>
-      </PublicPageShell>
-    );
   }
 
   if (loadError) {
@@ -631,6 +616,57 @@ export default function CheckoutPage() {
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
   const grandIrr = ticketIrr + extrasIrr;
   const grandDisplay = localeMoney(grandIrr.toString(), locale);
+  const passengerFormsComplete = passengers.every(isPassengerComplete);
+  const passengerCompletionNotice =
+    step === 'pax' && !passengerFormsComplete ? t.completePaxError : null;
+  const nextDisabled = busy || Boolean(passengerCompletionNotice);
+
+  const loginModal = loginOpen ? (
+    <div
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0d1b33]/70 px-4 backdrop-blur-[2px]"
+      role="dialog"
+      aria-modal="true"
+      data-testid="checkout-login-modal"
+    >
+      <div className="relative w-full max-w-[500px] rounded-[28px] bg-white px-7 pb-8 pt-16 shadow-2xl sm:px-10">
+        <button
+          type="button"
+          aria-label={locale === 'en' ? 'Close' : locale === 'ar' ? 'إغلاق' : 'بستن'}
+          onClick={() => setLoginOpen(false)}
+          className="absolute start-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f5f9] text-xl text-[#66758a]"
+        >
+          ×
+        </button>
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#eef4fb] text-3xl text-[#1668c4]">
+          ✈
+        </div>
+        <div className="mb-5 text-center">
+          <h2 className="m-0 text-xl font-black text-[#0d2640]">
+            {locale === 'en'
+              ? 'Sign in or register'
+              : locale === 'ar'
+                ? 'تسجيل الدخول أو إنشاء حساب'
+                : 'ورود یا ثبت‌نام'}
+          </h2>
+          <p className="mt-2 text-sm text-[#7b8798]">
+            {locale === 'en'
+              ? 'Enter your mobile number to continue your booking.'
+              : locale === 'ar'
+                ? 'أدخل رقم جوالك لمتابعة الحجز.'
+                : 'برای ادامه رزرو، شماره موبایل خود را وارد کنید.'}
+          </p>
+        </div>
+        <OtpLoginInline
+          embedded
+          showHeader={false}
+          onAuthenticated={() => {
+            setLoginOpen(false);
+            if (step === 'pax') setStep('extras');
+          }}
+        />
+      </div>
+    </div>
+  ) : null;
 
   const stepBody = (
     <>
@@ -640,6 +676,7 @@ export default function CheckoutPage() {
           passengers={passengers}
           onChange={setPassengers}
           savedPassengers={savedPassengers}
+          departureAt={draft.flight.departureAt}
         />
       )}
       {step === 'extras' && (
@@ -720,6 +757,8 @@ export default function CheckoutPage() {
             canBack={step !== 'pax'}
             busy={busy}
             error={error}
+            disabled={Boolean(passengerCompletionNotice)}
+            disabledHint={passengerCompletionNotice}
           />
         </div>
 
@@ -744,7 +783,7 @@ export default function CheckoutPage() {
           </div>
           <button
             type="button"
-            disabled={busy}
+            disabled={nextDisabled}
             onClick={goNext}
             data-testid="checkout-next-mobile"
             className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl bg-[#1668c4] text-[12.5px] font-extrabold text-white disabled:opacity-60"
@@ -752,6 +791,7 @@ export default function CheckoutPage() {
             {busy ? t.loading : nextLabel}
           </button>
         </div>
+        {loginModal}
       </PublicPageShell>
     );
   }
@@ -783,8 +823,11 @@ export default function CheckoutPage() {
           canBack={step !== 'pax'}
           busy={busy}
           error={error}
+          disabled={Boolean(passengerCompletionNotice)}
+          disabledHint={passengerCompletionNotice}
         />
       </div>
+      {loginModal}
     </PublicPageShell>
   );
 }

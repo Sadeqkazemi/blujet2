@@ -5,6 +5,7 @@ import PublicFooter from './PublicFooter';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
+import * as useSocialLinksModule from '../../hooks/useSocialLinks';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -21,6 +22,7 @@ function mockMobile() {
 beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
+  vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([]);
 });
 
 function renderFooter() {
@@ -60,6 +62,22 @@ describe('PublicFooter — desktop', () => {
     expect(screen.getByTestId('footer-trust-badges')).toBeInTheDocument();
     expect(screen.getByText('نماد اعتماد الکترونیکی')).toBeInTheDocument();
     expect(screen.getByText('عضو IATA')).toBeInTheDocument();
+  });
+
+  it('renders enabled social links supplied by site settings', () => {
+    mockLocale('fa');
+    vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([
+      {
+        id: 'instagram',
+        name: 'Instagram',
+        url: 'https://instagram.com/blujet',
+      },
+    ]);
+    renderFooter();
+    expect(screen.getByTestId('footer-social-instagram')).toHaveAttribute(
+      'href',
+      'https://instagram.com/blujet',
+    );
   });
 
   it('hides the careers link when disabled, shows it when enabled', () => {

@@ -70,6 +70,7 @@ function JalaliDobSelects({
   day,
   month,
   year,
+  latestYear,
   onDay,
   onMonth,
   onYear,
@@ -78,6 +79,7 @@ function JalaliDobSelects({
   day: string;
   month: string;
   year: string;
+  latestYear?: number;
   onDay: (v: string) => void;
   onMonth: (v: string) => void;
   onYear: (v: string) => void;
@@ -88,7 +90,8 @@ function JalaliDobSelects({
   const currentYear = locale === 'fa'
     ? Number(dayjs().calendar('jalali').format('YYYY'))
     : new Date().getUTCFullYear();
-  const years = Array.from({ length: 100 }, (_, i) => String(currentYear - i));
+  const firstYear = latestYear ?? currentYear;
+  const years = Array.from({ length: 110 }, (_, i) => String(firstYear - i));
   return (
     <div className="grid grid-cols-[1fr_1.2fr_1fr] overflow-hidden rounded-[10px] border-[1.5px] border-[#e2e7ee] bg-white">
       <select
@@ -136,13 +139,20 @@ export default function PassengerStep({
   passengers,
   onChange,
   savedPassengers,
+  departureAt,
 }: {
   locale: StoredLocale;
   passengers: PassengerFormDraft[];
   onChange: (next: PassengerFormDraft[]) => void;
   savedPassengers: SavedPassenger[];
+  departureAt?: string;
 }) {
   const t = CHECKOUT_COPY[locale];
+  const departureDate = departureAt ? dayjs(departureAt) : dayjs();
+  const adultLatestBirthYear =
+    locale === 'fa'
+      ? Number(departureDate.calendar('jalali').format('YYYY')) - 12
+      : departureDate.year() - 12;
   const passengerLabel = (passenger: PassengerFormDraft, index: number) => {
     if (passenger.passengerType === 'CHILD') {
       return locale === 'en'
@@ -275,6 +285,19 @@ export default function PassengerStep({
             </div>
           )}
 
+          {i > 0 && (
+            <div
+              className="mb-3 rounded-[10px] border border-[#efd59c] bg-[#fff9eb] px-3 py-2.5 text-[11.5px] font-semibold text-[#9a6818]"
+              data-testid={`checkout-passenger-age-notice-${i}`}
+            >
+              {locale === 'en'
+                ? 'Passenger age category and ticket price are calculated from the date of birth on the flight date.'
+                : locale === 'ar'
+                  ? 'تُحتسب الفئة العمرية للمسافر وسعر التذكرة حسب تاريخ الميلاد في يوم الرحلة.'
+                  : 'رده سنی مسافر و قیمت بلیط بر اساس تاریخ تولد در روز پرواز محاسبه می‌شود.'}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-[11px] sm:grid-cols-3">
             <input
               data-testid={`checkout-pax-first-${i}`}
@@ -343,6 +366,7 @@ export default function PassengerStep({
                   day={p.birthDay}
                   month={p.birthMonth}
                   year={p.birthYear}
+                  latestYear={i === 0 ? adultLatestBirthYear : undefined}
                   onDay={(v) => update(i, { birthDay: v })}
                   onMonth={(v) => update(i, { birthMonth: v })}
                   onYear={(v) => update(i, { birthYear: v })}
@@ -375,6 +399,7 @@ export default function PassengerStep({
                   day={p.birthDay}
                   month={p.birthMonth}
                   year={p.birthYear}
+                  latestYear={i === 0 ? adultLatestBirthYear : undefined}
                   onDay={(v) => update(i, { birthDay: v })}
                   onMonth={(v) => update(i, { birthMonth: v })}
                   onYear={(v) => update(i, { birthYear: v })}

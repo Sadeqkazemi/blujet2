@@ -97,4 +97,36 @@ describe('PassengerStep — saved passengers', () => {
     expect(screen.getByTestId('checkout-saved-chip-api-1')).toHaveTextContent('سارا احمدی');
     expect(screen.queryAllByTestId(/checkout-saved-chip/)).toHaveLength(1);
   });
+
+  it('limits the first passenger birth year to someone at least 12 on departure', () => {
+    render(
+      <PassengerStep
+        locale="fa"
+        passengers={[emptyPassenger('')]}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+        departureAt="2026-08-01T05:00:00.000Z"
+      />,
+    );
+
+    const yearSelect = screen.getAllByRole('combobox')[3]!;
+    expect(yearSelect).toHaveTextContent('۱۳۹۳');
+    expect(yearSelect).not.toHaveTextContent('۱۳۹۴');
+  });
+
+  it('shows the age and fare notice for every added passenger', () => {
+    render(
+      <PassengerStep
+        locale="fa"
+        passengers={[emptyPassenger(''), emptyPassenger('', 'CHILD')]}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+        departureAt="2026-08-01T05:00:00.000Z"
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-passenger-age-notice-1')).toHaveTextContent(
+      'رده سنی مسافر و قیمت بلیط بر اساس تاریخ تولد در روز پرواز محاسبه می‌شود.',
+    );
+  });
 });

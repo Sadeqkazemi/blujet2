@@ -62,9 +62,8 @@ import {
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
-/** CLAUDE.md: "HELD has a 10-minute TTL (matches the design's hold timer);
- * expiry releases inventory automatically." */
-const HOLD_TTL_MS = 10 * 60 * 1000;
+/** Unpaid bookings are held for exactly 15 minutes. Expiry releases inventory. */
+const HOLD_TTL_MS = 15 * 60 * 1000;
 
 function cabinLabelFa(cabin: CabinClass): string {
   switch (cabin) {

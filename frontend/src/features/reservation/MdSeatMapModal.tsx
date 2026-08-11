@@ -359,7 +359,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
             <LegendChip
               color="#f59e0b"
               border="#f59e0b"
-              label={`قفل موقت (تا ۱۰ دقیقه) ${faDigits(counts.tempLock)}`}
+              label={`قفل موقت ${faDigits(counts.tempLock)}`}
             />
             <LegendChip
               color="#3b82f6"
