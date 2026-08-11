@@ -10,6 +10,7 @@ import { uploadFile } from '../../api/files';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Pagination from '../../components/Pagination';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 import { usePagination } from '../../hooks/usePagination';
 import type {
   BlogCategory,
@@ -62,6 +63,9 @@ export default function BlogAdminPage() {
   const [scheduledAtLocal, setScheduledAtLocal] = useState('');
   const [coverUploading, setCoverUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BlogPostRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(async (cat: CategoryFilter) => {
     try {
@@ -142,13 +146,23 @@ export default function BlogAdminPage() {
     }
   }
 
-  async function onDelete(post: BlogPostRow) {
-    if (!window.confirm(`مقاله «${post.title}» حذف شود؟`)) return;
+  function requestDelete(post: BlogPostRow) {
+    setDeleteTarget(post);
+    setDeleteError(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
     try {
-      await deleteBlogPost(post.id);
+      await deleteBlogPost(deleteTarget.id);
+      setDeleteTarget(null);
       await load(category);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در حذف مقاله.');
+      setDeleteError(e instanceof Error ? e.message : 'خطا در حذف مقاله.');
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -359,7 +373,7 @@ export default function BlogAdminPage() {
                       ویرایش
                     </button>
                     <button
-                      onClick={() => void onDelete(p)}
+                      onClick={() => requestDelete(p)}
                       className="rounded-lg border border-border px-3 py-1.5 text-[11px] font-bold text-danger"
                     >
                       حذف
@@ -377,6 +391,23 @@ export default function BlogAdminPage() {
           variant="light"
         />
       </section>
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        title="حذف مقاله"
+        message={deleteTarget ? `مقاله «${deleteTarget.title}» برای همیشه حذف شود؟` : ''}
+        confirmLabel="حذف مقاله"
+        cancelLabel="انصراف"
+        busy={deleteBusy}
+        busyLabel="در حال حذف…"
+        error={deleteError}
+        variant="light"
+        testId="delete-blog-post-dialog"
+        onCancel={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

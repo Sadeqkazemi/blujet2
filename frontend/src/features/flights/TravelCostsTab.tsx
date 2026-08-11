@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createTravelCost, deleteTravelCost, fetchTravelCosts, updateTravelCost } from '../../api/travel-costs';
 import { faMoney, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import type { TravelCost, TravelExtraBillingUnit, TravelExtraCode } from '../../types/travel-costs';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 
 const CODE_OPTIONS: Array<{ value: TravelExtraCode; label: string }> = [
   { value: 'EXTRA_BAGGAGE', label: 'بار اضافه' },
@@ -30,6 +31,9 @@ export default function TravelCostsTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TravelCost | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTravelCosts()
@@ -78,14 +82,24 @@ export default function TravelCostsTab() {
     }
   }
 
-  async function remove(row: TravelCost) {
-    if (!window.confirm(`هزینه «${row.titleFa}» حذف شود؟`)) return;
-    setError(null);
+  function requestRemove(row: TravelCost) {
+    setDeleteTarget(row);
+    setDeleteError(null);
+  }
+
+  async function confirmRemove() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
     try {
-      await deleteTravelCost(row.id);
-      setRows((previous) => previous.filter((item) => item.id !== row.id));
+      await deleteTravelCost(deleteTarget.id);
+      setRows((previous) => previous.filter((item) => item.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setNotice('هزینه سفر حذف شد.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'خطا در حذف هزینه سفر.');
+      setDeleteError(e instanceof Error ? e.message : 'خطا در حذف هزینه سفر.');
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -178,7 +192,7 @@ export default function TravelCostsTab() {
               >
                 {row.purchaseEnabled ? 'قابل خرید' : 'فقط اطلاع‌رسانی'}
               </button>
-              <button onClick={() => void remove(row)} className="text-danger">
+              <button onClick={() => requestRemove(row)} className="text-danger">
                 حذف
               </button>
             </div>
@@ -190,6 +204,22 @@ export default function TravelCostsTab() {
           </p>
         )}
       </section>
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        title="حذف هزینه سفر"
+        message={deleteTarget ? `هزینه «${deleteTarget.titleFa}» حذف شود؟ این اقدام قابل بازگشت نیست.` : ''}
+        confirmLabel="حذف هزینه"
+        cancelLabel="انصراف"
+        busy={deleteBusy}
+        busyLabel="در حال حذف…"
+        error={deleteError}
+        testId="delete-travel-cost-dialog"
+        onCancel={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+        onConfirm={confirmRemove}
+      />
     </div>
   );
 }
