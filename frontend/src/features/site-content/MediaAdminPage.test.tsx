@@ -87,6 +87,7 @@ describe('MediaAdminPage', () => {
     vi.mocked(siteContentApi.updateDestination).mockResolvedValue(mockDestinations[0]);
     vi.mocked(siteContentApi.updateRoute).mockResolvedValue(mockRoutes[0]);
     vi.mocked(siteContentApi.createRoute).mockResolvedValue(mockRoutes[0]);
+    vi.mocked(siteContentApi.deleteDestination).mockResolvedValue({ id: 'd1' });
     vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue({
       settings: {
         homeHeroTitle: 'عنوان',
@@ -177,6 +178,19 @@ describe('MediaAdminPage', () => {
         enabled: false,
       });
     });
+  });
+
+  it('requires an in-app confirmation before deleting a destination', async () => {
+    const user = userEvent.setup();
+    render(<MediaAdminPage />);
+    await screen.findByText('IST');
+
+    await user.click(screen.getAllByRole('button', { name: 'حذف' })[0]);
+    expect(screen.getByTestId('delete-site-content-dialog')).toHaveTextContent('IST');
+    expect(siteContentApi.deleteDestination).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId('delete-site-content-dialog-confirm'));
+    await waitFor(() => expect(siteContentApi.deleteDestination).toHaveBeenCalledWith('d1'));
   });
 
   it('lists site pages and saves edited about text', async () => {

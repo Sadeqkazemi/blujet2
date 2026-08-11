@@ -1,36 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchAllotments, fetchDashboard } from '../../api/agency-portal';
-import { faDigits, faMoney } from '../../lib/fa-format';
+import { localeMoney } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { AgencyMiniIcon } from './AgencyNavIcon';
 import type { AgencyDashboard } from '../../types/agency-portal';
 
-const MONTH_LABELS: Record<string, Record<StoredLocale, string>> = {
-  '01': { fa: 'فروردین', en: 'Farvardin', ar: 'فروردین' },
-  '02': { fa: 'اردیبهشت', en: 'Ordibehesht', ar: 'اردیبهشت' },
-  '03': { fa: 'خرداد', en: 'Khordad', ar: 'خرداد' },
-  '04': { fa: 'تیر', en: 'Tir', ar: 'تیر' },
-  '05': { fa: 'مرداد', en: 'Mordad', ar: 'مرداد' },
-  '06': { fa: 'شهریور', en: 'Shahrivar', ar: 'شهریور' },
-  '07': { fa: 'مهر', en: 'Mehr', ar: 'مهر' },
-  '08': { fa: 'آبان', en: 'Aban', ar: 'آبان' },
-  '09': { fa: 'آذر', en: 'Azar', ar: 'آذر' },
-  '10': { fa: 'دی', en: 'Dey', ar: 'دی' },
-  '11': { fa: 'بهمن', en: 'Bahman', ar: 'بهمن' },
-  '12': { fa: 'اسفند', en: 'Esfand', ar: 'اسفند' },
-};
-
 function monthLabel(monthKey: string, locale: StoredLocale): string {
-  const [, m] = monthKey.split('-');
-  return MONTH_LABELS[m]?.[locale] ?? monthKey;
+  const [year, month] = monthKey.split('-');
+  if (!year || !month) return monthKey;
+  const date = new Date(`${year}-${month}-15T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return monthKey;
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : locale === 'fa' ? 'fa' : 'en', {
+    calendar: 'gregory',
+    month: 'short',
+  }).format(date);
 }
 
 function formatChartValue(irr: string, locale: StoredLocale): string {
   const toman = Math.round(Number(irr) / 10 / 1_000_000);
   if (locale === 'en') return `${toman}M`;
-  return faDigits(toman);
+  return localeDigits(toman, locale);
 }
 
 const STR: Record<StoredLocale, {
@@ -161,9 +153,9 @@ export default function AgencyDashboardPage() {
   const limitNum = Number(data.credit.limitIrr);
   const usedNum = Number(data.credit.usedIrr);
   const pct = limitNum > 0 ? Math.round((usedNum / limitNum) * 100) : 0;
-  const pctLabel = locale === 'fa' ? faDigits(pct) + '٪' : `${pct}%`;
+  const pctLabel = locale === 'en' ? `${pct}%` : `${localeDigits(pct, locale)}٪`;
 
-  const moneyWithUnit = (irr: string) => `${faMoney(irr)} ${t.toman}`;
+  const moneyWithUnit = (irr: string) => `${localeMoney(irr, locale)} ${t.toman}`;
 
   const kpis = [
     {
@@ -184,14 +176,14 @@ export default function AgencyDashboardPage() {
       iconPaths: '<path d="M5 11V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/><path d="M5 11h11a2 2 0 0 1 2 2v3H5z"/>',
       iconBg: '#f1ecfe',
       iconColor: '#8a5cf6',
-      value: locale === 'fa' ? faDigits(seatsAllocated) : String(seatsAllocated),
+      value: localeDigits(seatsAllocated, locale),
       label: t.kpiAllocated,
     },
     {
       iconPaths: '<path d="M9 12l2 2 4-4"/><path d="M12 3l7 3v5.5c0 4.2-2.9 7.4-7 8.5-4.1-1.1-7-4.3-7-8.5V6z"/>',
       iconBg: '#fdf1e7',
       iconColor: '#e8893a',
-      value: faDigits(data.kpis.seatsSoldThisMonth),
+      value: localeDigits(data.kpis.seatsSoldThisMonth, locale),
       label: t.kpiSold,
     },
   ];
@@ -242,7 +234,7 @@ export default function AgencyDashboardPage() {
                     background: 'linear-gradient(180deg,#3b8ae0,#1668c4)',
                     borderRadius: '7px 7px 0 0',
                   }}
-                  aria-label={`${monthLabel(m.month, locale)} — ${faMoney(m.salesIrr)} ${t.toman}`}
+                  aria-label={`${monthLabel(m.month, locale)} — ${localeMoney(m.salesIrr, locale)} ${t.toman}`}
                 />
                 <div style={{ fontSize: 10.5, color: '#8a96a6', fontWeight: 600 }}>{monthLabel(m.month, locale)}</div>
               </div>

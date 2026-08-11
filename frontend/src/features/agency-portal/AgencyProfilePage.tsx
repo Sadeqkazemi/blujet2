@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchDocuments, fetchProfile, uploadDocument } from '../../api/agency-portal';
-import { formatJalaliDate } from '../../lib/jalali';
+import { formatLocaleDate } from '../../lib/locale-format';
 import { ApiRequestError } from '../../api/envelope';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyDocument, AgencyDocumentType, AgencyProfile } from '../../types/agency-portal';
@@ -258,7 +258,7 @@ export default function AgencyProfilePage() {
                   <div>
                     <div className="font-bold">{DOC_TYPE_LABEL[d.docType][locale]}</div>
                     <div className="text-[10px] text-muted">
-                      {d.file.fileName} — {formatJalaliDate(d.createdAt)}
+                      {d.file.fileName} — {formatLocaleDate(d.createdAt, locale)}
                     </div>
                   </div>
                   <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>

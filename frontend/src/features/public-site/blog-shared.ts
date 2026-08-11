@@ -1,6 +1,6 @@
 import type { StoredLocale } from '../../hooks/useLocale';
 import { arDigits, faDigits } from '../../lib/fa-format';
-import { formatJalaliDate } from '../../lib/jalali';
+import { formatLocaleDate } from '../../lib/locale-format';
 import type { BlogCategory } from '../../types/blog';
 
 export const CATEGORY_GRADIENT: Record<BlogCategory, string> = {
@@ -23,14 +23,7 @@ export function blogCoverUrl(coverFileId: string | null): string | null {
 }
 
 export function formatPublicBlogDate(date: string, locale: StoredLocale): string {
-  if (locale === 'en') {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  }
-  return formatJalaliDate(date);
+  return formatLocaleDate(date, locale);
 }
 
 export function formatPublicCount(value: number, locale: StoredLocale): string {

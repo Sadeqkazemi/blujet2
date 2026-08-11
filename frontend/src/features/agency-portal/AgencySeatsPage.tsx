@@ -12,9 +12,8 @@ import {
   requestAgencySeats,
 } from '../../api/agency-portal';
 import { fetchSeatMap } from '../../api/publicSite';
-import { faDigits } from '../../lib/fa-format';
 import { publicCabinLabel } from '../../lib/flight-definition';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDateTime, localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
 import type { AgencySeatRequestOption } from '../../types/agency-portal';
@@ -300,7 +299,7 @@ export default function AgencySeatsPage() {
               <option value="">—</option>
               {matchingFlights.map((row) => (
                 <option key={row.flightInstanceId} value={row.flightInstanceId}>
-                  {row.flightNo} · {formatJalaliDateTime(row.departureAt)}
+                  {row.flightNo} · {formatLocaleDateTime(row.departureAt, locale)}
                 </option>
               ))}
             </select>
@@ -320,20 +319,20 @@ export default function AgencySeatsPage() {
               </div>
               <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-2 md:max-w-[520px]">
                 {[
-                  [locale === 'en' ? 'Capacity' : 'ظرفیت کل', requestFlight.capacity],
-                  [locale === 'en' ? 'Allocated' : 'تخصیص‌یافته', requestFlight.agencyAllocated],
-                  [locale === 'en' ? 'Available' : 'قابل درخواست', requestFlight.availableToRequest],
+                  [locale === 'en' ? 'Capacity' : locale === 'ar' ? 'السعة' : 'ظرفیت کل', requestFlight.capacity],
+                  [locale === 'en' ? 'Allocated' : locale === 'ar' ? 'المخصص' : 'تخصیص‌یافته', requestFlight.agencyAllocated],
+                  [locale === 'en' ? 'Available' : locale === 'ar' ? 'المتاح للطلب' : 'قابل درخواست', requestFlight.availableToRequest],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-xl bg-white p-3 text-center">
                     <div className="text-[10px] text-[#7d8ba0]">{label}</div>
-                    <div className="mt-1 text-lg font-black text-[#1668c4]">{faDigits(value as number)}</div>
+                    <div className="mt-1 text-lg font-black text-[#1668c4]">{localeDigits(value as number, locale)}</div>
                   </div>
                 ))}
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-[1fr_1.4fr_1fr]">
               <label className="text-[11px] font-bold text-[#3f546b]">
-                {locale === 'en' ? 'Seats needed' : 'تعداد صندلی مورد نیاز'}
+                {locale === 'en' ? 'Seats needed' : locale === 'ar' ? 'عدد المقاعد المطلوبة' : 'تعداد صندلی مورد نیاز'}
                 <input
                   type="number"
                   min={1}
@@ -345,7 +344,7 @@ export default function AgencySeatsPage() {
                 />
               </label>
               <fieldset className="text-[11px] font-bold text-[#3f546b]">
-                <legend>{locale === 'en' ? 'Preferred days' : 'روزهای ترجیحی'}</legend>
+                <legend>{locale === 'en' ? 'Preferred days' : locale === 'ar' ? 'الأيام المفضلة' : 'روزهای ترجیحی'}</legend>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {[['شنبه', 6], ['یکشنبه', 0], ['دوشنبه', 1], ['سه‌شنبه', 2], ['چهارشنبه', 3], ['پنجشنبه', 4]].map(([label, day]) => {
                     const selected = preferredWeekdays.includes(day as number);
@@ -354,11 +353,11 @@ export default function AgencySeatsPage() {
                 </div>
               </fieldset>
               <label className="text-[11px] font-bold text-[#3f546b]">
-                {locale === 'en' ? 'Purchase term' : 'دوره خرید'}
+                {locale === 'en' ? 'Purchase term' : locale === 'ar' ? 'مدة الشراء' : 'دوره خرید'}
                 <select value={termMonths} onChange={(event) => setTermMonths(Number(event.target.value) as 3 | 6 | 12)} className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none">
-                  <option value={3}>{locale === 'en' ? '3 months' : 'سه‌ماهه'}</option>
-                  <option value={6}>{locale === 'en' ? '6 months' : 'شش‌ماهه'}</option>
-                  <option value={12}>{locale === 'en' ? '12 months' : 'یک‌ساله'}</option>
+                  <option value={3}>{locale === 'en' ? '3 months' : locale === 'ar' ? '٣ أشهر' : 'سه‌ماهه'}</option>
+                  <option value={6}>{locale === 'en' ? '6 months' : locale === 'ar' ? '٦ أشهر' : 'شش‌ماهه'}</option>
+                  <option value={12}>{locale === 'en' ? '12 months' : locale === 'ar' ? 'سنة واحدة' : 'یک‌ساله'}</option>
                 </select>
               </label>
             </div>
@@ -376,7 +375,7 @@ export default function AgencySeatsPage() {
 
         {requestOptions?.length === 0 && (
           <p className="rounded-xl bg-[#f7f9fc] p-4 text-center text-xs text-[#7d8ba0]">
-            {locale === 'en' ? 'No scheduled flight route is available.' : 'هنوز مسیر پروازی زمان‌بندی‌شده‌ای برای درخواست وجود ندارد.'}
+            {locale === 'en' ? 'No scheduled flight route is available.' : locale === 'ar' ? 'لا يوجد مسار رحلة مجدول متاح حاليًا.' : 'هنوز مسیر پروازی زمان‌بندی‌شده‌ای برای درخواست وجود ندارد.'}
           </p>
         )}
       </section>
@@ -407,7 +406,7 @@ export default function AgencySeatsPage() {
                   <div>
                     <div className="text-sm font-black text-[#0d2640]">{f.route}</div>
                     <div className="mt-0.5 text-[11px] text-[#8a96a6]">
-                      <span dir="ltr">{f.flightNo}</span> · {formatJalaliDateTime(f.departureAt)}
+                      <span dir="ltr">{f.flightNo}</span> · {formatLocaleDateTime(f.departureAt, locale)}
                     </div>
                   </div>
                 </div>
@@ -430,7 +429,7 @@ export default function AgencySeatsPage() {
                   <div key={label} className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center">
                     <div className="mb-1 text-[10.5px] text-[#8a96a6]">{label}</div>
                     <div className="text-lg font-black" style={{ color }}>
-                      {faDigits(val)}
+                      {localeDigits(val, locale)}
                     </div>
                   </div>
                 ))}

@@ -50,7 +50,7 @@ describe('MaintenancePage', () => {
     renderPage();
     expect(screen.getByText('The site is under maintenance')).toBeInTheDocument();
     expect(screen.getByText('Updating')).toBeInTheDocument();
-    expect(screen.getByText(/in about ۲ hours/)).toBeInTheDocument();
+    expect(screen.getByText(/in about 2 hours/)).toBeInTheDocument();
   });
 
   it('renders translated maintenance notice in Arabic', () => {

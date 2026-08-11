@@ -1,6 +1,6 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { airportCityName } from '../../../lib/airport-cities';
-import { formatJalaliDateTime } from '../../../lib/jalali';
+import { formatLocaleDateTime } from '../../../lib/locale-format';
 import type { FlightSnapshot } from './checkout-types';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
@@ -23,7 +23,7 @@ export default function FlightSummaryCard({
   const dest = airportCityName(destCode || 'MHD', locale);
   const timePart = (() => {
     try {
-      const parts = formatJalaliDateTime(flight.departureAt).split(' ');
+      const parts = formatLocaleDateTime(flight.departureAt, locale).split(' ');
       return parts[1] || parts[0] || '';
     } catch {
       return '';

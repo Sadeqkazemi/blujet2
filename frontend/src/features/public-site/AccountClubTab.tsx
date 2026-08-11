@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { submitClubCardRequest } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { ClubMembershipView } from '../../types/club-membership';
 
@@ -220,10 +220,10 @@ function tierProgressInfo(membership: ClubMembershipView, locale: StoredLocale) 
       from: TIER_LABEL.GOLD[locale],
       to: TIER_LABEL.PLATINUM[locale],
       next: locale === 'en'
-        ? `To Platinum: ${faDigits(remaining)} more points`
+        ? `To Platinum: ${localeDigits(remaining, locale)} more points`
         : locale === 'ar'
-          ? `حتى البلاتين: ${faDigits(remaining)} نقطة أخرى`
-          : `تا پلاتین: ${faDigits(remaining)} امتیاز دیگر`,
+          ? `حتى البلاتين: ${localeDigits(remaining, locale)} نقطة أخرى`
+          : `تا پلاتین: ${localeDigits(remaining, locale)} امتیاز دیگر`,
       progressPct: Math.min(100, Math.round((balance / pMin) * 100)),
       style: TIER_STYLE.GOLD,
     };
@@ -234,10 +234,10 @@ function tierProgressInfo(membership: ClubMembershipView, locale: StoredLocale) 
     from: TIER_LABEL.SILVER[locale],
     to: TIER_LABEL.GOLD[locale],
     next: locale === 'en'
-      ? `To Gold: ${faDigits(remaining)} more points`
+      ? `To Gold: ${localeDigits(remaining, locale)} more points`
       : locale === 'ar'
-        ? `حتى الذهبية: ${faDigits(remaining)} نقطة أخرى`
-        : `تا طلایی: ${faDigits(remaining)} امتیاز دیگر`,
+        ? `حتى الذهبية: ${localeDigits(remaining, locale)} نقطة أخرى`
+        : `تا طلایی: ${localeDigits(remaining, locale)} امتیاز دیگر`,
     progressPct: Math.min(100, Math.round((balance / gMin) * 100)),
     style: TIER_STYLE.SILVER,
   };
@@ -323,7 +323,7 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
           </div>
           <div style={{ textAlign: locale === 'en' ? 'right' : 'left' }}>
             <div style={{ fontSize: 11.5, opacity: 0.9 }}>{t.lblCurrentPoints}</div>
-            <div style={{ fontSize: 23.5, fontWeight: 900, marginTop: 4 }}>{faDigits(membership.balance)}</div>
+            <div style={{ fontSize: 23.5, fontWeight: 900, marginTop: 4 }}>{localeDigits(membership.balance, locale)}</div>
           </div>
         </div>
         <div style={{ marginTop: 22 }}>
@@ -347,8 +347,8 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
         </div>
         <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 18px' }}>{t.subClubCard}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5a6678', marginBottom: 8 }}>
-          <span>{t.lblYourPoints}: <b style={{ color: '#0d2640' }}>{faDigits(membership.balance)}</b></span>
-          <span>{t.lblRequiredThreshold}: {faDigits(membership.tierRules.cardRequestMinPoints)}</span>
+          <span>{t.lblYourPoints}: <b style={{ color: '#0d2640' }}>{localeDigits(membership.balance, locale)}</b></span>
+          <span>{t.lblRequiredThreshold}: {localeDigits(membership.tierRules.cardRequestMinPoints, locale)}</span>
         </div>
         <div style={{ height: 10, background: '#eef1f5', borderRadius: 18, overflow: 'hidden', marginBottom: 18 }}>
           <div style={{ width: `${cardProgress}%`, height: '100%', background: tierStyle.main, borderRadius: 18 }} />
@@ -389,7 +389,7 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
               {t.eligibleTitle(eligibleTier)}
             </div>
             <div style={{ fontSize: 11.5, color: tierStyle.subtext, marginBottom: 16 }}>
-              {t.eligibleSub(faDigits(membership.balance))}
+              {t.eligibleSub(localeDigits(membership.balance, locale))}
             </div>
             {requestError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', marginBottom: 10 }}>{requestError}</p>}
             {notice && <p style={{ fontSize: 12, color: '#1f8a5b', marginBottom: 10 }}>{notice}</p>}
@@ -409,7 +409,7 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
           <div style={{ border: `1.5px solid ${tierStyle.border}`, background: tierStyle.soft, borderRadius: 14, padding: '15px 15px 13px' }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: tierStyle.text }}>{t.lockedTitle(eligibleTier)}</div>
             <div style={{ fontSize: 11.5, color: tierStyle.subtext, marginTop: 3 }}>
-              {t.lockedSub(faDigits(membership.pointsNeededForCard))}
+              {t.lockedSub(localeDigits(membership.pointsNeededForCard, locale))}
             </div>
           </div>
         )}

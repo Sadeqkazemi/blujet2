@@ -4,6 +4,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { fetchDevLastOtp } from '../../api/auth';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 
 const SHOW_TEST_OTP =
   import.meta.env.DEV && import.meta.env.VITE_SHOW_TEST_OTP === 'true';
@@ -182,14 +183,14 @@ export default function OtpLoginInline({
       ) : (
         <form onSubmit={onVerify} className="flex flex-col gap-3">
           <p className="text-xs font-semibold text-[#059669]" data-testid="otp-sent-notice">
-            {t.otpSent(normalizedPhone)}
+            {t.otpSent(localeDigits(normalizedPhone, locale))}
           </p>
           {devCode && (
             <p
               className="rounded-lg bg-[#eff6ff] p-2.5 text-xs font-semibold text-[#1668c4]"
               data-testid="otp-dev-hint"
             >
-              {t.otpDevHint(devCode)}
+              {t.otpDevHint(localeDigits(devCode, locale))}
             </p>
           )}
           <input

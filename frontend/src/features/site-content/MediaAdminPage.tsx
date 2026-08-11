@@ -24,6 +24,7 @@ import {
 } from '../../types/site-pages';
 import { faDigits, latinDigits, localeMoney } from '../../lib/fa-format';
 import Modal from '../../components/Modal';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { siteMediaUrl } from '../public-site/site-content-shared';
@@ -70,6 +71,11 @@ function cardClass() {
   return 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]';
 }
 
+type DeleteTarget =
+  | { kind: 'asset'; id: string; label: string }
+  | { kind: 'destination'; id: string; label: string }
+  | { kind: 'route'; id: string; label: string };
+
 export default function MediaAdminPage() {
   const [library, setLibrary] = useState<LibraryAssetRow[] | null>(null);
   const [blocks, setBlocks] = useState<ContentBlockRow[] | null>(null);
@@ -100,6 +106,9 @@ export default function MediaAdminPage() {
   const [supportEmail, setSupportEmail] = useState('');
   const [supportEditing, setSupportEditing] = useState(false);
   const [supportDraft, setSupportDraft] = useState({ phone: '', email: '' });
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const blockMap = useMemo(
     () => new Map((blocks ?? []).map((b) => [b.key, b])),
@@ -159,14 +168,9 @@ export default function MediaAdminPage() {
     }
   }
 
-  async function onDeleteAsset(id: string) {
-    if (!window.confirm('این تصویر از کتابخانه حذف شود؟')) return;
-    try {
-      await deleteLibraryAsset(id);
-      await load();
-    } catch {
-      setError('خطا در حذف تصویر.');
-    }
+  function requestDelete(target: DeleteTarget) {
+    setDeleteTarget(target);
+    setDeleteError(null);
   }
 
   function openBlockEdit(key: SiteContentBlockKey) {
@@ -240,16 +244,6 @@ export default function MediaAdminPage() {
     }
   }
 
-  async function removeDestination(id: string) {
-    if (!window.confirm('این مقصد حذف شود؟')) return;
-    try {
-      await deleteDestination(id);
-      await load();
-    } catch {
-      setError('خطا در حذف مقصد.');
-    }
-  }
-
   function openPageEdit(page: SitePageRow) {
     if (!siteContent || page.editableFields.length === 0) return;
     const draft: Partial<Record<SiteContentFieldKey, string>> = {};
@@ -320,13 +314,26 @@ export default function MediaAdminPage() {
     }
   }
 
-  async function removeRoute(id: string) {
-    if (!window.confirm('این مسیر حذف شود؟')) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
     try {
-      await deleteRoute(id);
+      if (deleteTarget.kind === 'asset') await deleteLibraryAsset(deleteTarget.id);
+      if (deleteTarget.kind === 'destination') await deleteDestination(deleteTarget.id);
+      if (deleteTarget.kind === 'route') await deleteRoute(deleteTarget.id);
+      setDeleteTarget(null);
       await load();
     } catch {
-      setError('خطا در حذف مسیر.');
+      const label =
+        deleteTarget.kind === 'asset'
+          ? 'تصویر'
+          : deleteTarget.kind === 'destination'
+            ? 'مقصد'
+            : 'مسیر';
+      setDeleteError(`خطا در حذف ${label}. دوباره تلاش کنید.`);
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -530,7 +537,11 @@ export default function MediaAdminPage() {
                   <button type="button" onClick={() => openDestEdit(d)} className="cursor-pointer text-[11.5px] font-bold text-accent">
                     ویرایش
                   </button>
-                  <button type="button" onClick={() => void removeDestination(d.id)} className="cursor-pointer text-[11.5px] font-bold text-[#f87171]">
+                  <button
+                    type="button"
+                    onClick={() => requestDelete({ kind: 'destination', id: d.id, label: d.airportCode })}
+                    className="cursor-pointer text-[11.5px] font-bold text-[#f87171]"
+                  >
                     حذف
                   </button>
                 </div>
@@ -579,7 +590,17 @@ export default function MediaAdminPage() {
               <button type="button" onClick={() => openRouteEdit(r)} className="cursor-pointer text-[10.5px] font-bold text-accent">
                 ویرایش
               </button>
-              <button type="button" onClick={() => void removeRoute(r.id)} className="cursor-pointer text-[10.5px] font-bold text-[#f87171]">
+              <button
+                type="button"
+                onClick={() =>
+                  requestDelete({
+                    kind: 'route',
+                    id: r.id,
+                    label: `${r.fromAirportCode} ← ${r.toAirportCode}`,
+                  })
+                }
+                className="cursor-pointer text-[10.5px] font-bold text-[#f87171]"
+              >
                 حذف
               </button>
             </div>
@@ -839,7 +860,7 @@ export default function MediaAdminPage() {
                 <div className="text-[10px] text-[#6b7b94]">{faDigits(Math.round(m.sizeBytes / 1024))} KB</div>
                 <button
                   type="button"
-                  onClick={() => void onDeleteAsset(m.id)}
+                  onClick={() => requestDelete({ kind: 'asset', id: m.id, label: m.label })}
                   className="mt-1 cursor-pointer text-[10.5px] font-bold text-[#f87171]"
                 >
                   حذف
@@ -1018,6 +1039,33 @@ export default function MediaAdminPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmActionDialog
+        open={deleteTarget !== null}
+        title={
+          deleteTarget?.kind === 'asset'
+            ? 'حذف تصویر'
+            : deleteTarget?.kind === 'destination'
+              ? 'حذف مقصد'
+              : 'حذف مسیر'
+        }
+        message={
+          deleteTarget
+            ? `«${deleteTarget.label}» حذف شود؟ این اقدام قابل بازگشت نیست.`
+            : ''
+        }
+        confirmLabel="حذف"
+        cancelLabel="انصراف"
+        busy={deleteBusy}
+        busyLabel="در حال حذف…"
+        error={deleteError}
+        testId="delete-site-content-dialog"
+        onCancel={() => {
+          setDeleteTarget(null);
+          setDeleteError(null);
+        }}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

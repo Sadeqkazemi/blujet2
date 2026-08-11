@@ -912,6 +912,7 @@ export default function HomeSearchCard({
                   }}
                 >
                   <JalaliDatePicker
+                    locale={locale}
                     label={t.lblDepartDate}
                     value={dateIso}
                     onChange={setDateIso}
@@ -942,6 +943,7 @@ export default function HomeSearchCard({
                     }}
                   >
                     <JalaliDatePicker
+                      locale={locale}
                       label={t.lblReturnDate}
                       value={returnIso}
                       onChange={setReturnIso}

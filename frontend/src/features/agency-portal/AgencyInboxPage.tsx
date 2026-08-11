@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { fetchInbox, postInboxMessage } from '../../api/agency-portal';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
 
@@ -133,7 +133,7 @@ export default function AgencyInboxPage() {
                 {m.senderIsAgency ? t.youLabel : 'blujet'}
               </div>
               <div>{m.body}</div>
-              <div className="mt-1 text-[10px] text-muted">{formatJalaliDateTime(m.createdAt)}</div>
+              <div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(m.createdAt, locale)}</div>
             </div>
           ))
         )}

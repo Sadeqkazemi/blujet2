@@ -5,8 +5,8 @@ import {
   syncMyLoanApplication,
 } from '../../api/loans';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { faMoney, parseTomanToRialString } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { localeMoney, parseTomanToRialString } from '../../lib/fa-format';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import type { LoanApplication, LoanDisplayStatus } from '../../types/loans';
 
 const COPY: Record<StoredLocale, {
@@ -135,8 +135,8 @@ export default function AccountLoansTab() {
               <article key={row.id} className="rounded-xl border border-[#edf1f6] bg-[#fafbfd] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="font-num text-base font-black text-[#1668c4]">{faMoney(row.requestedAmountIrr)} <small>{t.toman}</small></div>
-                    <div className="mt-1 text-[11px] text-[#8a96a6]">{formatJalaliDateTime(row.createdAt)}</div>
+                    <div className="font-num text-base font-black text-[#1668c4]">{localeMoney(row.requestedAmountIrr, locale)} <small>{t.toman}</small></div>
+                    <div className="mt-1 text-[11px] text-[#8a96a6]">{formatLocaleDateTime(row.createdAt, locale)}</div>
                     {row.bankReferenceId && <div className="mt-1 text-[11px] text-[#6b7787]">{t.reference}: <span dir="ltr" className="font-num">{row.bankReferenceId}</span></div>}
                   </div>
                   <span className="rounded-full bg-[#eaf2fc] px-3 py-1 text-[11px] font-black text-[#1668c4]">{STATUS[row.displayStatus]?.[locale] ?? row.displayStatus}</span>

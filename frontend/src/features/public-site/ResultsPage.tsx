@@ -15,7 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { localeMoney } from '../../lib/fa-format';
-import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
+import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
 import { airportCityLabel, airportCityName } from '../../lib/airport-cities';
 import type {
   Airport,
@@ -350,14 +350,7 @@ export default function ResultsPage() {
     );
   }
 
-  const dateLabel =
-    locale === 'en'
-      ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        })
-      : formatJalaliDate(`${date}T12:00:00Z`);
+  const dateLabel = formatLocaleDate(`${date}T12:00:00Z`, locale);
 
   return (
     <PublicPageShell>
@@ -1158,7 +1151,7 @@ export default function ResultsPage() {
                 >
                   {copy.lockRateUntil(
                     localeMoney(realLockResult.lock.lockedPriceIrr, locale),
-                    formatJalaliDateTime(realLockResult.lock.expiresAt),
+                    formatLocaleDateTime(realLockResult.lock.expiresAt, locale),
                   )}
                 </p>
                 <p style={{ fontSize: 11, color: '#8a96a6', marginBottom: 16 }}>

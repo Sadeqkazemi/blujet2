@@ -2,8 +2,9 @@ import { useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { lookupBookingByPnrAndLastName, submitAnonymousRefund } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import { faDigits, faMoney } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { localeMoney } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail } from '../../types/public-site';
 
@@ -304,7 +305,7 @@ export default function ManageBookingPage() {
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
                     {booking.originCode}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{formatJalaliDateTime(booking.departureAt)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{formatLocaleDateTime(booking.departureAt, locale)}</div>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', color: '#8a96a6', fontSize: 11 }}>
                   <div style={{ borderTop: '2px dashed #d5e1f0', margin: '8px 20px', position: 'relative' }}>
@@ -316,7 +317,7 @@ export default function ManageBookingPage() {
                   <div style={{ fontSize: 21, fontWeight: 900, color: '#0d2640' }} dir="ltr">
                     {booking.destCode}
                   </div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{formatJalaliDateTime(booking.arrivalAt)}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>{formatLocaleDateTime(booking.arrivalAt, locale)}</div>
                 </div>
               </div>
 
@@ -324,7 +325,7 @@ export default function ManageBookingPage() {
                 {[
                   [t.classLabel, CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin],
                   [t.statusLabel, booking.status],
-                  [t.priceLabel, `${faMoney(booking.priceIrr)} ${t.toman}`],
+                  [t.priceLabel, `${localeMoney(booking.priceIrr, locale)} ${t.toman}`],
                 ].map(([k, v]) => (
                   <div key={k} style={{ padding: '11px 14px', textAlign: 'center', borderLeft: '1px solid #f2f4f7' }}>
                     <div style={{ fontSize: 10.5, color: '#8a96a6', marginBottom: 3 }}>{k}</div>
@@ -394,16 +395,16 @@ export default function ManageBookingPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
                   <div style={{ background: '#fff', border: '1px solid #d9eee0', borderRadius: 12, padding: '10px 13px', textAlign: 'center' }}>
                     <div style={{ fontSize: 10.5, color: '#7a8696', marginBottom: 3 }}>
-                      {t.penaltyLabel} ({faDigits(refundResult.penaltyPct)}٪)
+                      {t.penaltyLabel} ({localeDigits(refundResult.penaltyPct, locale)}{locale === 'en' ? '%' : '٪'})
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: '#0d2640' }}>
-                      −{faMoney(refundResult.penaltyAmountIrr)} <span style={{ fontSize: 9, fontWeight: 400 }}>{t.toman}</span>
+                      −{localeMoney(refundResult.penaltyAmountIrr, locale)} <span style={{ fontSize: 9, fontWeight: 400 }}>{t.toman}</span>
                     </div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #d9eee0', borderRadius: 12, padding: '10px 13px', textAlign: 'center' }}>
                     <div style={{ fontSize: 10.5, color: '#7a8696', marginBottom: 3 }}>{t.refundableLabel}</div>
                     <div style={{ fontSize: 13, fontWeight: 900, color: '#0d2640' }} data-testid="mb-refundable-result">
-                      {faMoney(refundResult.refundableIrr)} <span style={{ fontSize: 9, fontWeight: 400 }}>{t.toman}</span>
+                      {localeMoney(refundResult.refundableIrr, locale)} <span style={{ fontSize: 9, fontWeight: 400 }}>{t.toman}</span>
                     </div>
                   </div>
                 </div>

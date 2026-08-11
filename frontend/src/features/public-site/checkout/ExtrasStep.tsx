@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, localeMoney } from '../../../lib/fa-format';
+import { localeMoney } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
 import { extraTitle, extraTotalIrr, type ExtraServiceState } from './checkout-types';
@@ -138,7 +139,7 @@ function GenericSeatMap({
       {rows.map((r) => (
         <div key={r.num} className="flex items-center gap-[5px]">
           <span className="w-5 flex-none text-center text-[9.5px] text-[#9aa4b2]">
-            {locale === 'en' ? r.num : faDigits(r.num)}
+            {localeDigits(r.num, locale)}
           </span>
           {r.seats.map((st, idx) => {
             const selected = selectedSeats.includes(st.seatCode);
@@ -286,7 +287,7 @@ export default function ExtrasStep({
                       −
                     </button>
                     <span className="min-w-8 text-center text-[11px] text-[#5a6678]">
-                      {locale === 'en' ? sv.quantity : faDigits(sv.quantity)} kg
+                      {localeDigits(sv.quantity, locale)} kg
                     </span>
                     <button
                       type="button"
@@ -386,8 +387,8 @@ export default function ExtrasStep({
                 </b>
               </div>
               <div>
-                {t.totalSold}: <b className="text-[#c0343a]">{locale === 'en' ? sold : faDigits(sold)}</b> {t.ofLabel}{' '}
-                <b>{locale === 'en' ? cap : faDigits(cap)}</b>
+                {t.totalSold}: <b className="text-[#c0343a]">{localeDigits(sold, locale)}</b> {t.ofLabel}{' '}
+                <b>{localeDigits(cap, locale)}</b>
               </div>
             </div>
           </>

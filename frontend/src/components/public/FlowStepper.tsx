@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 
 export type FlowStep = 'search' | 'results' | 'seat' | 'checkout' | 'payment' | 'ticket';
 
@@ -145,7 +145,7 @@ export default function FlowStepper({ current, onBack }: { current: FlowStep; on
                       flex: 'none',
                     }}
                   >
-                    {done ? '✓' : locale === 'en' ? i + 1 : faDigits(i + 1)}
+                    {done ? '✓' : localeDigits(i + 1, locale)}
                   </span>
                   <span
                     style={{

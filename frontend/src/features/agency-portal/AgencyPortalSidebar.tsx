@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { faDigits } from '../../lib/fa-format';
+import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import AgencyNavIcon from './AgencyNavIcon';
 import { AGENCY_NAV_ITEMS, agencyInitials, type AgencyNavKey } from './agency-nav-config';
 
 const STR: Record<StoredLocale, { activeCode: (code: string) => string; logout: string }> = {
   fa: {
-    activeCode: (code) => `● فعال · کد ${faDigits(code)}`,
+    activeCode: (code) => `● فعال · کد ${code}`,
     logout: 'خروج از حساب',
   },
   en: {
@@ -95,14 +95,14 @@ export default function AgencyPortalSidebar({
             >
               {agencyName}
             </div>
-            <div style={{ fontSize: 10, color: '#1f8a5b', fontWeight: 700 }}>{t.activeCode(codeSuffix)}</div>
+            <div style={{ fontSize: 10, color: '#1f8a5b', fontWeight: 700 }}>{t.activeCode(localeDigits(codeSuffix, locale))}</div>
           </div>
         </div>
       </div>
 
       {AGENCY_NAV_ITEMS.map((item) => {
         const active = activeKey === item.key;
-        const badge = item.showBadge && inboxCount > 0 ? (locale === 'fa' ? faDigits(inboxCount) : String(inboxCount)) : null;
+        const badge = item.showBadge && inboxCount > 0 ? localeDigits(inboxCount, locale) : null;
         return (
           <NavLink
             key={item.key}

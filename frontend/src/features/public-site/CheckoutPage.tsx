@@ -18,7 +18,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { localeMoney } from '../../lib/fa-format';
-import { parseJalaliDateToIso } from '../../lib/jalali';
+import { parseLocaleDateToIso } from '../../lib/locale-format';
 import type {
   BookingDetail,
   CabinClass,
@@ -372,8 +372,9 @@ export default function CheckoutPage() {
     const manifest = passengers.map((passenger) => ({
       passengerType: passenger.passengerType,
       birthDate:
-        parseJalaliDateToIso(
+        parseLocaleDateToIso(
           `${passenger.birthYear}/${passenger.birthMonth}/${passenger.birthDay}`,
+          locale,
         )?.slice(0, 10) ?? '',
     }));
     const code = validatePassengerAges(manifest, draft.flight.departureAt);
@@ -474,8 +475,9 @@ export default function CheckoutPage() {
         flightInstanceId: draft.flightInstanceId,
         cabin: draft.cabin,
         passengers: passengers.map((p) => {
-          const birthDate = parseJalaliDateToIso(
+          const birthDate = parseLocaleDateToIso(
             `${p.birthYear}/${p.birthMonth}/${p.birthDay}`,
+            locale,
           )?.slice(0, 10);
           if (!birthDate) throw new Error(t.completePaxError);
           return {

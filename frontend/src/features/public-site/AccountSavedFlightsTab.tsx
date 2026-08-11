@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { faMoney } from '../../lib/fa-format';
-import { formatJalaliDateTime } from '../../lib/jalali';
+import { localeMoney } from '../../lib/fa-format';
+import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { SavedFlight } from '../../types/public-site';
 
@@ -90,7 +90,7 @@ export default function AccountSavedFlightsTab({ flights, busyId, onRemove }: Pr
                     {f.originCityFa} ← {f.destCityFa}
                   </div>
                   <div style={{ fontSize: 11, color: '#9aa4b2' }}>
-                    {t.airline} · {formatJalaliDateTime(f.departureAt)}
+                    {t.airline} · {formatLocaleDateTime(f.departureAt, locale)}
                   </div>
                 </div>
                 <span
@@ -112,7 +112,7 @@ export default function AccountSavedFlightsTab({ flights, busyId, onRemove }: Pr
                   {f.bookable ? (
                     <>
                       <div style={{ fontSize: 14, fontWeight: 900, color: '#1668c4' }}>
-                        {faMoney(f.priceIrr)}
+                        {localeMoney(f.priceIrr, locale)}
                       </div>
                       <div style={{ fontSize: 10, color: '#9aa4b2' }}>{t.toman}</div>
                     </>

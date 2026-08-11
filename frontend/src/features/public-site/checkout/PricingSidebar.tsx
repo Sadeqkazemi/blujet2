@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { faDigits, localeMoney } from '../../../lib/fa-format';
+import { localeMoney } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import { CHECKOUT_COPY } from './checkout-copy';
 import {
   extraTitle,
@@ -60,7 +61,7 @@ export default function PricingSidebar({
               ? t.ticketPrice(paxCount)
               : t
                   .ticketPrice(paxCount)
-                  .replace(String(paxCount), faDigits(paxCount))}
+                  .replace(String(paxCount), localeDigits(paxCount, locale))}
           </span>
           <span className="font-bold text-[#16202e]">
             {localeMoney(ticketIrr.toString(), locale)}

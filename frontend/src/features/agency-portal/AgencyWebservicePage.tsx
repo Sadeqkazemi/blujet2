@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchApiKeys, fetchAgencyPortalWebservicePlans, fetchMyWebserviceRequests, requestWebservice } from '../../api/agency-portal';
 import { ApiRequestError } from '../../api/envelope';
-import { formatJalaliDate } from '../../lib/jalali';
-import { faMoney } from '../../lib/fa-format';
+import { formatLocaleDate } from '../../lib/locale-format';
+import { localeMoney } from '../../lib/fa-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyApiKeySummary, AgencyApiScope, AgencyWebserviceRequest } from '../../types/agency-portal';
 
@@ -168,7 +168,7 @@ export default function AgencyWebservicePage() {
   const wsPlans = ([1, 3, 12] as const).map((key) => ({
     key,
     label: WS_PLAN_LABELS[key],
-    priceLabel: faMoney(planPrices[key]),
+    priceLabel: localeMoney(planPrices[key], locale),
   }));
 
   const selPlan = wsPlans.find((p) => p.key === plan)!;
@@ -321,7 +321,7 @@ export default function AgencyWebservicePage() {
             {t.keyNotice}
           </div>
           <div data-testid="ws-key-activated-at" className="text-[10.5px] text-[#8a96a6]">
-            {t.activatedAtLabel} <span>{formatJalaliDate(activeKey.activatedAt)}</span>
+            {t.activatedAtLabel} <span>{formatLocaleDate(activeKey.activatedAt, locale)}</span>
           </div>
           <Link
             to="/agency/apidocs"

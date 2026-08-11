@@ -4,8 +4,8 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { fetchAirports } from '../../api/publicSite';
 import { lookupFlightStatus } from '../../api/flight-status';
-import { faDigits } from '../../lib/fa-format';
-import { formatJalaliDate, dayjs } from '../../lib/jalali';
+import { dayjs } from '../../lib/jalali';
+import { formatLocaleDate, localeDigits } from '../../lib/locale-format';
 import { ApiRequestError } from '../../api/envelope';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { Airport } from '../../types/public-site';
@@ -333,7 +333,7 @@ export default function FlightStatusPage() {
                 data-testid="fs-date-control"
                 style={{ height: 56, boxSizing: 'border-box', border: '1.5px solid #e2e7ee', borderRadius: 12, background: '#fafbfd' }}
               >
-                <JalaliDatePicker label={t.dateFieldLabel} value={dateIso} onChange={setDateIso} testId="fs-date" singleLine />
+                <JalaliDatePicker locale={locale} label={t.dateFieldLabel} value={dateIso} onChange={setDateIso} testId="fs-date" singleLine />
               </div>
             </div>
             <button
@@ -367,7 +367,7 @@ export default function FlightStatusPage() {
                   <span>✈</span> blujet
                 </span>
                 <span style={{ fontSize: 12 }}>
-                  <span dir="ltr">{result.flightNo}</span> · {formatJalaliDate(result.departureAt)}
+                  <span dir="ltr">{result.flightNo}</span> · {formatLocaleDate(result.departureAt, locale)}
                 </span>
                 <span
                   data-testid="fs-status-pill"
@@ -384,7 +384,7 @@ export default function FlightStatusPage() {
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7787' }}>{cityName(result.originCode, result.originCityFa, locale)}</div>
                   <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
-                    {faDigits(dayjs(result.departureAt).calendar('jalali').format('HH:mm'))}
+                    {localeDigits(dayjs(result.departureAt).format('HH:mm'), locale)}
                   </div>
                 </div>
                 <div style={{ flex: 1, textAlign: 'center', color: '#8a96a6', fontSize: 11 }}>
@@ -398,7 +398,7 @@ export default function FlightStatusPage() {
                   </div>
                   <div style={{ fontSize: 12, color: '#6b7787' }}>{cityName(result.destCode, result.destCityFa, locale)}</div>
                   <div className="font-num" style={{ fontSize: 15, fontWeight: 800, color: '#1668c4', marginTop: 4 }}>
-                    {faDigits(dayjs(result.arrivalAt).calendar('jalali').format('HH:mm'))}
+                    {localeDigits(dayjs(result.arrivalAt).format('HH:mm'), locale)}
                   </div>
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import { faDigits } from '../../lib/fa-format';
-import { formatJalaliDate } from '../../lib/jalali';
+import { formatLocaleDate, localeDigits } from '../../lib/locale-format';
 import type { CustomerReferralDashboard, CustomerReferralInvite } from '../../types/public-site';
 
 const STR: Record<
@@ -106,7 +105,7 @@ export default function AccountReferralTab({
 }: Props) {
   const { locale } = useLocale();
   const t = STR[locale];
-  const fmtNum = (n: number) => (locale === 'en' ? String(n) : faDigits(n));
+  const fmtNum = (n: number) => localeDigits(n, locale);
 
   return (
     <div
@@ -283,7 +282,7 @@ export default function AccountReferralTab({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700 }}>{f.fullName}</div>
                     <div style={{ fontSize: 10.5, color: '#9aa4b2' }}>
-                      {formatJalaliDate(f.joinedAt)}
+                      {formatLocaleDate(f.joinedAt, locale)}
                     </div>
                   </div>
                   <span

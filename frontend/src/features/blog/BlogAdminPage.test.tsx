@@ -106,4 +106,17 @@ describe('BlogAdminPage', () => {
     expect(screen.getByDisplayValue('راهنمای کامل چک‌این آنلاین')).toBeInTheDocument();
     expect(screen.getByText('ویرایش مقاله')).toBeInTheDocument();
   });
+
+  it('requires an in-app confirmation before deleting a post', async () => {
+    const user = userEvent.setup();
+    render(<BlogAdminPage />);
+    await screen.findByText('راهنمای کامل چک‌این آنلاین');
+
+    await user.click(screen.getAllByRole('button', { name: 'حذف' })[1]);
+    expect(screen.getByTestId('delete-blog-post-dialog')).toHaveTextContent('پیش‌نویس تست');
+    expect(blogApi.deleteBlogPost).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId('delete-blog-post-dialog-confirm'));
+    await waitFor(() => expect(blogApi.deleteBlogPost).toHaveBeenCalledWith('p2'));
+  });
 });

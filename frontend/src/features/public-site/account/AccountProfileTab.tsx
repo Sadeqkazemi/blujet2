@@ -1,5 +1,6 @@
 import type { AuthUser } from '../../../types/auth';
-import { faDigits, faMoney } from '../../../lib/fa-format';
+import { formatLocalePercent, localeMoney } from '../../../lib/fa-format';
+import { localeDigits } from '../../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { BookingDetail, UserProfile } from '../../../types/public-site';
 import type { TabKey } from './account-types';
@@ -222,7 +223,7 @@ export default function AccountProfileTab({
           >
             <span style={{ color: '#aac4e2' }}>{t.completionLabel}</span>
             <span style={{ fontWeight: 800, color: '#f2d98a' }}>
-              {profile ? `${faDigits(profile.completionPct)}٪` : '—'}
+              {profile ? formatLocalePercent(profile.completionPct, locale) : '—'}
             </span>
           </div>
           <div style={{ height: 7, borderRadius: 6, background: '#ffffff1c', overflow: 'hidden' }}>
@@ -287,7 +288,7 @@ export default function AccountProfileTab({
       <div data-testid="profile-stats-grid" style={{ display: 'grid', gridTemplateColumns: statsCols, gap: 11 }}>
         <ProfileStat
           label={t.statTrips}
-          value={faDigits(completedTrips)}
+          value={localeDigits(completedTrips, locale)}
           accent="#1668c4"
           bg="#eef4fb"
           onClick={() => onNavigateTab('trips')}
@@ -299,7 +300,7 @@ export default function AccountProfileTab({
         />
         <ProfileStat
           label={t.statPoints}
-          value={faDigits(clubBalance)}
+          value={localeDigits(clubBalance, locale)}
           accent="#caa53a"
           bg="#fdf6e3"
           onClick={() => onNavigateTab('club')}
@@ -311,7 +312,7 @@ export default function AccountProfileTab({
         />
         <ProfileStat
           label={t.statWallet}
-          value={walletBalanceIrr ? faMoney(walletBalanceIrr) : '—'}
+          value={walletBalanceIrr ? localeMoney(walletBalanceIrr, locale) : '—'}
           accent="#1f8a5b"
           bg="#e9f6ef"
           onClick={() => onNavigateTab('wallet')}
@@ -325,7 +326,7 @@ export default function AccountProfileTab({
         />
         <ProfileStat
           label={t.statPassengers}
-          value={faDigits(passengerCount)}
+          value={localeDigits(passengerCount, locale)}
           accent="#7c5cd6"
           bg="#f1edfb"
           onClick={() => onNavigateTab('passengers')}
