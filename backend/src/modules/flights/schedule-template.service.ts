@@ -454,6 +454,44 @@ export class ScheduleTemplateService {
     };
   }
 
+  async resolveActiveByFlightNo(rawFlightNo: string) {
+    const flightNo = rawFlightNo.trim().toUpperCase();
+    const template = await this.templateRepo.findOne({
+      where: {
+        flightNoBase: flightNo,
+        status: FlightScheduleTemplateStatus.ACTIVE,
+      },
+      order: { updatedAt: 'DESC' },
+      relations: {
+        originAirport: true,
+        destinationAirport: true,
+        aircraftDefinition: true,
+      },
+    });
+    if (!template) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مسیر فعالی برای این شماره پرواز تعریف نشده است.',
+      });
+    }
+
+    const nextInstance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .where('fi.scheduleTemplateId = :templateId', { templateId: template.id })
+      .andWhere('fi.departureAt >= :now', { now: new Date() })
+      .andWhere('fi.status != :cancelled', {
+        cancelled: FlightInstanceStatus.CANCELLED,
+      })
+      .orderBy('fi.departureAt', 'ASC')
+      .getOne();
+
+    return {
+      ...this.serialize(template),
+      nextFlightInstanceId: nextInstance?.id ?? null,
+      nextDepartureAt: nextInstance?.departureAt.toISOString() ?? null,
+    };
+  }
+
   async get(id: string) {
     return this.toView(id);
   }
@@ -619,6 +657,21 @@ export class ScheduleTemplateService {
   }
 
   private serialize(t: FlightScheduleTemplate) {
+    const cabinCapacities = Array.isArray(t.cabinCapacities)
+      ? t.cabinCapacities.flatMap((value) => {
+          if (
+            value == null ||
+            typeof value !== 'object' ||
+            Array.isArray(value)
+          ) {
+            return [];
+          }
+          const cabin = value.cabin;
+          const seats = value.seats;
+          if (typeof cabin !== 'string' || typeof seats !== 'number') return [];
+          return [{ cabin, seats }];
+        })
+      : [];
     return {
       id: t.id,
       originAirportId: t.originAirportId,
@@ -635,7 +688,8 @@ export class ScheduleTemplateService {
       weekdays: t.weekdays,
       agencyPriceIrr: t.agencyPriceIrr.toString(),
       legalCeilingIrr: t.legalCeilingIrr.toString(),
-      cabinCapacities: t.cabinCapacities,
+      cabinCapacities,
+      capacity: cabinCapacities.reduce((sum, row) => sum + row.seats, 0),
       status: t.status,
       idempotencyKey: t.idempotencyKey,
       createdByUserId: t.createdByUserId,

@@ -176,6 +176,17 @@ export interface AllotmentRow {
   active: boolean;
 }
 
+export interface AllotmentSummary {
+  flightInstanceId: string;
+  totalCapacity: number;
+  charterSeats: number;
+  directReserved: number;
+  agencySeats: number;
+  freeSeats: number;
+  agencyRevenueIrr: string;
+  agencies: (AllotmentRow & { revenueIrr: string })[];
+}
+
 export interface FareRuleRow {
   id: string;
   flightInstanceId: string;

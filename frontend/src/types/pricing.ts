@@ -3,6 +3,7 @@ import type {
   CalculatedChargeBreakdown,
   ChargeRule,
   FlightDefinitionSnapshot,
+  AllotmentSummary,
 } from "./flights";
 import type { FlightApprovalStatus } from "../lib/flight-definition";
 
@@ -89,6 +90,7 @@ export interface CommercialFlightRow {
     route: { originCode: string; destCode: string };
   };
   pricing: PricingProposal | null;
+  agencySummary?: AllotmentSummary;
 }
 
 export interface CommercialPricingResult {

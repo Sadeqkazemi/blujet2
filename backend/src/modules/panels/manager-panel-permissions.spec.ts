@@ -7,6 +7,7 @@ describe('manager panel permission mapping', () => {
   it('maps related nav items to the same coarse permission', () => {
     expect(permissionForNavKey('flightops')).toBe('flights');
     expect(permissionForNavKey('aircraft')).toBe('flights');
+    expect(permissionForNavKey('routes')).toBe('flights');
     expect(permissionForNavKey('mgrreports')).toBe('reports');
     expect(permissionForNavKey('dashboard')).toBeNull();
   });

@@ -131,6 +131,12 @@ export function fetchAllotments(instanceId: string) {
   return apiGet<AllotmentRow[]>(`/flights/${instanceId}/allotments`);
 }
 
+export function fetchAllotmentsSummary(instanceId: string) {
+  return apiGet<import('../types/flights').AllotmentSummary>(
+    `/flights/${instanceId}/allotments/summary`,
+  );
+}
+
 export function createAllotment(
   instanceId: string,
   dto: {
@@ -225,6 +231,12 @@ export function createScheduleTemplate(
 export function fetchScheduleTemplates(page = 1, pageSize = 20) {
   return apiGet<import('../types/schedule-templates').ScheduleTemplateList>(
     `/flights/schedule-templates?page=${page}&pageSize=${pageSize}`,
+  );
+}
+
+export function resolveScheduleTemplate(flightNo: string) {
+  return apiGet<import('../types/schedule-templates').ResolvedScheduleTemplate>(
+    `/flights/schedule-templates/resolve?flightNo=${encodeURIComponent(flightNo)}`,
   );
 }
 

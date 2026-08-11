@@ -6,6 +6,7 @@ import * as flightsApi from "../../api/flights";
 import * as pricingApi from "../../api/pricing";
 import * as aircraftApi from "../../api/aircraft";
 import * as agenciesApi from "../../api/agencies";
+import { ApiRequestError } from "../../api/envelope";
 
 describe("AddFlightPage", () => {
   beforeEach(() => {
@@ -17,6 +18,19 @@ describe("AddFlightPage", () => {
       { aircraftType: "Airbus A320", capacity: 180 },
       { aircraftType: "Boeing 737", capacity: 150 },
     ]);
+    vi.spyOn(flightsApi, "resolveScheduleTemplate").mockRejectedValue(
+      new ApiRequestError("NOT_FOUND", "not found", 404),
+    );
+    vi.spyOn(flightsApi, "fetchAllotmentsSummary").mockResolvedValue({
+      flightInstanceId: "fi-none",
+      totalCapacity: 180,
+      charterSeats: 0,
+      directReserved: 0,
+      agencySeats: 0,
+      freeSeats: 180,
+      agencyRevenueIrr: "0",
+      agencies: [],
+    });
     vi.spyOn(flightsApi, "fetchCommitments").mockResolvedValue([]);
     vi.spyOn(flightsApi, "fetchCommitmentsSummary").mockResolvedValue({
       cabins: [],

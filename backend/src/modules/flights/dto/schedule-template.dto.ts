@@ -104,3 +104,9 @@ export class ListScheduleTemplatesQueryDto {
   @Max(100)
   pageSize?: number;
 }
+
+export class ResolveScheduleTemplateQueryDto {
+  @ApiProperty({ example: 'XY1234' })
+  @Matches(/^[A-Za-z0-9]{2,8}$/)
+  flightNo!: string;
+}
