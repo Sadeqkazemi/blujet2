@@ -1306,6 +1306,66 @@ export class FlightsService {
     }));
   }
 
+  async allotmentSummary(instanceId: string) {
+    const instance = await this.instanceRepo.findOne({
+      where: { id: instanceId },
+    });
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+
+    const agencies = (await this.listAllotments(instanceId)).filter(
+      (row) => row.active,
+    );
+    const directReserved = await this.passengerRepo
+      .createQueryBuilder('passenger')
+      .innerJoin('passenger.booking', 'booking')
+      .where('booking.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('booking.agencyId IS NULL')
+      .andWhere('booking.deletedAt IS NULL')
+      .andWhere('passenger.deletedAt IS NULL')
+      .andWhere('passenger.occupiesSeat = true')
+      .andWhere('booking.status IN (:...statuses)', {
+        statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+      })
+      .getCount();
+
+    const agencySeats = agencies.reduce(
+      (sum, row) => sum + row.seatsAllocated,
+      0,
+    );
+    const agencyRevenueIrr = agencies.reduce(
+      (sum, row) =>
+        sum + BigInt(row.contractPriceIrr ?? 0) * BigInt(row.seatsAllocated),
+      0n,
+    );
+    const charterSeats = Math.max(instance.charterSeats ?? 0, 0);
+    const freeSeats = Math.max(
+      instance.capacity - charterSeats - agencySeats - directReserved,
+      0,
+    );
+
+    return {
+      flightInstanceId: instanceId,
+      totalCapacity: instance.capacity,
+      charterSeats,
+      directReserved,
+      agencySeats,
+      freeSeats,
+      agencyRevenueIrr: agencyRevenueIrr.toString(),
+      agencies: agencies.map((row) => ({
+        ...row,
+        contractPriceIrr: row.contractPriceIrr?.toString() ?? null,
+        revenueIrr: (
+          BigInt(row.contractPriceIrr ?? 0) * BigInt(row.seatsAllocated)
+        ).toString(),
+      })),
+    };
+  }
+
   /** Active = counts toward the agencySeatsAllocated cap right now: HARD
    * always counts; SOFT counts only until its releaseAt passes (lazy,
    * same pattern as Booking's HELD→EXPIRED — no cron job). */

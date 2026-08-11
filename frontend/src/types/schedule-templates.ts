@@ -27,11 +27,17 @@ export interface ScheduleTemplateRow extends ScheduleTemplatePayload {
   destCode?: string;
   aircraftCode?: string;
   cabinCapacities: CabinCapacity[];
+  capacity: number;
   status: 'ACTIVE' | 'DEACTIVATED';
   instanceCount?: number;
   createdAt: string;
   updatedAt: string;
   deactivatedAt: string | null;
+}
+
+export interface ResolvedScheduleTemplate extends ScheduleTemplateRow {
+  nextFlightInstanceId: string | null;
+  nextDepartureAt: string | null;
 }
 
 export interface ScheduleTemplateList {

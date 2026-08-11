@@ -47,6 +47,14 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
     </NavIcon>
   ),
+  routes: (
+    <NavIcon>
+      <circle cx="6" cy="17" r="2.5" />
+      <circle cx="18" cy="7" r="2.5" />
+      <path d="M8.5 16c3.8-.4 4.2-6.9 7-7.7" />
+      <path d="M11 5l2-2 2 2" />
+    </NavIcon>
+  ),
   aircraft: (
     <NavIcon>
       <path d="M3 12h18" />

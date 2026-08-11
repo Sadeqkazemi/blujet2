@@ -1291,6 +1291,61 @@ function CommercialPricing({ embedded = false }: { embedded?: boolean }) {
             </div>
           </div>
 
+          <div
+            className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2"
+            data-testid="pricing-agency-capacity-summary"
+          >
+            <div className="rounded-[11px] border border-blue-400/20 bg-blue-400/5 px-[13px] py-[11px]">
+              <div className="text-[10.5px] text-[#7f91aa]">
+                مجموع صندلی فروخته‌شده به آژانس
+              </div>
+              <div className="font-num mt-1.5 text-[18px] font-black text-white">
+                {faDigits(selected.agencySummary?.agencySeats ?? 0)} صندلی
+              </div>
+              <div className="font-num mt-1 text-[11px] text-blue-200">
+                درآمد آژانس:{" "}
+                {moneyOrDash(selected.agencySummary?.agencyRevenueIrr)}
+              </div>
+            </div>
+            <div className="rounded-[11px] border border-emerald-400/20 bg-emerald-400/5 px-[13px] py-[11px]">
+              <div className="text-[10.5px] text-[#7f91aa]">
+                صندلی آزاد قابل فروش
+              </div>
+              <div className="font-num mt-1.5 text-[18px] font-black text-emerald-200">
+                {faDigits(
+                  selected.agencySummary?.freeSeats ??
+                    Math.max(selected.capacity - selected.charterSeats, 0),
+                )}{" "}
+                صندلی
+              </div>
+              <div className="mt-1 text-[11px] text-[#7f91aa]">
+                پس از کسر تعهد چارتری، تعهد آژانس و رزرو مستقیم
+              </div>
+            </div>
+          </div>
+
+          {selected.agencySummary?.agencies.length ? (
+            <div className="mb-3.5 overflow-hidden rounded-[11px] border border-[#22304a] bg-[#0f1623]">
+              <div className="border-b border-[#22304a] px-3 py-2 text-[10.5px] font-bold text-[#91a1b8]">
+                جزئیات آژانس‌های متعهد
+              </div>
+              {selected.agencySummary.agencies.map((agency) => (
+                <div
+                  key={agency.id}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-[#22304a] px-3 py-2 text-[11px] last:border-b-0"
+                >
+                  <span className="font-bold text-[#dbe6f5]">
+                    {agency.agencyName}
+                  </span>
+                  <span className="font-num text-[#91a1b8]">
+                    {faDigits(agency.seatsAllocated)} صندلی ·{" "}
+                    {moneyOrDash(agency.revenueIrr)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {locked ? (
             <div>
               <div className="rounded-xl border border-[rgba(16,185,129,.4)] bg-[rgba(16,185,129,.09)] p-[15px] text-center">

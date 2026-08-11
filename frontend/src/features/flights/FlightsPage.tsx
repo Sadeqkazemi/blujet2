@@ -34,7 +34,6 @@ import JalaliDatePicker from "../../components/JalaliDatePicker";
 import PricingPage from "../pricing/PricingPage";
 import FlightCitiesTab from "./FlightCitiesTab";
 import TravelCostsTab from "./TravelCostsTab";
-import ScheduleTemplatesTab from "./ScheduleTemplatesTab";
 import AddFlightPage from "./AddFlightPage";
 import FlightLifecycleModal from "./FlightLifecycleModal";
 import type {
@@ -79,7 +78,7 @@ export default function FlightsPage() {
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [subTab, setSubTab] = useState<
-    "active" | "done" | "history" | "future" | "routes" | "cities" | "costs"
+    "active" | "done" | "history" | "future" | "cities" | "costs"
   >("active");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -380,7 +379,6 @@ export default function FlightsPage() {
         ["active", "پروازهای فعال"],
         ["done", "پروازهای انجام‌شده"],
         ["history", "تاریخچه پرواز"],
-        ["routes", "مسیرهای پروازی"],
         ["cities", "شهرهای پروازی"],
         ["costs", "هزینه‌های سفر"],
       ] as const)
@@ -904,7 +902,6 @@ export default function FlightsPage() {
 
           {subTab === "costs" && isCommercial && <TravelCostsTab />}
 
-          {subTab === "routes" && isCommercial && <ScheduleTemplatesTab />}
 
           {showFuturePanel && data && (
             <div className="flex flex-col gap-4">

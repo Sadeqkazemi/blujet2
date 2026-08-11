@@ -12,6 +12,7 @@ import AccessRevokedListener from './components/AccessRevokedListener';
 import AircraftListPage from './features/aircraft/AircraftListPage';
 import AircraftFormPage from './features/aircraft/AircraftFormPage';
 import AircraftDetailPage from './features/aircraft/AircraftDetailPage';
+import FlightRoutesPage from './features/flights/FlightRoutesPage';
 import LoginPage from './features/auth/LoginPage';
 import TwoFactorPage from './features/auth/TwoFactorPage';
 import ForcePasswordChangePage from './features/auth/ForcePasswordChangePage';
@@ -188,6 +189,9 @@ export default function App() {
               </Route>
               <Route path="flights" element={<TabGate tabKey="flights" />}>
                 <Route index element={<FlightsRouter />} />
+              </Route>
+              <Route path="routes" element={<TabGate tabKey="routes" />}>
+                <Route index element={<FlightRoutesPage />} />
               </Route>
               <Route path="aircraft" element={<TabGate tabKey="aircraft" />}>
                 <Route index element={<AircraftListPage />} />

@@ -27,6 +27,7 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { FlightDefinitionService } from '../flights/flight-definition.service';
+import { FlightsService } from '../flights/flights.service';
 import { SearchService } from '../booking-engine/search.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { compareIrr, toIrr } from '../../common/money';
@@ -54,7 +55,8 @@ export function isCeoRegisteredProposalVisible(
 ): boolean {
   return (
     proposal.approvedAt != null &&
-    proposal.approvedAt.getTime() >= now.getTime() - CEO_REGISTERED_VISIBILITY_MS
+    proposal.approvedAt.getTime() >=
+      now.getTime() - CEO_REGISTERED_VISIBILITY_MS
   );
 }
 
@@ -76,6 +78,7 @@ export class PricingService {
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly definitions: FlightDefinitionService,
+    private readonly flights: FlightsService,
     private readonly search: SearchService,
   ) {}
 
@@ -160,10 +163,18 @@ export class PricingService {
       proposals.map((p) => [p.flightInstanceId, p]),
     );
 
+    const agencySummaries = await Promise.all(
+      instances.map((instance) => this.flights.allotmentSummary(instance.id)),
+    );
+    const agencySummaryByInstanceId = new Map(
+      agencySummaries.map((summary) => [summary.flightInstanceId, summary]),
+    );
+
     return {
       flights: instances.map((i) => ({
         ...i,
         pricing: proposalByInstanceId.get(i.id) ?? null,
+        agencySummary: agencySummaryByInstanceId.get(i.id),
       })),
     };
   }

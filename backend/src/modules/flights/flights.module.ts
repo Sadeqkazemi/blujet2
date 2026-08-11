@@ -78,6 +78,6 @@ import { AuthModule } from '../auth/auth.module';
     AircraftService,
     CommitmentsService,
   ],
-  exports: [FlightDefinitionService, FlightWorkflowService],
+  exports: [FlightsService, FlightDefinitionService, FlightWorkflowService],
 })
 export class FlightsModule {}

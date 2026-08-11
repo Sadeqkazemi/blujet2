@@ -516,6 +516,11 @@ only this phase; an agency actually booking against one is a follow-up
   `COMMERCIAL_MANAGER`. Lists the instance's allotments (agency name,
   seats, type, releaseAt, contractPriceIrr), each flagged `active: boolean`
   (false once a SOFT row's `releaseAt` has passed).
+- `GET /flights/:instanceId/allotments/summary` — same roles — returns the
+  reservation-sourced capacity summary used by flight creation and pricing:
+  `totalCapacity`, `charterSeats`, `agencySeats`, occupied direct-passenger
+  seats, `freeSeats`, `agencyRevenueIrr`, and the active per-agency breakdown.
+  Lap infants (`occupiesSeat=false`) do not reduce free capacity.
 - `POST /flights/:instanceId/allotments` — same roles —
   `{ agencyId, seatsAllocated, type?, releaseAt?, contractPriceIrr? }`.
   400 `VALIDATION_FAILED` if the sum of every active allotment's
@@ -3482,6 +3487,7 @@ panel or MD-80 seat maps. Commercial → CEO pricing register path unchanged.
 | POST | `/flights/schedule-templates/preview` | COMMERCIAL/SENIOR/EMPLOYEE+`fl_manage` | Preview occurrences (no persist) |
 | POST | `/flights/schedule-templates` | same | Create + materialize; `idempotencyKey` required |
 | GET | `/flights/schedule-templates` | + `fl_view` | Paginated list |
+| GET | `/flights/schedule-templates/resolve?flightNo=XY1234` | + `fl_view` | Resolve the active route template and next instance for Add Flight autofill |
 | GET | `/flights/schedule-templates/:id` | + `fl_view` | Detail + instanceCount |
 | POST | `/flights/schedule-templates/:id/deactivate` | + `fl_manage` | Cancel future unsold instances; keep sold history |
 

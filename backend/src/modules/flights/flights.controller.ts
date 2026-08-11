@@ -44,6 +44,7 @@ import {
 import {
   CreateScheduleTemplateDto,
   ListScheduleTemplatesQueryDto,
+  ResolveScheduleTemplateQueryDto,
   ScheduleTemplatePreviewDto,
 } from './dto/schedule-template.dto';
 import { ScheduleTemplateService } from './schedule-template.service';
@@ -719,6 +720,21 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Get('schedule-templates/resolve')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({
+    summary: 'تکمیل مشخصات پرواز از روی شماره پرواز و مسیر فعال',
+  })
+  async resolveScheduleTemplate(
+    @Query() query: ResolveScheduleTemplateQueryDto,
+  ) {
+    const data = await this.scheduleTemplates.resolveActiveByFlightNo(
+      query.flightNo,
+    );
+    return { success: true, data };
+  }
+
   @Get('schedule-templates/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_view')
@@ -733,8 +749,7 @@ export class FlightsController {
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_manage')
   @ApiOperation({
-    summary:
-      'غیرفعال‌سازی آینده برنامه فصلی بدون حذف سوابق فروش‌شده',
+    summary: 'غیرفعال‌سازی آینده برنامه فصلی بدون حذف سوابق فروش‌شده',
   })
   async deactivateScheduleTemplate(
     @CurrentUser() actor: AuthenticatedUser,
@@ -900,6 +915,17 @@ export class FlightsController {
   @ApiOperation({ summary: 'فهرست سهمیه‌های آژانس این پرواز' })
   async listAllotments(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listAllotments(instanceId);
+    return { success: true, data };
+  }
+
+  @Get(':instanceId/allotments/summary')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view')
+  @ApiOperation({
+    summary: 'خلاصه خودکار تعهدات آژانس، ظرفیت آزاد و درآمد قراردادی',
+  })
+  async allotmentsSummary(@Param('instanceId') instanceId: string) {
+    const data = await this.flights.allotmentSummary(instanceId);
     return { success: true, data };
   }
 

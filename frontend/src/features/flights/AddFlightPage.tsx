@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  createCommitment,
   createFareRule,
   createFlight,
   fetchAircraftTypes,
+  fetchAllotmentsSummary,
   fetchAirports,
-  fetchCommitments,
-  fetchCommitmentsSummary,
   fetchFlightDefinition,
-  planFlight,
+  resolveScheduleTemplate,
   submitFlightToOperations,
   updateFlightDefinition,
 } from "../../api/flights";
@@ -51,20 +49,18 @@ import {
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../../lib/jalali";
 import type {
   AircraftTypeOption,
+  AllotmentSummary,
   AirportEntry,
   CreateFareRulePayload,
 } from "../../types/flights";
+import type { ResolvedScheduleTemplate } from "../../types/schedule-templates";
 import CabinCapacityEditor, {
   type CabinCapacityRow,
 } from "./components/CabinCapacityEditor";
 import ChargeRulesEditor from "./components/ChargeRulesEditor";
 import DurationFields from "./components/DurationFields";
 import FlightNumberInput from "./components/FlightNumberInput";
-import AgencyCommitmentsEditor, {
-  commitmentToDraft,
-  draftToCreatePayload,
-  type AgencyCommitmentDraft,
-} from "./components/AgencyCommitmentsEditor";
+import AgencyAllotmentsSummaryCard from "./components/AgencyAllotmentsSummaryCard";
 
 type Channel = "SYSTEM" | "CHARTER" | "AGENCY";
 
@@ -226,12 +222,11 @@ export default function AddFlightPage({
   const [cabinRows, setCabinRows] =
     useState<CabinCapacityRow[]>(defaultCabinRows);
   const [charter, setCharter] = useState("");
-  const [agencyCommitments, setAgencyCommitments] = useState<
-    AgencyCommitmentDraft[]
-  >([]);
-  const [commitmentsAvailableOnline, setCommitmentsAvailableOnline] = useState<
-    number | undefined
-  >(undefined);
+  const [resolvedTemplate, setResolvedTemplate] =
+    useState<ResolvedScheduleTemplate | null>(null);
+  const [agencySummary, setAgencySummary] =
+    useState<AllotmentSummary | null>(null);
+  const [routeResolving, setRouteResolving] = useState(false);
   const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
   const [fares, setFares] = useState<DraftFare[]>([]);
@@ -347,22 +342,9 @@ export default function AddFlightPage({
         if (def.basePriceIrr) {
           setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
-        return Promise.all([
-          fetchCommitments(flightId),
-          fetchCommitmentsSummary(flightId).catch(() => null),
-        ])
-          .then(([rows, summary]) => {
-            setAgencyCommitments(
-              rows
-                .filter((r) => r.type === "AGENCY" && r.status === "ACTIVE")
-                .map(commitmentToDraft),
-            );
-            setCommitmentsAvailableOnline(summary?.availableOnline);
-          })
-          .catch(() => {
-            setAgencyCommitments([]);
-            setCommitmentsAvailableOnline(undefined);
-          });
+        return fetchAllotmentsSummary(flightId)
+          .then(setAgencySummary)
+          .catch(() => setAgencySummary(null));
       })
       .catch((e) => {
         setError(
@@ -375,6 +357,75 @@ export default function AddFlightPage({
       })
       .finally(() => setLoadingDefinition(false));
   }, [isEdit, flightId]);
+
+  useEffect(() => {
+    if (isEdit || !isValidFlightNo(flightNo)) {
+      if (!isEdit) {
+        setResolvedTemplate(null);
+        setAgencySummary(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setRouteResolving(true);
+      resolveScheduleTemplate(flightNo)
+        .then(async (template) => {
+          if (cancelled) return;
+          setResolvedTemplate(template);
+          if (template.originCode) setOriginCode(template.originCode);
+          if (template.destCode) setDestCode(template.destCode);
+          setTime(template.departureTime);
+          const duration = splitDurationMinutes(template.durationMinutes);
+          setDurationHours(duration.hours);
+          setDurationMins(duration.minutes);
+          if (template.aircraftCode) setAircraft(template.aircraftCode);
+          if (template.cabinCapacities.length > 0) {
+            setCabinRows(
+              template.cabinCapacities.map((row, index) => ({
+                key: `template-cabin-${index}`,
+                cabin: row.cabin,
+                seats: String(row.seats),
+              })),
+            );
+          }
+          if (template.nextDepartureAt) {
+            const departure = dayjs(template.nextDepartureAt);
+            setDateIso(isoDateAtNoon(toIsoDateOnly(departure)));
+            setTime(departure.format("HH:mm"));
+          }
+          if (template.nextFlightInstanceId) {
+            const summary = await fetchAllotmentsSummary(
+              template.nextFlightInstanceId,
+            ).catch(() => null);
+            if (!cancelled) setAgencySummary(summary);
+          } else {
+            setAgencySummary(null);
+          }
+        })
+        .catch((cause) => {
+          if (cancelled) return;
+          setResolvedTemplate(null);
+          setAgencySummary(null);
+          if (!(cause instanceof ApiRequestError) || cause.status !== 404) {
+            setError(
+              cause instanceof Error
+                ? cause.message
+                : "خطا در دریافت اطلاعات مسیر پرواز.",
+            );
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setRouteResolving(false);
+        });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [flightNo, isEdit]);
 
   async function applyAircraftDefinition(type: string) {
     setAircraft(type);
@@ -588,10 +639,7 @@ export default function AddFlightPage({
       setError("تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.");
       return;
     }
-    const agencySeatsSum = agencyCommitments.reduce(
-      (sum, r) => sum + (Number(latinDigits(r.seats)) || 0),
-      0,
-    );
+    const agencySeatsSum = agencySummary?.agencySeats ?? 0;
     if (charterSeats + agencySeatsSum > capacity) {
       setError("مجموع تعهد چارتری و تعهدات آژانس از ظرفیت پرواز بیشتر است.");
       return;
@@ -664,18 +712,6 @@ export default function AddFlightPage({
           validUntil: f.validUntil || undefined,
         };
         await createFareRule(created.id, farePayload);
-      }
-
-      if (agencySeatsSum > 0) {
-        await planFlight(created.id, {
-          priceIrr: proposedIrr,
-          agencySeats: agencySeatsSum,
-        });
-        for (const draft of agencyCommitments) {
-          if (!draft.agencyId) continue;
-          const body = draftToCreatePayload(draft);
-          await createCommitment(created.id, body);
-        }
       }
 
       const legalIrr = moneyInputToRialString(legalToman);
@@ -944,13 +980,16 @@ export default function AddFlightPage({
                   error={cabinCapacityError}
                 />
               </div>
+              {resolvedTemplate && !isEdit && (
+                <p className="mt-3 rounded-xl border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-[11px] text-blue-200">
+                  اطلاعات مسیر از تعریف فعال شماره پرواز خوانده شد؛ همه فیلدها
+                  همچنان قابل ویرایش هستند.
+                </p>
+              )}
               <div className="mt-4">
-                <AgencyCommitmentsEditor
-                  capacity={capacity}
-                  charterSeats={Number(latinDigits(charter)) || 0}
-                  value={agencyCommitments}
-                  onChange={setAgencyCommitments}
-                  availableOnline={commitmentsAvailableOnline}
+                <AgencyAllotmentsSummaryCard
+                  summary={agencySummary}
+                  loading={routeResolving}
                 />
               </div>
             </section>
