@@ -73,7 +73,13 @@ const STR: Record<
   },
 };
 
-export default function OtpLoginInline() {
+export default function OtpLoginInline({
+  onAuthenticated,
+  embedded = false,
+}: {
+  onAuthenticated?: () => void;
+  embedded?: boolean;
+} = {}) {
   const { requestOtp, verifyOtp } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
@@ -128,6 +134,7 @@ export default function OtpLoginInline() {
     setBusy(true);
     try {
       await verifyOtp(challengeId!, normalizeIranMobile(code));
+      onAuthenticated?.();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpInvalid);
     } finally {
@@ -136,7 +143,13 @@ export default function OtpLoginInline() {
   }
 
   return (
-    <div className="mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 shadow-sm">
+    <div
+      className={
+        embedded
+          ? 'mx-auto w-full max-w-sm bg-white px-1 pb-1 pt-2'
+          : 'mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 shadow-sm'
+      }
+    >
       <h2 className="mb-1 text-sm font-extrabold text-[#0d2640]">{t.otpTitle}</h2>
       <p className="mb-4 text-xs text-[#6b7b94]">{t.otpSub}</p>
       {error && <p className="mb-3 rounded-lg bg-red-50 p-2.5 text-xs text-red-600">{error}</p>}

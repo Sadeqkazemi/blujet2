@@ -3533,3 +3533,24 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 - `PATCH /admins/:id/permissions` replaces that list and requires the existing `ADMIN_ROLE_CHANGE` step-up challenge.
 - A `null` permission list preserves the role's legacy/default access. An explicit list can only restrict the account's existing role; it never grants access that the role guard does not already allow.
 - The restriction is enforced both in `GET /panels/nav` and by `PanelAccessGuard` for mapped management APIs. Known keys are: `flights`, `agencies`, `reports`, `finance`, `refunds`, `club`, `content`, `support`, `admins`, and `settings`.
+
+## Agency seat requests and desktop checkout (2026-08-11)
+
+- `GET /agency-portal/seat-request-options` (`AGENCY`) returns future scheduled
+  route instances created through commercial flight planning. Routes are
+  visible before CEO publication so an agency can submit its commercial
+  request during planning. For each instance it returns route/flight details,
+  physical capacity, active agency commitments, the caller's own commitments,
+  and `availableToRequest`. Availability is derived server-side as physical
+  capacity minus active charter commitments, active agency commitments, and
+  occupied seats in DRAFT/HELD/PAID/TICKETED bookings.
+- `POST /agency-portal/seat-requests` (`AGENCY`) accepts
+  `{ flightInstanceId, seats, preferredWeekdays?, termMonths? }`, validates the
+  current capacity again, and creates a real cartable task for every active
+  `COMMERCIAL_MANAGER`. It does not directly reserve inventory; the existing
+  commercial commitment workflow remains the only path that activates and
+  locks agency inventory.
+- Guest desktop checkout now completes phone/OTP authentication inside the
+  results-page modal and resumes the stored flight/cabin/passenger selection.
+  Mobile retains its existing login-or-sign-up choice. Desktop passenger,
+  extras, review, and payment pages share one four-step progress contract.

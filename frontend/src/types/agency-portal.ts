@@ -120,6 +120,31 @@ export interface AgencyAllotmentRow {
   active: boolean;
 }
 
+export interface AgencySeatRequestOption {
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  aircraftType: string;
+  capacity: number;
+  agencyAllocated: number;
+  ownAllocated: number;
+  availableToRequest: number;
+  pricePerSeatIrr: string | null;
+  definitionStatus: 'DRAFT' | 'PENDING_REVISION' | 'PUBLISHED' | 'REJECTED';
+}
+
+export interface AgencySeatRequestResult {
+  id: string;
+  status: 'SUBMITTED';
+  recipientCount: number;
+  flightInstanceId: string;
+  seats: number;
+  preferredWeekdays?: number[];
+  termMonths?: 3 | 6 | 12;
+}
+
 export interface AgencyDocument {
   id: string;
   docType: AgencyDocumentType;

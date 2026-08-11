@@ -125,6 +125,9 @@ export default defineConfig(({ mode }) => {
         // always be fresh, never served from the service worker cache.
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [],
+        // The application shell currently exceeds Workbox's conservative
+        // 2 MiB default; API responses remain excluded from runtime caching.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
     }),
   ],

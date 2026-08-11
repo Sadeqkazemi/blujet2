@@ -7,7 +7,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { faDigits, localeMoney } from '../../lib/fa-format';
 import type { BookingDetail, PayResultPriceChanged } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import FlowStepper from '../../components/public/FlowStepper';
+import CheckoutStepBar from './checkout/CheckoutStepBar';
 import FlightSummaryCard from './checkout/FlightSummaryCard';
 import type { FlightSnapshot } from './checkout/checkout-types';
 import { PAYMENT_COPY } from './payment/payment-copy';
@@ -580,7 +580,7 @@ export default function PaymentPage() {
 
   return (
     <PublicPageShell>
-      <FlowStepper current="payment" onBack={() => navigate(-1)} />
+      <CheckoutStepBar current="payment" locale={locale} />
       <div className="mx-auto max-w-[1180px] px-5 py-5">
         {error && <p className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-600">{error}</p>}
 

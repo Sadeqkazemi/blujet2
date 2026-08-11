@@ -9,6 +9,9 @@ import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { User } from '../../database/entities/user.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
+import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
 import { AgencyPortalController } from './agency-portal.controller';
 import { AgencyPortalService } from './agency-portal.service';
 import { AuditModule } from '../audit/audit.module';
@@ -30,6 +33,9 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
       Booking,
       Passenger,
       User,
+      FlightInstance,
+      AgencySeatCommitment,
+      CharterCommitment,
     ]),
     AuditModule,
     CartableModule,

@@ -2756,3 +2756,13 @@ than relying on any cascade.
 - `users.panelPermissions jsonb NULL` stores an optional array of coarse manager-panel permission keys.
 - `NULL` means the account follows its role defaults (backward compatibility). An empty array is an explicit restriction to unmapped/common surfaces only.
 - These keys are subtractive. They do not replace role-based authorization and cannot expand a user's role.
+
+## Agency seat-request planning (2026-08-11)
+
+No new business table is introduced. A pending agency request is a workflow
+message, not inventory, and is persisted in the existing `cartable_tasks`
+table with `sourceType = AGENCY_REQUEST`; the request is also recorded in
+`audit_logs`. Capacity remains sourced from `flight_instances`, active
+`charter_commitments`, active `agency_seat_commitments`, and occupied
+passengers. Only approval through the existing commercial commitment API can
+create inventory that search and booking subtract from online availability.

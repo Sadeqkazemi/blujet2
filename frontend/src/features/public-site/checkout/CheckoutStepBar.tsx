@@ -3,19 +3,49 @@ import { faDigits } from '../../../lib/fa-format';
 import type { CheckoutWizardStep } from './checkout-types';
 import { CHECKOUT_COPY } from './checkout-copy';
 
-const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
+export type CheckoutProgressStep = CheckoutWizardStep | 'payment';
 
-const STEP_ICONS: Record<CheckoutWizardStep, string> = {
-  pax: '👤',
-  extras: '🧳',
-  review: '✓',
-};
+const STEP_ORDER: CheckoutProgressStep[] = ['pax', 'extras', 'review', 'payment'];
+
+function StepIcon({ step, done }: { step: CheckoutProgressStep; done: boolean }) {
+  if (done) return <span aria-hidden="true">✓</span>;
+  if (step === 'pax') {
+    return (
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20c0-4 3.2-6 7-6s7 2 7 6" />
+      </svg>
+    );
+  }
+  if (step === 'extras') {
+    return (
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="4" y="7" width="16" height="13" rx="2" />
+        <path d="M9 7V5.5A2.5 2.5 0 0 1 11.5 3h1A2.5 2.5 0 0 1 15 5.5V7M4 12h16" />
+      </svg>
+    );
+  }
+  if (step === 'review') {
+    return (
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <path d="m8 12 2.5 2.5L16 9" />
+      </svg>
+    );
+  }
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M3 10h18" />
+    </svg>
+  );
+}
 
 export default function CheckoutStepBar({
   current,
   locale,
 }: {
-  current: CheckoutWizardStep;
+  current: CheckoutProgressStep;
   locale: StoredLocale;
 }) {
   const t = CHECKOUT_COPY[locale];
@@ -23,9 +53,9 @@ export default function CheckoutStepBar({
   const progressPct = `${(currentIdx / (STEP_ORDER.length - 1)) * 100}%`;
 
   return (
-    <div className="hidden border-b border-[#e8eef6] bg-[#f6f9fd] md:block">
-      <div className="relative mx-auto max-w-[560px] px-6 py-5">
-        <div className="absolute left-[30px] right-[30px] top-[38px] h-[3px] rounded-sm bg-[#e2e7ee]">
+    <div className="hidden border-b border-[#e8eef6] bg-[#f6f9fd] md:block" data-testid="checkout-desktop-stepper">
+      <div className="relative mx-auto max-w-[900px] px-10 py-7">
+        <div className="absolute left-[76px] right-[76px] top-[48px] h-[3px] rounded-sm bg-[#e2e7ee]">
           <div
             className="h-full rounded-sm bg-[#1668c4] transition-all duration-300"
             style={{ width: progressPct }}
@@ -42,17 +72,23 @@ export default function CheckoutStepBar({
             return (
               <div key={step} className="flex min-w-[74px] flex-col items-center gap-2">
                 <div
-                  className="flex h-[38px] w-[38px] items-center justify-center rounded-full border-[2.5px] text-[13px] font-extrabold shadow-sm transition-all"
+                  className="flex h-[44px] w-[44px] items-center justify-center rounded-full border-[2.5px] text-[13px] font-extrabold shadow-sm transition-all"
                   style={{ background: bg, color, borderColor: border }}
                   data-testid={`checkout-step-${step}`}
                 >
-                  {done ? '✓' : STEP_ICONS[step]}
+                  <StepIcon step={step} done={done} />
                 </div>
                 <span
                   className="whitespace-nowrap text-[11.5px]"
                   style={{ fontWeight: active ? 800 : 600, color: labelColor }}
                 >
-                  {t.steps[step]}
+                  {step === 'payment'
+                    ? locale === 'en'
+                      ? 'Payment'
+                      : locale === 'ar'
+                        ? 'الدفع'
+                        : 'پرداخت'
+                    : t.steps[step]}
                 </span>
               </div>
             );
@@ -63,7 +99,7 @@ export default function CheckoutStepBar({
   );
 }
 
-export function stepNumberLabel(step: CheckoutWizardStep, locale: StoredLocale): string {
+export function stepNumberLabel(step: CheckoutProgressStep, locale: StoredLocale): string {
   const idx = STEP_ORDER.indexOf(step) + 1;
   return locale === 'en' ? String(idx) : faDigits(idx);
 }

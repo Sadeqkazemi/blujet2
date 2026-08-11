@@ -37,7 +37,10 @@ export default function FlightSummaryCard({
       data-testid="checkout-flight-summary"
     >
       <div className="flex items-center gap-3">
-        <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-[#1668c4] text-base text-white">
+        <span
+          className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-[#1668c4] text-base text-white"
+          style={{ transform: locale === 'en' ? undefined : 'scaleX(-1)' }}
+        >
           ✈
         </span>
         <div className="leading-relaxed">

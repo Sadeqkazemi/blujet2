@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgencySeatsPage from './AgencySeatsPage';
 import * as portalApi from '../../api/agency-portal';
 import * as publicApi from '../../api/publicSite';
 import * as useLocaleModule from '../../hooks/useLocale';
-import type { AgencyAllotmentRow } from '../../types/agency-portal';
+import type { AgencyAllotmentRow, AgencySeatRequestOption } from '../../types/agency-portal';
 
 const ROWS: AgencyAllotmentRow[] = [
   {
@@ -32,7 +32,57 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+beforeEach(() => {
+  vi.spyOn(portalApi, 'fetchSeatRequestOptions').mockResolvedValue([]);
+});
+
 describe('AgencySeatsPage', () => {
+  it('loads commercial routes and sends the selected seat request to the commercial manager', async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi-request-1',
+      flightNo: 'BJ-210',
+      originCode: 'THR',
+      destCode: 'DXB',
+      departureAt: '2026-09-01T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      capacity: 180,
+      agencyAllocated: 30,
+      ownAllocated: 10,
+      availableToRequest: 150,
+      pricePerSeatIrr: '30000000',
+      definitionStatus: 'DRAFT',
+    };
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
+    const request = vi.spyOn(portalApi, 'requestAgencySeats').mockResolvedValue({
+      id: 'request-1',
+      status: 'SUBMITTED',
+      recipientCount: 1,
+      flightInstanceId: option.flightInstanceId,
+      seats: 12,
+      preferredWeekdays: [],
+      termMonths: 3,
+    });
+    render(<AgencySeatsPage />);
+
+    await user.selectOptions(await screen.findByTestId('agency-request-origin'), 'THR');
+    await user.selectOptions(screen.getByTestId('agency-request-destination'), 'DXB');
+    expect(await screen.findByTestId('agency-request-flight-detail')).toBeInTheDocument();
+    const seats = screen.getByTestId('agency-request-seat-count');
+    await user.click(seats);
+    await user.keyboard('{Control>}a{/Control}12');
+    await user.click(screen.getByTestId('agency-submit-seat-request'));
+
+    expect(request).toHaveBeenCalledWith({
+      flightInstanceId: option.flightInstanceId,
+      seats: 12,
+      preferredWeekdays: [],
+      termMonths: 3,
+    });
+    expect(await screen.findByText('درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.')).toBeInTheDocument();
+  });
+
   it('renders real per-flight allotment cards with allocated/sold/remaining counts', async () => {
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
     render(<AgencySeatsPage />);
