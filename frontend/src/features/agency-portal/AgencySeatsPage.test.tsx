@@ -83,6 +83,30 @@ describe('AgencySeatsPage', () => {
     expect(await screen.findByText('درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.')).toBeInTheDocument();
   });
 
+  it('keeps commercial route options usable when allotment history fails to load', async () => {
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi-request-independent',
+      flightNo: 'BJ-310',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: '2026-09-02T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      capacity: 180,
+      agencyAllocated: 0,
+      ownAllocated: 0,
+      availableToRequest: 180,
+      pricePerSeatIrr: '30000000',
+      definitionStatus: 'PUBLISHED',
+    };
+    vi.spyOn(portalApi, 'fetchAllotments').mockRejectedValue(new Error('allotments unavailable'));
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+
+    render(<AgencySeatsPage />);
+
+    expect(await screen.findByRole('option', { name: /تهران/ })).toBeInTheDocument();
+    expect(screen.getByTestId('agency-request-origin')).not.toBeDisabled();
+  });
+
   it('renders real per-flight allotment cards with allocated/sold/remaining counts', async () => {
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
     render(<AgencySeatsPage />);

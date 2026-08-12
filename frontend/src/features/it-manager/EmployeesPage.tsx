@@ -70,6 +70,11 @@ export default function EmployeesPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    fullName: string;
+    username: string;
+    password: string;
+  } | null>(null);
 
   const employeesPager = usePagination(employees);
 
@@ -111,17 +116,23 @@ export default function EmployeesPage() {
       return;
     }
     try {
-      await createEmployee({
+      const submitted = {
         fullName: form.fullName.trim(),
         username: form.username.trim(),
         password: form.password,
+      };
+      await createEmployee({
+        fullName: submitted.fullName,
+        username: submitted.username,
+        password: submitted.password,
         dept: form.dept,
         rank: form.rank,
         referralScope: form.referralScope,
         permissionKeys: Array.from(selectedPerms),
       });
-      setNotice(`کارمند «${form.fullName.trim()}» ایجاد شد ✓`);
+      setNotice(`کارمند «${submitted.fullName}» ایجاد شد ✓`);
       setAddOpen(false);
+      setCreatedCredentials(submitted);
       setForm({
         fullName: '',
         username: '',
@@ -550,6 +561,44 @@ export default function EmployeesPage() {
               تعلیق حساب
             </button>
           </div>
+        </Modal>
+      )}
+
+      {createdCredentials && (
+        <Modal
+          variant="dark"
+          title="اطلاعات ورود کارمند"
+          onClose={() => setCreatedCredentials(null)}
+        >
+          <p className="mb-4 text-xs leading-6 text-[#9fb0c7]">
+            حساب «{createdCredentials.fullName}» فعال شد. این اطلاعات را فقط از مسیر امن در اختیار
+            کارمند قرار دهید؛ رمز اولیه پس از بستن این پنجره دوباره نمایش داده نمی‌شود.
+          </p>
+          <dl className="space-y-3 rounded-xl border border-[#1f2a3d] bg-[#101827] p-4 text-xs">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-[#9fb0c7]">نام کاربری</dt>
+              <dd className="font-num ltr select-all font-bold text-white">
+                {createdCredentials.username}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-[#9fb0c7]">رمز عبور اولیه</dt>
+              <dd className="font-num ltr select-all font-bold text-white">
+                {createdCredentials.password}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 rounded-xl border border-[#27416c] bg-[#152848] p-3 text-[11px] leading-6 text-[#cdd6e3]">
+            کارمند از صفحه ورود مدیران و کارمندان، ابتدا نام کاربری و همین رمز را وارد می‌کند؛ در
+            محیط سندباکس اگر پیامک نرسید کد ۱۲۳۴۵۶ معتبر است.
+          </p>
+          <button
+            type="button"
+            onClick={() => setCreatedCredentials(null)}
+            className="mt-4 w-full rounded-lg bg-[#3b82f6] px-4 py-2.5 text-xs font-bold text-white"
+          >
+            متوجه شدم
+          </button>
         </Modal>
       )}
 
