@@ -603,6 +603,24 @@ export class BookingService {
     return this.toDetail(await this.materializeExpiry(booking));
   }
 
+  async getAgencyBooking(reference: string, actor: AuthenticatedUser) {
+    const normalized = reference.trim();
+    const booking =
+      (await this.findBookingWithRelations({ id: normalized })) ??
+      (await this.findBookingWithRelations({ pnr: normalized.toUpperCase() }));
+    if (
+      !booking ||
+      booking.channel !== 'AGENCY' ||
+      booking.agencyId !== actor.id
+    ) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'رزرو یافت نشد.',
+      });
+    }
+    return this.toDetail(await this.materializeExpiry(booking));
+  }
+
   /** Anonymous مدیریت رزرو self-service — PNR + last name instead of a
    * login session. Same generic 404 whether the PNR doesn't exist or the
    * name doesn't match, so brute-forcing PNRs can't distinguish the two. */

@@ -46,6 +46,10 @@ async function bootstrap() {
     .setDescription('blujet airline platform — internal API')
     .setVersion('1.0')
     .addBearerAuth()
+    .addApiKey(
+      { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+      'agency-api-key',
+    )
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('docs', app, document);

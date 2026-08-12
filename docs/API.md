@@ -3556,3 +3556,29 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   results-page modal and resumes the stored flight/cabin/passenger selection.
   Mobile retains its existing login-or-sign-up choice. Desktop passenger,
   extras, review, and payment pages share one four-step progress contract.
+
+## Direct agency B2B reservation API (2026-08-12)
+
+This integration sells only blujet-owned internal inventory. It intentionally
+does not call GDS, NIRA, or a bank/payment gateway.
+
+All routes require an active `X-API-Key`. A suspended/expired key or a disabled
+agency fails closed. `SEARCH_ONLY` can search; `SEARCH_BOOK` and `FULL` can use
+agency allotments, reserve, retrieve ticketed reservations, and read credit.
+
+| Method | Path | Scope | Notes |
+|---|---|---|---|
+| POST | `/api/v2/accounting/getAuthorizeToken` | any active key | Validate API key; no secondary token |
+| POST | `/api/v2/flight/FlightSearch` | any active key | Published internal inventory only |
+| GET | `/api/v2/flight/:flightInstanceId/SeatMap` | any active key | Live internal seat map |
+| GET | `/api/v2/flight/Allotments` | SEARCH_BOOK/FULL | Caller-owned allotment IDs and remaining capacity |
+| POST | `/api/v2/flight/Book` | SEARCH_BOOK/FULL | Requires `Idempotency-Key`; transactional credit/inventory lock |
+| GET | `/api/v2/flight/Bookings/:bookingReference` | SEARCH_BOOK/FULL | Caller-owned booking only |
+| POST | `/api/v2/flight/AirDemandTicket` | SEARCH_BOOK/FULL | Returns the already-ticketed allotment booking |
+| GET/POST | `/api/v2/accounting/myCredit` | SEARCH_BOOK/FULL | Real agency limit, usage, and remaining credit |
+
+Booking input uses `{ allotmentId, cabin, passengers[] }`. Each passenger has
+`fullName`, `passengerType`, `birthDate`, and a `seatCode` except lap infants.
+The existing reservation engine validates age at departure, locks the
+allotment/credit/seat rows, debits the agency ledger, and returns the same result
+for a repeated idempotency key.

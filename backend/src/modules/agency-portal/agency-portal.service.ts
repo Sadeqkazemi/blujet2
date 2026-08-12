@@ -567,6 +567,8 @@ export class AgencyPortalService {
           flightInstanceId: r.flightInstanceId,
           flightNo: r.flightInstance.flight.flightNo,
           route: `${r.flightInstance.flight.route.originCode} → ${r.flightInstance.flight.route.destCode}`,
+          originCode: r.flightInstance.flight.route.originCode,
+          destinationCode: r.flightInstance.flight.route.destCode,
           departureAt: r.flightInstance.departureAt,
           aircraftType: r.flightInstance.flight.aircraftType,
           seatsAllocated: r.seatsAllocated,
