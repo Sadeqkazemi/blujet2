@@ -76,6 +76,27 @@ export interface ItServicesResult {
   external: ExternalService[];
 }
 
+export interface ServiceReportResult {
+  service: {
+    kind: 'internal' | 'external';
+    id: string;
+    key: string;
+    nameFa: string;
+    enabled: boolean;
+  };
+  items: {
+    id: string;
+    action: string;
+    detail: string;
+    actorName: string;
+    createdAt: string;
+    level: 'info' | 'warn';
+  }[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface SmsLogEntry {
   id: string;
   phoneMasked: string;

@@ -15,7 +15,7 @@ export default function LogsPage() {
   const [logs, setLogs] = useState<AuditLogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const logsPager = usePagination(logs ?? []);
+  const logsPager = usePagination(logs ?? [], 5);
 
   useEffect(() => {
     fetchSystemLogs({ page: 1, limit: 100 })
@@ -61,6 +61,7 @@ export default function LogsPage() {
                 return (
                   <li
                     key={l.id}
+                    data-testid="system-log-row"
                     className="grid grid-cols-[0.9fr_1.2fr_2.4fr_0.9fr_0.7fr] items-center gap-2 border-t border-[#1f2a3d] px-[11px] py-2.5 text-[11.5px]"
                   >
                     <span className="font-num ltr text-[#6b7b94]">{formatJalaliDateTime(l.createdAt)}</span>

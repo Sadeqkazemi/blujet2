@@ -341,6 +341,32 @@ describe('IT Manager (e2e)', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('GET /it/services/internal/:key/report returns real audit events in pages of five', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    for (let index = 0; index < 6; index += 1) {
+      const toggled = await request(app.getHttpServer())
+        .patch('/it/services/internal/search')
+        .set(auth(accessToken))
+        .send({ enabled: index % 2 === 0 });
+      expect(toggled.status).toBe(200);
+    }
+
+    const firstPage = await request(app.getHttpServer())
+      .get('/it/services/internal/search/report?page=1&limit=5')
+      .set(auth(accessToken));
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.data.service.key).toBe('search');
+    expect(firstPage.body.data.items).toHaveLength(5);
+    expect(firstPage.body.data.total).toBeGreaterThanOrEqual(6);
+    expect(firstPage.body.data.limit).toBe(5);
+
+    const secondPage = await request(app.getHttpServer())
+      .get('/it/services/internal/search/report?page=2&limit=5')
+      .set(auth(accessToken));
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.data.items.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('external service CRUD: create with encrypted key, update, delete', async () => {
     const { accessToken } = await loginAs(app, 'itadmin');
     const created = await request(app.getHttpServer())

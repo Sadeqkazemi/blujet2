@@ -232,19 +232,19 @@ export default function PanelsAccessPage() {
 
   if (readOnly) {
     return (
-      <div className="p-8">
-        <h1 className="mb-1 text-xl font-black text-ink">دسترسی به پنل‌ها</h1>
-        <p className="mb-6 text-sm text-muted">
+      <div data-testid="it-panel-access-grid" className="min-h-full bg-[#101827] p-8">
+        <h1 className="mb-1 text-xl font-black text-white">دسترسی به پنل‌ها</h1>
+        <p className="mb-6 text-sm text-[#6b7b94]">
           ورود به پنل‌های عملیاتی تحت مدیریت واحد IT — تعیین سطح دسترسی ورود در اختیار مدیر عامل است.
         </p>
 
-        <div className="mb-6 flex items-start gap-3 rounded-xl border border-border bg-white p-4 text-xs leading-6 text-text-2">
-          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-accent/15 text-accent">
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4 text-xs leading-6 text-[#9fb0c7]">
+          <span className="flex h-9 w-9 flex-none items-center justify-center rounded-lg bg-[#3b82f6]/15 text-[#60a5fa]">
             🛡
           </span>
           <p>
             واحد IT برای پشتیبانی فنی می‌تواند وارد پنل‌های عملیاتی و کارمندان شود. تعیین سطح دسترسی
-            ورود در اختیار <strong className="text-ink">مدیر عامل</strong> است؛ پنل‌های خارج از حوزهٔ
+            ورود در اختیار <strong className="text-white">مدیر عامل</strong> است؛ پنل‌های خارج از حوزهٔ
             واحد IT با قفل مشخص شده‌اند.
           </p>
         </div>
@@ -253,35 +253,35 @@ export default function PanelsAccessPage() {
           {IT_PANEL_CARDS.map((p) => (
             <div
               key={p.title}
-              className={`flex flex-col rounded-xl border bg-white p-4 ${
-                p.allowed ? 'border-border' : 'border-border opacity-55'
+              className={`flex min-h-[230px] flex-col rounded-xl border bg-[#141d2e] p-4 ${
+                p.allowed ? 'border-[#28344c]' : 'border-[#1f2a3d] opacity-55'
               }`}
             >
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-2xl">{p.allowed ? '🔓' : '🔒'}</span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                    p.allowed ? 'bg-[#10b98124] text-[#059669]' : 'bg-surface text-muted'
+                    p.allowed ? 'bg-[#10b98124] text-[#34d399]' : 'bg-[#18223a] text-[#6b7b94]'
                   }`}
                 >
                   {p.allowed ? 'مجاز' : 'بدون دسترسی'}
                 </span>
               </div>
-              <div className="text-sm font-bold text-ink">{p.title}</div>
-              <div className="mt-1 text-[11px] leading-5 text-muted">{p.desc}</div>
+              <div className="text-sm font-bold text-white">{p.title}</div>
+              <div className="mt-1 text-[11px] leading-5 text-[#6b7b94]">{p.desc}</div>
               {p.access.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {p.access.map((a) => (
                     <span
                       key={a}
-                      className="rounded-full border border-border bg-surface px-2 py-0.5 text-[9.5px] text-text-2"
+                      className="rounded-full border border-[#28344c] bg-[#18223a] px-2 py-0.5 text-[9.5px] text-[#9fb0c7]"
                     >
                       {a}
                     </span>
                   ))}
                 </div>
               )}
-              <div className="mt-auto border-t border-border pt-3 text-[11.5px] font-bold text-accent">
+              <div className="mt-auto border-t border-[#1f2a3d] pt-3 text-[11.5px] font-bold text-[#60a5fa]">
                 {p.allowed ? 'ورود به پنل ←' : 'بدون دسترسی'}
               </div>
             </div>

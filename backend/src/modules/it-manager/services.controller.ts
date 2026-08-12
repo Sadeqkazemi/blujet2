@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -40,6 +41,34 @@ export class ItServicesController {
   @ApiOperation({ summary: 'فهرست سرویس‌های داخلی و خارجی' })
   async list() {
     return { success: true, data: await this.services.list() };
+  }
+
+  @Get('internal/:key/report')
+  async internalReport(
+    @Param('key') key: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return {
+      success: true,
+      data: await this.services.internalReport(
+        key,
+        Number(page),
+        Number(limit),
+      ),
+    };
+  }
+
+  @Get('external/:id/report')
+  async externalReport(
+    @Param('id') id: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return {
+      success: true,
+      data: await this.services.externalReport(id, Number(page), Number(limit)),
+    };
   }
 
   @Patch('internal/:key')

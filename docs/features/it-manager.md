@@ -33,6 +33,7 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 ### Services
 - [x] `GET /it/services` returns seeded internal+external lists; `apiKeyEncrypted` never returned in plaintext — `'GET /it/services returns seeded lists; apiKey never returned in plaintext'`
 - [x] `PATCH /it/services/internal/:key` toggles enabled, audited (SYSTEM); unknown key → 404 — `'PATCH /it/services/internal/:key toggles; unknown key -> 404; audited'`
+- [x] `GET /it/services/internal/:key/report` and `GET /it/services/external/:id/report` return only real persisted audit events for the selected service with server-side pagination (five rows requested by the UI) — `'GET /it/services/internal/:key/report returns real audit events in pages of five'` + `ServicesPage.test.tsx`
 - [x] `POST /it/services/external` creates with encrypted API key; `PATCH`/`DELETE` update/remove — `'external service CRUD: create with encrypted key, update, delete'`
 - [x] `POST /it/services/external/:id/test` performs a real HTTP check and persists `lastTestAt/lastTestOk/lastTestMessage` — proven against an unreachable endpoint (no fabricated success) — `'POST /it/services/external/:id/test performs a real check and never fabricates success'`
 
@@ -46,15 +47,15 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 - [x] `GET /it/dashboard` KPIs reconcile with employees/services counts; `resources` are real `os.*` values, not random — `'GET /it/dashboard reconciles KPIs with employees/services and uses real host metrics'`
 - [x] `recentEvents` pulls real `AuditLog` rows — same test
 
-### Logs & Panel access (reused, not rebuilt)
-- [x] IT panel's لاگ و رویدادها tab renders `GET /audit/logs` (already implemented Phase 1) — no new backend — `LogsPage.tsx` wired directly; endpoint already covered by `audit.e2e-spec.ts`
-- [x] Nav confirms سامانه رزرواسیون / دسترسی به پنل‌ها / تنظیمات سامانه stay `implemented: false` — `staff-login-journey.spec.ts` itadmin case asserts the full 9-tab list incl. their "به‌زودی" suffix
+### Logs & Panel access
+- [x] IT panel's لاگ و رویدادها tab renders real `GET /audit/logs` records in the five-column dark table and fixes the UI page size at exactly five records — `LogsPage.test.tsx: 'renders exactly five log records per page'`; endpoint remains covered by `audit.e2e-spec.ts`
+- [x] دسترسی به پنل‌ها renders the design-aligned dark, read-only access-card grid for `IT_MANAGER`; authority to enable/disable panels remains with CEO — `PanelsAccessPage.test.tsx: 'IT_MANAGER gets the read-only card grid view'`
 
 ### Frontend
 - [x] داشبورد فنی: KPI cards, service-health list, resource bars, recent events — `ItDashboardPage.test.tsx`
-- [x] کاربران و دسترسی‌ها: create-employee form (dept picker, permission checkboxes, short-password validation), list with status/actions, detail modal (grant/revoke, reset password shows temp password once) — `EmployeesPage.test.tsx` (2 tests)
+- [x] کاربران و دسترسی‌ها: the complete create-employee form is inline in the page (identity, username/password, rank, referral scope, organizational unit and permission catalogue), followed by the account list and password/access controls; successful creation still reveals the generated credentials once — `EmployeesPage.test.tsx`
 - [x] رمزها و امنیت: policy toggles, params card, active-sessions list, «خروج همه» confirmation dialog — `SecurityPage.test.tsx` (2 tests)
-- [x] سرویس‌های سایت: internal toggle grid, external create/delete/test + result banner — `ServicesPage.test.tsx` (2 tests)
+- [x] سرویس‌های سایت: internal toggle grid, external create/delete/test + result banner; reports are opened explicitly per service and show real persisted audit events with exactly five records per page — `ServicesPage.test.tsx: 'loads the selected service report with exactly five real records per page'`
 - [x] Role isolation: no other role sees these nav entries; direct API calls from another role → 403 — `it-manager-journey.spec.ts: 'Non-IT role has no IT-panel nav entries'` + backend blanket-403 test
 
 ### Phase 28 — external-service «تنظیمات» edit modal

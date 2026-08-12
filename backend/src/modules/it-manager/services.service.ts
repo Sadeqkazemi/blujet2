@@ -45,6 +45,45 @@ export class ItServicesService {
     return { internal, external: external.map(toExternalView) };
   }
 
+  async internalReport(key: string, page = 1, limit = 5) {
+    const service = await this.internalServiceRepo.findOneBy({ key });
+    if (!service) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'سرویس یافت نشد.',
+      });
+    }
+    return {
+      service: {
+        kind: 'internal' as const,
+        id: service.id,
+        key: service.key,
+        nameFa: service.nameFa,
+        enabled: service.enabled,
+      },
+      ...(await this.audit.entityEvents('InternalService', key, page, limit)),
+    };
+  }
+
+  async externalReport(id: string, page = 1, limit = 5) {
+    const service = await this.getExternalOrThrow(id);
+    return {
+      service: {
+        kind: 'external' as const,
+        id: service.id,
+        key: service.key,
+        nameFa: service.nameFa,
+        enabled: service.enabled,
+      },
+      ...(await this.audit.entityEvents(
+        'ExternalServiceConfig',
+        id,
+        page,
+        limit,
+      )),
+    };
+  }
+
   async toggleInternal(
     actor: AuthenticatedUser,
     key: string,

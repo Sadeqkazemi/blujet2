@@ -222,8 +222,8 @@ export default function EmployeesPage() {
   const catalogGroups = catalogDeptKey ? (catalog?.[catalogDeptKey] ?? []) : [];
 
   return (
-    <div className="px-[21px] pb-[34px] pt-[18px]">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col px-[21px] pb-[34px] pt-[18px]">
+      <div className="order-1 mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[20.5px] font-black text-white">کاربران و دسترسی‌ها</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
@@ -241,10 +241,10 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
-      {notice && <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">{notice}</p>}
+      {error && <p className="order-2 mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
+      {notice && <p className="order-2 mb-4 rounded-lg bg-[rgba(16,185,129,.12)] p-3 text-sm text-[#34d399]">{notice}</p>}
 
-      <section className="mb-8 overflow-hidden rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
+      <section className="order-4 mb-8 overflow-hidden rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
         <div className="grid grid-cols-[1.6fr_1.3fr_1.4fr_1fr_0.9fr_1.4fr] gap-2 border-b border-[#1f2a3d] bg-[#18223a] px-4 py-2.5 text-[10.5px] font-bold text-[#6b7b94]">
           <span>کاربر</span>
           <span>نقش</span>
@@ -316,7 +316,7 @@ export default function EmployeesPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+      <section className="order-5 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
           <h3 className="mb-1 text-[14.5px] font-extrabold text-white">مدیریت رمز عبور کارمندان</h3>
           <p className="mb-3 text-[10.5px] text-[#6b7b94]">
             فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
@@ -345,7 +345,19 @@ export default function EmployeesPage() {
       </section>
 
       {addOpen && (
-        <Modal variant="dark" title="ایجاد کارمند جدید" onClose={() => setAddOpen(false)}>
+        <section
+          data-testid="inline-create-employee"
+          className="order-3 mb-8 rounded-xl border border-dashed border-[#31405d] bg-[#141d2e] p-5"
+        >
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-black text-white">ایجاد کارمند جدید</h2>
+              <p className="mt-1 text-[10.5px] text-[#6b7b94]">اطلاعات حساب، واحد سازمانی و سطح دسترسی را یکجا ثبت کنید.</p>
+            </div>
+            <button type="button" onClick={() => setAddOpen(false)} className="text-[11px] font-bold text-[#9fb0c7]">بستن</button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div>
           <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-name">
             نام و نام خانوادگی
           </label>
@@ -355,7 +367,9 @@ export default function EmployeesPage() {
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
             className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-username">
+          </div>
+          <div>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-username">
             نام کاربری
           </label>
           <input
@@ -365,7 +379,9 @@ export default function EmployeesPage() {
             onChange={(e) => setForm({ ...form, username: e.target.value })}
             className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
-          <label className="mb-1 mt-3 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-password">
+          </div>
+          <div>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-password">
             رمز عبور اولیه
           </label>
           <input
@@ -376,6 +392,8 @@ export default function EmployeesPage() {
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             className="w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
+          </div>
+          </div>
 
           <div className="mb-1 mt-3 text-xs font-bold text-[#e7ecf3]">رتبه سازمانی</div>
           <div className="flex flex-wrap gap-1.5">
@@ -538,7 +556,7 @@ export default function EmployeesPage() {
               ایجاد حساب و اعلان به مدیر
             </button>
           </div>
-        </Modal>
+        </section>
       )}
 
       {statusConfirm && (
