@@ -2,7 +2,12 @@ import { randomInt } from 'node:crypto';
 import { isSandboxAuthEnabled } from '../common/sandbox-auth';
 import type { Role } from './enums';
 
-export const TEMPORARY_PANEL_ACCESS_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+export const TEMPORARY_PANEL_INITIAL_ACCESS_MS = 7 * 24 * 60 * 60 * 1000;
+export const TEMPORARY_PANEL_EXTENSION_MS = 7 * 24 * 60 * 60 * 1000;
+/** Owner-approved UAT ceiling: the original seven-day window plus at most one
+ * controlled seven-day extension. Ordinary accounts never use this path. */
+export const TEMPORARY_PANEL_ACCESS_MAX_MS =
+  TEMPORARY_PANEL_INITIAL_ACCESS_MS + TEMPORARY_PANEL_EXTENSION_MS;
 export const TEMPORARY_PANEL_USERNAME_PREFIX = 'uat.';
 export const TEMPORARY_PANEL_PASSWORD_LENGTH = 16;
 const TEMPORARY_PANEL_PASSWORD_ALPHABET =
@@ -119,7 +124,7 @@ export function getTemporaryPanelAccessState(
 }
 
 export function createTemporaryPanelExpiry(now = new Date()): Date {
-  return new Date(now.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS);
+  return new Date(now.getTime() + TEMPORARY_PANEL_INITIAL_ACCESS_MS);
 }
 
 export interface UatSandboxAgencyCandidate extends TemporaryPanelAccessUser {

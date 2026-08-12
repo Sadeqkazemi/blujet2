@@ -219,6 +219,7 @@ Acceptance:
   temporary accounts, clears their password hashes, and revokes their sessions
   without deleting referenced business/audit history —
   `temporary-panel-accounts.spec.ts`.
-- [ ] The exception has a hard maximum lifetime of seven days from creation and
-  can be removed earlier when Kavenegar is operational —
+- [ ] The exception starts with seven days and supports one owner-approved
+  seven-day extension, with a hard maximum of 14 days from creation. It can be
+  removed earlier when Kavenegar is operational —
   `temporary-panel-accounts.spec.ts`.

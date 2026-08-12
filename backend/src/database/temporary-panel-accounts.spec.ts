@@ -3,6 +3,8 @@ import {
   TEMPORARY_PHONE_LOGIN_ACCOUNTS,
   isTemporaryPanelUsername,
   TEMPORARY_PANEL_ACCESS_MAX_MS,
+  TEMPORARY_PANEL_EXTENSION_MS,
+  TEMPORARY_PANEL_INITIAL_ACCESS_MS,
   createTemporaryPanelExpiry,
   generateTemporaryPanelPassword,
   getTemporaryPanelAccessState,
@@ -60,11 +62,11 @@ describe('temporary panel accounts', () => {
     ).toBe(true);
   });
 
-  it('hard-caps the access deadline at seven days', () => {
+  it('starts at seven days and permits only one controlled seven-day extension', () => {
     const createdAt = new Date('2026-08-05T00:00:00.000Z');
     const deadline = createTemporaryPanelExpiry(createdAt);
     expect(deadline.getTime() - createdAt.getTime()).toBe(
-      TEMPORARY_PANEL_ACCESS_MAX_MS,
+      TEMPORARY_PANEL_INITIAL_ACCESS_MS,
     );
     const base = {
       username: 'uat.it',
@@ -76,10 +78,24 @@ describe('temporary panel accounts', () => {
       getTemporaryPanelAccessState(base, new Date(deadline.getTime() - 1)),
     ).toBe('ACTIVE');
     expect(getTemporaryPanelAccessState(base, deadline)).toBe('EXPIRED');
+    const extendedDeadline = new Date(
+      deadline.getTime() + TEMPORARY_PANEL_EXTENSION_MS,
+    );
+    expect(
+      getTemporaryPanelAccessState(
+        {
+          ...base,
+          temporaryPasswordOnlyUntil: extendedDeadline,
+        },
+        new Date(extendedDeadline.getTime() - 1),
+      ),
+    ).toBe('ACTIVE');
     expect(
       getTemporaryPanelAccessState({
         ...base,
-        temporaryPasswordOnlyUntil: new Date(deadline.getTime() + 1),
+        temporaryPasswordOnlyUntil: new Date(
+          createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS + 1,
+        ),
       }),
     ).toBe('INVALID');
   });

@@ -62,7 +62,7 @@ jobs:
             # One-time, owner-approved UAT access while Kavenegar is repaired.
             # Credentials never enter Actions logs: stdout is redirected on the
             # server into a root-only file. The sentinel prevents password
-            # rotation/recreation on later deploys; DB-level expiry is 7 days.
+            # rotation/recreation on later deploys; initial DB expiry is 7 days.
             credentials=/root/blujet-temporary-panel-credentials.json
             sentinel=/root/.blujet-temporary-panel-bootstrap-complete
             if [ ! -f "$sentinel" ]; then
@@ -151,6 +151,24 @@ jobs:
               chmod 600 /root/blujet-uat-operations-account-v1.json
               touch "$operations_account_sentinel"
               chmod 600 "$operations_account_sentinel"
+            fi
+            # Owner-approved, one-time seven-day extension of the reserved UAT
+            # identities. The command validates every reserved account, caps
+            # access at 14 days from its original creation, writes security
+            # audit rows, and revokes existing refresh sessions. Its sentinel
+            # prevents a later deployment from extending the window again.
+            access_extension_sentinel=/root/.blujet-uat-temporary-access-extension-v1-complete
+            if [ ! -f "$access_extension_sentinel" ]; then
+              umask 077
+              access_extension_audit=/root/blujet-uat-temporary-access-extension-v1.json
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e NODE_ENV=production \
+                -e TEMP_PANEL_EXTENSION_CONFIRM=EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V1 \
+                backend node dist/database/extend-temporary-panel-access.js --execute \
+                > "$access_extension_audit"
+              chmod 600 "$access_extension_audit"
+              touch "$access_extension_sentinel"
+              chmod 600 "$access_extension_sentinel"
             fi
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
