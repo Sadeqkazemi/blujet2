@@ -6,6 +6,7 @@ import * as panelsApi from '../api/panels';
 import * as cartableApi from '../api/cartable';
 import * as refundsApi from '../api/refunds';
 import * as reportingApi from '../api/reporting';
+import * as notificationsApi from '../api/notifications';
 import * as useAuthModule from '../hooks/useAuth';
 
 function renderShell() {
@@ -187,7 +188,7 @@ describe('PanelShell', () => {
     });
   });
 
-  it('puts leftover low-sales alerts in the notification bell (banner keeps the first)', async () => {
+  it('shows only persisted unread notifications in the notification bell', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
       user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'FA' },
@@ -229,6 +230,42 @@ describe('PanelShell', () => {
         occupancyPct: 17,
       },
     ]);
+    vi.spyOn(notificationsApi, 'fetchNotificationsUnreadCount').mockResolvedValue({
+      total: 2,
+      CARTABLE: 0,
+      MESSAGE: 2,
+      REQUEST: 0,
+      APPROVAL: 0,
+      SYSTEM: 0,
+    });
+    vi.spyOn(notificationsApi, 'fetchNotifications').mockResolvedValue([
+      {
+        id: 'n1',
+        recipientId: 'u1',
+        category: 'MESSAGE',
+        action: 'MESSAGE_RECEIVED',
+        title: 'پیام مالی اول',
+        body: 'متن پیام اول',
+        entityType: null,
+        entityId: null,
+        dedupeKey: null,
+        readAt: null,
+        createdAt: '2026-08-12T08:00:00.000Z',
+      },
+      {
+        id: 'n2',
+        recipientId: 'u1',
+        category: 'MESSAGE',
+        action: 'MESSAGE_RECEIVED',
+        title: 'پیام مالی دوم',
+        body: 'متن پیام دوم',
+        entityType: null,
+        entityId: null,
+        dedupeKey: null,
+        readAt: null,
+        createdAt: '2026-08-12T08:01:00.000Z',
+      },
+    ]);
 
     const { default: userEvent } = await import('@testing-library/user-event');
     renderShell();
@@ -237,8 +274,10 @@ describe('PanelShell', () => {
       expect(screen.getByTestId('notification-bell-count')).toHaveTextContent('۲');
     });
     await userEvent.click(screen.getByRole('button', { name: 'اعلان‌ها' }));
-    expect(screen.getByText('BJ-100 THR ← MHD', { exact: false })).toBeInTheDocument();
-    expect(screen.getByText('BJ-101 MHD ← THR', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('پیام مالی اول')).toBeInTheDocument();
+    expect(screen.getByText('پیام مالی دوم')).toBeInTheDocument();
+    expect(screen.queryByText('BJ-100 THR ← MHD', { exact: false })).not.toBeInTheDocument();
+    expect(screen.queryByText('BJ-101 MHD ← THR', { exact: false })).not.toBeInTheDocument();
     expect(screen.queryByText(/EP-821/)).not.toBeInTheDocument();
   });
 
