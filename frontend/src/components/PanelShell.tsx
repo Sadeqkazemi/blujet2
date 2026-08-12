@@ -22,7 +22,6 @@ import { fetchSupportTickets } from '../api/support-tickets';
 import { fetchCustomersIncompleteCount } from '../api/customers';
 import type { NotificationRow } from '../types/notifications';
 import { faDigits } from '../lib/fa-format';
-import { formatJalaliDate } from '../lib/jalali';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
 import type { LowSalesAlert } from '../types/reporting';
 import { isLowSalesRole } from '../types/panel-shell';
@@ -65,17 +64,6 @@ function nameInitials(fullName: string): string {
   if (parts.length === 0) return '؟';
   if (parts.length === 1) return parts[0]!.slice(0, 2);
   return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`;
-}
-
-function lowSalesNotifItems(alerts: LowSalesAlert[]): PanelNotificationItem[] {
-  // First alert is shown as the in-page banner; leftovers go to the bell.
-  return alerts.slice(1).map((a) => ({
-    key: `low-sales-${a.flightNo}-${a.departureAt}`,
-    title: 'هشدار فروش ضعیف',
-    sublabel: `${a.flightNo} ${a.originCode} ← ${a.destCode} · ${formatJalaliDate(a.departureAt)}`,
-    to: '/panel/finance',
-    tone: 'warning' as const,
-  }));
 }
 
 function notificationTarget(n: NotificationRow): string {
@@ -177,8 +165,9 @@ export default function PanelShell() {
               sublabel: n.body,
               to: notificationTarget(n),
               tone: 'warning' as const,
-              onOpen: () => {
-                void markNotificationRead(n.id).catch(() => undefined);
+              onOpen: async () => {
+                await markNotificationRead(n.id);
+                setNotifications((current) => current.filter((item) => item.key !== `notif-${n.id}`));
               },
             })),
           );
@@ -417,7 +406,9 @@ export default function PanelShell() {
 
     void Promise.all(tasks).then(() => {
       setBadges(next);
-      setNotifications([...lowSalesNotifItems(lowSalesAlerts), ...nextNotifications]);
+      // The bell is a strict unread inbox. Operational counters stay on their
+      // sidebar entries and only persisted unread notifications appear here.
+      setNotifications(nextNotifications.filter((item) => item.key.startsWith('notif-')));
     });
     // Recompute when the active panel tab changes so badges refresh after
     // reading/acting on cartable, referrals, tickets, etc.

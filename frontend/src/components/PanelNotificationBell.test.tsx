@@ -1,6 +1,6 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
 
 const items: PanelNotificationItem[] = [
@@ -38,5 +38,15 @@ describe('PanelNotificationBell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'اعلان‌ها' }));
     expect(screen.getByText('اعلان جدیدی ندارید.')).toBeInTheDocument();
     expect(screen.queryByTestId('notification-bell-count')).not.toBeInTheDocument();
+  });
+
+  it('awaits the read acknowledgement before completing an unread item open', async () => {
+    const onOpen = vi.fn().mockResolvedValue(undefined);
+    renderBell([{ ...items[0]!, onOpen }]);
+
+    fireEvent.click(screen.getByTestId('notification-bell-count').closest('button')!);
+    fireEvent.click(screen.getAllByRole('button')[1]!);
+
+    await waitFor(() => expect(onOpen).toHaveBeenCalledTimes(1));
   });
 });

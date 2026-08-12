@@ -9,7 +9,7 @@ export interface PanelNotificationItem {
   to: string;
   tone: 'danger' | 'purple' | 'warning';
   /** Optional side-effect when the user opens the item (e.g. mark notification read). */
-  onOpen?: () => void;
+  onOpen?: () => void | Promise<void>;
 }
 
 const TONE_DOT: Record<PanelNotificationItem['tone'], string> = {
@@ -21,6 +21,7 @@ const TONE_DOT: Record<PanelNotificationItem['tone'], string> = {
 /** Header bell: domain badge sources plus GET /notifications when available. */
 export default function PanelNotificationBell({ items }: { items: PanelNotificationItem[] }) {
   const [open, setOpen] = useState(false);
+  const [openingKey, setOpeningKey] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -64,12 +65,19 @@ export default function PanelNotificationBell({ items }: { items: PanelNotificat
                 <li key={item.key}>
                   <button
                     type="button"
-                    onClick={() => {
+                    disabled={openingKey === item.key}
+                    onClick={async () => {
+                      if (openingKey) return;
+                      setOpeningKey(item.key);
                       setOpen(false);
-                      item.onOpen?.();
-                      navigate(item.to);
+                      try {
+                        await item.onOpen?.();
+                        navigate(item.to);
+                      } finally {
+                        setOpeningKey(null);
+                      }
                     }}
-                    className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-start text-xs transition hover:bg-white/5"
+                    className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-start text-xs transition hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
                   >
                     <span className={`mt-1 h-2 w-2 flex-none rounded-full ${TONE_DOT[item.tone]}`} />
                     <span className="min-w-0 flex-1">

@@ -203,16 +203,19 @@ export default function PublicFooter() {
       {!isMobile && (
         <>
           <div
+            data-testid="public-footer-desktop"
             style={{
-              maxWidth: 1320,
+              maxWidth: 1480,
               margin: '0 auto',
-              padding: '39px 26px 20px',
+              padding: '48px 40px 28px',
               display: 'grid',
-              gridTemplateColumns: '1.6fr 1fr 1fr 1fr',
-              gap: 33,
+              gridTemplateColumns: 'minmax(300px, 1.35fr) repeat(3, minmax(150px, .8fr))',
+              alignItems: 'start',
+              gap: 'clamp(34px, 5vw, 88px)',
+              direction: 'inherit',
             }}
           >
-            <div>
+            <div style={{ minWidth: 0 }}>
               <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16, textDecoration: 'none' }}>
                 <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1668c4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>
                   ✈
@@ -229,7 +232,7 @@ export default function PublicFooter() {
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
           </div>
           <div style={{ borderTop: '1px solid #ffffff12' }}>
-            <div style={{ maxWidth: 1320, margin: '0 auto', padding: '15px 26px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
+            <div style={{ maxWidth: 1480, margin: '0 auto', padding: '17px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
               <span>{t('footerCopyright')}</span>
             </div>
           </div>
