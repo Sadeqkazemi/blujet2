@@ -92,6 +92,9 @@ describe('CustomerLoginPage', () => {
     expect(screen.getByTestId('signin-agency-link')).toHaveTextContent('Agency partner login');
     expect(screen.getByTestId('signin-forgot')).toHaveAttribute('href', '/forgot-password');
     expect(screen.getByText('Log in to your account')).toBeInTheDocument();
+    expect(screen.getByTestId('customer-login-page')).toHaveStyle({
+      fontFamily: "Inter, 'Vazirmatn Variable', Vazirmatn, sans-serif",
+    });
   });
 
   it('renders translated tabs and labels in Arabic', () => {

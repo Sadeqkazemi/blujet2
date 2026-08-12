@@ -2511,8 +2511,10 @@ temporary authentication bypass.
 
 `User.temporaryPasswordOnlyUntil` is a nullable `timestamp(3)`. It is non-null
 only for controlled `uat.*` panel accounts. Such an account can use
-password-only staff login only before this timestamp and never for more than
-seven days from creation. Its access and refresh tokens cannot outlive the
+password-only staff login only before this timestamp. The initial window is
+seven days; a controlled owner-approved extension can add seven days once and
+is hard-capped at 14 days from creation. Its access and refresh tokens cannot
+outlive the
 timestamp. All ordinary staff retain mandatory 2FA. Cleanup deactivates the
 account, clears its password hash, and revokes its sessions while preserving
 audit and business references.

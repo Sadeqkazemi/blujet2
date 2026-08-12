@@ -3131,7 +3131,9 @@ API key when the database is clean; the key is never part of an API payload.
 production-UAT account may instead return
 `{ loginMode: "TEMPORARY_PASSWORD_ONLY", accessToken, user,
 temporaryAccessExpiresAt }` and set the refresh cookie directly. The bypass is
-account-scoped, audited, hard-capped at seven days, and returns
+account-scoped and audited. Access starts with a seven-day deadline; the
+owner-approved offline extension may add seven days once, with a hard maximum
+of 14 days from account creation. It returns
 `TEMPORARY_ACCESS_EXPIRED` after its deadline. Ordinary staff 2FA is unchanged.
 Temporary UAT credentials use a 16-character, letters-and-digits-only format.
 The owner-approved one-time format migration is an offline operation (there is

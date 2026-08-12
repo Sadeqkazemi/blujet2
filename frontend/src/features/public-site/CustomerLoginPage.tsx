@@ -5,6 +5,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { ApiRequestError } from '../../api/envelope';
 import { latinDigits } from '../../lib/fa-format';
+import { FONT } from '../../lib/i18n';
 import { localeDigits } from '../../lib/locale-format';
 
 /**
@@ -17,12 +18,6 @@ import { localeDigits } from '../../lib/locale-format';
 const RESEND_SECONDS = 120;
 const OTP_LEN = 6;
 const ACCENT = '#1668c4';
-
-const FONT: Record<StoredLocale, string> = {
-  fa: 'Vazirmatn, Tahoma, sans-serif',
-  ar: 'Vazirmatn, Tahoma, sans-serif',
-  en: 'Inter, system-ui, sans-serif',
-};
 
 function sanitizeMobileInput(raw: string) {
   return latinDigits(raw).replace(/[^\d]/g, '').slice(0, 11);
@@ -329,6 +324,7 @@ export default function CustomerLoginPage() {
 
   return (
     <div
+      data-testid="customer-login-page"
       dir={isRtl ? 'rtl' : 'ltr'}
       style={{
         fontFamily: FONT[locale],
