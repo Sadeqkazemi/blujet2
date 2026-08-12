@@ -129,12 +129,20 @@ export default function AgencySeatsPage() {
   }
 
   useEffect(() => {
-    Promise.all([fetchAllotments(), fetchSeatRequestOptions()])
-      .then(([allotments, options]) => {
-        setRows(allotments);
-        setRequestOptions(options);
-      })
-      .catch(() => setError(t.errorFallback));
+    // Route choices and existing allotments are independent resources. A
+    // failure in the history endpoint must not blank the commercial routes.
+    void fetchAllotments()
+      .then(setRows)
+      .catch(() => {
+        setRows([]);
+        setError(t.errorFallback);
+      });
+    void fetchSeatRequestOptions()
+      .then(setRequestOptions)
+      .catch(() => {
+        setRequestOptions([]);
+        setError(t.errorFallback);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

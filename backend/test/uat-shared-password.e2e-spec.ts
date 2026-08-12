@@ -450,6 +450,17 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         await assertNoAgencyBusinessData();
       });
 
+      it('seat request options returns the real flight catalogue instead of failing without an agency profile', async () => {
+        const accessToken = await loginUatAgency();
+        const res = await request(app.getHttpServer())
+          .get('/agency-portal/seat-request-options')
+          .set('Authorization', `Bearer ${accessToken}`);
+
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body.data)).toBe(true);
+        await assertNoAgencyBusinessData();
+      });
+
       it('every other read endpoint returns a real empty state (200) instead of the profile-not-found 404', async () => {
         const accessToken = await loginUatAgency();
         const auth = `Bearer ${accessToken}`;

@@ -28,13 +28,13 @@ export default function Modal({
       <div
         role="dialog"
         aria-label={title}
-        className={`w-full ${maxWidthClass} rounded-2xl border shadow-2xl ${
+        className={`flex max-h-[calc(100dvh-2rem)] w-full ${maxWidthClass} flex-col overflow-hidden rounded-2xl border shadow-2xl ${
           dark ? 'border-[#2a3550] bg-[#141d2e]' : 'border-border bg-white'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div
-          className={`flex items-center justify-between border-b px-5 py-4 ${
+          className={`flex shrink-0 items-center justify-between border-b px-5 py-4 ${
             dark ? 'border-[#1f2a3d]' : 'border-border'
           }`}
         >
@@ -52,7 +52,9 @@ export default function Modal({
             ✕
           </button>
         </div>
-        <div className={`p-5 ${dark ? 'text-[#e7ecf3]' : ''}`}>{children}</div>
+        <div className={`min-h-0 flex-1 overflow-y-auto p-5 ${dark ? 'text-[#e7ecf3]' : ''}`}>
+          {children}
+        </div>
       </div>
     </div>
   );

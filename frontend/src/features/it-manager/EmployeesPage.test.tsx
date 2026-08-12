@@ -110,4 +110,30 @@ describe('EmployeesPage', () => {
     await user.click(screen.getByRole('button', { name: 'افزودن' }));
     expect(screen.getByRole('button', { name: 'بازاریابی' })).toBeInTheDocument();
   });
+
+  it('keeps the tall create form scrollable and shows the assigned credentials after creation', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);
+    vi.spyOn(itApi, 'createEmployee').mockResolvedValue({
+      ...DETAIL,
+      id: 'created-1',
+      fullName: 'کارمند تازه',
+      username: 'fresh.user',
+    });
+
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
+    expect(screen.getByRole('dialog', { name: 'ایجاد کارمند جدید' })).toHaveClass(
+      'max-h-[calc(100dvh-2rem)]',
+    );
+    await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'کارمند تازه');
+    await user.type(screen.getByLabelText('نام کاربری'), 'fresh.user');
+    await user.type(screen.getByLabelText('رمز عبور اولیه'), 'Assigned@1405');
+    await user.click(screen.getByRole('button', { name: 'ایجاد حساب و اعلان به مدیر' }));
+
+    expect(await screen.findByRole('dialog', { name: 'اطلاعات ورود کارمند' })).toBeInTheDocument();
+    expect(screen.getByText('fresh.user')).toBeInTheDocument();
+    expect(screen.getByText('Assigned@1405')).toBeInTheDocument();
+  });
 });

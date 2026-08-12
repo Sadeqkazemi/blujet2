@@ -581,7 +581,13 @@ export class AgencyPortalService {
   }
 
   async seatRequestOptions(actor: AuthenticatedUser) {
-    await this.getOwnProfileOrThrow(actor);
+    // The shared UAT agency has no business profile by design, but it still
+    // needs the real published route/flight catalogue in order to exercise
+    // the sandbox seat-request flow. Other agency accounts keep the normal
+    // profile requirement.
+    if (!(await this.isUatSandboxAgencyActor(actor))) {
+      await this.getOwnProfileOrThrow(actor);
+    }
     const instances = await this.flightInstanceRepo.find({
       where: {
         departureAt: MoreThanOrEqual(new Date()),
@@ -684,8 +690,8 @@ export class AgencyPortalService {
       termMonths?: 3 | 6 | 12;
     },
   ) {
-    await this.assertAgencyPortalWritable(actor);
-    const profile = await this.getOwnProfileOrThrow(actor);
+    const uatUser = await this.loadUatSandboxAgencyUser(actor);
+    const profile = uatUser ? null : await this.getOwnProfileOrThrow(actor);
     const options = await this.seatRequestOptions(actor);
     const option = options.find(
       (row) => row.flightInstanceId === dto.flightInstanceId,
@@ -706,7 +712,9 @@ export class AgencyPortalService {
     const requestId = randomUUID();
     const weekdays = dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
     const term = dto.termMonths ? `${dto.termMonths} ماه` : 'تک‌پرواز';
-    const description = `آژانس «${profile.managerName}» برای پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
+    const senderLabel =
+      profile?.managerName ?? uatUser?.fullName ?? actor.fullName;
+    const description = `آژانس «${senderLabel}» برای پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
     const recipientCount = await this.cartable.createTasksForRoles(
       ['COMMERCIAL_MANAGER'],
       {
@@ -714,7 +722,7 @@ export class AgencyPortalService {
         title: `درخواست خرید ${dto.seats} صندلی · ${option.flightNo}`,
         description,
         senderId: actor.id,
-        senderLabelFa: profile.managerName,
+        senderLabelFa: senderLabel,
         sourceType: 'AGENCY_REQUEST',
         sourceId: requestId,
       },

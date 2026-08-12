@@ -723,6 +723,7 @@ export class AuthService {
       user.isActive &&
       !user.isSuperAdmin &&
       user.lastLoginAt === null &&
+      user.mustChangePassword &&
       getTemporaryPanelAccessState(user) === 'NONE';
     return { mode: firstLogin ? 'FIRST_LOGIN_SETUP' : 'PASSWORD' };
   }

@@ -168,6 +168,7 @@ export class EmployeesService {
           fullName: dto.fullName,
           username: dto.username,
           passwordHash,
+          mustChangePassword: false,
           dept: dto.dept,
           rank: dto.rank,
           referralScope: dto.referralScope ?? 'MANAGERS_ONLY',

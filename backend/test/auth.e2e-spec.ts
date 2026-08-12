@@ -49,6 +49,7 @@ describe('Auth (e2e)', () => {
         twoFactorEnabled: true,
         isActive: true,
         lastLoginAt: null,
+        mustChangePassword: true,
         updatedAt: new Date(),
       }),
     );
@@ -75,6 +76,38 @@ describe('Auth (e2e)', () => {
     expect(updated.phone).toBe(normalizeIranPhone(phone));
     expect(updated.passwordHash).toBeTruthy();
     expect(updated.lastLoginAt).toBeTruthy();
+  });
+
+  it('uses the IT-assigned password flow for a newly-created employee account', async () => {
+    process.env.AUTH_SANDBOX_ENABLED = 'true';
+    const username = `it-created.${crypto.randomUUID().slice(0, 8)}`;
+    const password = 'Assigned@1405';
+    await dataSource.getRepository(User).save(
+      dataSource.getRepository(User).create({
+        role: 'EMPLOYEE',
+        username,
+        passwordHash: await argon2.hash(password),
+        fullName: 'کارمند ساخته‌شده توسط مدیر IT',
+        twoFactorEnabled: true,
+        isActive: true,
+        lastLoginAt: null,
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      }),
+    );
+
+    const mode = await request(app.getHttpServer())
+      .post('/auth/staff/login-mode')
+      .send({ username });
+    expect(mode.status).toBe(200);
+    expect(mode.body.data.mode).toBe('PASSWORD');
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username, password });
+    expect(login.status).toBe(200);
+    expect(login.body.data.loginMode).toBe('TWO_FACTOR');
+    expect(login.body.data.challengeId).toBeTruthy();
   });
 
   it('sandbox login-mode does not disclose an unknown username', async () => {
