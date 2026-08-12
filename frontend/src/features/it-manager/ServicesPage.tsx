@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   createExternalService,
   fetchItServices,
+  fetchServiceReport,
   fetchSmsLog,
   removeExternalService,
   testExternalService,
@@ -11,7 +12,9 @@ import {
 import { faDigits, faPercent } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
-import type { ExternalService, InternalService, SmsLogResult } from '../../types/it-manager';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
+import type { ExternalService, InternalService, ServiceReportResult, SmsLogResult } from '../../types/it-manager';
 
 const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
   OTP: 'کد یکبار مصرف',
@@ -22,6 +25,10 @@ export default function ServicesPage() {
   const [internal, setInternal] = useState<InternalService[]>([]);
   const [external, setExternal] = useState<ExternalService[]>([]);
   const [smsLog, setSmsLog] = useState<SmsLogResult | null>(null);
+  const [selectedReport, setSelectedReport] = useState<{ kind: 'internal' | 'external'; id: string; nameFa: string } | null>(null);
+  const [serviceReport, setServiceReport] = useState<ServiceReportResult | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<{ id: string; ok: boolean; message: string } | null>(null);
 
@@ -51,12 +58,31 @@ export default function ServicesPage() {
     } catch {
       setError('خطا در دریافت سرویس‌ها.');
     }
+  }, []);
+
+  const smsPager = usePagination(smsLog?.recent ?? [], 5);
+
+  async function openReport(kind: 'internal' | 'external', id: string, nameFa: string, page = 1) {
+    setSelectedReport({ kind, id, nameFa });
+    setReportLoading(true);
+    setReportError(null);
     try {
-      setSmsLog(await fetchSmsLog());
+      if (kind === 'internal' && id === 'sms') {
+        smsPager.setPage(1);
+        setSmsLog(await fetchSmsLog());
+        setServiceReport(null);
+      } else {
+        setSmsLog(null);
+        setServiceReport(await fetchServiceReport(kind, id, page, 5));
+      }
     } catch {
       setSmsLog(null);
+      setServiceReport(null);
+      setReportError('گزارش این سرویس دریافت نشد. دوباره تلاش کنید.');
+    } finally {
+      setReportLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
     void load();
@@ -226,11 +252,18 @@ export default function ServicesPage() {
             >
               {s.enabled ? 'فعال' : 'غیرفعال'}
             </span>
+            <button
+              type="button"
+              onClick={() => void openReport('internal', s.key, s.nameFa)}
+              className="mr-2 text-[10.5px] font-bold text-[#60a5fa]"
+            >
+              مشاهده گزارش
+            </button>
           </div>
         ))}
       </div>
 
-      {smsLog && (
+      {selectedReport?.kind === 'internal' && selectedReport.id === 'sms' && smsLog && (
         <div className="mb-8 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-[14.5px] font-extrabold text-white">سامانه پیامک (SMS)</h2>
@@ -256,7 +289,7 @@ export default function ServicesPage() {
             {smsLog.recent.length === 0 && (
               <p className="py-2 text-xs text-[#6b7b94]">پیامکی ثبت نشده است.</p>
             )}
-            {smsLog.recent.map((r) => (
+            {smsPager.pageItems.map((r) => (
               <div key={r.id} data-testid="sms-log-row" className="flex items-center gap-3 py-2 text-xs">
                 <div className="ltr font-num min-w-[110px] text-[#6b7b94]">{r.phoneMasked}</div>
                 <div className="min-w-[110px] text-[#e7ecf3]">{SMS_MESSAGE_TYPE_LABEL[r.messageType] ?? r.messageType}</div>
@@ -272,6 +305,7 @@ export default function ServicesPage() {
               </div>
             ))}
           </div>
+          <Pagination page={smsPager.page} totalPages={smsPager.totalPages} onChange={smsPager.setPage} />
         </div>
       )}
 
@@ -324,6 +358,9 @@ export default function ServicesPage() {
                 {s.enabled ? 'فعال' : 'غیرفعال'}
               </span>
               <div className="flex gap-2">
+                <button onClick={() => void openReport('external', s.id, s.nameFa)} className="text-[10.5px] font-bold text-[#60a5fa]">
+                  مشاهده گزارش
+                </button>
                 <button onClick={() => onOpenSettings(s)} className="text-[10.5px] font-bold text-[#3b82f6]">
                   تنظیمات
                 </button>
@@ -338,6 +375,40 @@ export default function ServicesPage() {
           </div>
         ))}
       </div>
+
+      {selectedReport && !(selectedReport.kind === 'internal' && selectedReport.id === 'sms' && smsLog) && (
+        <section className="mt-6 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4" data-testid="service-report">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[14.5px] font-extrabold text-white">گزارش {selectedReport.nameFa}</h2>
+              <p className="mt-1 text-[11px] text-[#6b7b94]">رویدادهای واقعی ثبت‌شده برای این سرویس</p>
+            </div>
+            <button type="button" onClick={() => setSelectedReport(null)} className="text-xs text-[#9fb0c7]">بستن</button>
+          </div>
+          {reportLoading && <p className="py-5 text-center text-xs text-[#9fb0c7]">در حال دریافت گزارش…</p>}
+          {reportError && <p role="alert" className="rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-xs text-[#f87171]">{reportError}</p>}
+          {!reportLoading && !reportError && serviceReport && (
+            <>
+              <div className="divide-y divide-[#1f2a3d] overflow-hidden rounded-lg border border-[#1f2a3d]">
+                {serviceReport.items.length === 0 && <p className="p-4 text-xs text-[#6b7b94]">هنوز رویدادی برای این سرویس ثبت نشده است.</p>}
+                {serviceReport.items.map((row) => (
+                  <div key={row.id} data-testid="service-report-row" className="grid gap-2 p-3 text-xs md:grid-cols-[1fr_2fr_1fr_1fr]">
+                    <span className="font-bold text-[#e7ecf3]">{row.action}</span>
+                    <span className="text-[#9fb0c7]">{row.detail}</span>
+                    <span className="text-[#9fb0c7]">{row.actorName}</span>
+                    <span className="ltr font-num text-[#6b7b94]">{formatJalaliDateTime(row.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+              <Pagination
+                page={serviceReport.page}
+                totalPages={Math.max(1, Math.ceil(serviceReport.total / serviceReport.limit))}
+                onChange={(page) => void openReport(selectedReport.kind, selectedReport.id, selectedReport.nameFa, page)}
+              />
+            </>
+          )}
+        </section>
+      )}
 
       {addOpen && (
         <Modal variant="dark" title="تعریف سرویس خارجی جدید" onClose={() => setAddOpen(false)}>

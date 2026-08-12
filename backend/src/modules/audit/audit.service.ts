@@ -185,6 +185,43 @@ export class AuditService {
     };
   }
 
+  /** Real per-entity activity used by the IT service report drawer. */
+  async entityEvents(
+    entityType: string,
+    entityId: string,
+    page = 1,
+    limit = 5,
+  ) {
+    const safePage = Number.isInteger(page) && page > 0 ? page : 1;
+    const safeLimit = Math.min(
+      Number.isInteger(limit) && limit > 0 ? limit : 5,
+      50,
+    );
+    const qb = this.auditRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.actor', 'actor')
+      .addSelect(['actor.id', 'actor.fullName'])
+      .where('a.entityType = :entityType', { entityType })
+      .andWhere('a.entityId = :entityId', { entityId })
+      .orderBy('a.createdAt', 'DESC')
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit);
+    const [rows, total] = await qb.getManyAndCount();
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        action: r.action,
+        detail: r.detail,
+        actorName: r.actor?.fullName ?? '—',
+        createdAt: r.createdAt,
+        level: r.category === 'SECURITY' ? 'warn' : 'info',
+      })),
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
+  }
+
   /** Lightweight count for the IT sidebar badge on «لاگ و رویدادها». */
   async systemLogsBadgeCount() {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);

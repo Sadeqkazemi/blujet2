@@ -53,6 +53,7 @@ describe('PanelsAccessPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('پنل کارمند')).toBeInTheDocument();
     expect(screen.getByText('پنل مدیر عامل')).toBeInTheDocument();
+    expect(screen.getByTestId('it-panel-access-grid')).toHaveClass('bg-[#101827]');
     expect(screen.queryByRole('switch', { name: 'پنل مدیر مالی' })).not.toBeInTheDocument();
   });
 

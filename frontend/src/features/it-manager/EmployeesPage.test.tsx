@@ -111,7 +111,7 @@ describe('EmployeesPage', () => {
     expect(screen.getByRole('button', { name: 'بازاریابی' })).toBeInTheDocument();
   });
 
-  it('keeps the tall create form scrollable and shows the assigned credentials after creation', async () => {
+  it('shows the reference add-user form inline and then shows the assigned credentials', async () => {
     vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
     vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);
     vi.spyOn(itApi, 'createEmployee').mockResolvedValue({
@@ -124,9 +124,8 @@ describe('EmployeesPage', () => {
     render(<EmployeesPage />);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
-    expect(screen.getByRole('dialog', { name: 'ایجاد کارمند جدید' })).toHaveClass(
-      'max-h-[calc(100dvh-2rem)]',
-    );
+    expect(screen.getByTestId('inline-create-employee')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'ایجاد کارمند جدید' })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'کارمند تازه');
     await user.type(screen.getByLabelText('نام کاربری'), 'fresh.user');
     await user.type(screen.getByLabelText('رمز عبور اولیه'), 'Assigned@1405');
