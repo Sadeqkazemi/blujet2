@@ -24,6 +24,8 @@ export interface SeatCell {
   occupant?: SeatOccupant | null;
   lockExpiresAt?: string | null;
   lockPassengerName?: string | null;
+  lockAgencyId?: string | null;
+  lockAgencyName?: string | null;
 }
 
 export interface SeatRow {

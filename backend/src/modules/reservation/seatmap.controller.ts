@@ -25,6 +25,12 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 export class SeatmapController {
   constructor(private readonly seatmap: SeatmapService) {}
 
+  @Get('agencies/active')
+  @ApiOperation({ summary: 'فهرست آژانس‌های فعال برای هدف لاک صندلی' })
+  async agencies() {
+    return { success: true, data: await this.seatmap.listLockAgencies() };
+  }
+
   @Get(':flightInstanceId')
   @ApiOperation({
     summary:

@@ -270,14 +270,16 @@ tabs to them; no new backend endpoints.
 
 ## Phase 9 — Reservation system (seat lock / PNR)
 
-Roles: `CEO` + `BOARD_CHAIR` (nav label **هواپیما**) and `IT_MANAGER`
+Roles: `CEO` + `BOARD_CHAIR` (nav label **هواپیما**), `COMMERCIAL_MANAGER`
+(from flight management), and `IT_MANAGER`
 (سامانه رزرواسیون) have the reachable reservation nav entry per
 `panel-nav.config.ts`. `SENIOR_MANAGER` stays authorized at the API level
 (⚑ product decision, see `docs/DB_SCHEMA.md` → Phase 9) but — per the
 2026-08-03 senior-panel trim — no longer has a reachable nav entry; it is
 view-only. `canLock` (PNR cancel / change-seat / manual issue / no-show) =
-`CEO`/`BOARD_CHAIR`/`IT_MANAGER`. Seat-map managerial lock/release/approve/
-reject is narrower: `canSeatLock` = `CEO`/`BOARD_CHAIR` only — **IT Manager
+`CEO`/`BOARD_CHAIR`/`COMMERCIAL_MANAGER`/`IT_MANAGER`. Seat-map managerial
+lock/release/approve/reject is narrower: `CEO`/`BOARD_CHAIR`/
+`COMMERCIAL_MANAGER` — **IT Manager
 cannot manually lock seats** (view sold-seat passenger details only).
 `SENIOR_MANAGER` is view-only on every write endpoint below (403).
 
@@ -285,8 +287,8 @@ cannot manually lock seats** (view sold-seat passenger details only).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }` that powers the IT/Board seat-map popup, plus a lighter `occupant` `{ pnr, passengerName, bookingStatus }`; locked seats carry `lockExpiresAt` / `lockPassengerName` for the countdown chip. Staff-only (IT cannot lock). |
-| POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`) | `{ seatCode, passengerName?, passengerNationalId?, passengerMobile? }` — 409 if the seat is already sold or actively locked (DB partial-unique-index-backed). PII encrypted+hashed like `ClubMember`. `AuditLog(category=RESERVATION)`. IT_MANAGER → 403. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, COMMERCIAL_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }`; locked seats carry `lockExpiresAt`, optional passenger identity and `lockAgencyId`. Staff-only; IT is read-only. |
+| POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`/`COMMERCIAL_MANAGER`) | `{ seatCode, agencyId?, passengerName?, passengerNationalId?, passengerMobile?, reason, classification, discountPct? }` — agencyId must reference an active `AgencyProfile`; passenger/agency/anonymous targets are supported. 409 if sold/locked. PII remains encrypted+hashed. IT_MANAGER → 403. |
 | PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
 | GET | `/reservation/pnr/:pnr` | all 4 | Full detail incl. passenger + boarding-pass fields. 404 if not found. |
@@ -463,6 +465,9 @@ stays untouched on the same page).
   to become the bookable price); SENIOR_MANAGER's save is allowed as-is
   for the plan figures only. The bookable price NEVER comes from this
   endpoint.
+- Flight creation automatically requests and persists one advisory ML price
+  suggestion after the creation transaction. Provider timeout/failure is a
+  graceful no-op and never blocks creation or publishes a fare.
 - POST `/flights/ai-analysis` — «تحلیل قیمت‌گذاری با هوش مصنوعی» over the
   future list, reusing Phase 6's ml-service client verbatim (2s timeout,
   graceful degradation, advisory only, persisted with modelVersion).

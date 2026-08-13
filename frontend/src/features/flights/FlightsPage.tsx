@@ -37,6 +37,8 @@ import FlightCitiesTab from "./FlightCitiesTab";
 import TravelCostsTab from "./TravelCostsTab";
 import AddFlightPage from "./AddFlightPage";
 import FlightLifecycleModal from "./FlightLifecycleModal";
+import MdSeatMapModal from "../reservation/MdSeatMapModal";
+import { updatePublishedPrice } from "../../api/pricing";
 import type {
   AircraftTypeOption,
   AirportEntry,
@@ -92,6 +94,10 @@ export default function FlightsPage() {
   const pricingSectionRef = useRef<HTMLDivElement>(null);
 
   const [detail, setDetail] = useState<FlightDetail | null>(null);
+  const [seatMapFlight, setSeatMapFlight] = useState<FlightRow | null>(null);
+  const [salePriceToman, setSalePriceToman] = useState("");
+  const [salePriceReason, setSalePriceReason] = useState("");
+  const [salePriceBusy, setSalePriceBusy] = useState(false);
   const [lifecycleFlight, setLifecycleFlight] = useState<FlightRow | CompletedFlightRow | null>(null);
   const [expandedDone, setExpandedDone] = useState<string | null>(null);
 
@@ -172,6 +178,8 @@ export default function FlightsPage() {
       const d = await fetchFlightDetail(id);
       setDetail(d);
       setSelectedAircraftType(d.aircraftType);
+      setSalePriceToman(d.basePriceIrr ? irrToTomanInput(d.basePriceIrr) : "");
+      setSalePriceReason("");
     } catch {
       setError("خطا در دریافت جزئیات پرواز.");
     }
@@ -181,6 +189,33 @@ export default function FlightsPage() {
       } catch {
         // silently unavailable — the change control just won't render options
       }
+    }
+  }
+
+  async function onUpdateSalePrice() {
+    if (!detail || !salePriceReason.trim()) {
+      setError("دلیل تغییر قیمت الزامی است.");
+      return;
+    }
+    setSalePriceBusy(true);
+    setError(null);
+    try {
+      const salePriceIrr = parseTomanToRialString(salePriceToman);
+      if (!salePriceIrr) {
+        setError("قیمت فروش معتبر وارد کنید.");
+        return;
+      }
+      const result = await updatePublishedPrice(detail.id, {
+        salePriceIrr,
+        reason: salePriceReason.trim(),
+      });
+      setDetail({ ...detail, basePriceIrr: result.registeredPriceIrr });
+      setNotice("قیمت فروش در سایت و سرویس API به‌روزرسانی شد.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در تغییر قیمت فروش.");
+    } finally {
+      setSalePriceBusy(false);
     }
   }
 
@@ -383,6 +418,7 @@ export default function FlightsPage() {
   const kpis = data?.kpis;
   const isCommercial =
     user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE";
+  const canPublishFareAndControlSeats = user?.role === "COMMERCIAL_MANAGER";
   const canManageFlights =
     user?.role !== "EMPLOYEE" || employeePermissionKeys.includes("fl_manage");
   const isCeo = user?.role === "CEO";
@@ -1352,6 +1388,59 @@ export default function FlightsPage() {
             </span>
           </div>
 
+          {canPublishFareAndControlSeats && canManageFlights && (
+            <div className="mt-3 rounded-xl border border-[#7c3aed66] bg-[#7c3aed0c] p-3">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-extrabold text-panel-ink">اصلاح قیمت فروش این پرواز</div>
+                  <div className="mt-1 text-[10px] text-panel-muted">تغییر پس از کنترل نرخ قانونی، هم‌زمان در جستجوی سایت و API منتشر می‌شود.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeatMapFlight(detail);
+                    setDetail(null);
+                  }}
+                  className="rounded-lg border border-accent px-3 py-2 text-[11px] font-bold text-accent"
+                >
+                  نقشه صندلی MD‑80
+                </button>
+              </div>
+              {detail.aiSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => setSalePriceToman(irrToTomanInput(String(detail.aiSuggestion!.priceIrr)))}
+                  className="mb-3 w-full rounded-lg border border-[#34d39955] bg-[#34d39912] p-2 text-right text-[11px] text-[#34d399]"
+                >
+                  استفاده از پیشنهاد هوش مصنوعی: {faMoney(detail.aiSuggestion.priceIrr)} تومان — {detail.aiSuggestion.reason}
+                </button>
+              )}
+              <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+                <input
+                  value={salePriceToman}
+                  onChange={(event) => setSalePriceToman(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="قیمت جدید (تومان)"
+                  className="rounded-lg border border-panel-border-2 bg-panel-canvas px-3 py-2 text-xs text-panel-ink outline-none"
+                />
+                <input
+                  value={salePriceReason}
+                  onChange={(event) => setSalePriceReason(event.target.value)}
+                  placeholder="دلیل تغییر قیمت"
+                  className="rounded-lg border border-panel-border-2 bg-panel-canvas px-3 py-2 text-xs text-panel-ink outline-none"
+                />
+                <button
+                  type="button"
+                  disabled={salePriceBusy}
+                  onClick={() => void onUpdateSalePrice()}
+                  className="rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                >
+                  {salePriceBusy ? "در حال انتشار…" : "انتشار نرخ"}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-3 rounded-lg border border-panel-border p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-bold text-panel-ink">
@@ -1413,6 +1502,15 @@ export default function FlightsPage() {
 
           <FareRulesSection instanceId={detail.id} readOnly={!canManageFlights} />
         </Modal>
+      )}
+      {seatMapFlight && (
+        <MdSeatMapModal
+          flight={seatMapFlight}
+          onClose={() => setSeatMapFlight(null)}
+          onNotice={setNotice}
+          onError={setError}
+          onChanged={() => void load()}
+        />
       )}
       {aircraftStepUp.modal}
 

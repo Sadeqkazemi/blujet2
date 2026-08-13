@@ -13,6 +13,7 @@ import { LockApprovalStatus, LockClassification, Role } from '../enums';
 import { Booking } from './booking.entity';
 import { FlightInstance } from './flight-instance.entity';
 import { User } from './user.entity';
+import { AgencyProfile } from './agency-profile.entity';
 
 @Index('seat_locks_active_seat_unique', ['flightInstanceId', 'seatCode'], {
   unique: true,
@@ -20,6 +21,7 @@ import { User } from './user.entity';
 })
 @Index('seat_locks_bookingId_key', ['bookingId'], { unique: true })
 @Index('seat_locks_flightInstanceId_idx', ['flightInstanceId'])
+@Index('seat_locks_agencyId_idx', ['agencyId'])
 @Entity('seat_locks')
 export class SeatLock {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'seat_locks_pkey' })
@@ -55,6 +57,17 @@ export class SeatLock {
     foreignKeyConstraintName: 'seat_locks_lockedById_fkey',
   })
   lockedBy!: User;
+
+  @Column({ type: 'text', nullable: true })
+  agencyId!: string | null;
+
+  @ManyToOne(() => AgencyProfile, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'agencyId',
+    referencedColumnName: 'userId',
+    foreignKeyConstraintName: 'seat_locks_agencyId_fkey',
+  })
+  agency!: AgencyProfile | null;
 
   @Column({ type: 'text', nullable: true })
   passengerName!: string | null;
