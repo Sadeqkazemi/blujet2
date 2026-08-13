@@ -20,8 +20,10 @@ const BOOKING_STATUS_FA: Record<BookingStatus, string> = {
 
 const SEAT_STYLE: Record<SeatStatus, string> = {
   FREE: 'border-[#2a3550] bg-[#1a2438] text-[#9fb0c7] hover:border-[#3b82f6]',
+  HELD: 'border-[#0284c7] bg-[#0ea5e9] text-white hover:brightness-110',
   SOLD: 'border-[#2563eb] bg-[#3b82f6] text-white hover:brightness-110',
   LOCKED: 'border-[#d97706] bg-[#f59e0b] text-[#1a1305] hover:brightness-110',
+  BLOCKED: 'border-[#9333ea] bg-[#a855f7] text-white hover:brightness-110',
 };
 
 function genericCabinLabel(cabin: string, prevCabin: string | null): string | null {

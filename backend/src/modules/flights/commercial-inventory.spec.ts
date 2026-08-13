@@ -1,0 +1,95 @@
+import { FlightDefinitionStatus } from '../../database/enums';
+import {
+  commercialSalesHealth,
+  isCommercialInventoryVisible,
+} from './flights.service';
+
+describe('commercial active inventory policy', () => {
+  const now = new Date('2026-08-13T10:00:00.000Z');
+
+  it('shows only sellable CEO-approved inventory', () => {
+    expect(
+      isCommercialInventoryVisible({
+        status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.PUBLISHED,
+        approvedSnapshot: null,
+      }),
+    ).toBe(true);
+    expect(
+      isCommercialInventoryVisible({
+        status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.DRAFT,
+        approvedSnapshot: null,
+      }),
+    ).toBe(false);
+    expect(
+      isCommercialInventoryVisible({
+        status: 'SCHEDULED',
+        definitionStatus: FlightDefinitionStatus.PENDING_REVISION,
+        approvedSnapshot: { id: 'approved-snapshot' },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not expose inventory before sale starts or after sale ends', () => {
+    const base = {
+      status: 'SCHEDULED' as const,
+      definitionStatus: FlightDefinitionStatus.PUBLISHED,
+      approvedSnapshot: null,
+    };
+    expect(
+      isCommercialInventoryVisible(
+        { ...base, saleStartsAt: new Date('2026-08-13T11:00:00.000Z') },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isCommercialInventoryVisible(
+        { ...base, saleEndsAt: new Date('2026-08-13T09:00:00.000Z') },
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isCommercialInventoryVisible(
+        {
+          ...base,
+          saleStartsAt: new Date('2026-08-13T09:00:00.000Z'),
+          saleEndsAt: new Date('2026-08-13T11:00:00.000Z'),
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it('flags weak sales inside the 72-hour window from server time', () => {
+    const health = commercialSalesHealth(
+      new Date('2026-08-14T10:00:00.000Z'),
+      20,
+      140,
+      now,
+    );
+    expect(health.isWeak).toBe(true);
+    expect(health.occupancyPct).toBe(14);
+    expect(health.hoursToDeparture).toBe(24);
+    expect(health.reasonFa).toContain('فروش');
+  });
+
+  it('does not flag healthy or distant inventory', () => {
+    expect(
+      commercialSalesHealth(
+        new Date('2026-08-14T10:00:00.000Z'),
+        100,
+        140,
+        now,
+      ).isWeak,
+    ).toBe(false);
+    expect(
+      commercialSalesHealth(
+        new Date('2026-08-17T10:00:00.000Z'),
+        20,
+        140,
+        now,
+      ).isWeak,
+    ).toBe(false);
+  });
+});

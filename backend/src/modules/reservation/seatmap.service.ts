@@ -37,6 +37,24 @@ const LOCK_HOLD_TTL_HOURS = 48;
  * across every flight instance (⚑ global, not per-flight — see docs). */
 const MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER = 5;
 
+export type ManagerSeatStatus =
+  | 'FREE'
+  | 'HELD'
+  | 'SOLD'
+  | 'LOCKED'
+  | 'BLOCKED';
+
+export function classifySeatProjection(
+  bookingStatus: string | null | undefined,
+  lockClassification: string | null | undefined,
+): ManagerSeatStatus {
+  if (bookingStatus === 'HELD') return 'HELD';
+  if (bookingStatus) return 'SOLD';
+  if (lockClassification === 'FREE') return 'BLOCKED';
+  if (lockClassification) return 'LOCKED';
+  return 'FREE';
+}
+
 function hoursFromNow(hours: number): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
@@ -157,7 +175,7 @@ export class SeatmapService {
           { now: new Date() },
         )
         .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
-        .addSelect(['b.pnr', 'b.status', 'b.priceIrr'])
+        .addSelect(['b.pnr', 'b.status', 'b.priceIrr', 'b.holdExpiresAt'])
         .getMany(),
       this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
@@ -189,7 +207,10 @@ export class SeatmapService {
       }
       const sold = soldByCode.get(seat.seatCode);
       const lock = lockedByCode.get(seat.seatCode);
-      const status = sold ? 'SOLD' : lock ? 'LOCKED' : 'FREE';
+      const status = classifySeatProjection(
+        sold?.booking.status,
+        lock?.classification,
+      );
       rowsMap.get(seat.row)!.seats.push({
         seatCode: seat.seatCode,
         status,
@@ -216,6 +237,12 @@ export class SeatmapService {
             }
           : null,
         lockExpiresAt: lock?.expiresAt ?? null,
+        holdExpiresAt:
+          sold?.booking.status === 'HELD'
+            ? sold.booking.holdExpiresAt
+            : null,
+        lockClassification: lock?.classification ?? null,
+        lockApprovalStatus: lock?.approvalStatus ?? null,
         lockPassengerName: lock?.passengerName ?? null,
         lockAgencyId: lock?.agencyId ?? null,
         lockAgencyName: lock?.agency?.user?.fullName ?? null,
@@ -244,7 +271,17 @@ export class SeatmapService {
         ECONOMY: { aisleAfterIndex: map.economyColsLeft?.length ?? 0 },
       },
       capacity: seats.length,
-      soldCount: soldByCode.size,
+      soldCount: soldPassengers.filter((p) => p.booking.status !== 'HELD')
+        .length,
+      heldCount: soldPassengers.filter((p) => p.booking.status === 'HELD')
+        .length,
+      managerLockedCount: activeLocks.filter(
+        (lock) => lock.classification !== 'FREE',
+      ).length,
+      blockedCount: activeLocks.filter(
+        (lock) => lock.classification === 'FREE',
+      ).length,
+      // Backwards-compatible total for older executive consumers.
       lockedCount: activeLocks.length,
       freeCount: Math.max(
         0,

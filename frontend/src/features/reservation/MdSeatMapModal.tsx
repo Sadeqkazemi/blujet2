@@ -17,6 +17,7 @@ import {
 import ReservationMd80SeatMap from './ReservationMd80SeatMap';
 import type { FlightRow } from '../../types/flights';
 import type { BookingStatus, SeatCell, SeatMap, SeatStatus } from '../../types/reservation';
+import { useOptionalAuth } from '../../hooks/useAuth';
 
 type Props = {
   flight: FlightRow;
@@ -24,6 +25,9 @@ type Props = {
   onNotice: (msg: string) => void;
   onError: (msg: string) => void;
   onChanged: () => void;
+  embedded?: boolean;
+  /** Tests/previews may override; production derives this from the signed-in role. */
+  canManageOverride?: boolean;
 };
 
 type CabinBand = 'FIRST' | 'BUSINESS' | 'MCE' | 'ECONOMY';
@@ -83,8 +87,10 @@ function seatVisual(
 ): { bg: string; border: string } {
   if (selected) return { bg: '#f59e0b', border: '#fff' };
   if (highlight) return { bg: '#f59e0b', border: '#fbbf24' };
+  if (status === 'HELD') return { bg: '#0ea5e9', border: '#38bdf8' };
   if (status === 'SOLD') return { bg: '#3b82f6', border: '#3b82f6' };
   if (status === 'LOCKED') return { bg: '#f59e0b', border: '#f59e0b' };
+  if (status === 'BLOCKED') return { bg: '#a855f7', border: '#c084fc' };
   return { bg: '#141d2e', border: '#3a4a66' };
 }
 
@@ -106,7 +112,19 @@ function seatPnr(seat: SeatCell): string | null {
   return seat.passenger?.pnr ?? seat.occupant?.pnr ?? null;
 }
 
-export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onChanged }: Props) {
+export default function MdSeatMapModal({
+  flight,
+  onClose,
+  onNotice,
+  onError,
+  onChanged,
+  embedded = false,
+  canManageOverride,
+}: Props) {
+  const auth = useOptionalAuth();
+  const canManage =
+    canManageOverride ??
+    ['CEO', 'BOARD_CHAIR', 'COMMERCIAL_MANAGER'].includes(auth?.user?.role ?? '');
   const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -135,9 +153,11 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
   useEffect(() => {
     void reload();
-    fetchSeatLockAgencies().then(setAgencies).catch(() => setAgencies([]));
+    if (canManage) {
+      fetchSeatLockAgencies().then(setAgencies).catch(() => setAgencies([]));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per flight
-  }, [flight.id]);
+  }, [flight.id, canManage]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -146,22 +166,26 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
   const counts = useMemo(() => {
     let free = 0;
+    let held = 0;
     let tempLock = 0;
     let sold = 0;
+    let blocked = 0;
     for (const row of seatMap?.rows ?? []) {
       for (const s of row.seats) {
         if (s.status === 'FREE') free += 1;
+        else if (s.status === 'HELD') held += 1;
         else if (s.status === 'SOLD') sold += 1;
         else if (s.status === 'LOCKED') tempLock += 1;
+        else if (s.status === 'BLOCKED') blocked += 1;
       }
     }
-    return { free, tempLock, sold, blocked: 0 };
+    return { free, held, tempLock, sold, blocked };
   }, [seatMap]);
 
   const lockedList = useMemo(() => {
     return (seatMap?.rows ?? [])
       .flatMap((r) => r.seats)
-      .filter((s) => s.status === 'LOCKED' && s.lockId)
+      .filter((s) => (s.status === 'LOCKED' || s.status === 'BLOCKED') && s.lockId)
       .sort((a, b) => a.seatCode.localeCompare(b.seatCode, 'en'));
   }, [seatMap]);
 
@@ -215,9 +239,13 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
   function onSeatClick(seat: SeatCell) {
     setHighlightCode(seat.seatCode);
-    if (seat.status === 'SOLD' || seat.status === 'LOCKED') {
+    if (seat.status !== 'FREE') {
       setLockSeatCode(null);
       setInfoSeat(seat);
+      return;
+    }
+    if (!canManage) {
+      onNotice('این نقشه فقط خواندنی است؛ قفل صندلی فقط برای مدیرعامل، مدیر بازرگانی و رئیس هیئت‌مدیره مجاز است.');
       return;
     }
     setInfoSeat(null);
@@ -308,17 +336,21 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
   return (
     <div
-      className="fixed inset-0 z-[8000] flex items-start justify-center overflow-auto bg-[rgba(7,11,20,.78)] p-4 backdrop-blur-[3px] sm:p-6"
+      className={embedded
+        ? 'relative w-full'
+        : 'fixed inset-0 z-[8000] flex items-start justify-center overflow-auto bg-[rgba(7,11,20,.78)] p-4 backdrop-blur-[3px] sm:p-6'}
       role="presentation"
-      onClick={onClose}
+      onClick={embedded ? undefined : onClose}
     >
       <div
-        role="dialog"
+        role={embedded ? undefined : 'dialog'}
         aria-labelledby="md-seatmap-title"
-        className="relative my-4 w-full max-w-[720px] overflow-hidden rounded-2xl border border-[#22304a] bg-[#0f1623] shadow-[0_40px_100px_-25px_rgba(0,0,0,.8)]"
+        className={embedded
+          ? 'relative w-full overflow-hidden rounded-xl border border-[#22304a] bg-[#0f1623]'
+          : 'relative my-4 w-full max-w-[720px] overflow-hidden rounded-2xl border border-[#22304a] bg-[#0f1623] shadow-[0_40px_100px_-25px_rgba(0,0,0,.8)]'}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[#1f2a3d] px-4 py-3.5">
+        {!embedded && <div className="flex items-start justify-between gap-3 border-b border-[#1f2a3d] px-4 py-3.5">
           <div>
             <h2 id="md-seatmap-title" className="m-0 text-[15.5px] font-extrabold text-white">
               نقشه صندلی‌ها —{' '}
@@ -339,7 +371,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
           >
             ×
           </button>
-        </div>
+        </div>}
 
         <div className="max-h-[min(78vh,820px)] overflow-y-auto px-4 py-3.5">
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -359,6 +391,11 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
           </div>
 
           <div className="mb-3 flex flex-wrap gap-2">
+            <LegendChip
+              color="#0ea5e9"
+              border="#38bdf8"
+              label={`رزرو ۱۵ دقیقه‌ای ${faDigits(counts.held)}`}
+            />
             <LegendChip
               color="#141d2e"
               border="#3a4a66"
@@ -388,7 +425,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
               seatsByCode={seatsByCode}
               selectedSeatCode={lockSeatCode ?? infoSeat?.seatCode ?? null}
               highlightSeatCode={highlightCode}
-              canLock
+              canLock={canManage}
               onSeatClick={onSeatClick}
             />
           ) : (
@@ -505,7 +542,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                   </span>
                 </div>
               )}
-              {infoSeat.status === 'LOCKED' && infoSeat.lockId && (
+              {(infoSeat.status === 'LOCKED' || infoSeat.status === 'BLOCKED') && infoSeat.lockId && canManage && (
                 <button
                   type="button"
                   onClick={() => void onRelease(infoSeat.lockId!)}
@@ -528,14 +565,14 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                     key={s.seatCode}
                     className="flex items-center justify-between rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2"
                   >
-                    <button
+                    {canManage && <button
                       type="button"
                       onClick={() => s.lockId && void onRelease(s.lockId)}
                       className="text-[10.5px] font-bold text-[#f87171]"
                       title="آزادسازی"
                     >
                       آزادسازی
-                    </button>
+                    </button>}
                     <span className="font-num text-[13px] font-extrabold text-[#fcd34d]" dir="ltr">
                       {formatCountdown(s.lockExpiresAt, now)}
                     </span>
@@ -555,7 +592,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
         </div>
       </div>
 
-      {lockSeatCode && (
+      {lockSeatCode && canManage && (
         <div
           className="fixed inset-0 z-[8100] flex items-center justify-center bg-[rgba(7,11,20,.55)] p-4"
           role="presentation"

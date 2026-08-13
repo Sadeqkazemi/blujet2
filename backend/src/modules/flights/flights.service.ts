@@ -49,6 +49,7 @@ import {
   FlightInstanceStatus,
   type CabinClass,
 } from '../../database/enums';
+import { isSellableDefinitionStatus } from './definition-sellability';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -56,6 +57,60 @@ const FUTURE_WINDOW_DAYS = 7;
 
 /** Statuses that count as a sold seat (design: «صندلی فروخته‌شده»). */
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
+
+const WEAK_SALES_WINDOW_HOURS = 72;
+const WEAK_SALES_OCCUPANCY_PCT = 60;
+
+export function isCommercialInventoryVisible(
+  instance: Pick<
+    FlightInstance,
+    'status' | 'definitionStatus' | 'approvedSnapshot'
+  > &
+    Partial<Pick<FlightInstance, 'saleStartsAt' | 'saleEndsAt'>>,
+  now = new Date(),
+): boolean {
+  return (
+    (instance.status === FlightInstanceStatus.SCHEDULED ||
+      instance.status === FlightInstanceStatus.CANCELLED) &&
+    isSellableDefinitionStatus(
+      instance.definitionStatus,
+      instance.approvedSnapshot != null,
+    ) &&
+    (!instance.saleStartsAt || instance.saleStartsAt <= now) &&
+    (!instance.saleEndsAt || instance.saleEndsAt >= now)
+  );
+}
+
+export function commercialSalesHealth(
+  departureAt: Date,
+  sold: number,
+  capacity: number,
+  now = new Date(),
+) {
+  const occupancyPct =
+    capacity > 0 ? Math.round((Math.max(0, sold) / capacity) * 100) : 0;
+  const hoursToDeparture = Math.max(
+    0,
+    Math.round(((departureAt.getTime() - now.getTime()) / 3_600_000) * 10) /
+      10,
+  );
+  const isWeak =
+    departureAt > now &&
+    hoursToDeparture <= WEAK_SALES_WINDOW_HOURS &&
+    occupancyPct < WEAK_SALES_OCCUPANCY_PCT;
+  return {
+    isWeak,
+    occupancyPct,
+    hoursToDeparture,
+    thresholdPct: WEAK_SALES_OCCUPANCY_PCT,
+    windowHours: WEAK_SALES_WINDOW_HOURS,
+    reasonFa: isWeak
+      ? `فروش این پرواز تا ${hoursToDeparture} ساعت مانده به پرواز فقط ${occupancyPct}٪ ظرفیت است.`
+      : occupancyPct >= WEAK_SALES_OCCUPANCY_PCT
+        ? 'فروش پرواز در محدوده قابل قبول است.'
+        : 'پرواز هنوز خارج از بازه هشدار فروش ضعیف است.',
+  };
+}
 
 @Injectable()
 export class FlightsService {
@@ -139,8 +194,9 @@ export class FlightsService {
   }
 
   async overview() {
+    const now = new Date();
     const futureCutoff = new Date(
-      Date.now() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
+      now.getTime() + FUTURE_WINDOW_DAYS * 24 * 3_600_000,
     );
     const instances = await this.instanceRepo
       .createQueryBuilder('fi')
@@ -150,8 +206,11 @@ export class FlightsService {
       .getMany();
     const sold = await this.soldByInstance(instances.map((i) => i.id));
 
-    const scheduled = instances.filter(
-      (i) => i.status === 'SCHEDULED' || i.status === 'CANCELLED',
+    // Commercial inventory starts only after the governed approval/publish
+    // workflow. Draft/pending/rejected instances must never leak into the
+    // manager's sale controls merely because a schedule row already exists.
+    const scheduled = instances.filter((instance) =>
+      isCommercialInventoryVisible(instance, now),
     );
     const activeRows = scheduled.filter(
       (i) => i.departureAt <= futureCutoff || (sold.get(i.id) ?? 0) > 0,
@@ -168,6 +227,14 @@ export class FlightsService {
       return {
         ...this.baseRow(i, s),
         derivedStatus: this.derivedStatus(i.status, s, i.capacity),
+        salesHealth:
+          i.status === FlightInstanceStatus.CANCELLED
+            ? {
+                ...commercialSalesHealth(i.departureAt, s, i.capacity),
+                isWeak: false,
+                reasonFa: 'پرواز لغو شده و در تحلیل فروش فعال لحاظ نمی‌شود.',
+              }
+            : commercialSalesHealth(i.departureAt, s, i.capacity),
         aiSuggestion: i.aiSuggestion as unknown as PersistedAiSuggestion | null,
         competitorPriceIrr: i.competitorPriceIrr,
       };
@@ -787,6 +854,7 @@ export class FlightsService {
       .getMany();
     const sold = await this.soldByInstance(upcoming.map((item) => item.id));
     const analyzable = upcoming.filter((item) => {
+      if (!isCommercialInventoryVisible(item, now)) return false;
       if (item.basePriceIrr == null) return false;
       if (item.departureAt > futureCutoff) return true;
       const occupancy =
