@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Permission } from '../../database/entities/permission.entity';
 import { EmployeePermission } from '../../database/entities/employee-permission.entity';
@@ -82,7 +82,11 @@ export class EmployeesService {
   }
 
   private async getEmployeeOrThrow(id: string) {
-    const employee = await this.userRepo.findOneBy({ id, role: 'EMPLOYEE' });
+    const employee = await this.userRepo.findOneBy({
+      id,
+      role: 'EMPLOYEE',
+      deletedAt: IsNull(),
+    });
     if (!employee) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -112,7 +116,10 @@ export class EmployeesService {
   async list(actor: AuthenticatedUser, query: ListEmployeesQueryDto) {
     const employeeDept = await this.deptScopeForEmployee(actor);
     const deptFilter = employeeDept ?? query.dept;
-    const base: { role: 'EMPLOYEE'; dept?: string } = { role: 'EMPLOYEE' };
+    const base: FindOptionsWhere<User> = {
+      role: 'EMPLOYEE',
+      deletedAt: IsNull(),
+    };
     if (deptFilter) base.dept = deptFilter;
 
     const employees = await this.userRepo.find({
@@ -318,6 +325,47 @@ export class EmployeesService {
     }
 
     return { id: updated.id, isActive: updated.isActive };
+  }
+
+  async remove(actor: AuthenticatedUser, id: string) {
+    const employee = await this.getEmployeeOrThrow(id);
+    const deletedAt = new Date();
+
+    await this.userRepo.manager.transaction(async (tx) => {
+      await tx.update(
+        RefreshToken,
+        { userId: id, revokedAt: IsNull() },
+        { revokedAt: deletedAt },
+      );
+      await tx.delete(EmployeePermission, { employeeId: id });
+      await tx.update(
+        User,
+        { id },
+        {
+          isActive: false,
+          deletedAt,
+          username: null,
+          phone: null,
+          passwordHash: null,
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          mustChangePassword: false,
+          updatedAt: deletedAt,
+        },
+      );
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'ACCOUNT',
+      action: 'حذف حساب کارمند',
+      detail: `حساب «${employee.fullName}» (${employee.username ?? 'بدون نام کاربری'}) توسط ${actor.fullName} بایگانی شد و همه دسترسی‌ها و نشست‌های آن لغو گردید.`,
+      entityType: 'User',
+      entityId: id,
+    });
+
+    return { id, deletedAt: deletedAt.toISOString() };
   }
 
   async setPermission(

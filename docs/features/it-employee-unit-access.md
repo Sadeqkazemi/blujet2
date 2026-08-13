@@ -39,6 +39,10 @@ unmapped permission accidentally.
   matrix, IT scope card and password-management card.
 - A real end-to-end test proves create -> login -> allowed nav/API -> denied
   nav/API -> revoke behavior.
+- IT can delete an employee account through a confirmed archive action. The
+  account disappears from the roster, all grants and sessions are revoked,
+  login identifiers are released for reuse, and its audit/business history is
+  retained.
 
 ## Security invariants
 
@@ -49,3 +53,6 @@ unmapped permission accidentally.
 - IT cannot grant a permission outside the selected employee unit.
 - IT cannot grant itself access to CEO, Senior Manager, or Board Chair panels.
 - Employee mobile remains mandatory because staff login uses mandatory 2FA.
+- Account deletion is a soft archive (`deletedAt` plus `isActive = false`), not
+  a destructive database delete; archived employees cannot be fetched,
+  reactivated, or authenticated.

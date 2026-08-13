@@ -4,6 +4,7 @@ import {
   fetchEmployee,
   fetchEmployees,
   fetchPermissionCatalog,
+  removeEmployee,
   resetEmployeePassword,
   setEmployeePermission,
   setEmployeeStatus,
@@ -89,6 +90,7 @@ export default function EmployeesPage() {
   const [addingDept, setAddingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [statusConfirm, setStatusConfirm] = useState<EmployeeListRow | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<EmployeeListRow | null>(null);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
@@ -234,6 +236,19 @@ export default function EmployeesPage() {
     setStatusConfirm(null);
   }
 
+  async function confirmDelete() {
+    if (!deleteConfirm) return;
+    try {
+      await removeEmployee(deleteConfirm.id);
+      if (detailId === deleteConfirm.id) setDetailId(null);
+      setNotice(`حساب «${deleteConfirm.fullName}» حذف و بایگانی شد.`);
+      setDeleteConfirm(null);
+      await load();
+    } catch {
+      setError('خطا در حذف حساب کارمند.');
+    }
+  }
+
   function submitNewDept() {
     const name = newDeptName.trim();
     if (!name) return;
@@ -341,6 +356,12 @@ export default function EmployeesPage() {
                     }`}
                   >
                     {e.isActive ? 'تعلیق' : 'فعال‌سازی'}
+                  </button>}
+                  {canManageAccess && <button
+                    onClick={() => setDeleteConfirm(e)}
+                    className="rounded-lg border border-[#f87171]/40 px-2 py-1 text-[10px] font-bold text-[#f87171]"
+                  >
+                    حذف
                   </button>}
                 </div>
               </li>
@@ -703,6 +724,31 @@ export default function EmployeesPage() {
               className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white"
             >
               تعلیق حساب
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteConfirm && (
+        <Modal variant="dark" title="حذف حساب کارمند" onClose={() => setDeleteConfirm(null)}>
+          <p className="mb-3 text-xs leading-6 text-[#9fb0c7]">
+            حساب «{deleteConfirm.fullName}» از فهرست کاربران حذف می‌شود و دیگر امکان ورود نخواهد داشت.
+          </p>
+          <p className="mb-4 rounded-lg bg-[rgba(245,158,11,.1)] p-3 text-[11px] leading-6 text-[#fbbf24]">
+            نشست‌ها و دسترسی‌ها فوراً لغو می‌شوند؛ سوابق مالی و لاگ‌های امنیتی برای حسابرسی باقی می‌مانند. این عملیات قابل فعال‌سازی مجدد نیست.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setDeleteConfirm(null)}
+              className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
+            >
+              انصراف
+            </button>
+            <button
+              onClick={() => void confirmDelete()}
+              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white"
+            >
+              حذف و بایگانی حساب
             </button>
           </div>
         </Modal>

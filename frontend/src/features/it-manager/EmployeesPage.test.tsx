@@ -119,6 +119,27 @@ describe('EmployeesPage', () => {
     await waitFor(() => expect(statusSpy).toHaveBeenCalledWith('e1', false));
   });
 
+  it('requires confirmation and archives an employee account', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue(EMPLOYEES);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);
+    const removeSpy = vi.spyOn(itApi, 'removeEmployee').mockResolvedValue({
+      id: 'e1',
+      deletedAt: '2026-08-13T12:00:00.000Z',
+    });
+
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'حذف' }));
+
+    expect(screen.getByRole('dialog', { name: 'حذف حساب کارمند' })).toBeInTheDocument();
+    expect(screen.getByText(/سوابق مالی و لاگ‌های امنیتی/)).toBeInTheDocument();
+    expect(removeSpy).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'حذف و بایگانی حساب' }));
+    await waitFor(() => expect(removeSpy).toHaveBeenCalledWith('e1'));
+    expect(await screen.findByText(/حذف و بایگانی شد/)).toBeInTheDocument();
+  });
+
   it('creates a custom organizational unit in the add-user form', async () => {
     vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
     vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(CATALOG);

@@ -8,6 +8,7 @@ import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { PasswordResetEvent } from '../src/database/entities/password-reset-event.entity';
 import { SecurityPolicy } from '../src/database/entities/security-policy.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { EmployeePermission } from '../src/database/entities/employee-permission.entity';
 import { ExternalServiceConfig } from '../src/database/entities/external-service-config.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -261,6 +262,73 @@ describe('IT Manager (e2e)', () => {
 
     const audit = await findAuditLog({
       category: 'ACCOUNT',
+      entityType: 'User',
+      entityId: id,
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it('DELETE /it/employees/:id archives the account, revokes access, hides it and releases login identifiers', async () => {
+    const { res, accessToken, username, phone, password } = await createEmployee();
+    const id = res.body.data.id as string;
+
+    const removed = await request(app.getHttpServer())
+      .delete(`/it/employees/${id}`)
+      .set(auth(accessToken));
+    expect(removed.status).toBe(200);
+    expect(removed.body.data).toEqual({
+      id,
+      deletedAt: expect.any(String),
+    });
+
+    const archived = await dataSource.getRepository(User).findOneByOrFail({ id });
+    expect(archived).toEqual(
+      expect.objectContaining({
+        isActive: false,
+        username: null,
+        phone: null,
+        passwordHash: null,
+        twoFactorEnabled: false,
+      }),
+    );
+    expect(archived.deletedAt).toBeInstanceOf(Date);
+    expect(
+      await dataSource.getRepository(EmployeePermission).countBy({ employeeId: id }),
+    ).toBe(0);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/it/employees/${id}`)
+      .set(auth(accessToken));
+    expect(detail.status).toBe(404);
+
+    const list = await request(app.getHttpServer())
+      .get('/it/employees')
+      .set(auth(accessToken));
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((row: { id: string }) => row.id === id)).toBe(false);
+
+    const oldLogin = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username, password });
+    expect(oldLogin.status).toBe(401);
+
+    const recreated = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند جایگزین',
+        username,
+        phone,
+        password,
+        dept: 'commercial',
+        permissionKeys: ['ag_list'],
+      });
+    expect(recreated.status).toBe(201);
+    expect(recreated.body.data.id).not.toBe(id);
+
+    const audit = await findAuditLog({
+      category: 'ACCOUNT',
+      action: 'حذف حساب کارمند',
       entityType: 'User',
       entityId: id,
     });
