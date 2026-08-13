@@ -89,6 +89,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       .send({
         fullName: 'کارمند تست فاز ۲۷',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'Blujet@1404',
         dept,
         permissionKeys,

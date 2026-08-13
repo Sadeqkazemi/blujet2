@@ -30,6 +30,7 @@ describe('EMPLOYEE cartable (e2e)', () => {
       .send({
         fullName: 'کارمند کارتابل تست',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'Blujet@1404',
         dept: 'commercial',
         permissionKeys,

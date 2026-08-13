@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchAirports } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
+import { airportCityLabel, airportCityName, airportName } from '../../../lib/airport-cities';
 import { dayjs, toIsoDateOnly } from '../../../lib/jalali';
 import {
   calendarForLocale,
@@ -207,7 +207,7 @@ function AirportPicker({
                       {airportDisplayLabel(a, locale)}
                     </div>
                     <div style={{ marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11, color: '#8a96a6' }}>
-                      {a.airportNameFa || `فرودگاه ${a.cityFa}`}
+                      {airportName(a.code, locale, a.airportNameFa)}
                     </div>
                   </div>
                 </button>

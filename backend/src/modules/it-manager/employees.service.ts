@@ -18,6 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import {
   CATALOG_DEPTS,
   PERMISSION_CATALOG,
@@ -140,6 +141,7 @@ export class EmployeesService {
   }
 
   async create(actor: AuthenticatedUser, dto: CreateEmployeeDto) {
+    const normalizedPhone = normalizeIranPhone(dto.phone);
     const existing = await this.userRepo.findOneBy({
       username: dto.username,
     });
@@ -147,6 +149,16 @@ export class EmployeesService {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'این نام کاربری قبلاً استفاده شده است.',
+      });
+    }
+
+    const existingPhone = await this.userRepo.findOneBy({
+      phone: normalizedPhone,
+    });
+    if (existingPhone) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این شماره موبایل قبلاً استفاده شده است.',
       });
     }
 
@@ -167,7 +179,9 @@ export class EmployeesService {
           role: 'EMPLOYEE',
           fullName: dto.fullName,
           username: dto.username,
+          phone: normalizedPhone,
           passwordHash,
+          twoFactorEnabled: true,
           mustChangePassword: false,
           dept: dto.dept,
           rank: dto.rank,
@@ -234,6 +248,7 @@ export class EmployeesService {
       id: employee.id,
       fullName: employee.fullName,
       username: employee.username,
+      phone: employee.phone,
       dept: employee.dept,
       rank: employee.rank,
       referralScope: employee.referralScope,

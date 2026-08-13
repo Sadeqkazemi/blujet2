@@ -11,8 +11,8 @@ import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as useLocaleModule from '../../hooks/useLocale';
 
 const AIRPORTS = [
-  { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
-  { id: 'a2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
+  { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی مهرآباد', tz: 'Asia/Tehran' },
+  { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی شهید هاشمی‌نژاد', tz: 'Asia/Tehran' },
 ];
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -257,6 +257,11 @@ describe('HomeSearchPage', () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
       ...CMS_HOME,
+      routes: CMS_HOME.routes.map((route) => ({
+        ...route,
+        fromAirportCode: 'تهران',
+        toAirportCode: 'مشهد',
+      })),
       blocks: CMS_HOME.blocks.map((b) =>
         b.key === 'HERO_BANNER'
           ? { ...b, title: 'Book your next flight with blujet', badgeText: 'Up to 5% cashback' }
@@ -273,6 +278,12 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('Popular Destinations')).toBeInTheDocument();
     expect(screen.getByText('Take your trip with you')).toBeInTheDocument();
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('1,600,000');
+    expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('Tehran');
+    expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('Mashhad');
+    expect(screen.getByTestId('popular-route-MHD')).not.toHaveTextContent('تهران');
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.getByTestId('airport-option-THR')).toHaveTextContent('Mehrabad International Airport');
+    expect(screen.getByTestId('airport-option-THR')).not.toHaveTextContent('فرودگاه');
   });
 
   it('renders Arabic marketing sections with Eastern Arabic-Indic digits', async () => {
@@ -281,6 +292,11 @@ describe('HomeSearchPage', () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue({
       ...CMS_HOME,
+      routes: CMS_HOME.routes.map((route) => ({
+        ...route,
+        fromAirportCode: 'تهران',
+        toAirportCode: 'مشهد',
+      })),
       blocks: CMS_HOME.blocks.map((b) =>
         b.key === 'HERO_BANNER' ? { ...b, title: 'احجز رحلتك القادمة مع blujet' } : b,
       ),
@@ -291,6 +307,11 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('احجز رحلتك القادمة مع blujet')).toBeInTheDocument();
     expect(screen.getByText('الوجهات الشائعة')).toBeInTheDocument();
     expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('١٬٦٠٠٬٠٠٠');
+    expect(screen.getByTestId('popular-route-MHD')).toHaveTextContent('طهران');
+    expect(screen.getByTestId('popular-route-MHD')).not.toHaveTextContent('تهران');
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.getByTestId('airport-option-THR')).toHaveTextContent('مطار مهرآباد الدولي');
+    expect(screen.getByTestId('airport-option-THR')).not.toHaveTextContent('فرودگاه');
   });
 });
 

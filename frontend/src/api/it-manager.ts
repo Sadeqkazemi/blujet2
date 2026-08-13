@@ -38,6 +38,7 @@ export function fetchEmployee(id: string) {
 export function createEmployee(dto: {
   fullName: string;
   username: string;
+  phone: string;
   password: string;
   dept: string;
   rank?: string;

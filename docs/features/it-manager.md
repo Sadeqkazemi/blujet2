@@ -17,7 +17,7 @@ journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 ### Permission catalog & employees
 - [x] `GET /it/permissions` returns the 3-dept/12-key catalog verbatim from `PERM_CATALOG`; non-IT role → 403 — `'GET /it/permissions returns the catalog; non-IT role gets 403'`
 - [x] `GET /it/employees` lists only `role=EMPLOYEE` rows, `dept=`/`q=` filters work — exercised via `createEmployee` helper + list assertions across tests
-- [x] `POST /it/employees`: creates account (argon2 hash), grants the selected catalog permissions (design's implicit `dashboard`/`cartable` tags intentionally not carried over — see docs/API.md note), duplicate username → 409, password &lt;6 chars → 400, audited (ACCOUNT) — `'POST /it/employees creates account with granted permissions, duplicate username -> 409, short password -> 400, audited'`
+- [x] `POST /it/employees`: creates an operational staff account with normalized unique mobile + mandatory 2FA, argon2 hash and selected permissions (design's implicit `dashboard`/`cartable` tags intentionally not carried over — see docs/API.md note); duplicate username/mobile → 409, invalid mobile or password &lt;6 chars → 400, audited (ACCOUNT) — covered by `it-manager.e2e-spec.ts`
 - [x] `GET /it/employees/:id` returns granted + available permissions; non-IT role → 403 — `'GET/PATCH /it/employees/:id and non-IT role gets 403 everywhere'`
 - [x] `PATCH /it/employees/:id/status` suspends/reactivates, audited (ACCOUNT) — `'PATCH /it/employees/:id/status suspends and reactivates, audited'`
 - [x] `PATCH /it/employees/:id/permissions` grants/revokes one key idempotently, wrong-dept key → 400, audited (ACCESS) — `'PATCH /it/employees/:id/permissions grants/revokes idempotently, unknown key for dept -> 400, audited'`

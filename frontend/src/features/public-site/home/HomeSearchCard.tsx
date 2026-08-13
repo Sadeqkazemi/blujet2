@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityLabel, airportCityName } from '../../../lib/airport-cities';
+import { airportCityLabel, airportCityName, airportName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import {
   DomesticFlightIcon,
@@ -203,10 +203,12 @@ function AirportCell({
     if (!q) return airports;
     return airports.filter((a) => {
       const city = airportCityName(a.code, locale, a.cityFa);
+      const localizedAirport = airportName(a.code, locale, a.airportNameFa);
       return (
         a.code.toLowerCase().includes(q) ||
         a.cityFa.toLowerCase().includes(q) ||
         a.airportNameFa?.toLowerCase().includes(q) ||
+        localizedAirport.toLowerCase().includes(q) ||
         city.toLowerCase().includes(q)
       );
     });
@@ -406,7 +408,7 @@ function AirportCell({
                         color: '#9aa4b2',
                       }}
                     >
-                      {a.airportNameFa || `${cityListLabel} · ${a.code}`}
+                      {airportName(a.code, locale, a.airportNameFa) || `${cityListLabel} · ${a.code}`}
                     </div>
                   </div>
                   <span

@@ -8,7 +8,7 @@ import {
   setEmployeePermission,
   setEmployeeStatus,
 } from '../../api/it-manager';
-import { faDigits } from '../../lib/fa-format';
+import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
@@ -55,6 +55,7 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({
     fullName: '',
     username: '',
+    phone: '',
     password: '',
     dept: 'commercial',
     rank: 'کارشناس',
@@ -73,6 +74,7 @@ export default function EmployeesPage() {
   const [createdCredentials, setCreatedCredentials] = useState<{
     fullName: string;
     username: string;
+    phone: string;
     password: string;
   } | null>(null);
 
@@ -111,6 +113,11 @@ export default function EmployeesPage() {
       setAddError('نام و نام کاربری الزامی است.');
       return;
     }
+    const phone = normalizeIranMobile(form.phone);
+    if (!isValidIranMobile(phone)) {
+      setAddError('شماره موبایل معتبر وارد کنید (مثال: ۰۹۱۲۱۲۳۴۵۶۷).');
+      return;
+    }
     if (form.password.length < 6) {
       setAddError('رمز عبور باید حداقل ۶ کاراکتر باشد.');
       return;
@@ -119,11 +126,13 @@ export default function EmployeesPage() {
       const submitted = {
         fullName: form.fullName.trim(),
         username: form.username.trim(),
+        phone,
         password: form.password,
       };
       await createEmployee({
         fullName: submitted.fullName,
         username: submitted.username,
+        phone: submitted.phone,
         password: submitted.password,
         dept: form.dept,
         rank: form.rank,
@@ -136,6 +145,7 @@ export default function EmployeesPage() {
       setForm({
         fullName: '',
         username: '',
+        phone: '',
         password: '',
         dept: 'commercial',
         rank: 'کارشناس',
@@ -356,7 +366,7 @@ export default function EmployeesPage() {
             </div>
             <button type="button" onClick={() => setAddOpen(false)} className="text-[11px] font-bold text-[#9fb0c7]">بستن</button>
           </div>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div>
           <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-name">
             نام و نام خانوادگی
@@ -377,6 +387,21 @@ export default function EmployeesPage() {
             dir="ltr"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
+            className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
+          />
+          </div>
+          <div>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-phone">
+            شماره موبایل
+          </label>
+          <input
+            id="emp-phone"
+            dir="ltr"
+            inputMode="numeric"
+            autoComplete="tel"
+            value={faDigits(form.phone)}
+            onChange={(e) => setForm({ ...form, phone: normalizeIranMobile(e.target.value) })}
+            placeholder="۰۹۱۲۱۲۳۴۵۶۷"
             className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
           </div>
@@ -600,6 +625,12 @@ export default function EmployeesPage() {
               </dd>
             </div>
             <div className="flex items-center justify-between gap-4">
+              <dt className="text-[#9fb0c7]">شماره موبایل دریافت کد</dt>
+              <dd className="font-num ltr select-all font-bold text-white">
+                {faDigits(createdCredentials.phone)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
               <dt className="text-[#9fb0c7]">رمز عبور اولیه</dt>
               <dd className="font-num ltr select-all font-bold text-white">
                 {createdCredentials.password}
@@ -607,8 +638,8 @@ export default function EmployeesPage() {
             </div>
           </dl>
           <p className="mt-4 rounded-xl border border-[#27416c] bg-[#152848] p-3 text-[11px] leading-6 text-[#cdd6e3]">
-            کارمند از صفحه ورود مدیران و کارمندان، ابتدا نام کاربری و همین رمز را وارد می‌کند؛ در
-            محیط سندباکس اگر پیامک نرسید کد ۱۲۳۴۵۶ معتبر است.
+            کارمند از صفحه ورود مدیران و کارمندان، ابتدا نام کاربری و همین رمز را وارد می‌کند؛ کد
+            ورود دومرحله‌ای به شماره موبایل ثبت‌شده ارسال می‌شود.
           </p>
           <button
             type="button"

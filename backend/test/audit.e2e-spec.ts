@@ -281,6 +281,7 @@ describe('Audit (e2e)', () => {
       .send({
         fullName: 'کارمند تست بدون دسترسی لاگ',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'testpass1',
         dept: 'it',
         rank: 'کارشناس',
@@ -305,6 +306,7 @@ describe('Audit (e2e)', () => {
       .send({
         fullName: 'کارمند تست دسترسی آنی لاگ',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'testpass1',
         dept: 'it',
         rank: 'کارشناس',

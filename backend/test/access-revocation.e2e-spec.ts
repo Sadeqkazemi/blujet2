@@ -179,6 +179,7 @@ describe('Access revocation (e2e)', () => {
       .send({
         fullName: 'کارمند تست لغو دسترسی',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'testpass1',
         dept: 'commercial',
         rank: 'کارشناس',

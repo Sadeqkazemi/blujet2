@@ -53,21 +53,30 @@ describe('IT Manager (e2e)', () => {
     return qb.getOne();
   }
 
-  async function createEmployee(overrides?: Partial<{ dept: string }>) {
+  function uniqueIranMobile() {
+    return `09${crypto.randomInt(100_000_000, 1_000_000_000)}`;
+  }
+
+  async function createEmployee(
+    overrides?: Partial<{ dept: string; phone: string }>,
+  ) {
     const { accessToken } = await loginAs(app, 'itadmin');
     const username = `emp.${crypto.randomUUID().slice(0, 8)}`;
+    const phone = overrides?.phone ?? uniqueIranMobile();
+    const password = 'testpass1';
     const res = await request(app.getHttpServer())
       .post('/it/employees')
       .set(auth(accessToken))
       .send({
         fullName: 'کارمند تست',
         username,
-        password: 'testpass1',
+        phone,
+        password,
         dept: overrides?.dept ?? 'commercial',
         rank: 'کارشناس',
         permissionKeys: ['ag_list'],
       });
-    return { res, accessToken };
+    return { res, accessToken, username, phone, password };
   }
 
   // ── Permission catalog & employees ──────────────────────────────────
@@ -94,8 +103,10 @@ describe('IT Manager (e2e)', () => {
   });
 
   it('POST /it/employees creates account with granted permissions, duplicate username -> 409, short password -> 400, audited', async () => {
-    const { res, accessToken } = await createEmployee();
+    const { res, accessToken, username, phone, password } =
+      await createEmployee();
     expect(res.status).toBe(201);
+    expect(res.body.data.phone).toBe(`+98${phone.slice(1)}`);
     expect(res.body.data.permissions).toEqual(
       expect.arrayContaining([expect.objectContaining({ key: 'ag_list' })]),
     );
@@ -109,9 +120,22 @@ describe('IT Manager (e2e)', () => {
           .getRepository(User)
           .findOneBy({ fullName: 'کارمند تست' }))!.username,
         password: 'testpass1',
+        phone: uniqueIranMobile(),
         dept: 'commercial',
       });
     expect(dup.status).toBe(409);
+
+    const duplicatePhone = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'شماره تکراری',
+        username: `phone.${crypto.randomUUID().slice(0, 6)}`,
+        password: 'testpass1',
+        phone,
+        dept: 'commercial',
+      });
+    expect(duplicatePhone.status).toBe(409);
 
     const shortPassword = await request(app.getHttpServer())
       .post('/it/employees')
@@ -120,9 +144,27 @@ describe('IT Manager (e2e)', () => {
         fullName: 'رمز کوتاه',
         username: `short.${crypto.randomUUID().slice(0, 6)}`,
         password: '123',
+        phone: uniqueIranMobile(),
         dept: 'commercial',
       });
     expect(shortPassword.status).toBe(400);
+
+    const stored = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username });
+    expect(stored.phone).toBe(`+98${phone.slice(1)}`);
+    expect(stored.twoFactorEnabled).toBe(true);
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username, password });
+    expect(login.status).toBe(200);
+    expect(login.body.data).toEqual(
+      expect.objectContaining({
+        loginMode: 'TWO_FACTOR',
+        challengeId: expect.any(String),
+      }),
+    );
 
     const audit = await findAuditLog({
       category: 'ACCOUNT',
