@@ -25,7 +25,7 @@ export class AgencyRequestsPublicController {
 
   @Post('otp')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary: 'پیش‌ثبت‌نام آژانس همکار — ارسال کد تأیید به شماره موبایل',
   })

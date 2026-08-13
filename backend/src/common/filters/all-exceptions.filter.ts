@@ -22,9 +22,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
 
     const isHttp = exception instanceof HttpException;
+    const parserStatus = this.parserErrorStatus(exception);
     const status = isHttp
       ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+      : (parserStatus ?? HttpStatus.INTERNAL_SERVER_ERROR);
     const { code, message } = this.resolveBody(exception, isHttp, status);
 
     const trace = exception instanceof Error ? exception.stack : undefined;
@@ -47,6 +48,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private resolveBody(exception: unknown, isHttp: boolean, status: number) {
+    if (status === 413) {
+      return {
+        code: ErrorCode.PAYLOAD_TOO_LARGE,
+        message: 'حجم درخواست بیشتر از حد مجاز است.',
+      };
+    }
     if (!isHttp) {
       return { code: ErrorCode.INTERNAL_ERROR, message: FALLBACK_MESSAGE };
     }
@@ -67,7 +74,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       [HttpStatus.FORBIDDEN]: ErrorCode.FORBIDDEN,
       [HttpStatus.NOT_FOUND]: ErrorCode.NOT_FOUND,
       [HttpStatus.CONFLICT]: ErrorCode.CONFLICT,
+      [HttpStatus.PAYLOAD_TOO_LARGE]: ErrorCode.PAYLOAD_TOO_LARGE,
       [HttpStatus.TOO_MANY_REQUESTS]: ErrorCode.RATE_LIMITED,
+      [HttpStatus.GATEWAY_TIMEOUT]: ErrorCode.REQUEST_TIMEOUT,
     };
 
     const message =
@@ -79,5 +88,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code: fallbackByStatus[status] ?? ErrorCode.INTERNAL_ERROR,
       message,
     };
+  }
+
+  private parserErrorStatus(exception: unknown): number | undefined {
+    if (typeof exception !== 'object' || exception === null) return undefined;
+    const error = exception as { status?: unknown; type?: unknown };
+    if (error.status === HttpStatus.PAYLOAD_TOO_LARGE) {
+      return HttpStatus.PAYLOAD_TOO_LARGE;
+    }
+    if (error.type === 'entity.too.large') {
+      return HttpStatus.PAYLOAD_TOO_LARGE;
+    }
+    return undefined;
   }
 }

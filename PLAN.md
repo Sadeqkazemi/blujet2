@@ -1644,6 +1644,15 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   frontend unit tests passed; both production builds passed. See
   `docs/features/production-edge-hardening.md`.
 
+- [x] **API Gateway hardening (2026-08-13)** — added canonical `/api/v1`
+  aliases while retaining all legacy routes, validated request correlation,
+  trusted forwarded/real-IP handling, general and stricter login/OTP limits,
+  request timeout/body-size enforcement, rate-limit-exempt health checks,
+  security headers, structured/redacted edge logs, and normalized 413/429/504
+  errors. Added Supertest integration and Nginx/auth regression coverage; no
+  booking, pricing, seat-lock, executive-approval, finance logic, or database
+  migration was introduced. See `docs/features/api-gateway.md`.
+
 - [ ] **Production backend artifact paths (2026-08-05)** - fix the stale
   `dist/src/` paths used by the production Docker command and TypeORM
   migration/seed scripts, add regression coverage, and verify the rebuilt
