@@ -24,7 +24,7 @@ const META: Record<
     paths: (
       <>
         <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5z" />
-        <path d="M9 9.5c0 3 2.5 5.5 5.5 5.5" />
+        <path d="M8.5 7.8c.4-.4.8-.2 1 .2l.8 1.8c.1.3.1.5-.1.7l-.7.8a6.8 6.8 0 0 0 3.2 3.2l.8-.7c.2-.2.5-.2.7-.1l1.8.8c.4.2.6.6.4 1-.4 1-1.3 1.7-2.4 1.7-3.9-.2-7-3.3-7.2-7.2 0-1 .7-1.9 1.7-2.2z" />
       </>
     ),
   },
@@ -65,6 +65,7 @@ export function SocialIcon({
       strokeLinejoin="round"
       className={className}
       aria-hidden
+      data-testid={`social-icon-${id}`}
     >
       {meta.paths}
     </svg>
