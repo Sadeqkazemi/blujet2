@@ -20,6 +20,7 @@ import {
 } from '../api/notifications';
 import { fetchSupportTickets } from '../api/support-tickets';
 import { fetchCustomersIncompleteCount } from '../api/customers';
+import { fetchFinancialIntegrations } from '../api/finance-manager';
 import type { NotificationRow } from '../types/notifications';
 import { faDigits } from '../lib/fa-format';
 import type { EmployeeContext, PanelNavItem } from '../types/panels';
@@ -271,6 +272,21 @@ export default function PanelShell() {
                 to: '/panel/staff',
                 tone: 'danger',
               });
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
+    if (navKeys.has('integrations')) {
+      tasks.push(
+        fetchFinancialIntegrations()
+          .then((result) => {
+            if (result.connectedCount > 0) {
+              next.integrations = {
+                count: result.connectedCount,
+                className: 'bg-[#6ee7b7] text-[#0f3a2d]',
+              };
             }
           })
           .catch(() => undefined),

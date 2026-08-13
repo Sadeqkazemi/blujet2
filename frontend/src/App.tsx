@@ -46,6 +46,8 @@ import FlightsRouter from './components/FlightsRouter';
 import FlightOpsPage from './features/flightops/FlightOpsPage';
 import ReservationPage from './features/reservation/ReservationPage';
 import FinancePage from './features/finance/FinancePage';
+import FinanceReportsPage from './features/finance-reports/FinanceReportsPage';
+import FinancialIntegrationsPage from './features/financial-integrations/FinancialIntegrationsPage';
 import StaffReportsPage from './features/staff-reports/StaffReportsPage';
 import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import AdminsPage from './features/admins/AdminsPage';
@@ -225,6 +227,12 @@ export default function App() {
               </Route>
               <Route path="finance" element={<TabGate tabKey="finance" />}>
                 <Route index element={<FinancePage />} />
+              </Route>
+              <Route path="exports" element={<TabGate tabKey="exports" />}>
+                <Route index element={<FinanceReportsPage />} />
+              </Route>
+              <Route path="integrations" element={<TabGate tabKey="integrations" />}>
+                <Route index element={<FinancialIntegrationsPage />} />
               </Route>
               <Route path="reports" element={<TabGate tabKey="reports" />}>
                 <Route index element={<ReportsRouter />} />

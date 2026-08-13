@@ -20,6 +20,26 @@ happens at the frontend edge only (`frontend/src/lib/jalali.ts`).
 
 ---
 
+## Finance-manager completion (2026-08-13) — exports and accounting connections
+
+The reports/export feature is read-only over the existing `Booking`,
+`Passenger`, `FlightInstance`, `LedgerEntry`, `AgencyProfile`, and
+`AgencyInvoice` tables; report rows are not copied into a reporting table.
+Every IRR aggregate remains `bigint` until it crosses the API boundary.
+
+Accounting providers reuse `ExternalServiceConfig`, one row per provider with
+keys `finance_holo`, `finance_sepidar`, `finance_hesabfa`,
+`finance_rahkaran`, and `finance_parmis`. Existing columns hold the provider
+name, deployment-configured endpoint, encrypted API key, enabled/connected
+flag, last test/sync timestamp and success result. `lastTestMessage` stores a
+sanitized upstream result only; it must never contain the credential or raw
+financial payload. Connect, sync, and disconnect mutations also create
+`AuditLog(category=FINANCE)` entries. No schema migration is required because
+the existing encrypted external-service record already provides the required
+durable contract.
+
+---
+
 ## Phase 1 — Auth, RBAC, panel shell, dashboard/reporting core
 
 ### Role (enum)

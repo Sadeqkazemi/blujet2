@@ -176,7 +176,7 @@ describe('FinancePage', () => {
     await waitFor(() => expect(screen.queryByTestId('reconciliation-item')).not.toBeInTheDocument());
   });
 
-  it('FINANCE_MANAGER finance-ops view loads day granularity with Jalali date picker', async () => {
+  it('FINANCE_MANAGER finance-ops view follows the approved fixed annual layout', async () => {
     mockRole('FINANCE_MANAGER');
     const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
     vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
@@ -188,13 +188,11 @@ describe('FinancePage', () => {
     renderFinancePage();
     await screen.findByText('تراکنش‌های مالی اخیر');
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'روزانه' }));
-    expect(await screen.findByTestId('sales-chart-day')).toBeInTheDocument();
-
     await waitFor(() =>
-      expect(kpiSpy).toHaveBeenCalledWith(expect.objectContaining({ granularity: 'day', date: expect.any(String) })),
+      expect(kpiSpy).toHaveBeenCalledWith({ granularity: 'year' }),
     );
+    expect(screen.queryByText('بازه گزارش مالی')).not.toBeInTheDocument();
+    expect(screen.getByText(/کل درآمد · سال/)).toBeInTheDocument();
   });
 
   it('CEO gets the analytic view: sales chart + revenue mix, no transactions/settlements', async () => {

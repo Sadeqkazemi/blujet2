@@ -50,6 +50,8 @@ import { CustomersModule } from './modules/customers/customers.module';
 import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
 import { LoansModule } from './modules/loans/loans.module';
 import { PartnerApiModule } from './modules/partner-api/partner-api.module';
+import { FinanceReportsModule } from './modules/finance-reports/finance-reports.module';
+import { FinancialIntegrationsModule } from './modules/financial-integrations/financial-integrations.module';
 
 @Module({
   imports: [
@@ -73,6 +75,7 @@ import { PartnerApiModule } from './modules/partner-api/partner-api.module';
           'req.body.password',
           'req.body.otp',
           'req.body.nationalId',
+          'req.body.apiKey',
         ],
       },
     }),
@@ -129,6 +132,8 @@ import { PartnerApiModule } from './modules/partner-api/partner-api.module';
     TravelCostsModule,
     LoansModule,
     PartnerApiModule,
+    FinanceReportsModule,
+    FinancialIntegrationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

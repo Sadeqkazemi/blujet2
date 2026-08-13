@@ -95,6 +95,20 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M16 7h4v4" />
     </NavIcon>
   ),
+  exports: (
+    <NavIcon>
+      <path d="M12 3v12" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M4 18v2h16v-2" />
+    </NavIcon>
+  ),
+  integrations: (
+    <NavIcon>
+      <rect x="3" y="9" width="7" height="6" rx="2" />
+      <rect x="14" y="9" width="7" height="6" rx="2" />
+      <path d="M10 12h4" />
+    </NavIcon>
+  ),
   cartable: (
     <NavIcon>
       <path d="M4 13h4l1.5 3h5L16 13h4" />
