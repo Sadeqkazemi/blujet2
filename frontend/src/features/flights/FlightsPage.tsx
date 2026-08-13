@@ -1532,15 +1532,6 @@ export default function FlightsPage() {
           )}
         </Modal>
       )}
-      {seatMapFlight && (
-        <MdSeatMapModal
-          flight={seatMapFlight}
-          onClose={() => setSeatMapFlight(null)}
-          onNotice={setNotice}
-          onError={setError}
-          onChanged={() => void load()}
-        />
-      )}
       {aircraftStepUp.modal}
 
       {plan && (
