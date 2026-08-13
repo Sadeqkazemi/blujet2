@@ -35,8 +35,10 @@ describe('Panels (e2e)', () => {
       'reports',
       'staff',
       'finance',
+      'exports',
       'refund',
       'cartable',
+      'integrations',
     ]);
     expect(keys).not.toContain('flights');
     expect(keys).not.toContain('flightops');
