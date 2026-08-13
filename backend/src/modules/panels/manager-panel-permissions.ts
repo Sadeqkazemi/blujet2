@@ -28,6 +28,8 @@ const NAV_PERMISSION_BY_KEY: Readonly<
   staff: 'reports',
   mgrreports: 'reports',
   finance: 'finance',
+  exports: 'finance',
+  integrations: 'finance',
   refund: 'refunds',
   club: 'club',
   clubrules: 'club',
@@ -62,6 +64,7 @@ export function permissionForRequestPath(
     return 'reports';
   }
   if (/^\/reconciliation(?:\/|$)/.test(path)) return 'finance';
+  if (/^\/financial-integrations(?:\/|$)/.test(path)) return 'finance';
   if (/^\/refunds(?:\/|$)/.test(path)) return 'refunds';
   if (/^\/club(?:\/|$)/.test(path)) return 'club';
   if (/^\/(?:site-content\/admin|blog\/admin|careers)(?:\/|$)/.test(path)) {

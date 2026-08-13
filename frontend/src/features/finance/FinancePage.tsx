@@ -146,49 +146,6 @@ function RevenueMixCard({ mix, theme = 'light' }: { mix: RevenueMixResult; theme
   );
 }
 
-function CompletedFlightsCard({
-  flights,
-  theme = 'light',
-}: {
-  flights: CompletedFlightsSummary;
-  theme?: 'light' | 'dark';
-}) {
-  const dark = theme === 'dark';
-  return (
-    <div
-      className={
-        dark
-          ? 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5'
-          : 'rounded-xl border border-border bg-white p-5'
-      }
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <div className={`text-sm font-bold ${dark ? 'text-white' : 'text-ink'}`}>پروازهای انجام‌شده</div>
-        <span className={`font-num text-lg font-black ${dark ? 'text-white' : 'text-ink'}`}>
-          {faDigits(flights.flightCount)}{' '}
-          <span className={`text-[10px] font-normal ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>پرواز</span>
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-3 text-center">
-        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
-          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>مجموع صندلی</div>
-          <div className={`font-num mt-1 text-sm font-black ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}>
-            {faDigits(flights.totalSeats)}
-          </div>
-        </div>
-        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
-          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>فروخته‌شده</div>
-          <div className="font-num mt-1 text-sm font-black text-[#34d399]">{faDigits(flights.soldSeats)}</div>
-        </div>
-        <div className={dark ? 'rounded-xl bg-[#18223a] p-3' : 'rounded-lg bg-body p-3'}>
-          <div className={`text-[10px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>فروش‌نرفته</div>
-          <div className="font-num mt-1 text-sm font-black text-[#f87171]">{faDigits(flights.unsoldSeats)}</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const TX_STATUS_CLASS: Record<string, string> = {
   success: 'bg-[#10b98124] text-[#34d399]',
   warning: 'bg-[#f59e0b24] text-[#fbbf24]',
@@ -396,7 +353,6 @@ function ReconciliationQueueCard({
 function FinanceOpsView() {
   const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
   const bannerAlert = lowSalesAlerts[0] ?? null;
-  const chart = useSalesChartQuery({ includeFlightMode: false });
   const [kpis, setKpis] = useState<KpiResult | null>(null);
   const [flights, setFlights] = useState<CompletedFlightsSummary | null>(null);
   const [tx, setTx] = useState<RecentTransactionsResult | null>(null);
@@ -412,14 +368,13 @@ function FinanceOpsView() {
   const settlementsPager = usePagination(settlements?.rows ?? []);
 
   useEffect(() => {
-    if (!chart.isQueryReady) return;
-
+    const financeQuery = { granularity: 'year' as const };
     let cancelled = false;
     Promise.all([
-      fetchKpis(chart.query),
-      fetchCompletedFlightsSummary(chart.query),
+      fetchKpis(financeQuery),
+      fetchCompletedFlightsSummary(financeQuery),
       fetchRecentTransactions(),
-      fetchRevenueMix(chart.query),
+      fetchRevenueMix(financeQuery),
       fetchAgencySettlements(),
       fetchReconciliationQueue(),
     ])
@@ -440,7 +395,7 @@ function FinanceOpsView() {
     return () => {
       cancelled = true;
     };
-  }, [chart.query, chart.isQueryReady]);
+  }, []);
 
   async function onResolveReconciliation(id: string, note: string) {
     await resolveReconciliation(id, note);
@@ -462,26 +417,14 @@ function FinanceOpsView() {
   }
 
   if (loadError) return <p className="rounded-xl bg-danger/10 p-4 text-sm text-[#f87171]">{loadError}</p>;
-  if (!chart.isQueryReady || !kpis || !flights || !tx || !mix || !settlements || !reconciliation)
+  if (!kpis || !flights || !tx || !mix || !settlements || !reconciliation)
     return <p className="rounded-xl border border-white/10 bg-panel-surface p-8 text-center text-sm text-panel-muted">در حال بارگذاری…</p>;
-
-  const periodLabel =
-    chart.granularity === 'year'
-      ? 'سال جاری'
-      : chart.granularity === 'q6'
-        ? '۶ ماهه'
-        : chart.granularity === 'q3'
-          ? '۳ ماهه'
-          : chart.granularity === 'month'
-            ? 'ماهانه'
-            : chart.granularity === 'day'
-              ? 'روزانه'
-              : '';
+  const jalaliYear = faDigits(dayjs().calendar('jalali').year());
 
   const kpiCards = [
     {
       kind: 'revenue' as const,
-      label: `کل درآمد · ${periodLabel}`,
+      label: `کل درآمد · سال ${jalaliYear}`,
       value: compactFinanceMoney(kpis.revenueIrr),
       badge: trendBadge(kpis.trends.revenuePct),
     },
@@ -518,30 +461,6 @@ function FinanceOpsView() {
         </p>
       )}
 
-      <section className="rounded-[14px] border border-white/10 bg-panel-surface px-4 py-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[13px] font-extrabold text-panel-ink">بازه گزارش مالی</h2>
-            <p className="mt-1 text-[10.5px] text-panel-muted">شاخص‌ها و گزارش‌ها بر اساس بازه انتخاب‌شده به‌روزرسانی می‌شوند</p>
-          </div>
-          <div className="hscroll max-w-full overflow-x-auto pb-1">
-            <SalesChartControls
-              modes={chart.modes}
-              granularity={chart.granularity}
-              onGranularityChange={chart.setGranularity}
-              selectedDate={chart.selectedDate}
-              onSelectedDateChange={chart.setSelectedDate}
-              selectedMonthStart={chart.selectedMonthStart}
-              onSelectedMonthStartChange={chart.setSelectedMonthStart}
-              flightNo={chart.flightNo}
-              onFlightNoChange={chart.setFlightNo}
-              onApplyFlightNo={chart.applyFlightNo}
-              variant="segmented"
-            />
-          </div>
-        </div>
-      </section>
-
       <div className="grid grid-cols-1 gap-[13px] sm:grid-cols-2 xl:grid-cols-4">
         {kpiCards.map((k) => (
           <FinanceKpiCard key={k.label} {...k} />
@@ -550,7 +469,7 @@ function FinanceOpsView() {
 
       <LowSalesBanner alert={bannerAlert} variant="dark" />
 
-      <CompletedFlightsCard flights={flights} theme="dark" />
+      <FlightsStrip flights={flights} />
 
       <div className="grid grid-cols-1 gap-[13px] xl:grid-cols-[1.7fr_1fr]">
         <section className="rounded-[14px] border border-white/10 bg-panel-surface p-[15px]">
@@ -1361,7 +1280,7 @@ export default function FinancePage() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <h1 className="mb-1 text-xl font-black text-panel-ink">مالی</h1>
-        <p className="mb-6 text-sm text-panel-muted">تراکنش‌ها، ترکیب درآمد و تسویه‌حساب آژانس‌های همکار</p>
+        <p className="mb-6 text-sm text-panel-muted">فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی</p>
         <FinanceOpsView />
       </div>
     );

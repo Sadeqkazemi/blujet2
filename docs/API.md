@@ -675,10 +675,32 @@ panels that carry these tabs. Design findings that scope this phase:
 | GET | `/staff-reports/mine` | EMPLOYEE | «گزارش‌های من» — فید فعالیت خود کارمند از `AuditLog` (`{ items: [{ id, title, detail, category, at }] }`). |
 | GET | `/staff-reports` | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
 
-Deliberately not in scope (documented, not dropped): Excel/PDF exports
-(mock toast only); the finance mock's orphaned income/expense chart; the
-notification "mark as read" persistence (the design's dismiss is purely
-client-side state — kept client-side).
+The earlier Excel-export deferral is superseded by the finance-manager
+completion section below. PDF
+export remains out of scope because the approved finance-manager reference
+only exposes CSV and Excel actions. The finance mock's orphaned
+income/expense chart and notification "mark as read" persistence remain
+out of scope.
+
+### Finance-manager completion (2026-08-13) — reports, exports, and accounting connectors
+
+All routes in this section are `FINANCE_MANAGER` only and remain protected by
+`JwtAuthGuard`, `RolesGuard`, and `PanelAccessGuard`.
+
+| Method | Path | Request | Response / behavior |
+|---|---|---|---|
+| GET | `/reporting/finance-reports` | `scope=AGENCIES\|CHARTERS\|CUSTOMERS`, `period=flight\|day\|month\|q3\|q6\|year`, `date?`, `month?`, `flightInstanceId?` | Real booking/ledger aggregates for the approved «گزارشات و خروجی» tabs. Returns `{ rows, summary, selectedPeriod }`; empty datasets return empty rows and zero totals. |
+| GET | `/reporting/finance-reports/export` | Same filters plus `format=csv\|excel` | Downloads UTF-8 CSV or SpreadsheetML Excel generated from the exact filtered result. No client-side sample rows are introduced. |
+| GET | `/reporting/finance-flight-search` | `q?`, `date?`, `month?` | Completed/departed flights matching flight number or route, with real capacity, sold-seat and sales totals. |
+| GET | `/reporting/finance-flight-search/:flightInstanceId` | — | Selected flight summary plus per-agency sold seats, paid amount, and outstanding amount derived from bookings and ledger/invoices. |
+| GET | `/financial-integrations` | — | Five supported providers (`HOLO`, `SEPIDAR`, `HESABFA`, `RAHKARAN`, `PARMIS`) with connection status, masked key suffix, last real sync timestamp/status, and connected count. Secrets are never returned. |
+| POST | `/financial-integrations/:provider/connect` | `{ apiKey }` | Encrypts the key at rest and performs a real provider health/auth request against the configured endpoint. Persists connected state only after success; audited. Returns 422 when the provider endpoint is not configured or verification fails. |
+| POST | `/financial-integrations/:provider/sync` | — | Sends a real finance snapshot to the provider adapter, stores the real result/time, and audits it. Returns 409 if disconnected and 502 for upstream failure. |
+| DELETE | `/financial-integrations/:provider` | — | Clears the encrypted credential and connected state; audited. |
+
+Accounting provider base URLs are supplied through deployment configuration,
+not the browser. Vendor adapters fail closed when their endpoint is absent;
+the UI therefore never reports a fabricated connection or successful sync.
 
 ---
 
