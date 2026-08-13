@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { PanelAccessFlag } from '../src/database/entities/panel-access-flag.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -198,6 +199,69 @@ describe('Panels (e2e)', () => {
       'referrals',
     ]);
     expect(keys).not.toContain('flights');
+  });
+
+  it('IT grants update employee manager-derived nav and API authorization immediately', async () => {
+    const it = await loginAs(app, 'itadmin');
+    const employee = await loginAs(app, 'sales.moradi');
+    const employeeRow = await dataSource
+      .getRepository(User)
+      .findOne({ where: { username: 'sales.moradi' } });
+    expect(employeeRow).toBeTruthy();
+
+    const grant = (permissionKey: string, enabled: boolean) =>
+      request(app.getHttpServer())
+        .patch(`/it/employees/${employeeRow!.id}/permissions`)
+        .set('Authorization', `Bearer ${it.accessToken}`)
+        .send({ permissionKey, grant: enabled });
+
+    expect((await grant('fl_view', true)).status).toBe(200);
+    let nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    expect(nav.body.data.map((item: { key: string }) => item.key)).toEqual(
+      expect.arrayContaining(['flights']),
+    );
+    expect(nav.body.data.map((item: { key: string }) => item.key)).not.toEqual(
+      expect.arrayContaining(['routes', 'aircraft']),
+    );
+
+    const readable = await request(app.getHttpServer())
+      .get('/flights/airports')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    expect(readable.status).toBe(200);
+    const writeDenied = await request(app.getHttpServer())
+      .post('/flights/schedule-templates/preview')
+      .set('Authorization', `Bearer ${employee.accessToken}`)
+      .send({});
+    expect(writeDenied.status).toBe(403);
+
+    expect((await grant('fl_manage', true)).status).toBe(200);
+    nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    expect(nav.body.data.map((item: { key: string }) => item.key)).toEqual(
+      expect.arrayContaining(['flights', 'routes', 'aircraft']),
+    );
+    const writeReachesValidation = await request(app.getHttpServer())
+      .post('/flights/schedule-templates/preview')
+      .set('Authorization', `Bearer ${employee.accessToken}`)
+      .send({});
+    expect(writeReachesValidation.status).toBe(400);
+
+    expect((await grant('fl_view', false)).status).toBe(200);
+    expect((await grant('fl_manage', false)).status).toBe(200);
+    nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set('Authorization', `Bearer ${employee.accessToken}`);
+    expect(nav.body.data.map((item: { key: string }) => item.key)).not.toContain('flights');
+    expect(
+      (
+        await request(app.getHttpServer())
+          .get('/flights/airports')
+          .set('Authorization', `Bearer ${employee.accessToken}`)
+      ).status,
+    ).toBe(403);
   });
 
   it('returns the confirmed tab set for SITE_ADMIN', async () => {

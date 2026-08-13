@@ -166,11 +166,22 @@ export class EmployeesService {
     const isKnownCatalogDept = (CATALOG_DEPTS as readonly string[]).includes(
       catalogDept,
     );
+    const requestedPermissionKeys = dto.permissionKeys ?? [];
     const grantable = isKnownCatalogDept
       ? await this.permissionRepo.find({
-          where: { dept: catalogDept, key: In(dto.permissionKeys ?? []) },
+          where: { dept: catalogDept, key: In(requestedPermissionKeys) },
         })
       : [];
+    const grantableKeys = new Set(grantable.map((permission) => permission.key));
+    const invalidPermissionKeys = requestedPermissionKeys.filter(
+      (key) => !grantableKeys.has(key),
+    );
+    if (invalidPermissionKeys.length > 0) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `دسترسی‌های انتخاب‌شده برای این واحد معتبر نیست: ${invalidPermissionKeys.join(', ')}`,
+      });
+    }
 
     const passwordHash = await argon2.hash(dto.password);
     const employeeId = await this.userRepo.manager.transaction(async (tx) => {

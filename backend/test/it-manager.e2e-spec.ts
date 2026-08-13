@@ -173,6 +173,58 @@ describe('IT Manager (e2e)', () => {
     expect(audit).not.toBeNull();
   });
 
+  it('POST /it/employees rejects unknown and cross-unit grants instead of silently creating a weaker account', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const username = `invalid-grant.${crypto.randomUUID().slice(0, 6)}`;
+    const res = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند با دسترسی نامعتبر',
+        username,
+        phone: uniqueIranMobile(),
+        password: 'testpass1',
+        dept: 'commercial',
+        permissionKeys: ['ag_list', 'rf_process', 'does_not_exist'],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('دسترسی');
+    expect(await dataSource.getRepository(User).findOneBy({ username })).toBeNull();
+  });
+
+  it('a newly created employee logs in and receives only the navigation granted by IT', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const username = `finance-nav.${crypto.randomUUID().slice(0, 6)}`;
+    const password = 'Finance@1405';
+    const created = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند مالی دسترسی محدود',
+        username,
+        phone: uniqueIranMobile(),
+        password,
+        dept: 'finance',
+        rank: 'کارشناس',
+        permissionKeys: ['rf_list', 'rp_finance'],
+      });
+    expect(created.status).toBe(201);
+
+    const employee = await loginAs(app, username, password);
+    expect(employee.accessToken).toBeTruthy();
+    const nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set(auth(employee.accessToken));
+    expect(nav.status).toBe(200);
+    expect(nav.body.data.map((item: { key: string }) => item.key)).toEqual([
+      'dashboard',
+      'refund',
+      'reports',
+      'referrals',
+    ]);
+  });
+
   it('GET/PATCH /it/employees/:id and non-IT role gets 403 everywhere', async () => {
     const { res, accessToken } = await createEmployee();
     const id = res.body.data.id;

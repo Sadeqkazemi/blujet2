@@ -34,15 +34,16 @@ const CATALOG: PermissionCatalog = {
 };
 
 describe('EmployeesPage', () => {
-  it('shows a real empty state without a hardcoded manager permission matrix', async () => {
+  it('shows the reference access matrix and IT scope next to the real empty state', async () => {
     vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
     vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue({});
 
     render(<EmployeesPage />);
 
     expect(await screen.findAllByText('کارمندی ثبت نشده است.')).not.toHaveLength(0);
-    expect(screen.queryByText('تحت مدیریت IT')).not.toBeInTheDocument();
-    expect(screen.queryByText('سطح دسترسی واحد IT')).not.toBeInTheDocument();
+    expect(screen.getByText('دسترسی و سطوح کارمندان')).toBeInTheDocument();
+    expect(screen.getByText('سطح دسترسی واحد IT')).toBeInTheDocument();
+    expect(screen.getByText('مدیریت کاربران و حساب‌ها')).toBeInTheDocument();
   });
 
   it('renders the employee list and validates the create form (short password)', async () => {
@@ -128,7 +129,7 @@ describe('EmployeesPage', () => {
     await user.click(screen.getByRole('button', { name: '+ ایجاد واحد سازمانی جدید' }));
     await user.type(screen.getByPlaceholderText('نام واحد جدید (مثلاً بازاریابی)'), 'بازاریابی');
     await user.click(screen.getByRole('button', { name: 'افزودن' }));
-    expect(screen.getByRole('button', { name: 'بازاریابی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /بازاریابی/ })).toBeInTheDocument();
   });
 
   it('shows the reference add-user form inline and then shows the assigned credentials', async () => {
@@ -158,6 +159,34 @@ describe('EmployeesPage', () => {
     expect(screen.getByText('Assigned@1405')).toBeInTheDocument();
     expect(itApi.createEmployee).toHaveBeenCalledWith(
       expect.objectContaining({ phone: '09121234567' }),
+    );
+  });
+
+  it('identifies each unit manager and clears stale permissions when the unit changes', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue({
+      ...CATALOG,
+      finance: [
+        { sectionKey: 'refund', sectionLabelFa: 'استرداد بلیط', perms: [{ key: 'rf_list', labelFa: 'مشاهده درخواست‌ها' }] },
+      ],
+    });
+    const createSpy = vi.spyOn(itApi, 'createEmployee').mockResolvedValue(DETAIL);
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
+
+    expect(screen.getAllByText('زیرمجموعه مدیر بازرگانی')).toHaveLength(2);
+    expect(screen.getByText('زیرمجموعه مدیر مالی')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'مشاهدهٔ فهرست آژانس‌ها' }));
+    await user.click(screen.getByRole('button', { name: /واحد مالی/ }));
+    await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'کارمند مالی');
+    await user.type(screen.getByLabelText('نام کاربری'), 'finance.employee');
+    await user.type(screen.getByLabelText('شماره موبایل'), '09121234567');
+    await user.type(screen.getByLabelText('رمز عبور اولیه'), 'Assigned@1405');
+    await user.click(screen.getByRole('button', { name: 'ایجاد حساب و اعلان به مدیر' }));
+
+    expect(createSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ dept: 'finance', permissionKeys: [] }),
     );
   });
 });

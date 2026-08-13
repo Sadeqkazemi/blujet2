@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { fetchActiveSessions, fetchSecurityPolicy, logoutAllSessions, updateSecurityPolicy } from '../../api/it-manager';
 import { faDigits } from '../../lib/fa-format';
 import { useStepUp } from '../../hooks/useStepUp';
+import { useOptionalAuth } from '../../hooks/useAuth';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
 
 const TOGGLES: { key: keyof SecurityPolicy; title: string; desc: string }[] = [
@@ -16,10 +17,12 @@ function Toggle({
   on,
   label,
   onToggle,
+  disabled = false,
 }: {
   on: boolean;
   label: string;
   onToggle: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -28,6 +31,7 @@ function Toggle({
       aria-checked={on}
       aria-label={label}
       onClick={onToggle}
+      disabled={disabled}
       className={`relative h-[25px] w-11 flex-none rounded-full transition ${
         on ? 'bg-[#3b82f6]' : 'bg-[#28344c]'
       }`}
@@ -42,6 +46,8 @@ function Toggle({
 }
 
 export default function SecurityPage() {
+  const user = useOptionalAuth()?.user;
+  const readOnly = user?.role === 'EMPLOYEE';
   const [policy, setPolicy] = useState<SecurityPolicy | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -51,13 +57,16 @@ export default function SecurityPage() {
 
   const load = useCallback(async () => {
     try {
-      const [p, s] = await Promise.all([fetchSecurityPolicy(), fetchActiveSessions()]);
+      const [p, s] = await Promise.all([
+        fetchSecurityPolicy(),
+        readOnly ? Promise.resolve([]) : fetchActiveSessions(),
+      ]);
       setPolicy(p);
       setSessions(s);
     } catch {
       setError('خطا در دریافت اطلاعات امنیتی.');
     }
-  }, []);
+  }, [readOnly]);
 
   useEffect(() => {
     void load();
@@ -116,14 +125,14 @@ export default function SecurityPage() {
                   <div className="text-xs font-bold text-[#e7ecf3]">{t.title}</div>
                   <div className="mt-0.5 text-[10.5px] text-[#6b7b94]">{t.desc}</div>
                 </div>
-                <Toggle on={Boolean(policy[t.key])} label={t.title} onToggle={() => void onToggle(t.key)} />
+                <Toggle on={Boolean(policy[t.key])} label={t.title} disabled={readOnly} onToggle={() => void onToggle(t.key)} />
               </div>
             ))}
           </div>
         </section>
 
         <div className="flex flex-col gap-[15px]">
-          <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
+          {!readOnly && <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
             <h2 className="mb-3 text-[14.5px] font-extrabold text-white">پارامترهای رمز</h2>
             <div className="flex flex-col gap-3 text-xs">
               <div className="flex justify-between gap-3">
@@ -145,7 +154,7 @@ export default function SecurityPage() {
                 </span>
               </div>
             </div>
-          </section>
+          </section>}
 
           <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -188,7 +197,7 @@ export default function SecurityPage() {
         </div>
       </div>
 
-      {confirmLogoutAll && (
+      {confirmLogoutAll && !readOnly && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#070b14]/72 p-4 backdrop-blur-[3px]"
           role="presentation"
