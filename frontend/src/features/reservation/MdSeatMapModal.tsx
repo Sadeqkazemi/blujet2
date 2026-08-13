@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   fetchPnrList,
   fetchSeatMap,
-  issuePnr,
+  fetchSeatLockAgencies,
   lockSeat,
   releaseLock,
 } from '../../api/reservation';
@@ -116,6 +116,9 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
   const [infoSeat, setInfoSeat] = useState<SeatCell | null>(null);
   const [paxName, setPaxName] = useState('');
   const [paxNid, setPaxNid] = useState('');
+  const [targetMode, setTargetMode] = useState<'PASSENGER' | 'AGENCY'>('PASSENGER');
+  const [agencyId, setAgencyId] = useState('');
+  const [agencies, setAgencies] = useState<{ id: string; name: string; licenseNo: string }[]>([]);
   const [lockWithoutName, setLockWithoutName] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -132,6 +135,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
 
   useEffect(() => {
     void reload();
+    fetchSeatLockAgencies().then(setAgencies).catch(() => setAgencies([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per flight
   }, [flight.id]);
 
@@ -220,6 +224,8 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
     setLockSeatCode(seat.seatCode);
     setPaxName('');
     setPaxNid('');
+    setTargetMode('PASSENGER');
+    setAgencyId('');
     setLockWithoutName(false);
   }
 
@@ -227,26 +233,28 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
     if (!lockSeatCode) return;
     setBusy(true);
     try {
-      if (paxName.trim()) {
-        const pnr = await issuePnr({
-          flightInstanceId: flight.id,
-          seatCode: lockSeatCode,
-          passengerName: paxName.trim(),
-          passengerNationalId: paxNid || undefined,
-        });
-        onNotice(`صندلی ${lockSeatCode} رزرو شد ✓ (PNR ${pnr.pnr})`);
-      } else if (lockWithoutName) {
-        await lockSeat(flight.id, {
-          seatCode: lockSeatCode,
-          reason: 'قفل موقت مدیریتی / نگهداری صندلی',
-          classification: 'PAYABLE',
-        });
-        onNotice(`صندلی ${lockSeatCode} به‌صورت موقت قفل شد ✓`);
-      } else {
-        onError('نام مسافر را وارد کنید یا گزینهٔ «لاک بدون نام» را فعال کنید.');
-        setBusy(false);
+      if (targetMode === 'AGENCY' && !agencyId) {
+        onError('آژانس را انتخاب کنید.');
         return;
       }
+      if (targetMode === 'PASSENGER' && !paxName.trim() && !lockWithoutName) {
+        onError('نام مسافر را وارد کنید یا گزینهٔ «لاک بدون نام» را فعال کنید.');
+        return;
+      }
+      await lockSeat(flight.id, {
+        seatCode: lockSeatCode,
+        reason:
+          targetMode === 'AGENCY'
+            ? 'تخصیص مدیریتی صندلی به آژانس'
+            : 'قفل مدیریتی برای مسافر / نگهداری صندلی',
+        classification: 'PAYABLE',
+        agencyId: targetMode === 'AGENCY' ? agencyId : undefined,
+        passengerName:
+          targetMode === 'PASSENGER' ? paxName.trim() || undefined : undefined,
+        passengerNationalId:
+          targetMode === 'PASSENGER' ? paxNid || undefined : undefined,
+      });
+      onNotice(`صندلی ${lockSeatCode} برای تأیید مدیریتی قفل شد ✓`);
       setLockSeatCode(null);
       await reload();
       onChanged();
@@ -463,7 +471,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
                   <div className="text-[10px] text-[#6b7b94]">نام مسافر</div>
                   <div className="mt-0.5 text-[12.5px] font-extrabold text-white">
-                    {seatPassengerName(infoSeat) || '—'}
+                    {seatPassengerName(infoSeat) || infoSeat.lockAgencyName || '—'}
                   </div>
                 </div>
                 <div className="rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2">
@@ -576,6 +584,22 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
               </button>
             </div>
             <div className="px-4 py-3.5">
+              <div className="mb-3 grid grid-cols-2 gap-2 rounded-xl bg-[#0b1220] p-1">
+                <button
+                  type="button"
+                  onClick={() => setTargetMode('PASSENGER')}
+                  className={`rounded-lg py-2 text-xs font-bold ${targetMode === 'PASSENGER' ? 'bg-[#1668c4] text-white' : 'text-[#9fb0c7]'}`}
+                >
+                  قفل برای مسافر
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetMode('AGENCY')}
+                  className={`rounded-lg py-2 text-xs font-bold ${targetMode === 'AGENCY' ? 'bg-[#1668c4] text-white' : 'text-[#9fb0c7]'}`}
+                >
+                  قفل برای آژانس
+                </button>
+              </div>
               <div className="mb-3 rounded-[11px] border border-[#28344c] bg-[#0b1220] px-3 py-2.5 text-[11px] leading-relaxed text-[#cdd6e3]">
                 کلاس نرخی این صندلی: <b className="text-white">{lockBand || md80SectionLabel(lockSeatCode)}</b>
                 {' — '}
@@ -583,6 +607,21 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                 <b className="text-white">{taxHint} تومان</b> · بار مجاز ۲۰ کیلوگرم
               </div>
 
+              {targetMode === 'AGENCY' ? (
+                <select
+                  value={agencyId}
+                  onChange={(e) => setAgencyId(e.target.value)}
+                  className="mb-4 h-11 w-full rounded-[10px] border border-[#28344c] bg-[#0b1220] px-3 text-xs text-white outline-none"
+                >
+                  <option value="">انتخاب آژانس…</option>
+                  {agencies.map((agency) => (
+                    <option key={agency.id} value={agency.id}>
+                      {agency.name} · {agency.licenseNo}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <>
               <label className="mb-1 block text-[11px] font-bold text-[#9fb0c7]">
                 نام مسافر (اختیاری)
               </label>
@@ -612,6 +651,8 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                 />
                 لاک بدون نام مسافر (لاک اضطراری / نگهداری صندلی)
               </label>
+                </>
+              )}
 
               <button
                 type="button"
@@ -619,7 +660,7 @@ export default function MdSeatMapModal({ flight, onClose, onNotice, onError, onC
                 onClick={() => void onIssueOrTempLock()}
                 className="mb-2 flex h-12 w-full items-center justify-center rounded-xl bg-[#f59e0b] text-[13px] font-extrabold text-[#1a1206] disabled:opacity-60"
               >
-                قفل کردن این صندلی و ایجاد PNR
+                ثبت درخواست قفل صندلی
               </button>
               <button
                 type="button"

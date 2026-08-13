@@ -11,6 +11,7 @@ import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { Airport } from '../../database/entities/airport.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import {
@@ -53,6 +54,8 @@ export class SeatmapService {
     private readonly passengerRepo: Repository<Passenger>,
     @InjectRepository(Airport)
     private readonly airportRepo: Repository<Airport>,
+    @InjectRepository(AgencyProfile)
+    private readonly agencyRepo: Repository<AgencyProfile>,
     private readonly audit: AuditService,
   ) {}
 
@@ -63,13 +66,29 @@ export class SeatmapService {
     return { releasedAt: IsNull(), expiresAt: MoreThan(new Date()) };
   }
 
+  async listLockAgencies() {
+    const agencies = await this.agencyRepo.find({
+      where: { suspendedAt: IsNull() },
+      relations: { user: true },
+      order: { joinedAt: 'DESC' },
+    });
+    return agencies.map((agency) => ({
+      id: agency.userId,
+      name: agency.user.fullName,
+      licenseNo: agency.licenseNo,
+    }));
+  }
+
   private async findSoldConflict(flightInstanceId: string, seatCode: string) {
     return this.passengerRepo
       .createQueryBuilder('p')
       .innerJoin('p.booking', 'b')
       .where('p.seatCode = :seatCode', { seatCode })
       .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
-      .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+      .andWhere(
+        `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b."holdExpiresAt" > :now))`,
+        { now: new Date() },
+      )
       .getOne();
   }
 
@@ -133,12 +152,16 @@ export class SeatmapService {
         .andWhere('b.flightInstanceId = :flightInstanceId', {
           flightInstanceId,
         })
-        .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' })
+        .andWhere(
+          `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b."holdExpiresAt" > :now))`,
+          { now: new Date() },
+        )
         .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
         .addSelect(['b.pnr', 'b.status', 'b.priceIrr'])
         .getMany(),
       this.seatLockRepo.find({
         where: { flightInstanceId, ...this.activeLockWhere() },
+        relations: { agency: { user: true } },
       }),
       this.airportRepo.find({
         where: {
@@ -194,6 +217,8 @@ export class SeatmapService {
           : null,
         lockExpiresAt: lock?.expiresAt ?? null,
         lockPassengerName: lock?.passengerName ?? null,
+        lockAgencyId: lock?.agencyId ?? null,
+        lockAgencyName: lock?.agency?.user?.fullName ?? null,
       });
     }
 
@@ -275,6 +300,16 @@ export class SeatmapService {
       });
     }
 
+    if (dto.agencyId) {
+      const agency = await this.agencyRepo.findOneBy({ userId: dto.agencyId });
+      if (!agency || agency.suspendedAt) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'آژانس انتخاب‌شده فعال یا معتبر نیست.',
+        });
+      }
+    }
+
     const nationalId = dto.passengerNationalId
       ? normalizeNationalId(dto.passengerNationalId)
       : undefined;
@@ -297,6 +332,7 @@ export class SeatmapService {
           classification: dto.classification,
           discountPct: dto.discountPct ?? null,
           requesterRank: actor.role,
+          agencyId: dto.agencyId ?? null,
           approvalStatus: 'PENDING_APPROVAL',
           expiresAt: hoursFromNow(LOCK_REQUEST_TTL_HOURS),
           passengerName: dto.passengerName ?? null,

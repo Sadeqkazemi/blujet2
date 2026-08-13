@@ -37,6 +37,13 @@ export class LockSeatDto {
   @Max(100)
   discountPct?: number;
 
+  @ApiPropertyOptional({
+    description: 'AgencyProfile.userId target for an agency lock',
+  })
+  @IsOptional()
+  @IsString()
+  agencyId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

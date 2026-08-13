@@ -311,6 +311,32 @@ describe("FlightsPage", () => {
     expect(screen.getByText("تهران")).toBeInTheDocument();
   });
 
+  it("exposes published-fare and MD-80 seat controls only to the Commercial Manager", async () => {
+    mockRole("COMMERCIAL_MANAGER");
+    mockData();
+    vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue(DETAIL);
+
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<FlightsPage />);
+    await userEvent.click(await screen.findByText("EP-821"));
+
+    const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
+    expect(within(dialog).getByRole("button", { name: /MD/ })).toBeInTheDocument();
+  });
+
+  it("does not expose published-fare or seat-lock controls to an employee", async () => {
+    mockRole("EMPLOYEE");
+    mockData();
+    vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue(DETAIL);
+
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<FlightsPage />);
+    await userEvent.click(await screen.findByText("EP-821"));
+
+    const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
+    expect(within(dialog).queryByRole("button", { name: /MD/ })).not.toBeInTheDocument();
+  });
+
   it("Senior does NOT get the pricing section", async () => {
     mockRole("SENIOR_MANAGER");
     mockData();

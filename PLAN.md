@@ -1673,6 +1673,17 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   Verified with 677 frontend tests, lint, and the production build. See
   `docs/features/public-checkout-footer-airport-i18n.md`.
 
+- [x] **Commercial flight intelligence and seat control (2026-08-13)**
+  - added advisory ML pricing on flight creation and weak-sales warnings;
+  connected Commercial Manager price publication to the governed pricing API;
+  exposed the database-backed MD-80 map with passenger/agency/anonymous locks;
+  enforced CEO/Board Chair/Commercial lock authority while keeping IT read-only;
+  aligned inventory with active 15-minute checkout holds and immutable finance
+  ledger sales; moved desktop trust badges left and repaired WhatsApp. Verified
+  with 189 backend unit tests, 19 reservation e2e tests, 22 reservation UI tests,
+  production builds, and lint. See
+  `docs/features/commercial-flight-intelligence-seat-control.md`.
+
 ## Notable findings from design extraction (informs later phases)
 
 - Several panels contain orphaned tabs/handlers (coded, unreachable from

@@ -14,6 +14,12 @@ export function fetchSeatMap(flightInstanceId: string) {
   return apiGet<SeatMap>(`/reservation/seatmap/${flightInstanceId}`);
 }
 
+export function fetchSeatLockAgencies() {
+  return apiGet<{ id: string; name: string; licenseNo: string }[]>(
+    '/reservation/seatmap/agencies/active',
+  );
+}
+
 export function lockSeat(
   flightInstanceId: string,
   dto: {
@@ -21,6 +27,7 @@ export function lockSeat(
     reason: string;
     classification: 'FREE' | 'DISCOUNTED' | 'PAYABLE';
     discountPct?: number;
+    agencyId?: string;
     passengerName?: string;
     passengerNationalId?: string;
     passengerMobile?: string;

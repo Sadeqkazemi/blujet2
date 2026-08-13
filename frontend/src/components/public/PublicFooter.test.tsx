@@ -98,6 +98,10 @@ describe('PublicFooter — desktop', () => {
     expect(trust).toHaveClass('footer-trust-section');
     expect(screen.getByTestId('footer-social-whatsapp')).toHaveStyle({ color: '#25d366' });
     expect(screen.getByTestId('social-icon-whatsapp')).toBeInTheDocument();
+    expect(screen.getByTestId('footer-desktop-trust-row')).toHaveStyle({
+      justifyContent: 'flex-start',
+      direction: 'ltr',
+    });
   });
 
   it('hides the careers link when disabled, shows it when enabled', () => {

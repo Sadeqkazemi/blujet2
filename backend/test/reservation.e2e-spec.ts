@@ -588,17 +588,30 @@ describe('Reservation (e2e)', () => {
 
   // ── Role isolation ──────────────────────────────────────────────────
 
-  it('FINANCE_MANAGER and COMMERCIAL_MANAGER get 403 on every /reservation/* endpoint', async () => {
+  it('FINANCE_MANAGER is isolated while COMMERCIAL_MANAGER can view and lock seats', async () => {
     const instance = await createScheduledInstance();
     const finance = await loginAs(app, 'finance');
     const commercial = await loginAs(app, 'comm');
 
-    for (const { accessToken } of [finance, commercial]) {
-      const res = await request(app.getHttpServer())
-        .get(`/reservation/seatmap/${instance.id}`)
-        .set(auth(accessToken));
-      expect(res.status).toBe(403);
-    }
+    const financeRead = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth(finance.accessToken));
+    expect(financeRead.status).toBe(403);
+
+    const commercialRead = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instance.id}`)
+      .set(auth(commercial.accessToken));
+    expect(commercialRead.status).toBe(200);
+
+    const commercialLock = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(commercial.accessToken))
+      .send({
+        seatCode: '16A',
+        reason: 'کنترل موجودی بازرگانی',
+        classification: 'PAYABLE',
+      });
+    expect(commercialLock.status).toBe(201);
   });
 
   it('SENIOR_MANAGER: reads succeed, every write is 403 (view-only)', async () => {

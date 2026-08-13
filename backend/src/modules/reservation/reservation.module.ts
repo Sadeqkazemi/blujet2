@@ -11,6 +11,7 @@ import { FarePricingProposal } from '../../database/entities/fare-pricing-propos
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { InternalService } from '../../database/entities/internal-service.entity';
 import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { SeatmapController } from './seatmap.controller';
 import { SeatmapService } from './seatmap.service';
 import { PnrController } from './pnr.controller';
@@ -33,6 +34,7 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
       LedgerEntry,
       InternalService,
       AgencyApiKey,
+      AgencyProfile,
     ]),
     AuditModule,
     PanelsModule,

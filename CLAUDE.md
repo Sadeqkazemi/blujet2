@@ -212,7 +212,7 @@ Management panels (one per role — shared shell, role-scoped tabs):
   explicit user confirmation before charging.
 - Booking flow is an explicit state machine:
   `DRAFT → HELD → PAID → TICKETED → (CANCELLED | EXPIRED | REFUNDED)`
-  - HELD has a 10-minute TTL (matches the design's hold timer);
+  - HELD has a 15-minute TTL; an unpaid/failed order expires and releases its inventory;
     expiry releases inventory automatically.
   - All state transitions are transactional and idempotent.
 - Seat inventory lives ONLY in PostgreSQL. Prevent double-booking with

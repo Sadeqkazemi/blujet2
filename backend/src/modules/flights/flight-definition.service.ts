@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -44,6 +46,11 @@ import {
 import { resolveAircraftType } from './aircraft-type.util';
 import { toFlightUiStatus, toPublishStatus } from './definition-sellability';
 import {
+  PRICE_SUGGESTION_PROVIDER,
+  type PriceSuggestionProvider,
+} from '../ai/price-suggestion.provider';
+import type { PersistedAiSuggestion } from '../pricing/pricing.service';
+import {
   countSeatsByCabin,
   type AircraftSeatMapLike,
 } from '../reservation/seat-layout';
@@ -76,6 +83,8 @@ export type PreviousSearchLocation = {
 
 @Injectable()
 export class FlightDefinitionService {
+  private readonly logger = new Logger(FlightDefinitionService.name);
+
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -95,6 +104,8 @@ export class FlightDefinitionService {
     private readonly proposalRepo: Repository<FarePricingProposal>,
     @InjectRepository(Booking)
     private readonly bookingRepo: Repository<Booking>,
+    @Inject(PRICE_SUGGESTION_PROVIDER)
+    private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly audit: AuditService,
   ) {}
 
@@ -578,6 +589,49 @@ export class FlightDefinitionService {
         definitionStatus: FlightDefinitionStatus.DRAFT,
       },
     });
+
+    // Advisory only: a missing/slow ML service must never roll back or block
+    // the authoritative flight-definition transaction above.
+    try {
+      const aiResult = await this.priceSuggestions.suggest([
+        {
+          proposal_id: createdId,
+          origin_code: dto.originCode,
+          dest_code: dto.destCode,
+          departure_at: departureAt.toISOString(),
+          base_price_irr: Number(dto.basePriceIrr),
+          competitor_price_irr: Number(
+            dto.competitorPriceIrr ?? dto.basePriceIrr,
+          ),
+          proposed_price_irr: Number(dto.basePriceIrr),
+          capacity: dto.capacity,
+          charter_seats: charterSeats,
+        },
+      ]);
+      const ai = aiResult?.suggestions?.find(
+        (item) => item.proposal_id === createdId,
+      );
+      if (ai && aiResult) {
+        const suggestion: PersistedAiSuggestion = {
+          priceIrr: ai.price_irr,
+          reason: ai.reason_fa,
+          factors: ai.factors_fa,
+          season: ai.season_fa,
+          occasion: ai.occasion_fa,
+          confidence: ai.confidence,
+          modelVersion: aiResult.model_version,
+          generatedAt: new Date().toISOString(),
+        };
+        await this.dataSource.query(
+          `UPDATE "flight_instances" SET "aiSuggestion" = $1::jsonb WHERE "id" = $2`,
+          [JSON.stringify(suggestion), createdId],
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Flight ${createdId} was created, but its advisory ML suggestion could not be persisted: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
 
     return this.getDefinition(createdId);
   }

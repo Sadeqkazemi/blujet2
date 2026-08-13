@@ -572,6 +572,8 @@ export class FlightsService {
           ? Math.round((sold / instance.capacity) * 100)
           : 0,
       aircraftType: resolveAircraftType(instance),
+      aiSuggestion:
+        instance.aiSuggestion as unknown as PersistedAiSuggestion | null,
     };
   }
 

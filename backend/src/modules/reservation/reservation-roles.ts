@@ -5,6 +5,7 @@ import type { Role } from '../../database/enums';
 export const RESERVATION_ROLES = [
   'CEO',
   'BOARD_CHAIR',
+  'COMMERCIAL_MANAGER',
   'SENIOR_MANAGER',
   'IT_MANAGER',
 ] as const satisfies readonly Role[];
@@ -14,6 +15,7 @@ export const RESERVATION_ROLES = [
 export const CAN_LOCK_ROLES = [
   'CEO',
   'BOARD_CHAIR',
+  'COMMERCIAL_MANAGER',
   'IT_MANAGER',
 ] as const satisfies readonly Role[];
 
@@ -22,4 +24,5 @@ export const CAN_LOCK_ROLES = [
 export const CAN_SEAT_LOCK_ROLES = [
   'CEO',
   'BOARD_CHAIR',
+  'COMMERCIAL_MANAGER',
 ] as const satisfies readonly Role[];

@@ -245,11 +245,23 @@ export default function PublicFooter() {
               <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>{t('footerTagline')}</p>
               <DownloadButtons />
               {socialRow}
-              <TrustBadges />
             </div>
             <FooterLinkColumn title={t('footerColServices')} links={serviceLinks} />
             <FooterLinkColumn title={t('footerColCompany')} links={companyLinks} />
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
+          </div>
+          <div
+            data-testid="footer-desktop-trust-row"
+            style={{
+              maxWidth: 1480,
+              margin: '0 auto',
+              padding: '0 40px 28px',
+              display: 'flex',
+              justifyContent: 'flex-start',
+              direction: 'ltr',
+            }}
+          >
+            <TrustBadges />
           </div>
           <div style={{ borderTop: '1px solid #ffffff12' }}>
             <div style={{ maxWidth: 1480, margin: '0 auto', padding: '17px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
