@@ -631,6 +631,7 @@ export default function CheckoutPage() {
       <div className="relative w-full max-w-[500px] rounded-[28px] bg-white px-7 pb-8 pt-16 shadow-2xl sm:px-10">
         <button
           type="button"
+          data-testid="checkout-login-close"
           aria-label={locale === 'en' ? 'Close' : locale === 'ar' ? 'إغلاق' : 'بستن'}
           onClick={() => setLoginOpen(false)}
           className="absolute start-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f5f9] text-xl text-[#66758a]"
