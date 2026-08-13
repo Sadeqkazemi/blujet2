@@ -175,7 +175,7 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
       expect(denied.status).toBe(403);
     });
 
-    it('fl_manage grants API access but never adds a "flights" nav tab — «مدیریت پروازها» stays out of the employee sidebar per product', async () => {
+    it('fl_manage grants API access and exposes the matching manager surfaces in the employee sidebar', async () => {
       const { username } = await createEmployeeWithPermissions('commercial', [
         'fl_manage',
       ]);
@@ -186,7 +186,9 @@ describe('Phase 27 — EMPLOYEE fl_manage/ag_settle/fn_invoices (e2e)', () => {
         .set('Authorization', `Bearer ${accessToken}`);
       expect(nav.status).toBe(200);
       const keys = (nav.body.data as { key: string }[]).map((n) => n.key);
-      expect(keys).not.toContain('flights');
+      expect(keys).toEqual(
+        expect.arrayContaining(['flights', 'routes', 'aircraft']),
+      );
     });
   });
 
