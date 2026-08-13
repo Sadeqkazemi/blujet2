@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as crypto from 'node:crypto';
 import type { Request } from 'express';
 import { Repository } from 'typeorm';
 import { ErrorCode } from '../../common/errors';
@@ -19,6 +18,7 @@ import {
   type AgencyApiScope as AgencyApiScopeType,
 } from '../../database/enums';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { hashAgencyApiKey } from '../../common/agency-api-key';
 
 export const PARTNER_API_SCOPES = 'partner-api-scopes';
 
@@ -30,10 +30,6 @@ export interface PartnerApiContext {
 
 export interface PartnerApiRequest extends Request {
   partnerApi?: PartnerApiContext;
-}
-
-function hashSecret(raw: string): string {
-  return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
 @Injectable()
@@ -56,7 +52,7 @@ export class PartnerApiKeyGuard implements CanActivate {
     }
 
     const apiKey = await this.apiKeyRepo.findOne({
-      where: { keyHash: hashSecret(rawKey.trim()) },
+      where: { keyHash: hashAgencyApiKey(rawKey.trim()) },
       relations: { agency: { user: true } },
     });
     const now = new Date();

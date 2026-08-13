@@ -10,6 +10,7 @@ import {
 } from './partner-api-key.guard';
 
 describe('PartnerApiKeyGuard', () => {
+  const originalPiiKey = process.env.PII_ENCRYPTION_KEY;
   const request = { headers: {} } as PartnerApiRequest;
   const context = {
     switchToHttp: () => ({ getRequest: () => request }),
@@ -29,6 +30,18 @@ describe('PartnerApiKeyGuard', () => {
     getAllAndOverride,
   } as unknown as Reflector;
   const guard = new PartnerApiKeyGuard(repo, reflector);
+
+  beforeAll(() => {
+    process.env.PII_ENCRYPTION_KEY = 'a'.repeat(64);
+  });
+
+  afterAll(() => {
+    if (originalPiiKey === undefined) {
+      delete process.env.PII_ENCRYPTION_KEY;
+    } else {
+      process.env.PII_ENCRYPTION_KEY = originalPiiKey;
+    }
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
