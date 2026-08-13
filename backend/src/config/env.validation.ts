@@ -75,6 +75,30 @@ class EnvironmentVariables {
   @IsOptional()
   @IsNumberString()
   BANK_LOAN_TIMEOUT_MS?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  API_RATE_LIMIT_MAX?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  API_RATE_LIMIT_WINDOW_MS?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  API_REQUEST_TIMEOUT_MS?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  API_MAX_BODY_BYTES?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  TRUST_PROXY_HOPS?: string;
+
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  HTTPS_ENABLED?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

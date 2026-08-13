@@ -72,7 +72,7 @@ function setRefreshCookie(res: Response, token: string, expiresAt?: Date) {
     secure: isCookieSecure(),
     sameSite: 'strict',
     maxAge,
-    path: '/auth',
+    path: '/',
   });
 }
 
@@ -95,7 +95,7 @@ export class AuthController {
 
   @Post('staff/first-login/request')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Sandbox staff first login: set password/mobile and issue OTP',
   })
@@ -197,7 +197,7 @@ export class AuthController {
 
   @Post('agency/first-login/request')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary: 'Sandbox agency first login: set password and issue OTP',
   })
@@ -229,7 +229,7 @@ export class AuthController {
 
   @Post('agency/password-reset/request')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({ summary: 'بازیابی رمز آژانس — درخواست OTP پیامکی' })
   async agencyPasswordResetRequest(@Body() dto: AgencyPasswordResetRequestDto) {
     const result = await this.auth.requestAgencyPasswordReset(dto.phone);
@@ -256,7 +256,7 @@ export class AuthController {
 
   @Post('otp/request')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Public purchase engine — step 1: request an OTP for a customer phone number',
@@ -336,7 +336,7 @@ export class AuthController {
       REFRESH_COOKIE
     ];
     if (presented) await this.auth.logout(presented);
-    res.clearCookie(REFRESH_COOKIE, { path: '/auth' });
+    res.clearCookie(REFRESH_COOKIE, { path: '/' });
     return { success: true };
   }
 
@@ -456,7 +456,7 @@ export class AuthController {
 
   @Post('password-reset/email/request')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'فراموشی رمز — مسیر ایمیل: ارسال کد به ایمیل تأییدشدهٔ حساب (جایگزین OTP پیامکی)',
@@ -508,7 +508,7 @@ export class AuthController {
   @Post('step-up/request')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'درخواست کد تأیید مجدد پیش از عملیات پرریسک — تحویل از طریق کانال 2FA موجود',

@@ -1,14 +1,28 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
-import { randomUUID } from 'node:crypto';
+import {
+  DEFAULT_RATE_LIMIT_MAX,
+  DEFAULT_RATE_LIMIT_WINDOW_MS,
+  positiveInteger,
+} from './gateway/gateway.constants';
+import { requestIdFromHeader } from './gateway/request-id';
+import {
+  serializeLogRequest,
+  serializeLogResponse,
+} from './gateway/structured-logging';
+import {
+  authIdentityTracker,
+  ipTracker,
+  isSensitiveAuth,
+  sensitiveAuthLimit,
+} from './gateway/throttling';
 import { validateEnv } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
-import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { PanelsModule } from './modules/panels/panels.module';
@@ -67,15 +81,26 @@ import { FinancialIntegrationsModule } from './modules/financial-integrations/fi
             : process.env.NODE_ENV === 'production'
               ? 'info'
               : 'debug',
-        genReqId: (req) =>
-          (req.headers['x-request-id'] as string) || randomUUID(),
+        genReqId: (req) => requestIdFromHeader(req.headers['x-request-id']),
+        customProps: (req) => ({
+          requestId: req.id,
+          realIp: (req as typeof req & { ip?: string }).ip,
+        }),
+        serializers: {
+          req: serializeLogRequest,
+          res: serializeLogResponse,
+        },
         redact: [
           'req.headers.authorization',
           'req.headers.cookie',
           'req.body.password',
           'req.body.otp',
+          'req.body.code',
           'req.body.nationalId',
           'req.body.apiKey',
+          'req.body.passportNumber',
+          'req.body.cardNumber',
+          'req.body.accountNumber',
         ],
       },
     }),
@@ -86,7 +111,34 @@ import { FinancialIntegrationsModule } from './modules/financial-integrations/fi
     // already carry their own stricter @Throttle() override and are
     // unaffected by this default.
     ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 600 }],
+      throttlers: [
+        {
+          name: 'default',
+          ttl: positiveInteger(
+            process.env.API_RATE_LIMIT_WINDOW_MS,
+            DEFAULT_RATE_LIMIT_WINDOW_MS,
+          ),
+          limit: positiveInteger(
+            process.env.API_RATE_LIMIT_MAX,
+            DEFAULT_RATE_LIMIT_MAX,
+          ),
+          getTracker: ipTracker,
+        },
+        {
+          name: 'sensitiveIp',
+          ttl: 60_000,
+          limit: sensitiveAuthLimit,
+          skipIf: (context) => !isSensitiveAuth(context),
+          getTracker: ipTracker,
+        },
+        {
+          name: 'sensitiveIdentity',
+          ttl: 60_000,
+          limit: sensitiveAuthLimit,
+          skipIf: (context) => !isSensitiveAuth(context),
+          getTracker: authIdentityTracker,
+        },
+      ],
     }),
     CommonModule,
     DatabaseModule,
@@ -137,8 +189,4 @@ import { FinancialIntegrationsModule } from './modules/financial-integrations/fi
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

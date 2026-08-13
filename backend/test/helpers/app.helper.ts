@@ -1,29 +1,25 @@
 import { Test } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import cookieParser from 'cookie-parser';
+import { INestApplication } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
-import { AllExceptionsFilter } from '../../src/common/filters/all-exceptions.filter';
+import { configureGateway } from '../../src/gateway/configure-gateway';
 
 export async function createTestApp(): Promise<INestApplication<App>> {
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
   }).compile();
-  const app = moduleFixture.createNestApplication<INestApplication<App>>({
+  const app = moduleFixture.createNestApplication<
+    NestExpressApplication & INestApplication<App>
+  >({
     bufferLogs: true,
+    bodyParser: false,
+    rawBody: true,
   });
   const logger = app.get(Logger);
   app.useLogger(logger);
-  app.use(cookieParser());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-  app.useGlobalFilters(new AllExceptionsFilter(logger));
+  configureGateway(app);
   await app.init();
   return app;
 }

@@ -11,6 +11,33 @@ Auth: `Authorization: Bearer <accessToken>` (JWT, short-lived) +
 httpOnly refresh cookie. All endpoints below require an authenticated staff
 session unless marked public.
 
+## API gateway contract
+
+- The canonical base path is `/api/v1`. During the compatibility window, each
+  existing unprefixed endpoint remains an alias with identical method,
+  authentication, status, and payload semantics. For example,
+  `/api/v1/auth/me` and `/auth/me` reach the same handler.
+- `GET /health` and `GET /api/v1/health` are public, unauthenticated, and
+  rate-limit-exempt. They report database/build readiness without secrets.
+- Every response carries `X-Request-Id`. Clients may supply a 1-128 character
+  identifier containing ASCII letters, digits, `.`, `_`, `:`, or `-`; invalid
+  values are replaced with a server-generated UUID.
+- The edge honors forwarded client IP/protocol/host only through the configured
+  trusted proxy chain. Application logs use the resolved real IP.
+- General traffic is rate-limited per resolved IP. Login endpoints are limited
+  to 5 attempts/minute and OTP issuance endpoints to 3 attempts/minute; their
+  tracker also incorporates the normalized username/phone/email identity.
+- Controller processing is limited to 30 seconds by default and request bodies
+  to 10 MiB by default. Limits are environment-configurable. Gateway timeout
+  and oversized-body responses use the common envelope.
+- Gateway error codes add `REQUEST_TIMEOUT` (HTTP 504) and
+  `PAYLOAD_TOO_LARGE` (HTTP 413). `RATE_LIMITED` remains HTTP 429.
+- JSON request logs include correlation ID, real IP, method, URL, status, and
+  duration. Nginx and NestJS share the same validated correlation ID.
+  Credentials, tokens, cookies, query strings, OTPs, and passenger identity
+  fields are redacted or omitted. Nginx-local oversized-body failures also
+  return the common JSON error envelope.
+
 **Money fields (post Int→BigInt migration, see `docs/DB_SCHEMA.md`):**
 every IRR-denominated field (`priceIrr`, `taxIrr`, `amountIrr`,
 `signedAmountIrr`, `limitIrr`, `feeIrr`, ... — any field ending `Irr`,

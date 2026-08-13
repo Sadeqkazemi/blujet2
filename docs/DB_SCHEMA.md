@@ -2788,3 +2788,11 @@ table with `sourceType = AGENCY_REQUEST`; the request is also recorded in
 `charter_commitments`, active `agency_seat_commitments`, and occupied
 passengers. Only approval through the existing commercial commitment API can
 create inventory that search and booking subtract from online availability.
+
+## API Gateway hardening (2026-08-13)
+
+No database schema or migration is introduced. API version aliases, request
+correlation, trusted-proxy address resolution, throttling, timeouts, body-size
+limits, security headers, logging, health checks, and error normalization are
+transport/operational concerns. They do not persist or mutate reservation,
+pricing, seat-lock, executive-approval, or financial state.

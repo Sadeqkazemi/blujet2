@@ -1,8 +1,14 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
 
 @Controller('health')
+@SkipThrottle({
+  default: true,
+  sensitiveIp: true,
+  sensitiveIdentity: true,
+})
 export class HealthController {
   constructor(private readonly dataSource: DataSource) {}
 

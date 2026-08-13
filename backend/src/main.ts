@@ -1,45 +1,31 @@
 import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
-import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { initSentry } from './common/sentry';
+import {
+  configureGateway,
+  configureHttpServerTimeouts,
+} from './gateway/configure-gateway';
 import './common/bigint-json';
 
 initSentry();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
+    bodyParser: false,
     // Needed for HMAC verification of bank loan webhooks.
     rawBody: true,
   });
 
   const logger = app.get(Logger);
   app.useLogger(logger);
-
-  app.use(helmet());
-  app.use(cookieParser());
-  app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean),
-    credentials: true,
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  app.useGlobalFilters(new AllExceptionsFilter(app.get(Logger)));
+  configureGateway(app);
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('blujet API')
@@ -69,7 +55,8 @@ async function bootstrap() {
   }
   // (__dirname resolves to backend/dist/src at runtime — three levels up reaches the repo root.)
 
-  await app.listen(process.env.PORT ?? 3000);
+  const server = await app.listen(process.env.PORT ?? 3000);
+  configureHttpServerTimeouts(server);
   logger.log(`blujet backend listening on :${process.env.PORT ?? 3000}`);
 }
 void bootstrap();
