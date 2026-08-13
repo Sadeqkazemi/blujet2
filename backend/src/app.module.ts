@@ -49,6 +49,7 @@ import { WebservicePricingModule } from './modules/webservice-pricing/webservice
 import { CustomersModule } from './modules/customers/customers.module';
 import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
 import { LoansModule } from './modules/loans/loans.module';
+import { PartnerApiModule } from './modules/partner-api/partner-api.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { LoansModule } from './modules/loans/loans.module';
     CustomersModule,
     TravelCostsModule,
     LoansModule,
+    PartnerApiModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

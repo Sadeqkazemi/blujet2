@@ -46,6 +46,7 @@ import type { Irr } from '../../common/money';
 import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.interface';
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { hashAgencyApiKey } from '../../common/agency-api-key';
 import type {
   AgencyApiScope,
   AgencyApiKeyStatus,
@@ -54,10 +55,6 @@ import type {
   AgencyMembershipStatus,
   AgencyWebserviceRequestStatus,
 } from '../../database/enums';
-
-function hashSecret(raw: string): string {
-  return crypto.createHash('sha256').update(raw).digest('hex');
-}
 
 function generateApiKeySecret(): string {
   return `bjk_${crypto.randomBytes(32).toString('base64url')}`;
@@ -1179,7 +1176,7 @@ export class AgenciesService {
     const created = await this.apiKeyRepo.save(
       this.apiKeyRepo.create({
         agencyId: id,
-        keyHash: hashSecret(rawKey),
+        keyHash: hashAgencyApiKey(rawKey),
         scope,
         status: 'ACTIVE',
       }),
@@ -1226,7 +1223,7 @@ export class AgenciesService {
         'API_KEY_ROTATE',
       );
       const rawKey = generateApiKeySecret();
-      key.keyHash = hashSecret(rawKey);
+      key.keyHash = hashAgencyApiKey(rawKey);
       key.activatedAt = new Date();
       key.lastUsedAt = null;
       key.callCount = 0;

@@ -46,5 +46,6 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
   ],
   controllers: [AgencyPortalController],
   providers: [AgencyPortalService],
+  exports: [AgencyPortalService],
 })
 export class AgencyPortalModule {}
