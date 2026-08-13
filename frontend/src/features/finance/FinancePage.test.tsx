@@ -112,6 +112,7 @@ function mockRole(role: Role) {
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
+    refreshMe: vi.fn(),
     signOut: vi.fn(),
   });
 }
@@ -129,6 +130,10 @@ describe('FinancePage', () => {
 
     renderFinancePage();
     expect(await screen.findByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
+    expect(screen.getByTestId('finance-ops-view')).toBeInTheDocument();
+    expect(screen.getByTestId('finance-kpi-revenue')).toHaveTextContent('۵۰۰ میلیون');
+    expect(screen.getByTestId('finance-kpi-debt')).toHaveTextContent('۲ آژانس');
+    expect(screen.getByTestId('finance-revenue-mix')).toHaveTextContent('بر اساس کانال فروش');
     expect(screen.getByText('تسویه حساب')).toBeInTheDocument();
     expect(screen.getByText('تسویه‌حساب آژانس‌های همکار')).toBeInTheDocument();
     expect(screen.getByText(/معوق — ۴۲ روز/)).toBeInTheDocument();
@@ -137,6 +142,7 @@ describe('FinancePage', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'ارسال یادآوری' }));
     await waitFor(() => expect(remindSpy).toHaveBeenCalledWith('ag1', 'inv3'));
+    expect(await screen.findByText(/یادآوری تسویه.*ارسال شد/)).toBeInTheDocument();
   });
 
   it('shows the payment-reconciliation queue and resolves an item with a required note', async () => {
