@@ -913,7 +913,17 @@ export default function FlightsPage() {
                                     <div
                                       className={`font-num font-bold ${Number(d.lossIrr) > 0 ? "text-danger" : "text-panel-muted"}`}
                                     >
-                                      
+                                      {Number(d.lossIrr) > 0
+                                        ? `${faMoney(d.lossIrr)} تومان`
+                                        : "—"}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ),
+                        )}
+                      </>
                     )}
                     {data.completed.rows.length === 0 && (
                       <p className="py-6 text-center text-xs text-panel-muted">
