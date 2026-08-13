@@ -195,6 +195,15 @@ describe('CheckoutPage', () => {
     expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
     expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('checkout-login-close'));
+    expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
+
+    await userEvent.click(next);
+    expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {

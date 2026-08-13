@@ -58,7 +58,7 @@ function TrustBadges({ compact }: { compact?: boolean }) {
   const borderRadius = compact ? 11 : 12;
   const badges = [t('badgeTrust'), t('badgeGuild'), t('badgeSamandehi'), t('badgeIata')];
 
-  return (
+  const badgesRow = (
     <div
       data-testid="footer-trust-badges"
       style={{
@@ -91,6 +91,20 @@ function TrustBadges({ compact }: { compact?: boolean }) {
           {label}
         </span>
       ))}
+    </div>
+  );
+
+  return (
+    <div
+      className="footer-trust-section"
+      data-testid="footer-trust-section"
+      style={{
+        marginTop: compact ? 0 : 18,
+        paddingTop: compact ? 0 : 18,
+        borderTop: compact ? undefined : '1px solid #ffffff12',
+      }}
+    >
+      {badgesRow}
     </div>
   );
 }
@@ -152,25 +166,31 @@ export default function PublicFooter() {
 
   const socialRow = socialLinks.length ? (
     <div
-      className="flex flex-wrap items-center gap-2"
-      style={{ justifyContent: isMobile ? 'center' : 'flex-start' }}
-      data-testid="footer-social-links"
+      className="footer-social-section"
+      data-testid="footer-social-section"
+      style={{ margin: isMobile ? '4px 0 18px' : '2px 0 0' }}
     >
-      {socialLinks.map((link) => (
-        <a
-          key={link.id}
-          href={link.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label={link.name}
-          title={link.name}
-          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 transition hover:bg-white/10"
-          style={{ color: socialBrandColor(link.id) }}
-          data-testid={`footer-social-${link.id}`}
-        >
-          <SocialIcon id={link.id} size={18} />
-        </a>
-      ))}
+      <div
+        className="flex flex-wrap items-center gap-2"
+        style={{ justifyContent: isMobile ? 'center' : 'flex-start' }}
+        data-testid="footer-social-links"
+      >
+        {socialLinks.map((link) => (
+          <a
+            key={link.id}
+            href={link.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={link.name}
+            title={link.name}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 transition hover:-translate-y-0.5 hover:bg-white/10"
+            style={{ color: socialBrandColor(link.id) }}
+            data-testid={`footer-social-${link.id}`}
+          >
+            <SocialIcon id={link.id} size={18} />
+          </a>
+        ))}
+      </div>
     </div>
   ) : null;
 

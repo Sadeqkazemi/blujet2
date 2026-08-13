@@ -80,6 +80,26 @@ describe('PublicFooter — desktop', () => {
     );
   });
 
+  it('keeps social icons and trust badges in separate spaced layout groups', () => {
+    mockLocale('fa');
+    vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([
+      {
+        id: 'whatsapp',
+        name: 'WhatsApp',
+        url: 'https://wa.me/989121234567',
+      },
+    ]);
+    renderFooter();
+
+    const social = screen.getByTestId('footer-social-section');
+    const trust = screen.getByTestId('footer-trust-section');
+    expect(social).not.toContainElement(trust);
+    expect(social).toHaveClass('footer-social-section');
+    expect(trust).toHaveClass('footer-trust-section');
+    expect(screen.getByTestId('footer-social-whatsapp')).toHaveStyle({ color: '#25d366' });
+    expect(screen.getByTestId('social-icon-whatsapp')).toBeInTheDocument();
+  });
+
   it('hides the careers link when disabled, shows it when enabled', () => {
     mockLocale('fa');
     const { rerender } = renderFooter();
@@ -97,6 +117,17 @@ describe('PublicFooter — desktop', () => {
 
 describe('PublicFooter — mobile', () => {
   beforeEach(() => mockMobile());
+
+  it('separates social links from trust badges on narrow screens', () => {
+    mockLocale('en');
+    vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([
+      { id: 'whatsapp', name: 'WhatsApp', url: 'https://wa.me/989121234567' },
+    ]);
+    renderFooter();
+
+    expect(screen.getByTestId('footer-social-section')).toBeInTheDocument();
+    expect(screen.getByTestId('footer-trust-section')).toBeInTheDocument();
+  });
 
   it('renders centered brand block and accordion sections', () => {
     mockLocale('fa');
