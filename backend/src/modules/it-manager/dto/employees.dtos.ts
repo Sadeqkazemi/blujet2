@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -6,8 +7,10 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
+import { toLocalIranMobile } from '../../../common/normalize-iran-phone';
 
 const REFERRAL_SCOPES = ['MANAGERS_ONLY', 'ALL_STAFF'] as const;
 
@@ -33,6 +36,16 @@ export class CreateEmployeeDto {
   @IsString()
   @MinLength(2)
   username: string;
+
+  @ApiProperty({
+    example: '09121234567',
+    description: 'شماره موبایل کارمند برای دریافت کد ورود دومرحله‌ای',
+  })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? toLocalIranMobile(value) : value,
+  )
+  @Matches(/^09\d{9}$/, { message: 'شماره موبایل معتبر نیست.' })
+  phone: string;
 
   @ApiProperty({ description: 'رمز عبور اولیه — حداقل ۶ کاراکتر' })
   @IsString()

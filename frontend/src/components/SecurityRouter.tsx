@@ -6,6 +6,6 @@ import { useAuth } from '../hooks/useAuth';
  * «رمزها و امنیت» page and CEO/Senior's Phase 12 «امنیت و رمز عبور». */
 export default function SecurityRouter() {
   const { user } = useAuth();
-  if (user?.role === 'IT_MANAGER') return <SecurityPage />;
+  if (user?.role === 'IT_MANAGER' || user?.role === 'EMPLOYEE') return <SecurityPage />;
   return <OwnSecurityPage />;
 }

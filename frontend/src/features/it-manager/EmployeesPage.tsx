@@ -4,22 +4,24 @@ import {
   fetchEmployee,
   fetchEmployees,
   fetchPermissionCatalog,
+  removeEmployee,
   resetEmployeePassword,
   setEmployeePermission,
   setEmployeeStatus,
 } from '../../api/it-manager';
-import { faDigits } from '../../lib/fa-format';
+import { faDigits, isValidIranMobile, normalizeIranMobile } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
+import { useOptionalAuth } from '../../hooks/useAuth';
 import type { EmployeeDetail, EmployeeListRow, PermissionCatalog } from '../../types/it-manager';
 
 const DEPT_OPTIONS = [
-  { value: 'commercial', label: 'واحد بازرگانی' },
-  { value: 'sales', label: 'واحد فروش' },
-  { value: 'finance', label: 'واحد مالی' },
-  { value: 'it', label: 'واحد IT' },
+  { value: 'commercial', label: 'واحد بازرگانی', manager: 'مدیر بازرگانی', color: '#38bdf8' },
+  { value: 'sales', label: 'واحد فروش', manager: 'مدیر بازرگانی', color: '#4ade80' },
+  { value: 'finance', label: 'واحد مالی', manager: 'مدیر مالی', color: '#3b82f6' },
+  { value: 'it', label: 'واحد IT', manager: 'مدیر IT', color: '#8b5cf6' },
 ];
 
 const DEPT_LABELS: Record<string, string> = {
@@ -30,6 +32,25 @@ const DEPT_LABELS: Record<string, string> = {
 };
 
 const RANK_OPTIONS = ['کارآموز', 'کارشناس', 'کارشناس ارشد', 'سرپرست واحد', 'معاون'];
+
+const ACCESS_MATRIX = [
+  { role: 'مدیر مالی', sub: 'تحت مدیریت IT', color: '#6ee7b7', access: [true, true, false, false, false] },
+  { role: 'مدیر بازرگانی', sub: 'تحت مدیریت IT', color: '#6ee7b7', access: [true, true, true, false, false] },
+  { role: 'ادمین سایت', sub: 'تحت مدیریت IT', color: '#6ee7b7', access: [true, false, true, true, false] },
+  { role: 'آژانس', sub: 'تحت مدیریت IT', color: '#6ee7b7', access: [true, true, false, false, true] },
+  { role: 'مدیر ارشد', sub: 'فقط رئیس هیئت مدیره', color: '#f59e0b', access: [true, true, false, true, false] },
+  { role: 'رئیس هیئت مدیره', sub: 'بالاترین سطح', color: '#f87171', access: [true, true, false, true, false] },
+] as const;
+
+const ACCESS_COLUMNS = ['داشبورد', 'مالی', 'محتوا', 'کاربران', 'تنظیمات'] as const;
+
+const IT_SCOPE_ITEMS = [
+  ['مدیریت کاربران و حساب‌ها', true],
+  ['بازنشانی و مدیریت رمز عبور', true],
+  ['تعیین دسترسی نقش‌ها', true],
+  ['دسترسی به پنل مدیر ارشد', false],
+  ['دسترسی به پنل رئیس هیئت مدیره', false],
+] as const;
 
 function deptRoleLabel(
   dept: string | null,
@@ -44,6 +65,8 @@ function deptRoleLabel(
 }
 
 export default function EmployeesPage() {
+  const user = useOptionalAuth()?.user;
+  const canManageAccess = user?.role !== 'EMPLOYEE';
   const [employees, setEmployees] = useState<EmployeeListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +78,7 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({
     fullName: '',
     username: '',
+    phone: '',
     password: '',
     dept: 'commercial',
     rank: 'کارشناس',
@@ -66,6 +90,7 @@ export default function EmployeesPage() {
   const [addingDept, setAddingDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [statusConfirm, setStatusConfirm] = useState<EmployeeListRow | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<EmployeeListRow | null>(null);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<EmployeeDetail | null>(null);
@@ -73,6 +98,7 @@ export default function EmployeesPage() {
   const [createdCredentials, setCreatedCredentials] = useState<{
     fullName: string;
     username: string;
+    phone: string;
     password: string;
   } | null>(null);
 
@@ -111,6 +137,11 @@ export default function EmployeesPage() {
       setAddError('نام و نام کاربری الزامی است.');
       return;
     }
+    const phone = normalizeIranMobile(form.phone);
+    if (!isValidIranMobile(phone)) {
+      setAddError('شماره موبایل معتبر وارد کنید (مثال: ۰۹۱۲۱۲۳۴۵۶۷).');
+      return;
+    }
     if (form.password.length < 6) {
       setAddError('رمز عبور باید حداقل ۶ کاراکتر باشد.');
       return;
@@ -119,11 +150,13 @@ export default function EmployeesPage() {
       const submitted = {
         fullName: form.fullName.trim(),
         username: form.username.trim(),
+        phone,
         password: form.password,
       };
       await createEmployee({
         fullName: submitted.fullName,
         username: submitted.username,
+        phone: submitted.phone,
         password: submitted.password,
         dept: form.dept,
         rank: form.rank,
@@ -136,6 +169,7 @@ export default function EmployeesPage() {
       setForm({
         fullName: '',
         username: '',
+        phone: '',
         password: '',
         dept: 'commercial',
         rank: 'کارشناس',
@@ -202,16 +236,36 @@ export default function EmployeesPage() {
     setStatusConfirm(null);
   }
 
+  async function confirmDelete() {
+    if (!deleteConfirm) return;
+    try {
+      await removeEmployee(deleteConfirm.id);
+      if (detailId === deleteConfirm.id) setDetailId(null);
+      setNotice(`حساب «${deleteConfirm.fullName}» حذف و بایگانی شد.`);
+      setDeleteConfirm(null);
+      await load();
+    } catch {
+      setError('خطا در حذف حساب کارمند.');
+    }
+  }
+
   function submitNewDept() {
     const name = newDeptName.trim();
     if (!name) return;
     const id = `custom_${Date.now()}`;
     setCustomDepts((prev) => [...prev, { id, label: name }]);
     setCustomDeptLabels((prev) => ({ ...prev, [id]: name }));
-    setForm((f) => ({ ...f, dept: id }));
+    selectDept(id);
     setAddingDept(false);
     setNewDeptName('');
     setNotice(`واحد سازمانی «${name}» ایجاد شد ✓`);
+  }
+
+  function selectDept(dept: string) {
+    setForm((current) => ({ ...current, dept }));
+    // Permission keys are unit-scoped. Carrying selections between units
+    // would either grant the wrong manager surface or be rejected by the API.
+    setSelectedPerms(new Set());
   }
 
   const catalogDeptKey = form.dept.startsWith('custom_')
@@ -225,12 +279,12 @@ export default function EmployeesPage() {
     <div className="flex flex-col px-[21px] pb-[34px] pt-[18px]">
       <div className="order-1 mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[20.5px] font-black text-white">کاربران و دسترسی‌ها</h1>
+          <h1 className="text-[20.5px] font-black text-white">کاربران و حساب‌های سامانه</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-            حساب‌ها، نقش‌ها، رمز عبور و سطح دسترسی کارمندان واحدها — یکپارچه
+            مدیریت یوزرها، نقش‌ها و بازنشانی رمز عبور — همه حساب‌ها زیر نظر واحد IT
           </p>
         </div>
-        <button
+        {canManageAccess && <button
           onClick={() => {
             setAddError(null);
             setAddOpen(true);
@@ -238,7 +292,7 @@ export default function EmployeesPage() {
           className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
         >
           افزودن کاربر
-        </button>
+        </button>}
       </div>
 
       {error && <p className="order-2 mb-4 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-sm text-[#f87171]">{error}</p>}
@@ -295,14 +349,20 @@ export default function EmployeesPage() {
                   >
                     ریست رمز
                   </button>
-                  <button
+                  {canManageAccess && <button
                     onClick={() => requestStatusChange(e)}
                     className={`rounded-lg border border-[#1f2a3d] px-2 py-1 text-[10px] font-bold ${
                       e.isActive ? 'text-[#f87171]' : 'text-[#34d399]'
                     }`}
                   >
                     {e.isActive ? 'تعلیق' : 'فعال‌سازی'}
-                  </button>
+                  </button>}
+                  {canManageAccess && <button
+                    onClick={() => setDeleteConfirm(e)}
+                    className="rounded-lg border border-[#f87171]/40 px-2 py-1 text-[10px] font-bold text-[#f87171]"
+                  >
+                    حذف
+                  </button>}
                 </div>
               </li>
             ))}
@@ -316,32 +376,83 @@ export default function EmployeesPage() {
         />
       </section>
 
-      <section className="order-5 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
-          <h3 className="mb-1 text-[14.5px] font-extrabold text-white">مدیریت رمز عبور کارمندان</h3>
-          <p className="mb-3 text-[10.5px] text-[#6b7b94]">
-            فقط رمز عبور کارمندان واحدها قابل بازنشانی است.
+      <section className="order-5 mb-6">
+        <div className="mb-3 flex items-start gap-2">
+          <span className="mt-1 h-7 w-1 rounded-full bg-[#f59e0b]" />
+          <div>
+            <h2 className="text-[16px] font-black text-white">دسترسی و سطوح کارمندان</h2>
+            <p className="mt-1 text-[11px] text-[#6b7b94]">تعیین سطح دسترسی کارمندان واحدها و مدیریت رمز عبور</p>
+          </div>
+        </div>
+        <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-4 text-[11.5px] leading-6 text-[#cdd6e3]">
+          <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-[#f59e0b]/15 text-lg text-[#f59e0b]">▣</span>
+          <p>
+            واحد IT فقط دسترسی <strong className="text-white">کارمندان واحدها</strong> را تعیین می‌کند.
+            دسترسی به پنل‌های مدیریتی توسط مدیر عامل و مدیر ارشد مدیریت می‌شود.
           </p>
-          <div className="flex flex-col gap-2">
-            {employees.length === 0 && (
-              <div className="rounded-lg border border-dashed border-[#28344c] p-5 text-center text-xs text-[#6b7b94]">
-                کارمندی ثبت نشده است.
-              </div>
-            )}
-            {employees.map((e) => (
-              <div key={e.id} className="flex items-center gap-2 rounded-lg border border-[#1f2a3d] p-2.5 text-xs">
-                <span className="flex-1 font-bold text-[#e7ecf3]">
-                  {e.fullName}{' '}
-                  <span className="font-normal text-[#6b7b94]">· {DEPT_LABELS[e.dept ?? ''] ?? e.dept}</span>
-                </span>
-                <button
-                  onClick={() => void onQuickReset(e)}
-                  className="rounded-lg border border-[#1f2a3d] px-2.5 py-1 text-[10px] font-bold text-[#3b82f6]"
-                >
-                  بازنشانی رمز
-                </button>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-[#1f2a3d] bg-[#141d2e]">
+          <div className="min-w-[720px]">
+            <div className="grid grid-cols-[1.6fr_repeat(5,1fr)] border-b border-[#1f2a3d] bg-[#18223a] px-4 py-3 text-[10.5px] font-bold text-[#6b7b94]">
+              <span>نقش</span>
+              {ACCESS_COLUMNS.map((column) => <span key={column} className="text-center">{column}</span>)}
+            </div>
+            {ACCESS_MATRIX.map((row) => (
+              <div key={row.role} className="grid grid-cols-[1.6fr_repeat(5,1fr)] items-center border-b border-[#1f2a3d] px-4 py-3 last:border-b-0">
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-white">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: row.color }} />
+                    {row.role}
+                  </div>
+                  <div className="mt-1 text-[9.5px] text-[#6b7b94]">{row.sub}</div>
+                </div>
+                {row.access.map((allowed, index) => (
+                  <span key={`${row.role}-${ACCESS_COLUMNS[index]}`} className={`text-center text-lg font-bold ${allowed ? 'text-[#6ee7b7]' : 'text-[#526079]'}`}>
+                    {allowed ? '✓' : '×'}
+                  </span>
+                ))}
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="order-6 mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+          <h3 className="mb-4 text-[14.5px] font-extrabold text-white">سطح دسترسی واحد IT</h3>
+          <div className="divide-y divide-[#1f2a3d]">
+            {IT_SCOPE_ITEMS.map(([label, allowed]) => (
+              <div key={label} className="flex items-center justify-between gap-3 py-2.5 text-[11.5px]">
+                <span className="text-[#cdd6e3]">{label}</span>
+                <span className={`flex items-center gap-1.5 font-bold ${allowed ? 'text-[#6ee7b7]' : 'text-[#f87171]'}`}>
+                  <span className={`flex h-6 w-6 items-center justify-center rounded-lg ${allowed ? 'bg-[#10b981]/15' : 'bg-[#f87171]/15'}`}>{allowed ? '✓' : '×'}</span>
+                  {allowed ? 'مجاز' : 'غیرمجاز'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">
+          <h3 className="mb-1 text-[14.5px] font-extrabold text-white">مدیریت رمز عبور کارمندان</h3>
+          <p className="mb-4 text-[10.5px] leading-5 text-[#6b7b94]">فقط رمز عبور کارمندان واحدها قابل بازنشانی است؛ رمز مدیران در دسترس واحد IT نیست.</p>
+          {employees.length === 0 ? (
+            <p className="py-8 text-center text-xs text-[#6b7b94]">کارمندی ثبت نشده است.</p>
+          ) : (
+            <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+              {employees.map((employee) => (
+                <div key={employee.id} className="flex items-center gap-2 rounded-lg border border-[#1f2a3d] p-2.5 text-xs">
+                  <span className="flex-1 font-bold text-[#e7ecf3]">
+                    {employee.fullName}{' '}
+                    <span className="font-normal text-[#6b7b94]">· {DEPT_LABELS[employee.dept ?? ''] ?? employee.dept}</span>
+                  </span>
+                  <button onClick={() => void onQuickReset(employee)} className="rounded-lg border border-[#28344c] px-2.5 py-1 text-[10px] font-bold text-[#60a5fa]">
+                    بازنشانی رمز
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
 
       {addOpen && (
@@ -356,7 +467,7 @@ export default function EmployeesPage() {
             </div>
             <button type="button" onClick={() => setAddOpen(false)} className="text-[11px] font-bold text-[#9fb0c7]">بستن</button>
           </div>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
           <div>
           <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-name">
             نام و نام خانوادگی
@@ -377,6 +488,37 @@ export default function EmployeesPage() {
             dir="ltr"
             value={form.username}
             onChange={(e) => setForm({ ...form, username: e.target.value })}
+            className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
+          />
+          </div>
+          <div>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-position">
+            سمت / نقش
+          </label>
+          <select
+            id="emp-position"
+            value={form.dept}
+            onChange={(event) => selectDept(event.target.value)}
+            className="w-full rounded-lg border border-[#1f2a3d] bg-[#101827] p-3 text-xs text-[#e7ecf3] outline-none transition focus:border-[#3b82f6]"
+          >
+            {DEPT_OPTIONS.map((dept) => (
+              <option key={dept.value} value={dept.value}>کارشناس {dept.label.replace('واحد ', '')}</option>
+            ))}
+            {customDepts.map((dept) => <option key={dept.id} value={dept.id}>کارشناس {dept.label}</option>)}
+          </select>
+          </div>
+          <div>
+          <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-phone">
+            شماره موبایل
+          </label>
+          <input
+            id="emp-phone"
+            dir="ltr"
+            inputMode="numeric"
+            autoComplete="tel"
+            value={faDigits(form.phone)}
+            onChange={(e) => setForm({ ...form, phone: normalizeIranMobile(e.target.value) })}
+            placeholder="۰۹۱۲۱۲۳۴۵۶۷"
             className="font-num w-full rounded-lg border border-[#1f2a3d] p-3 text-xs outline-none transition focus:border-[#3b82f6]"
           />
           </div>
@@ -434,29 +576,34 @@ export default function EmployeesPage() {
           </div>
 
           <div className="mb-1 mt-3 text-xs font-bold text-[#e7ecf3]">واحد سازمانی</div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {DEPT_OPTIONS.map((d) => (
               <button
                 key={d.value}
                 type="button"
-                onClick={() => setForm({ ...form, dept: d.value })}
-                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
-                  form.dept === d.value ? 'bg-[#3b82f6] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+                onClick={() => selectDept(d.value)}
+                className={`rounded-xl border px-4 py-3 text-right transition ${
+                  form.dept === d.value ? 'border-[#3b82f6] bg-[#23395f] text-white' : 'border-[#28344c] bg-[#101827] text-[#cdd6e3]'
                 }`}
               >
-                {d.label}
+                <span className="flex items-center gap-2 text-xs font-extrabold">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                  {d.label}
+                </span>
+                <span className="mt-1 block text-[9.5px] font-normal text-[#6b7b94]">زیرمجموعه {d.manager}</span>
               </button>
             ))}
             {customDepts.map((d) => (
               <button
                 key={d.id}
                 type="button"
-                onClick={() => setForm({ ...form, dept: d.id })}
-                className={`rounded-lg px-3 py-2 text-[11px] font-bold transition ${
-                  form.dept === d.id ? 'bg-[#f59e0b] text-white' : 'bg-[#18223a] text-[#cdd6e3]'
+                onClick={() => selectDept(d.id)}
+                className={`rounded-xl border px-4 py-3 text-right text-[11px] font-bold transition ${
+                  form.dept === d.id ? 'border-[#f59e0b] bg-[#f59e0b]/10 text-white' : 'border-[#28344c] bg-[#101827] text-[#cdd6e3]'
                 }`}
               >
                 {d.label}
+                <span className="mt-1 block text-[9.5px] font-normal text-[#6b7b94]">واحد سازمانی سفارشی</span>
               </button>
             ))}
           </div>
@@ -582,6 +729,31 @@ export default function EmployeesPage() {
         </Modal>
       )}
 
+      {deleteConfirm && (
+        <Modal variant="dark" title="حذف حساب کارمند" onClose={() => setDeleteConfirm(null)}>
+          <p className="mb-3 text-xs leading-6 text-[#9fb0c7]">
+            حساب «{deleteConfirm.fullName}» از فهرست کاربران حذف می‌شود و دیگر امکان ورود نخواهد داشت.
+          </p>
+          <p className="mb-4 rounded-lg bg-[rgba(245,158,11,.1)] p-3 text-[11px] leading-6 text-[#fbbf24]">
+            نشست‌ها و دسترسی‌ها فوراً لغو می‌شوند؛ سوابق مالی و لاگ‌های امنیتی برای حسابرسی باقی می‌مانند. این عملیات قابل فعال‌سازی مجدد نیست.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setDeleteConfirm(null)}
+              className="rounded-lg bg-[#18223a] px-4 py-2 text-xs font-bold text-[#cdd6e3]"
+            >
+              انصراف
+            </button>
+            <button
+              onClick={() => void confirmDelete()}
+              className="rounded-lg bg-danger px-4 py-2 text-xs font-bold text-white"
+            >
+              حذف و بایگانی حساب
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {createdCredentials && (
         <Modal
           variant="dark"
@@ -600,6 +772,12 @@ export default function EmployeesPage() {
               </dd>
             </div>
             <div className="flex items-center justify-between gap-4">
+              <dt className="text-[#9fb0c7]">شماره موبایل دریافت کد</dt>
+              <dd className="font-num ltr select-all font-bold text-white">
+                {faDigits(createdCredentials.phone)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-4">
               <dt className="text-[#9fb0c7]">رمز عبور اولیه</dt>
               <dd className="font-num ltr select-all font-bold text-white">
                 {createdCredentials.password}
@@ -607,8 +785,8 @@ export default function EmployeesPage() {
             </div>
           </dl>
           <p className="mt-4 rounded-xl border border-[#27416c] bg-[#152848] p-3 text-[11px] leading-6 text-[#cdd6e3]">
-            کارمند از صفحه ورود مدیران و کارمندان، ابتدا نام کاربری و همین رمز را وارد می‌کند؛ در
-            محیط سندباکس اگر پیامک نرسید کد ۱۲۳۴۵۶ معتبر است.
+            کارمند از صفحه ورود مدیران و کارمندان، ابتدا نام کاربری و همین رمز را وارد می‌کند؛ کد
+            ورود دومرحله‌ای به شماره موبایل ثبت‌شده ارسال می‌شود.
           </p>
           <button
             type="button"
@@ -647,14 +825,14 @@ export default function EmployeesPage() {
             {detail.permissions.map((p) => (
               <div key={p.key} className="flex items-center gap-2 rounded-lg border border-[#10b98140] bg-[#10b98108] p-2">
                 <span className="flex-1 text-[11px] text-[#cdd6e3]">{p.labelFa}</span>
-                <button onClick={() => void onGrant(p.key, false)} className="text-[10px] font-bold text-[#f87171]">
-                  حذف
-                </button>
+                {canManageAccess && (
+                  <button onClick={() => void onGrant(p.key, false)} className="text-[10px] font-bold text-[#f87171]">حذف</button>
+                )}
               </div>
             ))}
           </div>
 
-          {detail.available.length > 0 && (
+          {canManageAccess && detail.available.length > 0 && (
             <div className="mt-3 border-t border-[#1f2a3d] pt-3">
               <div className="mb-2 text-xs font-bold text-[#e7ecf3]">افزودن دسترسی</div>
               <div className="grid grid-cols-2 gap-1.5">

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, ILike, In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Permission } from '../../database/entities/permission.entity';
 import { EmployeePermission } from '../../database/entities/employee-permission.entity';
@@ -18,6 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
 import { generateTempPassword } from '../../common/temp-password';
+import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import {
   CATALOG_DEPTS,
   PERMISSION_CATALOG,
@@ -81,7 +82,11 @@ export class EmployeesService {
   }
 
   private async getEmployeeOrThrow(id: string) {
-    const employee = await this.userRepo.findOneBy({ id, role: 'EMPLOYEE' });
+    const employee = await this.userRepo.findOneBy({
+      id,
+      role: 'EMPLOYEE',
+      deletedAt: IsNull(),
+    });
     if (!employee) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -111,7 +116,10 @@ export class EmployeesService {
   async list(actor: AuthenticatedUser, query: ListEmployeesQueryDto) {
     const employeeDept = await this.deptScopeForEmployee(actor);
     const deptFilter = employeeDept ?? query.dept;
-    const base: { role: 'EMPLOYEE'; dept?: string } = { role: 'EMPLOYEE' };
+    const base: FindOptionsWhere<User> = {
+      role: 'EMPLOYEE',
+      deletedAt: IsNull(),
+    };
     if (deptFilter) base.dept = deptFilter;
 
     const employees = await this.userRepo.find({
@@ -140,6 +148,7 @@ export class EmployeesService {
   }
 
   async create(actor: AuthenticatedUser, dto: CreateEmployeeDto) {
+    const normalizedPhone = normalizeIranPhone(dto.phone);
     const existing = await this.userRepo.findOneBy({
       username: dto.username,
     });
@@ -150,15 +159,36 @@ export class EmployeesService {
       });
     }
 
+    const existingPhone = await this.userRepo.findOneBy({
+      phone: normalizedPhone,
+    });
+    if (existingPhone) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'این شماره موبایل قبلاً استفاده شده است.',
+      });
+    }
+
     const catalogDept = catalogDeptFor(dto.dept);
     const isKnownCatalogDept = (CATALOG_DEPTS as readonly string[]).includes(
       catalogDept,
     );
+    const requestedPermissionKeys = dto.permissionKeys ?? [];
     const grantable = isKnownCatalogDept
       ? await this.permissionRepo.find({
-          where: { dept: catalogDept, key: In(dto.permissionKeys ?? []) },
+          where: { dept: catalogDept, key: In(requestedPermissionKeys) },
         })
       : [];
+    const grantableKeys = new Set(grantable.map((permission) => permission.key));
+    const invalidPermissionKeys = requestedPermissionKeys.filter(
+      (key) => !grantableKeys.has(key),
+    );
+    if (invalidPermissionKeys.length > 0) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `دسترسی‌های انتخاب‌شده برای این واحد معتبر نیست: ${invalidPermissionKeys.join(', ')}`,
+      });
+    }
 
     const passwordHash = await argon2.hash(dto.password);
     const employeeId = await this.userRepo.manager.transaction(async (tx) => {
@@ -167,7 +197,9 @@ export class EmployeesService {
           role: 'EMPLOYEE',
           fullName: dto.fullName,
           username: dto.username,
+          phone: normalizedPhone,
           passwordHash,
+          twoFactorEnabled: true,
           mustChangePassword: false,
           dept: dto.dept,
           rank: dto.rank,
@@ -234,6 +266,7 @@ export class EmployeesService {
       id: employee.id,
       fullName: employee.fullName,
       username: employee.username,
+      phone: employee.phone,
       dept: employee.dept,
       rank: employee.rank,
       referralScope: employee.referralScope,
@@ -292,6 +325,47 @@ export class EmployeesService {
     }
 
     return { id: updated.id, isActive: updated.isActive };
+  }
+
+  async remove(actor: AuthenticatedUser, id: string) {
+    const employee = await this.getEmployeeOrThrow(id);
+    const deletedAt = new Date();
+
+    await this.userRepo.manager.transaction(async (tx) => {
+      await tx.update(
+        RefreshToken,
+        { userId: id, revokedAt: IsNull() },
+        { revokedAt: deletedAt },
+      );
+      await tx.delete(EmployeePermission, { employeeId: id });
+      await tx.update(
+        User,
+        { id },
+        {
+          isActive: false,
+          deletedAt,
+          username: null,
+          phone: null,
+          passwordHash: null,
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          mustChangePassword: false,
+          updatedAt: deletedAt,
+        },
+      );
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'ACCOUNT',
+      action: 'حذف حساب کارمند',
+      detail: `حساب «${employee.fullName}» (${employee.username ?? 'بدون نام کاربری'}) توسط ${actor.fullName} بایگانی شد و همه دسترسی‌ها و نشست‌های آن لغو گردید.`,
+      entityType: 'User',
+      entityId: id,
+    });
+
+    return { id, deletedAt: deletedAt.toISOString() };
   }
 
   async setPermission(

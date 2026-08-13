@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import { fetchEmployeeContext } from "../../api/panels";
 import {
   changeFlightAircraft,
   createAllotment,
@@ -75,6 +76,7 @@ const WEEKDAYS_FA = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
 export default function FlightsPage() {
   const { user } = useAuth();
+  const [employeePermissionKeys, setEmployeePermissionKeys] = useState<string[]>([]);
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [subTab, setSubTab] = useState<
@@ -151,6 +153,16 @@ export default function FlightsPage() {
       .then(setAirports)
       .catch(() => setAirports([]));
   }, [load]);
+
+  useEffect(() => {
+    if (user?.role !== "EMPLOYEE") {
+      setEmployeePermissionKeys([]);
+      return;
+    }
+    fetchEmployeeContext()
+      .then((context) => setEmployeePermissionKeys(context.permissionKeys))
+      .catch(() => setEmployeePermissionKeys([]));
+  }, [user?.role]);
 
   async function openDetail(id: string) {
     setError(null);
@@ -371,6 +383,8 @@ export default function FlightsPage() {
   const kpis = data?.kpis;
   const isCommercial =
     user?.role === "COMMERCIAL_MANAGER" || user?.role === "EMPLOYEE";
+  const canManageFlights =
+    user?.role !== "EMPLOYEE" || employeePermissionKeys.includes("fl_manage");
   const isCeo = user?.role === "CEO";
   const showFuturePanel =
     subTab === "future" || (isCommercial && subTab === "active");
@@ -506,12 +520,14 @@ export default function FlightsPage() {
                 <h2 className="text-sm font-bold text-panel-ink">
                   مدیریت پروازها و موجودی
                 </h2>
-                <button
-                  onClick={() => setAddOpen(true)}
-                  className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-                >
-                  + افزودن پرواز
-                </button>
+                {canManageFlights && (
+                  <button
+                    onClick={() => setAddOpen(true)}
+                    className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                  >
+                    + افزودن پرواز
+                  </button>
+                )}
               </div>
               {isCommercial && weakActiveFlights.length > 0 && (
                 <div className="grid grid-cols-1 gap-3 border-b border-panel-border bg-[#f59e0b0b] p-4 lg:grid-cols-2" data-testid="weak-sales-ai-list">
@@ -519,7 +535,7 @@ export default function FlightsPage() {
                     <article key={flight.id} className="rounded-xl border border-[#f59e0b55] bg-[#171d29] p-4">
                       <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-extrabold text-[#fbbf24]">هشدار خودکار فروش ضعیف</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{flight.flightNo} · {flight.originCode} ← {flight.destCode}</div></div><span className="font-num rounded-full bg-[#f59e0b1f] px-2 py-1 text-[10px] text-[#fbbf24]">فروش {faDigits(flight.sold)} از {faDigits(flight.capacity)}</span></div>
                       {flight.aiSuggestion ? <div className="mt-3 rounded-lg bg-black/15 p-3"><div className="text-[10px] text-panel-muted">پیشنهاد رقابتی هوش مصنوعی</div><div className="font-num mt-1 text-base font-black text-[#34d399]">{faMoney(flight.aiSuggestion.priceIrr)} تومان</div><p className="mt-1 text-[10.5px] leading-5 text-[#aebbd0]">{flight.aiSuggestion.reason}</p></div> : <p className="mt-3 text-[10.5px] text-panel-muted">پیشنهاد قیمت در حال آماده‌سازی است؛ نرخ فعلی خودکار تغییر نمی‌کند.</p>}
-                      <button type="button" onClick={() => void openDetail(flight.id)} className="mt-3 text-[11px] font-bold text-accent">مشاهده و مدیریت پرواز ←</button>
+                      <button type="button" onClick={() => void openDetail(flight.id)} className="mt-3 text-[11px] font-bold text-accent">{canManageFlights ? 'مشاهده و مدیریت پرواز' : 'مشاهده پرواز'} ←</button>
                     </article>
                   ))}
                 </div>
@@ -994,6 +1010,7 @@ export default function FlightsPage() {
                   </h2>
                   <button
                     onClick={() => void onAiAnalysis()}
+                    hidden={!canManageFlights}
                     className="rounded-lg bg-gradient-to-l from-accent to-[#9333ea] px-3 py-2 text-xs font-bold text-white"
                   >
                     ✦ تحلیل قیمت‌گذاری با هوش مصنوعی
@@ -1101,7 +1118,7 @@ export default function FlightsPage() {
                               </span>
                             </span>
                           </button>
-                          <div className="flex flex-wrap items-center gap-2">
+                          {canManageFlights && <div className="flex flex-wrap items-center gap-2">
                             <div className="flex flex-col items-end gap-1">
                               <button
                                 type="button"
@@ -1127,7 +1144,7 @@ export default function FlightsPage() {
                             >
                               {priced ? "ویرایش نرخ" : "نرخ‌گذاری"}
                             </button>
-                          </div>
+                          </div>}
                         </div>
 
                         {expanded && (
@@ -1340,7 +1357,7 @@ export default function FlightsPage() {
               <span className="text-xs font-bold text-panel-ink">
                 نوع هواپیما
               </span>
-              {!aircraftChangeOpen && (
+              {!aircraftChangeOpen && canManageFlights && (
                 <button
                   onClick={() => {
                     setSelectedAircraftType(detail.aircraftType);
@@ -1394,7 +1411,7 @@ export default function FlightsPage() {
             )}
           </div>
 
-          <FareRulesSection instanceId={detail.id} />
+          <FareRulesSection instanceId={detail.id} readOnly={!canManageFlights} />
         </Modal>
       )}
       {aircraftStepUp.modal}

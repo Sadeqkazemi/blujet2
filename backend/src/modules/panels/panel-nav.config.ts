@@ -159,11 +159,11 @@ export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
  * `navKeys = ["dashboard"].concat(granted).concat(["referrals"])`), not a
  * static PANEL_NAV row. This maps each PERMISSION_CATALOG sectionKey to
  * the nav tab it unlocks and the exact catalog key(s) actually wired to
- * real backend access this phase — an employee only sees the tab if they
- * hold one of its wired keys, so a section that's in the catalog but not
- * yet wired (the whole IT dept: users/services/security/logs) never
- * renders as a dead tab. See Phase 18 notes in docs/DB_SCHEMA.md;
- * fl_manage/ag_settle/fn_invoices wired in Phase 27.
+ * real backend access this phase. An employee only sees a tab if they hold
+ * one of its wired keys. Read-only flight access unlocks the flight list;
+ * route and aircraft management remain write-grant-only. IT capabilities
+ * are also real, narrowly scoped employee surfaces (see the controller
+ * comments), not access to the complete IT Manager role.
  *
  * fn_invoices' real UI surface is the per-agency invoice list on
  * AgencyDetailPage (reached via the `agencies` tab, same as ag_settle) —
@@ -177,10 +177,8 @@ export const EMPLOYEE_SECTION_NAV: Record<
   string,
   { labelFa: string; wiredKeys: string[] }
 > = {
-  // Order + labels match design-reference-v2/پنل کارمند.dc.html + user
-  // screenshots (سمیرا احمدی). «مدیریت پروازها» removed from employee
-  // sidebar per product — fl_* stays permission-catalog only, no tab.
-  // finance / IT sections stay unwired — no dead tabs.
+  // Order follows the owning manager panels. A grant changes both this live
+  // navigation response and the matching @RequiresPermission API guard.
   agencies: {
     labelFa: 'مدیریت آژانس‌ها',
     wiredKeys: [
@@ -191,6 +189,18 @@ export const EMPLOYEE_SECTION_NAV: Record<
       'fn_invoices',
     ],
   },
+  flights: {
+    labelFa: 'مدیریت پروازها',
+    wiredKeys: ['fl_view', 'fl_manage'],
+  },
+  routes: {
+    labelFa: 'مسیرهای پروازی',
+    wiredKeys: ['fl_manage'],
+  },
+  aircraft: {
+    labelFa: 'تعریف هواپیما',
+    wiredKeys: ['fl_manage'],
+  },
   pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {
     labelFa: 'استرداد بلیط',
@@ -200,6 +210,22 @@ export const EMPLOYEE_SECTION_NAV: Record<
   cartable: {
     labelFa: 'کارتابل',
     wiredKeys: ['ct_list', 'ct_process'],
+  },
+  users: {
+    labelFa: 'کاربران و دسترسی‌ها',
+    wiredKeys: ['us_manage'],
+  },
+  security: {
+    labelFa: 'رمزها و امنیت',
+    wiredKeys: ['sc_manage'],
+  },
+  services: {
+    labelFa: 'سرویس‌های سایت',
+    wiredKeys: ['sv_control'],
+  },
+  logs: {
+    labelFa: 'لاگ و رویدادها',
+    wiredKeys: ['lg_view'],
   },
 };
 

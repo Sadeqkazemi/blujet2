@@ -38,6 +38,7 @@ export function fetchEmployee(id: string) {
 export function createEmployee(dto: {
   fullName: string;
   username: string;
+  phone: string;
   password: string;
   dept: string;
   rank?: string;
@@ -49,6 +50,10 @@ export function createEmployee(dto: {
 
 export function setEmployeeStatus(id: string, isActive: boolean) {
   return apiPatch<{ id: string; isActive: boolean }>(`/it/employees/${id}/status`, { isActive });
+}
+
+export function removeEmployee(id: string) {
+  return apiDelete<{ id: string; deletedAt: string }>(`/it/employees/${id}`);
 }
 
 export function setEmployeePermission(id: string, permissionKey: string, grant: boolean) {

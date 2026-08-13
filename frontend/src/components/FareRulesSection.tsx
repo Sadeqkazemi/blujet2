@@ -30,9 +30,10 @@ const EMPTY_FORM = {
 
 interface FareRulesSectionProps {
   instanceId: string;
+  readOnly?: boolean;
 }
 
-export default function FareRulesSection({ instanceId }: FareRulesSectionProps) {
+export default function FareRulesSection({ instanceId, readOnly = false }: FareRulesSectionProps) {
   const [rules, setRules] = useState<FareRuleRow[]>([]);
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -129,7 +130,7 @@ export default function FareRulesSection({ instanceId }: FareRulesSectionProps) 
     <div className="mt-5 border-t border-border pt-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xs font-bold text-ink">کلاس‌های نرخی</h3>
-        {!formOpen && (
+        {!formOpen && !readOnly && (
           <button onClick={openCreate} className="text-[11px] font-bold text-accent">
             + افزودن
           </button>
@@ -170,19 +171,17 @@ export default function FareRulesSection({ instanceId }: FareRulesSectionProps) 
                 </span>
               )}
             </div>
-            <div className="mt-1.5 flex gap-2">
-              <button onClick={() => openEdit(r)} className="text-accent">
-                ویرایش
-              </button>
-              <button onClick={() => void onDelete(r.id)} className="text-danger">
-                حذف
-              </button>
-            </div>
+            {!readOnly && (
+              <div className="mt-1.5 flex gap-2">
+                <button onClick={() => openEdit(r)} className="text-accent">ویرایش</button>
+                <button onClick={() => void onDelete(r.id)} className="text-danger">حذف</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {formOpen && (
+      {formOpen && !readOnly && (
         <div className="mb-3 rounded-lg border border-border p-3">
           <div className="mb-2 text-xs font-bold text-ink">
             {editingId ? 'ویرایش کلاس نرخی' : 'افزودن کلاس نرخی'}

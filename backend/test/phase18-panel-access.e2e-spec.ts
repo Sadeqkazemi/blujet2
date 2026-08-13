@@ -124,6 +124,7 @@ describe('Phase 18 — SITE_ADMIN + EMPLOYEE panel access (e2e)', () => {
       .send({
         fullName: 'کارمند تست فاز ۱۸',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'Blujet@1404',
         dept,
         permissionKeys,

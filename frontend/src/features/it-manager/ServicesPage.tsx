@@ -14,6 +14,7 @@ import { formatJalaliDateTime } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
+import { useOptionalAuth } from '../../hooks/useAuth';
 import type { ExternalService, InternalService, ServiceReportResult, SmsLogResult } from '../../types/it-manager';
 
 const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
@@ -22,6 +23,8 @@ const SMS_MESSAGE_TYPE_LABEL: Record<string, string> = {
 };
 
 export default function ServicesPage() {
+  const user = useOptionalAuth()?.user;
+  const readOnly = user?.role === 'EMPLOYEE';
   const [internal, setInternal] = useState<InternalService[]>([]);
   const [external, setExternal] = useState<ExternalService[]>([]);
   const [smsLog, setSmsLog] = useState<SmsLogResult | null>(null);
@@ -236,6 +239,7 @@ export default function ServicesPage() {
                 aria-checked={s.enabled}
                 aria-label={s.nameFa}
                 onClick={() => void onToggleInternal(s)}
+                disabled={readOnly}
                 className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-[#3b82f6]' : 'bg-[#28344c]'}`}
               >
                 <span
@@ -252,13 +256,13 @@ export default function ServicesPage() {
             >
               {s.enabled ? 'فعال' : 'غیرفعال'}
             </span>
-            <button
+            {!readOnly && <button
               type="button"
               onClick={() => void openReport('internal', s.key, s.nameFa)}
               className="mr-2 text-[10.5px] font-bold text-[#60a5fa]"
             >
               مشاهده گزارش
-            </button>
+            </button>}
           </div>
         ))}
       </div>
@@ -311,7 +315,7 @@ export default function ServicesPage() {
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[14.5px] font-extrabold text-white">سرویس‌های خارجی (API)</h2>
-        <button
+        {!readOnly && <button
           onClick={() => {
             setAddError(null);
             setAddOpen(true);
@@ -319,7 +323,7 @@ export default function ServicesPage() {
           className="rounded-lg bg-[#3b82f6] px-3 py-1.5 text-[11px] font-bold text-white transition hover:brightness-110"
         >
           افزودن سرویس خارجی
-        </button>
+        </button>}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {external.map((s) => (
@@ -334,6 +338,7 @@ export default function ServicesPage() {
                 aria-checked={s.enabled}
                 aria-label={s.nameFa}
                 onClick={() => onToggleExternal(s)}
+                disabled={readOnly}
                 className={`relative h-6 w-11 rounded-full transition ${s.enabled ? 'bg-[#3b82f6]' : 'bg-[#28344c]'}`}
               >
                 <span
@@ -357,7 +362,7 @@ export default function ServicesPage() {
               >
                 {s.enabled ? 'فعال' : 'غیرفعال'}
               </span>
-              <div className="flex gap-2">
+              {!readOnly && <div className="flex gap-2">
                 <button onClick={() => void openReport('external', s.id, s.nameFa)} className="text-[10.5px] font-bold text-[#60a5fa]">
                   مشاهده گزارش
                 </button>
@@ -370,7 +375,7 @@ export default function ServicesPage() {
                 <button onClick={() => void onRemove(s)} className="text-[10.5px] font-bold text-[#f87171]">
                   حذف
                 </button>
-              </div>
+              </div>}
             </div>
           </div>
         ))}

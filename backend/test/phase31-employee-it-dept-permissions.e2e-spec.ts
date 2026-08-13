@@ -39,6 +39,7 @@ describe('Phase 31 — EMPLOYEE narrow access to IT-dept permission keys (e2e)',
       .send({
         fullName: 'کارمند تست فاز ۳۱',
         username,
+        phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
         password: 'Blujet@1404',
         dept,
         permissionKeys,
@@ -111,6 +112,7 @@ describe('Phase 31 — EMPLOYEE narrow access to IT-dept permission keys (e2e)',
         .send({
           fullName: 'تلاش برای ایجاد',
           username: `e31.${crypto.randomUUID().slice(0, 8)}`,
+          phone: `09${crypto.randomInt(100_000_000, 1_000_000_000)}`,
           password: 'Blujet@1404',
           dept: 'it',
         });

@@ -36,3 +36,10 @@ Acceptance checklist for پنل کارمند parity with user screenshots
 - `com.ahmadi` / `Blujet@1404` — سمیرا احمدی (agencies, reports, cartable, referrals)
 - `sales.moradi` / `Blujet@1404` — commercial demo (no flights)
 - `emp.none` / `Blujet@1404` — zero permissions
+# Superseded navigation decision
+
+The earlier requirement in this file to hide flight surfaces from every
+employee was superseded by the 2026-08-13 unit-derived access requirement.
+Employees now receive manager-derived navigation only when IT grants the
+matching live permission; see `it-employee-unit-access.md`. The demo accounts
+remain flight-free until such a grant is made.

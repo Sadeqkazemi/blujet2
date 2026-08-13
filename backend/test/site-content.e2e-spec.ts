@@ -237,6 +237,16 @@ describe('Site content (e2e)', () => {
       expect(routeRes.status).toBe(201);
       createdRouteIds.push(routeRes.body.data.id);
 
+      const invalidLegacyRoute = await request(app.getHttpServer())
+        .post('/site-content/admin/routes')
+        .set(auth(accessToken))
+        .send({
+          fromAirportCode: 'تهران',
+          toAirportCode: 'مشهد',
+          priceIrr: 9_500_000,
+        });
+      expect(invalidLegacyRoute.status).toBe(400);
+
       const delRoute = await request(app.getHttpServer())
         .delete(`/site-content/admin/routes/${routeRes.body.data.id}`)
         .set(auth(accessToken));

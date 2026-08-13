@@ -215,3 +215,9 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
+
+/** Read-only presentation surfaces may also render in isolated tests or
+ * previews. Mutating auth flows must keep using useAuth(). */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}

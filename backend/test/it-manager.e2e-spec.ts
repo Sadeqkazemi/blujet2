@@ -8,6 +8,7 @@ import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { PasswordResetEvent } from '../src/database/entities/password-reset-event.entity';
 import { SecurityPolicy } from '../src/database/entities/security-policy.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { EmployeePermission } from '../src/database/entities/employee-permission.entity';
 import { ExternalServiceConfig } from '../src/database/entities/external-service-config.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
@@ -53,21 +54,30 @@ describe('IT Manager (e2e)', () => {
     return qb.getOne();
   }
 
-  async function createEmployee(overrides?: Partial<{ dept: string }>) {
+  function uniqueIranMobile() {
+    return `09${crypto.randomInt(100_000_000, 1_000_000_000)}`;
+  }
+
+  async function createEmployee(
+    overrides?: Partial<{ dept: string; phone: string }>,
+  ) {
     const { accessToken } = await loginAs(app, 'itadmin');
     const username = `emp.${crypto.randomUUID().slice(0, 8)}`;
+    const phone = overrides?.phone ?? uniqueIranMobile();
+    const password = 'testpass1';
     const res = await request(app.getHttpServer())
       .post('/it/employees')
       .set(auth(accessToken))
       .send({
         fullName: 'کارمند تست',
         username,
-        password: 'testpass1',
+        phone,
+        password,
         dept: overrides?.dept ?? 'commercial',
         rank: 'کارشناس',
         permissionKeys: ['ag_list'],
       });
-    return { res, accessToken };
+    return { res, accessToken, username, phone, password };
   }
 
   // ── Permission catalog & employees ──────────────────────────────────
@@ -94,8 +104,10 @@ describe('IT Manager (e2e)', () => {
   });
 
   it('POST /it/employees creates account with granted permissions, duplicate username -> 409, short password -> 400, audited', async () => {
-    const { res, accessToken } = await createEmployee();
+    const { res, accessToken, username, phone, password } =
+      await createEmployee();
     expect(res.status).toBe(201);
+    expect(res.body.data.phone).toBe(`+98${phone.slice(1)}`);
     expect(res.body.data.permissions).toEqual(
       expect.arrayContaining([expect.objectContaining({ key: 'ag_list' })]),
     );
@@ -109,9 +121,22 @@ describe('IT Manager (e2e)', () => {
           .getRepository(User)
           .findOneBy({ fullName: 'کارمند تست' }))!.username,
         password: 'testpass1',
+        phone: uniqueIranMobile(),
         dept: 'commercial',
       });
     expect(dup.status).toBe(409);
+
+    const duplicatePhone = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'شماره تکراری',
+        username: `phone.${crypto.randomUUID().slice(0, 6)}`,
+        password: 'testpass1',
+        phone,
+        dept: 'commercial',
+      });
+    expect(duplicatePhone.status).toBe(409);
 
     const shortPassword = await request(app.getHttpServer())
       .post('/it/employees')
@@ -120,15 +145,85 @@ describe('IT Manager (e2e)', () => {
         fullName: 'رمز کوتاه',
         username: `short.${crypto.randomUUID().slice(0, 6)}`,
         password: '123',
+        phone: uniqueIranMobile(),
         dept: 'commercial',
       });
     expect(shortPassword.status).toBe(400);
+
+    const stored = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ username });
+    expect(stored.phone).toBe(`+98${phone.slice(1)}`);
+    expect(stored.twoFactorEnabled).toBe(true);
+
+    const login = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username, password });
+    expect(login.status).toBe(200);
+    expect(login.body.data).toEqual(
+      expect.objectContaining({
+        loginMode: 'TWO_FACTOR',
+        challengeId: expect.any(String),
+      }),
+    );
 
     const audit = await findAuditLog({
       category: 'ACCOUNT',
       action: 'ایجاد حساب کارمند',
     });
     expect(audit).not.toBeNull();
+  });
+
+  it('POST /it/employees rejects unknown and cross-unit grants instead of silently creating a weaker account', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const username = `invalid-grant.${crypto.randomUUID().slice(0, 6)}`;
+    const res = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند با دسترسی نامعتبر',
+        username,
+        phone: uniqueIranMobile(),
+        password: 'testpass1',
+        dept: 'commercial',
+        permissionKeys: ['ag_list', 'rf_process', 'does_not_exist'],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('دسترسی');
+    expect(await dataSource.getRepository(User).findOneBy({ username })).toBeNull();
+  });
+
+  it('a newly created employee logs in and receives only the navigation granted by IT', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const username = `finance-nav.${crypto.randomUUID().slice(0, 6)}`;
+    const password = 'Finance@1405';
+    const created = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند مالی دسترسی محدود',
+        username,
+        phone: uniqueIranMobile(),
+        password,
+        dept: 'finance',
+        rank: 'کارشناس',
+        permissionKeys: ['rf_list', 'rp_finance'],
+      });
+    expect(created.status).toBe(201);
+
+    const employee = await loginAs(app, username, password);
+    expect(employee.accessToken).toBeTruthy();
+    const nav = await request(app.getHttpServer())
+      .get('/panels/nav')
+      .set(auth(employee.accessToken));
+    expect(nav.status).toBe(200);
+    expect(nav.body.data.map((item: { key: string }) => item.key)).toEqual([
+      'dashboard',
+      'refund',
+      'reports',
+      'referrals',
+    ]);
   });
 
   it('GET/PATCH /it/employees/:id and non-IT role gets 403 everywhere', async () => {
@@ -167,6 +262,73 @@ describe('IT Manager (e2e)', () => {
 
     const audit = await findAuditLog({
       category: 'ACCOUNT',
+      entityType: 'User',
+      entityId: id,
+    });
+    expect(audit).not.toBeNull();
+  });
+
+  it('DELETE /it/employees/:id archives the account, revokes access, hides it and releases login identifiers', async () => {
+    const { res, accessToken, username, phone, password } = await createEmployee();
+    const id = res.body.data.id as string;
+
+    const removed = await request(app.getHttpServer())
+      .delete(`/it/employees/${id}`)
+      .set(auth(accessToken));
+    expect(removed.status).toBe(200);
+    expect(removed.body.data).toEqual({
+      id,
+      deletedAt: expect.any(String),
+    });
+
+    const archived = await dataSource.getRepository(User).findOneByOrFail({ id });
+    expect(archived).toEqual(
+      expect.objectContaining({
+        isActive: false,
+        username: null,
+        phone: null,
+        passwordHash: null,
+        twoFactorEnabled: false,
+      }),
+    );
+    expect(archived.deletedAt).toBeInstanceOf(Date);
+    expect(
+      await dataSource.getRepository(EmployeePermission).countBy({ employeeId: id }),
+    ).toBe(0);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/it/employees/${id}`)
+      .set(auth(accessToken));
+    expect(detail.status).toBe(404);
+
+    const list = await request(app.getHttpServer())
+      .get('/it/employees')
+      .set(auth(accessToken));
+    expect(list.status).toBe(200);
+    expect(list.body.data.some((row: { id: string }) => row.id === id)).toBe(false);
+
+    const oldLogin = await request(app.getHttpServer())
+      .post('/auth/staff/login')
+      .send({ username, password });
+    expect(oldLogin.status).toBe(401);
+
+    const recreated = await request(app.getHttpServer())
+      .post('/it/employees')
+      .set(auth(accessToken))
+      .send({
+        fullName: 'کارمند جایگزین',
+        username,
+        phone,
+        password,
+        dept: 'commercial',
+        permissionKeys: ['ag_list'],
+      });
+    expect(recreated.status).toBe(201);
+    expect(recreated.body.data.id).not.toBe(id);
+
+    const audit = await findAuditLog({
+      category: 'ACCOUNT',
+      action: 'حذف حساب کارمند',
       entityType: 'User',
       entityId: id,
     });

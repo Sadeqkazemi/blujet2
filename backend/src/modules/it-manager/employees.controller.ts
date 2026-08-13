@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -82,6 +83,15 @@ export class EmployeesController {
       success: true,
       data: await this.employees.setStatus(actor, id, dto.isActive),
     };
+  }
+
+  @Delete('employees/:id')
+  @ApiOperation({ summary: 'بایگانی امن حساب کارمند و لغو فوری همه دسترسی‌ها' })
+  async remove(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    return { success: true, data: await this.employees.remove(actor, id) };
   }
 
   @Patch('employees/:id/permissions')

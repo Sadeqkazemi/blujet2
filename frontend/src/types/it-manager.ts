@@ -18,6 +18,7 @@ export interface EmployeeListRow {
 }
 
 export interface EmployeeDetail extends EmployeeListRow {
+  phone: string;
   referralScope: 'MANAGERS_ONLY' | 'ALL_STAFF' | null;
   mustChangePassword: boolean;
   permissions: { key: string; labelFa: string; sectionLabelFa: string }[];

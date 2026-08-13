@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Min,
   MinLength,
 } from 'class-validator';
@@ -109,12 +110,16 @@ export class UpdateDestinationDto {
 export class CreateRouteDto {
   @ApiProperty({ example: 'THR' })
   @IsString()
-  @MinLength(3)
+  @Matches(/^[A-Za-z]{3}$/, {
+    message: 'کد فرودگاه مبدأ باید سه حرف لاتین باشد.',
+  })
   fromAirportCode: string;
 
   @ApiProperty({ example: 'MHD' })
   @IsString()
-  @MinLength(3)
+  @Matches(/^[A-Za-z]{3}$/, {
+    message: 'کد فرودگاه مقصد باید سه حرف لاتین باشد.',
+  })
   toAirportCode: string;
 
   @ApiProperty()
@@ -132,11 +137,17 @@ export class UpdateRouteDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z]{3}$/, {
+    message: 'کد فرودگاه مبدأ باید سه حرف لاتین باشد.',
+  })
   fromAirportCode?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @Matches(/^[A-Za-z]{3}$/, {
+    message: 'کد فرودگاه مقصد باید سه حرف لاتین باشد.',
+  })
   toAirportCode?: string;
 
   @ApiPropertyOptional()

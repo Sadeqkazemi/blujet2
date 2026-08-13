@@ -15,7 +15,7 @@ import HomeSearchCard from './home/HomeSearchCard';
 import HomePromoCarousel from './home/HomePromoCarousel';
 import { QUICK_LINK_ICONS } from './home/home-icons';
 import { HOME_EXTRA, buildSearchCopy } from './home/home-copy';
-import { airportCityName } from '../../lib/airport-cities';
+import { airportCityName, resolveAirportCode } from '../../lib/airport-cities';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -336,13 +336,13 @@ export default function HomeSearchPage() {
   const popularRoutes = useMemo(() => {
     if (homeContent?.routes?.length) {
       return homeContent.routes.map((r) => ({
-        fromCode: r.fromAirportCode,
-        toCode: r.toAirportCode,
+        fromCode: resolveAirportCode(r.fromAirportCode, airports, r.fromCityFa),
+        toCode: resolveAirportCode(r.toAirportCode, airports, r.toCityFa),
         tomanPrice: Math.round(Number(r.priceIrr) / 10),
       }));
     }
     return [];
-  }, [homeContent]);
+  }, [homeContent, airports]);
 
   const popularDests = useMemo(() => {
     if (homeContent?.destinations?.length) {
