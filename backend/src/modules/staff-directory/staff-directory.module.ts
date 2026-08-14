@@ -62,7 +62,7 @@ export class StaffDirectoryController {
   constructor(private readonly staffDirectory: StaffDirectoryService) {}
 
   @Get()
-  @RequiresPermission('ct_process')
+  @RequiresPermission('ct_process', 'rf_process', 'ag_requests')
   @ApiOperation({ summary: 'فهرست کارکنان فعال برای انتخاب مقصد انتقال/ارجاع' })
   async list(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.staffDirectory.list(actor.id, actor.role);

@@ -63,6 +63,19 @@ const mockRoutes = [
   },
 ];
 
+const mockLibrary = [
+  {
+    id: 'asset-1',
+    label: 'hero.jpg',
+    fileName: 'hero.jpg',
+    mimeType: 'image/jpeg',
+    sizeBytes: 1024,
+    fileId: 'file-1',
+    url: '/api/files/file-1',
+    createdAt: '2026-08-14T00:00:00.000Z',
+  },
+];
+
 const mockSocial = [
   { id: 'instagram' as const, name: 'اینستاگرام', url: 'instagram.com/blujet', enabled: true },
   { id: 'telegram' as const, name: 'تلگرام', url: 't.me/blujet', enabled: true },
@@ -85,6 +98,7 @@ describe('MediaAdminPage', () => {
     vi.mocked(siteContentApi.fetchRoutes).mockResolvedValue(mockRoutes);
     vi.mocked(siteContentApi.updateContentBlock).mockResolvedValue(mockBlocks[0]);
     vi.mocked(siteContentApi.updateDestination).mockResolvedValue(mockDestinations[0]);
+    vi.mocked(siteContentApi.createDestination).mockResolvedValue(mockDestinations[0]);
     vi.mocked(siteContentApi.updateRoute).mockResolvedValue(mockRoutes[0]);
     vi.mocked(siteContentApi.createRoute).mockResolvedValue(mockRoutes[0]);
     vi.mocked(siteContentApi.deleteDestination).mockResolvedValue({ id: 'd1' });
@@ -130,7 +144,8 @@ describe('MediaAdminPage', () => {
     expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
     expect(screen.getByText('تماس پشتیبانی')).toBeInTheDocument();
     expect(screen.getByText('کتابخانهٔ تصاویر')).toBeInTheDocument();
-    expect(screen.queryByText('فرصت‌های شغلی')).not.toBeInTheDocument();
+    expect(screen.getByText('مدیریت بلاگ')).toBeInTheDocument();
+    expect(screen.getByText('فرصت‌های شغلی')).toBeInTheDocument();
   });
 
   it('shows seeded destination, route and support contact', async () => {
@@ -166,6 +181,45 @@ describe('MediaAdminPage', () => {
     await screen.findByText('بنر اصلی سایت');
     await user.click(screen.getAllByRole('button', { name: 'ویرایش بنر' })[0]);
     expect(screen.getByDisplayValue('پرواز بعدی‌ات را با blujet رزرو کن')).toBeInTheDocument();
+  });
+
+  it('assigns an uploaded library image to the hero banner', async () => {
+    const user = userEvent.setup();
+    vi.mocked(siteContentApi.fetchLibraryAssets).mockResolvedValue(mockLibrary);
+    render(<MediaAdminPage />);
+    await screen.findByText('بنر اصلی سایت');
+
+    await user.click(screen.getAllByRole('button', { name: 'ویرایش بنر' })[0]);
+    await user.click(screen.getByRole('button', { name: 'انتخاب تصویر hero.jpg' }));
+    await user.click(screen.getByRole('button', { name: 'ذخیره' }));
+
+    await waitFor(() => {
+      expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith(
+        'HERO_BANNER',
+        expect.objectContaining({ imageFileId: 'file-1' }),
+      );
+    });
+  });
+
+  it('assigns an uploaded library image when creating a destination', async () => {
+    const user = userEvent.setup();
+    vi.mocked(siteContentApi.fetchLibraryAssets).mockResolvedValue(mockLibrary);
+    render(<MediaAdminPage />);
+    await screen.findByText('مقاصد محبوب');
+
+    await user.click(screen.getByRole('button', { name: /افزودن مقصد/ }));
+    await user.type(screen.getByLabelText('کد فرودگاه'), 'dxb');
+    await user.type(screen.getByLabelText('قیمت (تومان)'), '2500000');
+    await user.click(screen.getByRole('button', { name: 'انتخاب تصویر hero.jpg' }));
+    await user.click(screen.getByRole('button', { name: 'ذخیره' }));
+
+    await waitFor(() => {
+      expect(siteContentApi.createDestination).toHaveBeenCalledWith({
+        airportCode: 'DXB',
+        priceIrr: 25000000,
+        imageFileId: 'file-1',
+      });
+    });
   });
 
   it('toggles announcement bar with design deactivate label', async () => {

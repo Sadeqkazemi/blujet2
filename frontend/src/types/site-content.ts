@@ -73,7 +73,9 @@ export type CreateDestinationInput = {
   sortOrder?: number;
 };
 
-export type UpdateDestinationInput = Partial<CreateDestinationInput> & {
+export type UpdateDestinationInput = Partial<
+  Omit<CreateDestinationInput, 'imageFileId'>
+> & {
   imageFileId?: string | null;
 };
 

@@ -38,8 +38,8 @@ export const SITE_PAGE_ROWS: SitePageRow[] = [
     nameFa: 'تماس با ما',
     path: '/contact',
     statusLabel: 'منتشرشده',
-    editableFields: ['contactAddress'],
-    editHint: 'تلفن و ایمیل در تب تنظیمات',
+    editableFields: ['contactAddress', 'contactOfficeHours'],
+    editHint: 'تلفن و ایمیل در بخش تماس پشتیبانی مدیریت می‌شوند',
   },
   {
     id: 'terms',

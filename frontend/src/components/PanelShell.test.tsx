@@ -281,7 +281,7 @@ describe('PanelShell', () => {
     expect(screen.queryByText(/EP-821/)).not.toBeInTheDocument();
   });
 
-  it('SITE_ADMIN sidebar hides blog, kyc and settings even if the API still returns them', async () => {
+  it('SITE_ADMIN sidebar exposes site content tools and hides system-only kyc/settings', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
       user: { id: 'sa1', fullName: 'ادمین سایت', role: 'SITE_ADMIN', preferredLocale: 'FA' },
@@ -311,7 +311,7 @@ describe('PanelShell', () => {
     expect(await screen.findByText('تیکت‌ها')).toBeInTheDocument();
     expect(screen.getByText('مدیریت سایت')).toBeInTheDocument();
     expect(screen.getByText('درخواست‌های استخدام')).toBeInTheDocument();
-    expect(screen.queryByText('مدیریت بلاگ')).not.toBeInTheDocument();
+    expect(screen.getByText('مدیریت بلاگ')).toBeInTheDocument();
     expect(screen.queryByText('احراز هویت مشتریان')).not.toBeInTheDocument();
     expect(screen.queryByText('تنظیمات سامانه')).not.toBeInTheDocument();
   });

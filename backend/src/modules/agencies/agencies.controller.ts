@@ -54,7 +54,7 @@ export class AgenciesController {
   // below), which is only reachable by first loading this list — an
   // EMPLOYEE holding only one of those two keys would otherwise have a
   // granted-but-unreachable permission.
-  @RequiresPermission('ag_list', 'ag_settle', 'fn_invoices')
+  @RequiresPermission('ag_list', 'ag_info', 'ag_settle', 'fn_invoices')
   @ApiOperation({ summary: 'لیست آژانس‌ها + کارت‌های KPI' })
   async list(@Query() query: ListAgenciesQueryDto) {
     const data = await this.agencies.list(query);

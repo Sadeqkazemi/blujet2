@@ -9,11 +9,11 @@ export interface PanelNavItem {
 }
 
 /**
- * SITE_ADMIN sidebar must never surface these keys (product request 2026-08).
+ * SITE_ADMIN sidebar must never surface these system-only keys.
  * Kept as an explicit denylist so a future accidental re-add to PANEL_NAV
  * cannot ship them again without also deleting this set.
  */
-export const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
+export const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['kyc', 'settings']);
 
 /**
  * Server-computed per-role sidebar, confirmed from a full read of each
@@ -28,9 +28,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   // `blog` added in Phase D (real CMS backend).
   // `media` added in Phase E (site content CMS backend).
   // Order/labels match design-reference-v2/پنل ادمین سایت.dc.html
-  // roleDefs.siteAdmin.access (visible sidebar). Blog/KYC/settings are
-  // reachable via routes for other workflows but deliberately omitted from
-  // the SITE_ADMIN sidebar per product request (2026-08).
+  // roleDefs.siteAdmin.access (visible sidebar). The public blog is part of
+  // site content management; KYC and system settings stay system-only.
   SITE_ADMIN: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
@@ -43,6 +42,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
     { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
+    { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
     { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
   ],
   // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar

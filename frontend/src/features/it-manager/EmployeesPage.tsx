@@ -16,6 +16,7 @@ import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { useOptionalAuth } from '../../hooks/useAuth';
 import type { EmployeeDetail, EmployeeListRow, PermissionCatalog } from '../../types/it-manager';
+import { togglePermissionSelection } from './employee-permission-dependencies';
 
 const DEPT_OPTIONS = [
   { value: 'commercial', label: 'واحد بازرگانی', manager: 'مدیر بازرگانی', color: '#38bdf8' },
@@ -665,12 +666,9 @@ export default function EmployeesPage() {
                             key={p.key}
                             type="button"
                             onClick={() =>
-                              setSelectedPerms((prev) => {
-                                const next = new Set(prev);
-                                if (checked) next.delete(p.key);
-                                else next.add(p.key);
-                                return next;
-                              })
+                              setSelectedPerms((prev) =>
+                                togglePermissionSelection(prev, p.key),
+                              )
                             }
                             className={`rounded-lg border px-2.5 py-1.5 text-right text-[11px] transition ${
                               checked ? 'border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]' : 'border-[#1f2a3d] text-[#cdd6e3]'

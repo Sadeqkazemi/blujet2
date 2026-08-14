@@ -47,7 +47,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 /** Must stay in sync with backend `SITE_ADMIN_SIDEBAR_DENYLIST`. */
-const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['blog', 'kyc', 'settings']);
+const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['kyc', 'settings']);
 
 /** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
 const ROLE_BRAND_SUB: Record<string, string> = {

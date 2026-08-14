@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { submitSupportTicket } from '../../api/support-tickets';
+import { fetchPublicSupportContact } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -186,6 +187,22 @@ export default function SupportPage() {
   const [trackingCode, setTrackingCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [supportContact, setSupportContact] = useState({
+    phone: '۰۲۱ — ۹۱۰۰۰۰۰۰',
+    email: 'support@blujet.ir',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPublicSupportContact()
+      .then((contact) => {
+        if (!cancelled) setSupportContact(contact);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const query = q.trim();
   const visibleFaqs = query ? FAQS.filter((f) => f.q[locale].includes(query) || f.a[locale].includes(query)) : FAQS;
@@ -368,7 +385,7 @@ export default function SupportPage() {
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{t.phone24}</div>
               <div style={{ fontSize: 13, color: '#1668c4', fontWeight: 800, marginTop: 3 }} dir="ltr">
-                ۰۲۱ — ۹۱۰۰۰۰۰۰
+                {supportContact.phone}
               </div>
             </div>
           </div>
@@ -391,7 +408,7 @@ export default function SupportPage() {
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{t.email}</div>
               <div style={{ fontSize: 12, color: '#5a6678', marginTop: 3 }} dir="ltr">
-                support@blujet.ir
+                {supportContact.email}
               </div>
             </div>
           </div>
