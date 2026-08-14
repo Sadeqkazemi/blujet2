@@ -7,11 +7,11 @@ import {
 import { PanelsService } from './panels.service';
 
 describe('operations panel access contract', () => {
-  it('publishes the aircraft catalog in commercial and senior navigation', () => {
+  it('publishes the aircraft catalog only in commercial navigation', () => {
     expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
       'aircraft',
     );
-    expect(PANEL_NAV.SENIOR_MANAGER?.map((item) => item.key)).toContain(
+    expect(PANEL_NAV.SENIOR_MANAGER?.map((item) => item.key)).not.toContain(
       'aircraft',
     );
   });
