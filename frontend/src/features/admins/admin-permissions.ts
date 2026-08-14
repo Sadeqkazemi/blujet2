@@ -1,122 +1,112 @@
 import type { AdminCreatableRole } from '../../types/admins';
 
 export type PermKey =
+  | 'dashboard'
+  | 'priorities'
   | 'flights'
   | 'agencies'
+  | 'approvals'
   | 'reports'
   | 'finance'
-  | 'refunds'
-  | 'club'
-  | 'content'
-  | 'support'
+  | 'cartable'
   | 'admins'
-  | 'settings';
+  ;
 
 export type PermState = Record<PermKey, boolean>;
 
 export const PERM_DEFS: { key: PermKey; label: string; desc: string }[] = [
+  { key: 'dashboard', label: 'داشبورد', desc: 'مشاهده نمای کلی فروش و آمار سازمان' },
+  { key: 'priorities', label: 'اولویت‌های راهبردی', desc: 'تعریف و ابلاغ اولویت‌های سازمانی' },
+  {
+    key: 'agencies',
+    label: 'مدیریت آژانس‌ها',
+    desc: 'مشاهده و ویرایش پروفایل آژانس‌ها',
+  },
+  {
+    key: 'approvals',
+    label: 'تأیید درخواست‌ها',
+    desc: 'تأیید یا لغو درخواست عضویت آژانس‌ها',
+  },
   {
     key: 'flights',
     label: 'مدیریت پروازها',
     desc: 'افزودن، ویرایش و نرخ‌گذاری پروازها',
   },
-  {
-    key: 'agencies',
-    label: 'مدیریت آژانس‌ها',
-    desc: 'پروفایل، اعتبار و درخواست آژانس‌ها',
-  },
   { key: 'reports', label: 'گزارش مسافران', desc: 'جستجوی مسافر و گزارش فروش' },
   { key: 'finance', label: 'مالی و تسویه', desc: 'تراکنش‌ها و تسویه‌حساب' },
-  {
-    key: 'refunds',
-    label: 'استرداد بلیط',
-    desc: 'بررسی و تأیید درخواست‌های استرداد',
-  },
-  {
-    key: 'club',
-    label: 'باشگاه مشتریان',
-    desc: 'اعضا، امتیاز و صدور کارت عضویت',
-  },
-  {
-    key: 'content',
-    label: 'محتوای سایت و بلاگ',
-    desc: 'بنرها، مقاصد و مطالب بلاگ',
-  },
-  {
-    key: 'support',
-    label: 'پشتیبانی و تیکت‌ها',
-    desc: 'پاسخ به تیکت‌های کاربران',
-  },
+  { key: 'cartable', label: 'کارتابل', desc: 'بررسی و پاسخ به کارهای ارجاع‌شده' },
   {
     key: 'admins',
-    label: 'مدیریت مدیران',
+    label: 'مدیران و ادمین‌ها',
     desc: 'افزودن و تعیین سطح دسترسی مدیران',
   },
-  { key: 'settings', label: 'تنظیمات سامانه', desc: 'پیکربندی کلی سیستم' },
 ];
 
 /** Default permission toggles per creatable role — design-reference-v2 rolePresets(). */
 const ROLE_PRESET_BITS: Record<AdminCreatableRole, Record<PermKey, 0 | 1>> = {
   SENIOR_MANAGER: {
+    dashboard: 1,
+    priorities: 1,
     flights: 1,
     agencies: 1,
+    approvals: 1,
     reports: 1,
     finance: 1,
-    refunds: 1,
-    club: 1,
-    content: 1,
-    support: 1,
+    cartable: 1,
     admins: 1,
-    settings: 1,
   },
   FINANCE_MANAGER: {
+    dashboard: 1,
+    priorities: 0,
     flights: 0,
     agencies: 0,
+    approvals: 0,
     reports: 1,
     finance: 1,
-    refunds: 1,
-    club: 0,
-    content: 0,
-    support: 0,
+    cartable: 1,
     admins: 0,
-    settings: 0,
   },
   COMMERCIAL_MANAGER: {
+    dashboard: 1,
+    priorities: 1,
     flights: 1,
     agencies: 1,
+    approvals: 1,
     reports: 1,
     finance: 1,
-    refunds: 0,
-    club: 0,
-    content: 0,
-    support: 0,
+    cartable: 1,
     admins: 0,
-    settings: 0,
   },
   IT_MANAGER: {
+    dashboard: 1,
+    priorities: 0,
     flights: 0,
     agencies: 0,
+    approvals: 0,
     reports: 0,
     finance: 0,
-    refunds: 0,
-    club: 0,
-    content: 0,
-    support: 1,
+    cartable: 0,
     admins: 1,
-    settings: 1,
   },
   SITE_ADMIN: {
+    dashboard: 1,
+    priorities: 0,
     flights: 0,
-    agencies: 0,
+    agencies: 1,
+    approvals: 1,
     reports: 1,
     finance: 0,
-    refunds: 0,
-    club: 1,
-    content: 1,
-    support: 1,
+    cartable: 1,
     admins: 0,
-    settings: 0,
   },
+};
+
+const HIDDEN_ROLE_PERMISSIONS: Record<AdminCreatableRole, string[]> = {
+  SENIOR_MANAGER: ['refunds', 'club', 'content', 'support', 'settings'],
+  FINANCE_MANAGER: ['refunds'],
+  COMMERCIAL_MANAGER: ['club'],
+  IT_MANAGER: ['support', 'settings'],
+  SITE_ADMIN: ['refunds', 'club', 'content', 'support'],
 };
 
 export function rolePermissionPreset(role: AdminCreatableRole): PermState {
@@ -127,18 +117,18 @@ export function rolePermissionPreset(role: AdminCreatableRole): PermState {
   }, {} as PermState);
 }
 
-export function enabledPermissionKeys(perms: PermState): PermKey[] {
-  return PERM_DEFS.filter(({ key }) => perms[key]).map(({ key }) => key);
+export function enabledPermissionKeys(
+  perms: PermState,
+  role?: AdminCreatableRole,
+): string[] {
+  const visible = PERM_DEFS.filter(({ key }) => perms[key]).map(({ key }) => key);
+  return role ? [...visible, ...HIDDEN_ROLE_PERMISSIONS[role]] : visible;
 }
 
 export function permissionStateFromKeys(
   keys: readonly string[],
-  fallbackRole: AdminCreatableRole,
+  _fallbackRole: AdminCreatableRole,
 ): PermState {
-  const known = new Set(PERM_DEFS.map(({ key }) => key));
-  if (keys.some((key) => !known.has(key as PermKey))) {
-    return rolePermissionPreset(fallbackRole);
-  }
   const selected = new Set(keys);
   return PERM_DEFS.reduce((state, { key }) => {
     state[key] = selected.has(key);

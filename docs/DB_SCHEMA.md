@@ -2807,3 +2807,6 @@ confirmed paid/ticketed passenger seats, active managerial `seat_locks`, and
 company blocks (`seat_locks.classification=FREE`). The public 15-minute hold
 deadline continues to be stored in `bookings.holdExpiresAt`; immutable financial
 sales continue to be stored in `ledger_entries`.
+# Senior Manager permission catalog (2026-08)
+
+Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.

@@ -96,6 +96,8 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
         ...stepUp1,
       });
     expect(createRes.status).toBe(201);
+    expect(createRes.body.data.tempPassword).toBe('Fresh@123456');
+    expect(createRes.body.data.username).toBe(`new.${suffix}`);
 
     // The new account really works against the staff login.
     const loginRes = await request(app.getHttpServer())

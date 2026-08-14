@@ -11,6 +11,7 @@ import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
+import { useAuth } from '../../hooks/useAuth';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import type { AdminCreatableRole, AdminRow } from '../../types/admins';
@@ -277,6 +278,7 @@ const RefreshIcon = () => (
 
 /** Dark management-panel admins tab — design-reference-v2/پنل رئیس هیئت مدیره.dc.html */
 export default function PanelAdminsPage() {
+  const { user } = useAuth();
   const [rows, setRows] = useState<AdminRow[] | null>(null);
   const [selected, setSelected] = useState<AdminRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -286,8 +288,6 @@ export default function PanelAdminsPage() {
     fullName: '',
     email: '',
     role: 'IT_MANAGER' as AdminCreatableRole,
-    password: '',
-    delivery: 'sms' as 'sms' | 'email',
   });
   const [addPerms, setAddPerms] = useState<PermState>(() =>
     rolePermissionPreset('IT_MANAGER'),
@@ -295,6 +295,11 @@ export default function PanelAdminsPage() {
   const [addError, setAddError] = useState(false);
   const [detailPerms, setDetailPerms] = useState<PermState | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [createdCredential, setCreatedCredential] = useState<{
+    fullName: string;
+    username: string;
+    tempPassword: string;
+  } | null>(null);
   const [newPass, setNewPass] = useState('');
   const [cpSuggested, setCpSuggested] = useState('');
   const [resetDelivery, setResetDelivery] = useState<'sms' | 'email'>('sms');
@@ -320,8 +325,6 @@ export default function PanelAdminsPage() {
       fullName: '',
       email: '',
       role: 'IT_MANAGER',
-      password: '',
-      delivery: 'sms',
     });
     setAddPerms(rolePermissionPreset('IT_MANAGER'));
     setAddOpen(true);
@@ -352,29 +355,33 @@ export default function PanelAdminsPage() {
   }
 
   async function onSubmitAdd() {
-    const { fullName, email, password, role, delivery } = addForm;
-    if (!fullName.trim() || !email.trim() || password.length < 6) {
+    const { fullName, email, role } = addForm;
+    if (!fullName.trim() || !email.trim()) {
       setAddError(true);
       return;
     }
     setAddError(false);
     const username = deriveUsernameFromEmail(email);
+    const password = generatePassword();
     try {
       const fields = await stepUp.confirm();
-      await createAdmin({
+      const created = await createAdmin({
         fullName,
         email,
         username,
         role,
         password,
-        delivery,
-        permissions: enabledPermissionKeys(addPerms),
+        delivery: 'email',
+        permissions: enabledPermissionKeys(addPerms, role),
         ...fields,
       });
       setAddOpen(false);
-      setNotice(
-        `مدیر جدید افزوده شد و رمز عبور از طریق ${delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد ✓`,
-      );
+      setCreatedCredential({
+        fullName: fullName.trim(),
+        username,
+        tempPassword: created.tempPassword ?? password,
+      });
+      setNotice('حساب مدیر جدید ایجاد و دسترسی‌ها از سمت سرور اعمال شد ✓');
       reload();
     } catch (err) {
       if (err instanceof Error && err.message === 'CANCELLED') return;
@@ -401,7 +408,7 @@ export default function PanelAdminsPage() {
     try {
       const fields = await stepUp.confirm();
       await updateAdminPermissions(row.id, {
-        permissions: enabledPermissionKeys(perms),
+        permissions: enabledPermissionKeys(perms, row.role as AdminCreatableRole),
         ...fields,
       });
       setNotice('سطح دسترسی با موفقیت ذخیره و از سمت سرور اعمال شد.');
@@ -826,7 +833,9 @@ export default function PanelAdminsPage() {
                 }
                 className={`h-[46px] w-full cursor-pointer px-[11px] text-xs ${panelInput}`}
               >
-                {CREATABLE_ROLES.map((role) => (
+                {CREATABLE_ROLES.filter(
+                  (role) => user?.role !== 'SENIOR_MANAGER' || role.value !== 'SENIOR_MANAGER',
+                ).map((role) => (
                   <option key={role.value} value={role.value}>
                     {role.label}
                   </option>
@@ -838,42 +847,6 @@ export default function PanelAdminsPage() {
               </p>
             </div>
 
-            <div>
-              <label
-                htmlFor="pa-pass"
-                className={`mb-2 block text-[11.5px] font-bold ${panelText}`}
-              >
-                رمز عبور ورود <span className="text-[#f87171]">*</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="pa-pass"
-                  dir="ltr"
-                  value={addForm.password}
-                  onChange={(e) =>
-                    setAddForm((f) => ({ ...f, password: e.target.value }))
-                  }
-                  placeholder="حداقل ۶ کاراکتر"
-                  className={`font-num ltr h-[46px] min-w-0 flex-1 px-[11px] text-left text-[12.5px] ${panelInput} ${addError && addForm.password.length < 6 ? 'border-[#f87171]' : ''}`}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAddForm((f) => ({ ...f, password: generatePassword() }))
-                  }
-                  className={`flex h-[46px] shrink-0 items-center gap-1.5 px-[13px] text-[11.5px] font-bold ${panelBtnGhost}`}
-                >
-                  <RefreshIcon />
-                  تولید خودکار
-                </button>
-              </div>
-              <DeliveryCards
-                value={addForm.delivery}
-                onChange={(d) => setAddForm((f) => ({ ...f, delivery: d }))}
-                label="روش ارسال رمز عبور به مدیر:"
-              />
-            </div>
-
             <PermissionsList perms={addPerms} onToggle={toggleAddPerm} boxed />
 
             {addError ? (
@@ -881,9 +854,36 @@ export default function PanelAdminsPage() {
                 role="alert"
                 className="text-[11.5px] font-semibold text-[#f87171]"
               >
-                نام، ایمیل و رمز عبور (حداقل ۶ کاراکتر) الزامی است.
+                نام و ایمیل سازمانی معتبر الزامی است.
               </p>
             ) : null}
+          </div>
+        </PanelModal>
+      )}
+
+      {createdCredential && (
+        <PanelModal
+          title="حساب مدیر ایجاد شد"
+          onClose={() => setCreatedCredential(null)}
+          footer={
+            <button
+              type="button"
+              onClick={() => setCreatedCredential(null)}
+              className={`h-[42px] w-full text-xs font-bold ${panelBtnPrimary}`}
+            >
+              بستن
+            </button>
+          }
+        >
+          <div className="space-y-3 text-xs text-[#cdd9ec]">
+            <p>
+              حساب «{createdCredential.fullName}» ایجاد شد. این رمز اولیه فقط همین یک‌بار نمایش داده
+              می‌شود و کاربر در اولین ورود ملزم به تغییر آن است.
+            </p>
+            <div className="rounded-xl border border-[#28344c] bg-[#0f1623] p-3" dir="ltr">
+              <div>Username: <strong>{createdCredential.username}</strong></div>
+              <div className="mt-2">Temporary password: <strong>{createdCredential.tempPassword}</strong></div>
+            </div>
           </div>
         </PanelModal>
       )}

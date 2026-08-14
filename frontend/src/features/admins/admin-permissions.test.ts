@@ -18,14 +18,14 @@ describe('admin-permissions', () => {
       'FINANCE_MANAGER',
     );
     expect(enabledPermissionKeys(state)).toEqual(['reports', 'finance']);
-    expect(state.refunds).toBe(false);
+    expect(state.cartable).toBe(false);
   });
 
   it('presets IT manager permissions per design', () => {
     const perms = rolePermissionPreset('IT_MANAGER');
-    expect(perms.support).toBe(true);
+    expect(perms.dashboard).toBe(true);
     expect(perms.admins).toBe(true);
-    expect(perms.settings).toBe(true);
+    expect(perms.cartable).toBe(false);
     expect(perms.flights).toBe(false);
   });
 

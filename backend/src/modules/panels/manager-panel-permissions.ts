@@ -1,8 +1,12 @@
 export const MANAGER_PANEL_PERMISSION_KEYS = [
+  'dashboard',
+  'priorities',
   'flights',
   'agencies',
+  'approvals',
   'reports',
   'finance',
+  'cartable',
   'refunds',
   'club',
   'content',
@@ -17,6 +21,7 @@ export type ManagerPanelPermissionKey =
 const NAV_PERMISSION_BY_KEY: Readonly<
   Record<string, ManagerPanelPermissionKey>
 > = {
+  dashboard: 'dashboard',
   flights: 'flights',
   flightops: 'flights',
   aircraft: 'flights',
@@ -41,6 +46,8 @@ const NAV_PERMISSION_BY_KEY: Readonly<
   users: 'admins',
   panels: 'admins',
   settings: 'settings',
+  cartable: 'cartable',
+  referrals: 'cartable',
 };
 
 export function permissionForNavKey(
@@ -53,7 +60,9 @@ export function permissionForRequestPath(
   rawPath: string,
 ): ManagerPanelPermissionKey | null {
   const path = rawPath.split('?')[0].replace(/^\/api(?=\/)/, '');
+  if (/^\/cartable(?:\/|$)/.test(path)) return 'cartable';
   if (/^\/admins(?:\/|$)/.test(path)) return 'admins';
+  if (/^\/agencies\/requests(?:\/|$)/.test(path)) return 'approvals';
   if (/^\/agencies(?:\/|$)/.test(path)) return 'agencies';
   if (
     /^\/(?:flightops|flights|pricing|webservice\/pricing)(?:\/|$)/.test(path)

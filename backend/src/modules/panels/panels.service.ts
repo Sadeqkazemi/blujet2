@@ -59,6 +59,12 @@ export class PanelsService {
       const items = Array.isArray(restrictions)
         ? roleItems.filter((item) => {
             const permission = permissionForNavKey(item.key);
+            if (item.key === 'agencies') {
+              return (
+                restrictions.includes('agencies') ||
+                restrictions.includes('approvals')
+              );
+            }
             return permission === null || restrictions.includes(permission);
           })
         : roleItems;

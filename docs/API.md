@@ -3645,3 +3645,8 @@ for a repeated idempotency key.
 a Persian reason. This server decision is separate from the persisted advisory
 `aiSuggestion`; the browser must not recompute weak-sale eligibility from its
 own clock.
+# Senior Manager panel completion (2026-08)
+
+- `GET /panels/nav` returns the approved Senior Manager sidebar without `customers`, `reservation`, or `aircraft`.
+- `POST /admins` returns the one-time initial credential in `tempPassword` after step-up verification; the account is persisted with `mustChangePassword=true`.
+- Manager permission payloads additionally accept `dashboard`, `priorities`, `approvals`, and `cartable`; `dashboard` and `cartable` are enforced by the server navigation/access guard.
