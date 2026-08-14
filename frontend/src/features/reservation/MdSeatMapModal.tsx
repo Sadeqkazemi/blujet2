@@ -373,7 +373,7 @@ export default function MdSeatMapModal({
           </button>
         </div>}
 
-        <div className="max-h-[min(78vh,820px)] overflow-y-auto px-4 py-3.5">
+        <div className={embedded ? 'px-4 py-3.5' : 'max-h-[min(78vh,820px)] overflow-y-auto px-4 py-3.5'}>
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               value={query}
