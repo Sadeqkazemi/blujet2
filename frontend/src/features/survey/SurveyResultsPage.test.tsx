@@ -50,6 +50,17 @@ describe('SurveyResultsPage', () => {
     expect(screen.getByRole('button', { name: /تحلیل نظرات/ })).toBeInTheDocument();
   });
 
+  it('BOARD_CHAIR receives the same real survey results view', async () => {
+    mockRole('BOARD_CHAIR');
+    const resultsSpy = vi.spyOn(surveyApi, 'fetchSurveyResults').mockResolvedValue(RESULTS);
+
+    render(<SurveyResultsPage />);
+
+    expect(await screen.findByText('تهران ← دبی')).toBeInTheDocument();
+    expect(screen.getByTestId('survey-result-row')).toBeInTheDocument();
+    expect(resultsSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the disabled banner instead of an empty-state when the survey is off', async () => {
     mockRole('CEO');
     vi.spyOn(surveyApi, 'fetchSurveyResults').mockResolvedValue({ disabled: true, flights: [] });
