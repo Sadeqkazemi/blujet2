@@ -79,6 +79,14 @@ export interface FlightRow {
   approvedSnapshot?: FlightDefinitionSnapshot | null;
   aiSuggestion?: FlightAiSuggestion | null;
   competitorPriceIrr?: string | null;
+  salesHealth?: {
+    isWeak: boolean;
+    occupancyPct: number;
+    hoursToDeparture: number;
+    thresholdPct: number;
+    windowHours: number;
+    reasonFa: string;
+  };
 }
 
 export interface FlightAiSuggestion {

@@ -287,7 +287,7 @@ cannot manually lock seats** (view sold-seat passenger details only).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, COMMERCIAL_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + sold seats (`Passenger.seatCode` on non-CANCELLED bookings) + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, lockedCount, freeCount, capacity, occupancyPct }`. Each SOLD seat carries the rich `passenger` `{ fullName, pnr, bookingStatus, nationalId, priceIrr }`; locked seats carry `lockExpiresAt`, optional passenger identity and `lockAgencyId`. Staff-only; IT is read-only. |
+| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, COMMERCIAL_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + confirmed sales + unexpired 15-minute checkout holds + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, heldCount, managerLockedCount, blockedCount, lockedCount, freeCount, capacity, occupancyPct }`. Cell status is one of `FREE|HELD|SOLD|LOCKED|BLOCKED`; held cells carry `holdExpiresAt`, sold/held cells carry the authorized passenger shape, and managerial locks carry classification/approval/agency fields. Staff-only; IT is read-only. |
 | POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`/`COMMERCIAL_MANAGER`) | `{ seatCode, agencyId?, passengerName?, passengerNationalId?, passengerMobile?, reason, classification, discountPct? }` — agencyId must reference an active `AgencyProfile`; passenger/agency/anonymous targets are supported. 409 if sold/locked. PII remains encrypted+hashed. IT_MANAGER → 403. |
 | PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
 | GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
@@ -3636,3 +3636,12 @@ Booking input uses `{ allotmentId, cabin, passengers[] }`. Each passenger has
 The existing reservation engine validates age at departure, locks the
 allotment/credit/seat rows, debits the agency ledger, and returns the same result
 for a repeated idempotency key.
+
+## Commercial active-inventory projection (2026-08-13)
+
+`GET /flights/overview` exposes only commercially sellable instances in its
+`active` and `future` arrays. Every active row also returns `salesHealth` with
+`isWeak`, `occupancyPct`, `hoursToDeparture`, `thresholdPct`, `windowHours`, and
+a Persian reason. This server decision is separate from the persisted advisory
+`aiSuggestion`; the browser must not recompute weak-sale eligibility from its
+own clock.

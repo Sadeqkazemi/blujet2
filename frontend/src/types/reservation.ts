@@ -1,4 +1,4 @@
-export type SeatStatus = 'FREE' | 'SOLD' | 'LOCKED';
+export type SeatStatus = 'FREE' | 'HELD' | 'SOLD' | 'LOCKED' | 'BLOCKED';
 
 /** Rich sold-seat passenger info surfaced in the IT reservation seat map. */
 export interface SeatPassengerInfo {
@@ -23,6 +23,9 @@ export interface SeatCell {
   passenger?: SeatPassengerInfo | null;
   occupant?: SeatOccupant | null;
   lockExpiresAt?: string | null;
+  holdExpiresAt?: string | null;
+  lockClassification?: 'PAYABLE' | 'FREE' | 'DISCOUNTED' | null;
+  lockApprovalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | null;
   lockPassengerName?: string | null;
   lockAgencyId?: string | null;
   lockAgencyName?: string | null;
@@ -47,6 +50,9 @@ export interface SeatMap {
   cabinLayout: Partial<Record<'BUSINESS' | 'COMFORT' | 'ECONOMY', { aisleAfterIndex: number }>>;
   capacity: number;
   soldCount: number;
+  heldCount?: number;
+  managerLockedCount?: number;
+  blockedCount?: number;
   lockedCount: number;
   freeCount: number;
   occupancyPct: number;

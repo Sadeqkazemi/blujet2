@@ -99,9 +99,8 @@ function TrustBadges({ compact }: { compact?: boolean }) {
       className="footer-trust-section"
       data-testid="footer-trust-section"
       style={{
-        marginTop: compact ? 0 : 18,
-        paddingTop: compact ? 0 : 18,
-        borderTop: compact ? undefined : '1px solid #ffffff12',
+        marginTop: 0,
+        paddingTop: 0,
       }}
     >
       {badgesRow}
@@ -255,7 +254,7 @@ export default function PublicFooter() {
             style={{
               maxWidth: 1480,
               margin: '0 auto',
-              padding: '0 40px 28px',
+              padding: '0 40px 28px 88px',
               display: 'flex',
               justifyContent: 'flex-start',
               direction: 'ltr',

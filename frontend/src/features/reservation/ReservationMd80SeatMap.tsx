@@ -38,8 +38,10 @@ function seatTone(
   highlight: boolean,
 ): { fill: string; stroke: string; text: string } {
   if (selected || highlight) return { fill: '#f59e0b', stroke: '#fbbf24', text: '#1a1206' };
+  if (status === 'HELD') return { fill: '#0ea5e9', stroke: '#38bdf8', text: '#fff' };
   if (status === 'SOLD') return { fill: '#3b82f6', stroke: '#60a5fa', text: '#fff' };
   if (status === 'LOCKED') return { fill: '#f59e0b', stroke: '#fbbf24', text: '#1a1206' };
+  if (status === 'BLOCKED') return { fill: '#a855f7', stroke: '#c084fc', text: '#fff' };
   if (exitRow) return { fill: '#1f1520', stroke: '#f0a8b4', text: '#f0a8b4' };
   return { fill: '#e8eef6', stroke: '#8aa4c0', text: '#1a3a55' };
 }

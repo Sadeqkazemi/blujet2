@@ -94,7 +94,7 @@ export default function FlightsPage() {
   const pricingSectionRef = useRef<HTMLDivElement>(null);
 
   const [detail, setDetail] = useState<FlightDetail | null>(null);
-  const [seatMapFlight, setSeatMapFlight] = useState<FlightRow | null>(null);
+  const [detailTab, setDetailTab] = useState<"details" | "seats">("details");
   const [salePriceToman, setSalePriceToman] = useState("");
   const [salePriceReason, setSalePriceReason] = useState("");
   const [salePriceBusy, setSalePriceBusy] = useState(false);
@@ -177,6 +177,7 @@ export default function FlightsPage() {
     try {
       const d = await fetchFlightDetail(id);
       setDetail(d);
+      setDetailTab("details");
       setSelectedAircraftType(d.aircraftType);
       setSalePriceToman(d.basePriceIrr ? irrToTomanInput(d.basePriceIrr) : "");
       setSalePriceReason("");
@@ -407,11 +408,7 @@ export default function FlightsPage() {
   const futurePager = usePagination(visibleFuture);
   const weakActiveFlights = useMemo(
     () =>
-      (data?.active ?? []).filter((row) => {
-        const hoursToDeparture = (new Date(row.departureAt).getTime() - Date.now()) / 3_600_000;
-        const occupancy = row.capacity > 0 ? row.sold / row.capacity : 0;
-        return row.derivedStatus !== "CANCELLED" && hoursToDeparture >= 0 && hoursToDeparture <= 72 && occupancy < 0.6;
-      }),
+      (data?.active ?? []).filter((row) => row.salesHealth?.isWeak === true),
     [data?.active],
   );
 
@@ -556,14 +553,25 @@ export default function FlightsPage() {
                 <h2 className="text-sm font-bold text-panel-ink">
                   مدیریت پروازها و موجودی
                 </h2>
-                {canManageFlights && (
-                  <button
-                    onClick={() => setAddOpen(true)}
-                    className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
-                  >
-                    + افزودن پرواز
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {isCommercial && canManageFlights && (
+                    <button
+                      type="button"
+                      onClick={() => void onAiAnalysis()}
+                      className="rounded-lg bg-[#7c3aed] px-3 py-2 text-xs font-bold text-white transition hover:bg-[#6d28d9]"
+                    >
+                      ✦ تحلیل فروش ضعیف با هوش مصنوعی
+                    </button>
+                  )}
+                  {canManageFlights && (
+                    <button
+                      onClick={() => setAddOpen(true)}
+                      className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                    >
+                      + افزودن پرواز
+                    </button>
+                  )}
+                </div>
               </div>
               {isCommercial && weakActiveFlights.length > 0 && (
                 <div className="grid grid-cols-1 gap-3 border-b border-panel-border bg-[#f59e0b0b] p-4 lg:grid-cols-2" data-testid="weak-sales-ai-list">
@@ -1326,7 +1334,17 @@ export default function FlightsPage() {
         <Modal
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
+          maxWidthClass="max-w-4xl"
         >
+          <div className="mb-4 flex w-max gap-1 rounded-xl border border-panel-border bg-panel-canvas p-1">
+            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-lg px-4 py-2 text-xs font-extrabold ${detailTab === "details" ? "bg-accent text-white" : "text-panel-muted"}`}>
+              جزئیات پرواز
+            </button>
+            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-lg px-4 py-2 text-xs font-extrabold ${detailTab === "seats" ? "bg-accent text-white" : "text-panel-muted"}`}>
+              نقشه صندلی
+            </button>
+          </div>
+          <div className={detailTab === "details" ? "block" : "hidden"}>
           <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
             <div className="rounded-lg bg-panel-canvas p-2.5">
               <div className="text-[10px] text-panel-muted">
@@ -1398,8 +1416,7 @@ export default function FlightsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSeatMapFlight(detail);
-                    setDetail(null);
+                    setDetailTab("seats");
                   }}
                   className="rounded-lg border border-accent px-3 py-2 text-[11px] font-bold text-accent"
                 >
@@ -1501,16 +1518,19 @@ export default function FlightsPage() {
           </div>
 
           <FareRulesSection instanceId={detail.id} readOnly={!canManageFlights} />
+          </div>
+          {detailTab === "seats" && (
+            <MdSeatMapModal
+              embedded
+              canManageOverride={canPublishFareAndControlSeats}
+              flight={detail}
+              onClose={() => setDetailTab("details")}
+              onNotice={setNotice}
+              onError={setError}
+              onChanged={() => void load()}
+            />
+          )}
         </Modal>
-      )}
-      {seatMapFlight && (
-        <MdSeatMapModal
-          flight={seatMapFlight}
-          onClose={() => setSeatMapFlight(null)}
-          onNotice={setNotice}
-          onError={setError}
-          onChanged={() => void load()}
-        />
       )}
       {aircraftStepUp.modal}
 

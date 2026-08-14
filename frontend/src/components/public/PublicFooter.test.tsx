@@ -101,7 +101,9 @@ describe('PublicFooter — desktop', () => {
     expect(screen.getByTestId('footer-desktop-trust-row')).toHaveStyle({
       justifyContent: 'flex-start',
       direction: 'ltr',
+      padding: '0 40px 28px 88px',
     });
+    expect(trust).not.toHaveStyle({ borderTop: '1px solid #ffffff12' });
   });
 
   it('hides the careers link when disabled, shows it when enabled', () => {

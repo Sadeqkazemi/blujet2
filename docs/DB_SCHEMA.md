@@ -2796,3 +2796,14 @@ correlation, trusted-proxy address resolution, throttling, timeouts, body-size
 limits, security headers, logging, health checks, and error normalization are
 transport/operational concerns. They do not persist or mutate reservation,
 pricing, seat-lock, executive-approval, or financial state.
+
+## Commercial inventory state projection (2026-08-13)
+
+No schema change is required. Commercial active inventory is projected only
+from sellable `flight_instances` (published/approved, or a pending revision
+that retains an approved snapshot). The seat-map projection deliberately keeps
+four existing persistence states distinct: unexpired `Booking.status=HELD`,
+confirmed paid/ticketed passenger seats, active managerial `seat_locks`, and
+company blocks (`seat_locks.classification=FREE`). The public 15-minute hold
+deadline continues to be stored in `bookings.holdExpiresAt`; immutable financial
+sales continue to be stored in `ledger_entries`.

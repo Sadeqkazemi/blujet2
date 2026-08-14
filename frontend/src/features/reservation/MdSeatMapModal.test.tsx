@@ -70,6 +70,7 @@ describe('MdSeatMapModal managerial locking', () => {
     const user = userEvent.setup();
     render(
       <MdSeatMapModal
+        canManageOverride
         flight={FLIGHT}
         onClose={vi.fn()}
         onNotice={vi.fn()}
@@ -103,6 +104,7 @@ describe('MdSeatMapModal managerial locking', () => {
     const user = userEvent.setup();
     render(
       <MdSeatMapModal
+        canManageOverride
         flight={FLIGHT}
         onClose={vi.fn()}
         onNotice={vi.fn()}
@@ -126,5 +128,25 @@ describe('MdSeatMapModal managerial locking', () => {
         expect.objectContaining({ seatCode: '3B', agencyId: undefined }),
       ),
     );
+  });
+
+  it('keeps IT/read-only viewers from opening managerial lock controls', async () => {
+    setupApi();
+    const user = userEvent.setup();
+    render(
+      <MdSeatMapModal
+        canManageOverride={false}
+        flight={FLIGHT}
+        onClose={vi.fn()}
+        onNotice={vi.fn()}
+        onError={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+
+    await screen.findByTestId('reservation-md80-seat-map');
+    await user.click(screen.getByRole('button', { name: '3A' }));
+    expect(screen.queryByRole('dialog', { name: /لاک دستی صندلی/ })).not.toBeInTheDocument();
+    expect(reservationApi.fetchSeatLockAgencies).not.toHaveBeenCalled();
   });
 });
