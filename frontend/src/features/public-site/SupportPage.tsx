@@ -212,8 +212,6 @@ export default function SupportPage() {
     }
   }
 
-  const gridCols4 = isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
-
   return (
     <PublicPageShell>
       {/* HERO + SEARCH */}
@@ -223,7 +221,7 @@ export default function SupportPage() {
           <p style={{ fontSize: 14, color: '#c9dcf3', margin: '0 0 24px', lineHeight: 1.9 }}>
             {t.heroDesc}
           </p>
-          <div style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="flex items-center gap-2 max-[420px]:flex-wrap" style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4-4" />
@@ -234,14 +232,14 @@ export default function SupportPage() {
               placeholder={t.searchPlaceholder}
               style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 13, color: '#16202e', minWidth: 0 }}
             />
-            <span style={{ flex: 'none', background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '10px 19px', borderRadius: 10 }}>{t.searchLabel}</span>
+            <span className="max-[420px]:w-full max-[420px]:text-center" style={{ flex: 'none', background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '10px 19px', borderRadius: 10 }}>{t.searchLabel}</span>
           </div>
         </div>
       </section>
 
       {/* CATEGORY CARDS */}
       <section style={{ maxWidth: 1180, margin: '-26px auto 0', padding: '0 22px', position: 'relative' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols4, gap: 13 }}>
+        <div className="grid grid-cols-1 gap-[13px] min-[480px]:grid-cols-2 lg:grid-cols-4" data-testid="support-category-grid">
           {CATS.map((c) => (
             <div key={c.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: '17px 15px', boxShadow: '0 14px 32px -20px rgba(13,38,102,.25)' }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: c.bg, color: c.color, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 11 }}>
@@ -254,7 +252,7 @@ export default function SupportPage() {
         </div>
       </section>
 
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '33px 22px 47px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1.5fr 1fr', gap: 24, alignItems: 'start' }}>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.5fr_1fr]" data-testid="support-content-grid" style={{ maxWidth: 1180, margin: '0 auto', padding: '33px 22px 47px' }}>
         {/* FAQ */}
         <div>
           <h2 style={{ fontSize: 19, fontWeight: 900, color: '#0d2640', margin: '0 0 15px' }}>{t.faqHeading}</h2>
@@ -299,7 +297,7 @@ export default function SupportPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2" style={{ marginBottom: 10 }} data-testid="support-ticket-identity-grid">
                   <input
                     data-testid="ticket-name"
                     value={name}
