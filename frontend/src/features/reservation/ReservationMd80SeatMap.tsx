@@ -229,7 +229,7 @@ export default function ReservationMd80SeatMap({
 
   return (
     <div
-      className="max-h-[min(62vh,520px)] overflow-auto rounded-[16px] border border-[#1c2740] bg-[#0a1220] p-3"
+      className="overflow-x-auto overflow-y-visible rounded-[16px] border border-[#1c2740] bg-[#0a1220] p-3"
       data-testid="reservation-md80-seat-map"
       data-aircraft="MD-80"
     >
