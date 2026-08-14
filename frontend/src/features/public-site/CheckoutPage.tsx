@@ -623,12 +623,12 @@ export default function CheckoutPage() {
 
   const loginModal = loginOpen ? (
     <div
-      className="fixed inset-0 z-[150] flex items-center justify-center bg-[#0d1b33]/70 px-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[150] flex items-center justify-center overflow-y-auto bg-[#0d1b33]/65 px-4 py-6 backdrop-blur-[4px]"
       role="dialog"
       aria-modal="true"
       data-testid="checkout-login-modal"
     >
-      <div className="relative w-full max-w-[500px] rounded-[28px] bg-white px-7 pb-8 pt-16 shadow-2xl sm:px-10">
+      <div className="relative my-auto w-full max-w-[500px] rounded-[28px] bg-white px-6 pb-9 pt-12 shadow-[0_28px_80px_rgba(8,20,40,.3)] sm:px-9">
         <button
           type="button"
           data-testid="checkout-login-close"
@@ -660,11 +660,19 @@ export default function CheckoutPage() {
         <OtpLoginInline
           embedded
           showHeader={false}
+          checkoutStyle
           onAuthenticated={() => {
             setLoginOpen(false);
             if (step === 'pax') setStep('extras');
           }}
         />
+        <button
+          type="button"
+          onClick={() => setLoginOpen(false)}
+          className="mt-5 w-full text-center text-sm font-bold text-[#7d8797] transition hover:text-[#0d2640]"
+        >
+          {locale === 'en' ? 'Cancel' : locale === 'ar' ? 'إلغاء' : 'انصراف'}
+        </button>
       </div>
     </div>
   ) : null;

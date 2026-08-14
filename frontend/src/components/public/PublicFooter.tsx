@@ -1,120 +1,127 @@
 import { Link } from 'react-router-dom';
-import { useIsMobile } from '../../hooks/useIsMobile';
 import { useCareersEnabled } from '../../hooks/useCareersEnabled';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useSocialLinks } from '../../hooks/useSocialLinks';
 import { useT } from '../../lib/i18n';
-import { SocialIcon, socialBrandColor } from './SocialIcon';
+import { SocialIcon } from './SocialIcon';
 
-function AppStoreIcon({ size = 15 }: { size?: number }) {
+const CONTACT: Record<StoredLocale, { phone: string; email: string }> = {
+  fa: { phone: 'تلفن پشتیبانی', email: 'ایمیل پشتیبانی' },
+  en: { phone: 'Support phone', email: 'Support email' },
+  ar: { phone: 'هاتف الدعم', email: 'البريد الإلكتروني للدعم' },
+};
+
+function BrandMark() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M17.05 12.5c-.03-2.36 1.93-3.5 2.02-3.55-1.1-1.6-2.8-1.82-3.4-1.85-1.44-.15-2.83.85-3.56.85-.74 0-1.87-.83-3.08-.8-1.58.02-3.05.92-3.86 2.34-1.66 2.88-.42 7.13 1.2 9.46.79 1.13 1.72 2.4 2.95 2.36 1.18-.05 1.63-.76 3.06-.76 1.42 0 1.83.76 3.08.73 1.28-.02 2.08-1.15 2.86-2.29.9-1.3 1.27-2.57 1.29-2.64-.03-.01-2.47-.95-2.5-3.76-.02-2.35 1.92-3.48 2-3.53-1.1-1.62-2.8-1.8-3.4-1.83M14.65 4.87c.66-.8 1.1-1.9.98-3.02-.95.04-2.1.63-2.78 1.43-.61.7-1.15 1.85-1 2.93 1.06.08 2.14-.53 2.8-1.34" />
-    </svg>
+    <Link to="/" className="inline-flex items-center gap-2.5 no-underline" aria-label="blujet">
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#1668c4] text-white">
+        <svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="m2.8 13.1 7.1 1.5 3.2 6.1 2-1-1.1-6 5.9-4.1c1.1-.8 1.6-2.2 1.2-3.5-.2-.7-1-1-1.6-.6l-7 4.1-5.8-4L5 6.7l3.8 5.1-5.7-.3-.3 1.6Z" fill="currentColor" />
+        </svg>
+      </span>
+      <span className="text-[20px] font-black text-white">blujet</span>
+    </Link>
   );
 }
 
-function GooglePlayIcon({ size = 15 }: { size?: number }) {
+function DownloadButtons({ compact = false }: { compact?: boolean }) {
+  const buttonClass = compact
+    ? 'flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-3 text-[11px] font-black text-white'
+    : 'flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-4 text-xs font-black text-white transition hover:bg-white/[.12]';
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3.6 2.3c-.35.2-.6.6-.6 1.1v17.2c0 .5.25.9.6 1.1l9.6-9.7L3.6 2.3zm12.5 8.7 2.5-1.4c.7-.4.7-1.4 0-1.8l-2.6-1.5-2.7 2.8 2.8 2.9zm-2.9-2 2.7-2.8L5.1 1.7l8.1 7.3zm0 2.1-8.1 8.2 10.9-6.3-2.8-1.9z" />
-    </svg>
-  );
-}
-
-function DownloadButtons({ compact }: { compact?: boolean }) {
-  const btnStyle = {
-    display: 'flex' as const,
-    alignItems: 'center' as const,
-    gap: compact ? 6 : 7,
-    background: '#ffffff14',
-    border: '1px solid #ffffff1f',
-    color: '#fff',
-    padding: compact ? '7px 12px' : '8px 14px',
-    borderRadius: 10,
-    fontSize: compact ? 11 : '11.5px',
-    fontWeight: 700,
-    cursor: 'pointer' as const,
-    whiteSpace: 'nowrap' as const,
-  };
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: compact ? 'center' : undefined, gap: compact ? 8 : 9, flexWrap: 'wrap', marginBottom: compact ? 14 : 16 }}>
-      <span data-testid="footer-app-store" style={btnStyle}>
-        <AppStoreIcon size={compact ? 13 : 15} />
+    <div className={`mt-5 flex flex-wrap gap-2 ${compact ? 'justify-center' : 'justify-start'}`} dir="ltr">
+      <a data-testid="footer-app-store" className={buttonClass} href="#" aria-label="App Store">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M17.05 12.5c-.03-2.36 1.93-3.5 2.02-3.55-1.1-1.6-2.8-1.82-3.4-1.85-1.44-.15-2.83.85-3.56.85-.74 0-1.87-.83-3.08-.8-1.58.02-3.05.92-3.86 2.34-1.66 2.88-.42 7.13 1.2 9.46.79 1.13 1.72 2.4 2.95 2.36 1.18-.05 1.63-.76 3.06-.76 1.42 0 1.83.76 3.08.73 1.28-.02 2.08-1.15 2.86-2.29.9-1.3 1.27-2.57 1.29-2.64-.03-.01-2.47-.95-2.5-3.76M14.65 4.87c.66-.8 1.1-1.9.98-3.02-.95.04-2.1.63-2.78 1.43-.61.7-1.15 1.85-1 2.93 1.06.08 2.14-.53 2.8-1.34" />
+        </svg>
         App Store
-      </span>
-      <span data-testid="footer-google-play" style={btnStyle}>
-        <GooglePlayIcon size={compact ? 13 : 15} />
+      </a>
+      <a data-testid="footer-google-play" className={buttonClass} href="#" aria-label="Google Play">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+          <path d="M3.6 2.3c-.35.2-.6.6-.6 1.1v17.2c0 .5.25.9.6 1.1l9.6-9.7L3.6 2.3zm12.5 8.7 2.5-1.4c.7-.4.7-1.4 0-1.8l-2.6-1.5-2.7 2.8 2.8 2.9zm-2.9-2 2.7-2.8L5.1 1.7l8.1 7.3zm0 2.1-8.1 8.2 10.9-6.3-2.8-1.9z" />
+        </svg>
         Google Play
-      </span>
+      </a>
     </div>
   );
 }
 
-function TrustBadges({ compact }: { compact?: boolean }) {
-  const t = useT();
-  const size = compact ? 44 : 66;
-  const fontSize = compact ? 7 : '8.5px';
-  const borderRadius = compact ? 11 : 12;
-  const badges = [t('badgeTrust'), t('badgeGuild'), t('badgeSamandehi'), t('badgeIata')];
-
-  const badgesRow = (
-    <div
-      data-testid="footer-trust-badges"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: compact ? 'center' : undefined,
-        gap: compact ? 7 : 10,
-        flexWrap: 'wrap',
-      }}
-    >
-      {badges.map((label) => (
-        <span
-          key={label}
-          style={{
-            width: size,
-            height: size,
-            borderRadius,
-            background: '#ffffff10',
-            border: '1px solid #ffffff14',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            fontSize,
-            color: '#9fb2c9',
-            lineHeight: compact ? 1.3 : 1.5,
-            padding: compact ? 4 : 6,
-          }}
-        >
-          {label}
+function ContactRows({ compact = false }: { compact?: boolean }) {
+  const { locale } = useLocale();
+  const labels = CONTACT[locale];
+  const rowClass = compact ? 'justify-center' : 'justify-start';
+  return (
+    <div className={`mt-5 flex flex-col gap-3 ${compact ? 'items-center' : 'items-start'}`}>
+      <a href="tel:+982144694471" aria-label={labels.phone} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[.07] text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.5 2.1L8.1 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.8 2.1Z" />
+          </svg>
         </span>
-      ))}
+        <span dir="ltr" className="font-num text-sm font-bold">021-44694471</span>
+      </a>
+      <a href="mailto:info@blujet.com" aria-label={labels.email} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[.07] text-white">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+        </span>
+        <span dir="ltr" className="text-sm font-bold">info@blujet.com</span>
+      </a>
     </div>
   );
+}
 
+function SocialLinks({ compact = false }: { compact?: boolean }) {
+  const links = useSocialLinks();
+  if (!links.length) return null;
   return (
-    <div
-      className="footer-trust-section"
-      data-testid="footer-trust-section"
-      style={{
-        marginTop: 0,
-        paddingTop: 0,
-      }}
-    >
-      {badgesRow}
+    <div className="footer-social-section mt-5" data-testid="footer-social-section">
+      <div className={`flex flex-wrap items-center gap-2 ${compact ? 'justify-center' : 'justify-start'}`} data-testid="footer-social-links">
+        {links.map((link) => (
+          <a
+            key={link.id}
+            href={link.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={link.name}
+            title={link.name}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[.07] text-[#d9e4ef] transition hover:-translate-y-0.5 hover:bg-white/[.13] hover:text-white"
+            data-testid={`footer-social-${link.id}`}
+          >
+            <SocialIcon id={link.id} size={18} />
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TrustBadges({ compact = false }: { compact?: boolean }) {
+  const t = useT();
+  const badges = [t('badgeTrust'), t('badgeGuild'), t('badgeSamandehi'), t('badgeIata')];
+  return (
+    <div className="footer-trust-section" data-testid="footer-trust-section">
+      <div className={`flex flex-wrap items-center gap-3 ${compact ? 'justify-center' : 'justify-start'}`} data-testid="footer-trust-badges">
+        {badges.map((label) => (
+          <span key={label} className="flex h-[66px] w-[78px] items-center justify-center rounded-xl border border-white/10 bg-white/[.055] px-2 text-center text-[9px] leading-[1.45] text-[#a9bbcf]">
+            {label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
 function FooterLinkColumn({ title, links }: { title: string; links: { to: string; label: string }[] }) {
   return (
-    <div>
-      <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#fff', marginBottom: 16 }}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 11, fontSize: '13.5px' }}>
+    <div className="min-w-0">
+      <h3 className="mb-5 text-[15px] font-black text-white">{title}</h3>
+      <div className="flex flex-col gap-3.5 text-[13px]">
         {links.map((link) => (
-          <Link key={link.label} to={link.to} style={{ color: '#aebfd4', textDecoration: 'none' }}>
+          <Link key={link.label} to={link.to} className="text-[#b6c7d9] no-underline transition hover:text-white">
             {link.label}
           </Link>
         ))}
@@ -125,29 +132,16 @@ function FooterLinkColumn({ title, links }: { title: string; links: { to: string
 
 function MobileAccordionSection({ title, links }: { title: string; links: { to: string; label: string }[] }) {
   return (
-    <details>
-      <summary
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '15px 24px',
-          fontSize: '13.5px',
-          fontWeight: 700,
-          color: '#fff',
-          borderBottom: '1px solid #ffffff14',
-          listStyle: 'none',
-          cursor: 'pointer',
-        }}
-      >
+    <details className="border-b border-white/10">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-black text-white">
         {title}
-        <span className="footer-chev" style={{ color: '#7d92ad', fontSize: 12, transition: 'transform .2s' }}>
-          ⌄
-        </span>
+        <svg className="footer-chevron text-[#8fa4ba] transition" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </summary>
-      <div style={{ padding: '14px 24px 18px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 13, fontSize: 13, borderBottom: '1px solid #ffffff14' }}>
+      <div className="flex flex-col items-start gap-3 px-5 pb-5 text-[13px]">
         {links.map((link) => (
-          <Link key={link.label} to={link.to} style={{ color: '#aebfd4', textDecoration: 'none' }}>
+          <Link key={link.label} to={link.to} className="text-[#b6c7d9] no-underline">
             {link.label}
           </Link>
         ))}
@@ -156,50 +150,16 @@ function MobileAccordionSection({ title, links }: { title: string; links: { to: 
   );
 }
 
-/** Public-site footer — matches design-reference-v2 shared shell. */
 export default function PublicFooter() {
   const t = useT();
   const isMobile = useIsMobile();
   const careersEnabled = useCareersEnabled();
-  const socialLinks = useSocialLinks();
-
-  const socialRow = socialLinks.length ? (
-    <div
-      className="footer-social-section"
-      data-testid="footer-social-section"
-      style={{ margin: isMobile ? '4px 0 18px' : '2px 0 0' }}
-    >
-      <div
-        className="flex flex-wrap items-center gap-2"
-        style={{ justifyContent: isMobile ? 'center' : 'flex-start' }}
-        data-testid="footer-social-links"
-      >
-        {socialLinks.map((link) => (
-          <a
-            key={link.id}
-            href={link.url}
-            target="_blank"
-            rel="noreferrer noopener"
-            aria-label={link.name}
-            title={link.name}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 transition hover:-translate-y-0.5 hover:bg-white/10"
-            style={{ color: socialBrandColor(link.id) }}
-            data-testid={`footer-social-${link.id}`}
-          >
-            <SocialIcon id={link.id} size={18} />
-          </a>
-        ))}
-      </div>
-    </div>
-  ) : null;
 
   const serviceLinks = [
     { to: '/results', label: t('footerBookFlight') },
     { to: '/manage-booking', label: t('footerManageBooking') },
     { to: '/flight-status', label: t('footerFlightStatus') },
     { to: '/club', label: t('navLoyalty') },
-    // Only the link label — never the job ads themselves — appears when
-    // SITE_ADMIN enables «نمایش آگهی در فوتر» / CareersSettings.enabled.
     ...(careersEnabled ? [{ to: '/careers', label: t('footerCareers') }] : []),
   ];
   const companyLinks = [
@@ -210,86 +170,53 @@ export default function PublicFooter() {
   const supportLinks = [
     { to: '/support', label: t('footerHelpCenter') },
     { to: '/support', label: t('footerFaq') },
+    { to: '/results', label: t('footerBookFlight') },
   ];
 
   return (
-    <footer style={{ background: '#0d2640', color: '#aebfd4', marginTop: isMobile ? 48 : 72 }}>
+    <footer className="mt-12 bg-[#0d2943] text-[#b6c7d9] md:mt-[72px]">
       <style>{`
-        footer details[open] .footer-chev { transform: rotate(180deg); }
         footer summary::-webkit-details-marker { display: none; }
+        footer details[open] .footer-chevron { transform: rotate(180deg); }
       `}</style>
 
-      {!isMobile && (
+      {!isMobile ? (
         <>
-          <div
-            data-testid="public-footer-desktop"
-            style={{
-              maxWidth: 1480,
-              margin: '0 auto',
-              padding: '48px 40px 28px',
-              display: 'grid',
-              gridTemplateColumns: 'minmax(300px, 1.35fr) repeat(3, minmax(150px, .8fr))',
-              alignItems: 'start',
-              gap: 'clamp(34px, 5vw, 88px)',
-              direction: 'inherit',
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 16, textDecoration: 'none' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#1668c4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>
-                  ✈
-                </div>
-                <span style={{ fontWeight: 900, fontSize: 18, color: '#fff' }}>blujet</span>
-              </Link>
-              <p style={{ fontSize: '13.5px', lineHeight: 1.85, margin: '0 0 20px', maxWidth: 300 }}>{t('footerTagline')}</p>
+          <div data-testid="public-footer-desktop" className="mx-auto grid max-w-[1480px] grid-cols-[minmax(300px,1.25fr)_repeat(3,minmax(150px,.8fr))] items-start gap-[clamp(36px,5vw,92px)] px-10 pb-8 pt-14">
+            <div className="min-w-0">
+              <BrandMark />
+              <p className="mb-0 mt-5 max-w-[330px] text-[13.5px] leading-8 text-[#c2d0df]">{t('footerTagline')}</p>
               <DownloadButtons />
-              {socialRow}
+              <ContactRows />
+              <SocialLinks />
             </div>
             <FooterLinkColumn title={t('footerColServices')} links={serviceLinks} />
             <FooterLinkColumn title={t('footerColCompany')} links={companyLinks} />
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
           </div>
-          <div
-            data-testid="footer-desktop-trust-row"
-            style={{
-              maxWidth: 1480,
-              margin: '0 auto',
-              padding: '0 40px 28px 88px',
-              display: 'flex',
-              justifyContent: 'flex-start',
-              direction: 'ltr',
-            }}
-          >
+          <div data-testid="footer-desktop-trust-row" className="mx-auto flex max-w-[1480px] justify-start px-10 pb-8" dir="ltr">
             <TrustBadges />
           </div>
-          <div style={{ borderTop: '1px solid #ffffff12' }}>
-            <div style={{ maxWidth: 1480, margin: '0 auto', padding: '17px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: '#7d92ad' }}>
-              <span>{t('footerCopyright')}</span>
-            </div>
+          <div className="border-t border-white/[.07]">
+            <div className="mx-auto max-w-[1480px] px-10 py-4 text-[11.5px] text-[#7f96ae]">{t('footerCopyright')}</div>
           </div>
         </>
-      )}
-
-      {isMobile && (
+      ) : (
         <>
-          <div style={{ padding: '34px 24px 6px', textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 14 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 10, background: '#1668c4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 15 }}>
-                ✈
-              </div>
-              <span style={{ fontWeight: 900, fontSize: 17, color: '#fff' }}>blujet</span>
-            </div>
-            <p style={{ fontSize: '12.5px', lineHeight: 1.8, margin: '0 auto 16px', maxWidth: 270, color: '#aebfd4' }}>{t('footerTagline')}</p>
+          <div className="px-5 pb-7 pt-9 text-center">
+            <BrandMark />
+            <p className="mx-auto mb-0 mt-4 max-w-[300px] text-[13px] leading-7 text-[#c2d0df]">{t('footerTagline')}</p>
             <DownloadButtons compact />
-            {socialRow}
-            <TrustBadges compact />
+            <ContactRows compact />
+            <SocialLinks compact />
+            <div className="mt-7"><TrustBadges compact /></div>
           </div>
-          <div style={{ marginTop: 22, borderTop: '1px solid #ffffff14' }}>
+          <div className="border-t border-white/10">
             <MobileAccordionSection title={t('footerColServices')} links={serviceLinks} />
             <MobileAccordionSection title={t('footerColCompany')} links={companyLinks} />
             <MobileAccordionSection title={t('footerColSupport')} links={supportLinks} />
           </div>
-          <div style={{ padding: '16px 24px', textAlign: 'center', fontSize: 11, color: '#7d92ad' }}>{t('footerCopyright')}</div>
+          <div className="px-5 py-4 text-center text-[11px] text-[#7f96ae]">{t('footerCopyright')}</div>
         </>
       )}
     </footer>

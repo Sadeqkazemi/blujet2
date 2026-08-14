@@ -40,7 +40,7 @@ describe('PublicFooter — desktop', () => {
     mockLocale('fa');
     renderFooter();
     expect(screen.getByText('خدمات')).toBeInTheDocument();
-    expect(screen.getByText('رزرو پرواز')).toHaveAttribute('href', '/results');
+    expect(screen.getAllByText('رزرو پرواز')[0]).toHaveAttribute('href', '/results');
     expect(screen.getByText('© ۱۴۰۵ blujet. تمامی حقوق محفوظ است.')).toBeInTheDocument();
     expect(screen.queryByText('استرداد بلیط')).not.toBeInTheDocument();
     expect(screen.queryByText('بلاگ')).not.toBeInTheDocument();
@@ -50,7 +50,7 @@ describe('PublicFooter — desktop', () => {
     mockLocale('en');
     renderFooter();
     expect(screen.getByText('Services')).toBeInTheDocument();
-    expect(screen.getByText('Book a Flight')).toHaveAttribute('href', '/results');
+    expect(screen.getAllByText('Book a Flight')[0]).toHaveAttribute('href', '/results');
     expect(screen.getByText('© 2026 blujet. All rights reserved.')).toBeInTheDocument();
   });
 
@@ -96,13 +96,10 @@ describe('PublicFooter — desktop', () => {
     expect(social).not.toContainElement(trust);
     expect(social).toHaveClass('footer-social-section');
     expect(trust).toHaveClass('footer-trust-section');
-    expect(screen.getByTestId('footer-social-whatsapp')).toHaveStyle({ color: '#25d366' });
+    expect(screen.getByTestId('footer-social-whatsapp')).toHaveClass('text-[#d9e4ef]');
     expect(screen.getByTestId('social-icon-whatsapp')).toBeInTheDocument();
-    expect(screen.getByTestId('footer-desktop-trust-row')).toHaveStyle({
-      justifyContent: 'flex-start',
-      direction: 'ltr',
-      padding: '0 40px 28px 88px',
-    });
+    expect(screen.getByTestId('footer-desktop-trust-row')).toHaveAttribute('dir', 'ltr');
+    expect(screen.getByTestId('footer-desktop-trust-row')).toHaveClass('justify-start');
     expect(trust).not.toHaveStyle({ borderTop: '1px solid #ffffff12' });
   });
 

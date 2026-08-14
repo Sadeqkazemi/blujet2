@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import {
   fetchCompletedFlightsSummary,
   fetchFinanceDashboardStats,
@@ -15,6 +15,8 @@ import type {
   SalesGranularity,
 } from '../../types/reporting';
 import SalesBarChart from '../../components/SalesBarChart';
+import LowSalesBanner from '../../components/LowSalesBanner';
+import type { PanelShellContext } from '../../types/panel-shell';
 
 const CHART_MODES: { key: SalesGranularity; label: string }[] = [
   { key: 'q3', label: '۳ ماهه' },
@@ -60,6 +62,8 @@ function StatCard({
 }
 
 export default function FinanceDashboardPage() {
+  const { lowSalesAlerts = [] } = useOutletContext<PanelShellContext>();
+  const bannerAlert = lowSalesAlerts[0] ?? null;
   const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
   const [granularity, setGranularity] = useState<SalesGranularity>('q6');
   const [periodKey, setPeriodKey] = useState<string | null>(null);
@@ -171,6 +175,8 @@ export default function FinanceDashboardPage() {
           />
         </div>
       )}
+
+      <LowSalesBanner alert={bannerAlert} variant="dark" />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.7fr_1fr]">
         <div className="rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-5">

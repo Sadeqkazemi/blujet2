@@ -78,10 +78,12 @@ export default function OtpLoginInline({
   onAuthenticated,
   embedded = false,
   showHeader = true,
+  checkoutStyle = false,
 }: {
   onAuthenticated?: () => void;
   embedded?: boolean;
   showHeader?: boolean;
+  checkoutStyle?: boolean;
 } = {}) {
   const { requestOtp, verifyOtp } = useAuth();
   const { locale } = useLocale();
@@ -95,6 +97,24 @@ export default function OtpLoginInline({
 
   const normalizedPhone = normalizeIranMobile(phone);
   const phoneReady = isValidIranMobile(normalizedPhone);
+  const checkoutPhoneValue = normalizedPhone.replace(/^0/, '');
+  const checkoutCopy = {
+    fa: {
+      label: 'شماره موبایل',
+      request: 'تأیید و دریافت کد',
+      terms: 'با ادامه، شما با قوانین و مقررات سایت موافقت می‌کنید.',
+    },
+    en: {
+      label: 'Mobile number',
+      request: 'Confirm & get code',
+      terms: 'By continuing, you agree to the website terms and conditions.',
+    },
+    ar: {
+      label: 'رقم الجوال',
+      request: 'تأكيد واستلام الرمز',
+      terms: 'بالمتابعة، أنت توافق على شروط وأحكام الموقع.',
+    },
+  }[locale];
 
   async function sendOtp() {
     setError(null);
@@ -149,7 +169,7 @@ export default function OtpLoginInline({
     <div
       className={
         embedded
-          ? 'mx-auto w-full max-w-sm bg-white px-1 pb-1 pt-2 font-sans'
+          ? `mx-auto w-full bg-white font-sans ${checkoutStyle ? 'max-w-[430px] p-0' : 'max-w-sm px-1 pb-1 pt-2'}`
           : 'mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 font-sans shadow-sm'
       }
     >
@@ -166,25 +186,50 @@ export default function OtpLoginInline({
             e.preventDefault();
             void sendOtp();
           }}
-          className="flex flex-col gap-3"
+          className={`flex flex-col ${checkoutStyle ? 'gap-4' : 'gap-3'}`}
         >
-          <input
-            data-testid="otp-phone"
-            type="tel"
-            dir="ltr"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(normalizeIranMobile(e.target.value))}
-            placeholder={t.otpPhonePlaceholder}
-            className="rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
-          />
+          {checkoutStyle ? (
+            <label className="flex flex-col gap-2 text-start text-sm font-bold text-[#8a96a6]">
+              <span>{checkoutCopy.label}</span>
+              <span className="flex h-16 overflow-hidden rounded-2xl border border-[#dce3ec] bg-[#f7f9fc] focus-within:border-[#1668c4] focus-within:ring-2 focus-within:ring-[#1668c4]/10" dir="ltr">
+                <span className="flex items-center border-e border-[#dce3ec] px-4 text-base font-bold text-[#4d596b]">+98</span>
+                <input
+                  data-testid="otp-phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={checkoutPhoneValue}
+                  onChange={(e) => {
+                    const digits = normalizeIranMobile(e.target.value);
+                    const local = digits.startsWith('0') ? digits.slice(1) : digits;
+                    setPhone(local ? `0${local.slice(0, 10)}` : '');
+                  }}
+                  placeholder="9xxxxxxxxx"
+                  className="min-w-0 flex-1 bg-transparent px-4 text-base font-semibold text-[#16202e] outline-none placeholder:text-[#9aa6b7]"
+                />
+              </span>
+            </label>
+          ) : (
+            <input
+              data-testid="otp-phone"
+              type="tel"
+              dir="ltr"
+              inputMode="tel"
+              value={phone}
+              onChange={(e) => setPhone(normalizeIranMobile(e.target.value))}
+              placeholder={t.otpPhonePlaceholder}
+              className="rounded-lg border border-[#eef1f5] px-3.5 py-2.5 text-sm outline-none focus:border-[#1668c4]"
+            />
+          )}
           <button
             type="submit"
             disabled={busy || !phoneReady}
-            className="rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className={checkoutStyle
+              ? 'h-16 rounded-2xl bg-[#3569be] px-4 text-base font-black text-white transition hover:bg-[#285ba9] disabled:cursor-not-allowed disabled:opacity-60'
+              : 'rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60'}
           >
-            {busy ? t.otpRequesting : t.otpRequest}
+            {busy ? t.otpRequesting : checkoutStyle ? checkoutCopy.request : t.otpRequest}
           </button>
+          {checkoutStyle && <p className="m-0 text-center text-xs leading-6 text-[#9aa6b7]">{checkoutCopy.terms}</p>}
         </form>
       ) : (
         <form onSubmit={onVerify} className="flex flex-col gap-3">
