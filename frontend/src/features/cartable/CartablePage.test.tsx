@@ -68,6 +68,19 @@ describe('CartablePage', () => {
     expect(screen.queryByText('ارجاع و ارسال گزارش به رئیس هیئت مدیره')).not.toBeInTheDocument();
   });
 
+  it('BOARD_CHAIR loads and can act on assigned cartable tasks', async () => {
+    mockRole('BOARD_CHAIR');
+    const listSpy = vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+
+    renderPage();
+
+    expect(await screen.findByText('درخواست گزارش فروش سه‌ماهه')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'بررسی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ایجاد پیام' })).toBeInTheDocument();
+    expect(listSpy).toHaveBeenCalled();
+  });
+
   it('Finance Manager sees the chairman-permission gate with the request button', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);

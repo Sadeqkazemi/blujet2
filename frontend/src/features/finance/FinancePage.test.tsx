@@ -224,6 +224,23 @@ describe('FinancePage', () => {
     expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
   });
 
+  it('BOARD_CHAIR gets the connected executive finance view', async () => {
+    mockRole('BOARD_CHAIR');
+    const salesSpy = vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);
+    const kpiSpy = vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    const mixSpy = vi.spyOn(reportingApi, 'fetchRevenueMix').mockResolvedValue(MIX);
+
+    renderFinancePage();
+
+    expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
+    expect(screen.getByText('ترکیب درآمد')).toBeInTheDocument();
+    expect(salesSpy).toHaveBeenCalled();
+    expect(kpiSpy).toHaveBeenCalled();
+    expect(mixSpy).toHaveBeenCalled();
+    expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
+  });
+
   it('CEO شماره پرواز mode shows searchable flight cards and selected-flight summary', async () => {
     mockRole('CEO');
     vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);

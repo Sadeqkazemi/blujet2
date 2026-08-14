@@ -582,6 +582,7 @@ describe('Reservation (e2e)', () => {
       expect(row).toHaveProperty('flightNo');
       expect(row).toHaveProperty('sold');
       expect(row).toHaveProperty('capacity');
+      expect(row).toHaveProperty('basePriceIrr');
       expect(['SELLING', 'NEAR_FULL', 'FULL']).toContain(row.statusKey);
     }
   });

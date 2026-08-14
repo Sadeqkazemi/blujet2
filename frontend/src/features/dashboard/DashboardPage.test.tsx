@@ -112,10 +112,22 @@ describe('DashboardPage', () => {
   it('shows an error message when the reporting API fails', async () => {
     vi.spyOn(reportingApi, 'fetchFinanceDashboardStats').mockRejectedValue(new Error('network error'));
     vi.spyOn(reportingApi, 'fetchRevenueMix').mockRejectedValue(new Error('network error'));
+    vi.spyOn(cartableApi, 'fetchCartable').mockRejectedValue(new Error('network error'));
 
     renderDashboard();
 
     expect(await screen.findByText('خطا در دریافت اطلاعات داشبورد.')).toBeInTheDocument();
+  });
+
+  it('keeps healthy dashboard widgets visible when one feed fails', async () => {
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockRejectedValue(new Error('mix unavailable'));
+
+    renderDashboard();
+
+    expect(await screen.findByText('آژانس فعال')).toBeInTheDocument();
+    expect(screen.getByText('کارتابل')).toBeInTheDocument();
+    expect(screen.getByText('خطا در دریافت بخشی از اطلاعات داشبورد.')).toBeInTheDocument();
+    expect(screen.queryByText('گزارش مالی')).not.toBeInTheDocument();
   });
 
   it('does not render a banner when there are no alerts', async () => {
