@@ -188,19 +188,27 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([
+    Promise.allSettled([
       fetchFinanceDashboardStats(),
       fetchRevenueMix({ granularity: 'year' }),
       fetchCartable(),
     ])
-      .then(([statsData, mixData, cartableData]) => {
+      .then(([statsResult, mixResult, cartableResult]) => {
         if (cancelled) return;
-        setStats(statsData);
-        setMix(mixData);
-        setCartable(cartableData);
-      })
-      .catch(() => {
-        if (!cancelled) setError('خطا در دریافت اطلاعات داشبورد.');
+        if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+        if (mixResult.status === 'fulfilled') setMix(mixResult.value);
+        if (cartableResult.status === 'fulfilled') setCartable(cartableResult.value);
+
+        const failed = [statsResult, mixResult, cartableResult].filter(
+          (result) => result.status === 'rejected',
+        ).length;
+        setError(
+          failed === 0
+            ? null
+            : failed === 3
+              ? 'خطا در دریافت اطلاعات داشبورد.'
+              : 'خطا در دریافت بخشی از اطلاعات داشبورد.',
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -294,10 +302,12 @@ export default function DashboardPage() {
 
       <LowSalesBanner alert={bannerAlert} variant="dark" />
 
-      {mix && cartable && (
-        <div className="grid grid-cols-1 items-start gap-[15px] lg:grid-cols-[1.7fr_1fr]">
-          <ChannelSummary mix={mix} />
-          <CartableWidget cartable={cartable} />
+      {(mix || cartable) && (
+        <div
+          className={`grid grid-cols-1 items-start gap-[15px] ${mix && cartable ? 'lg:grid-cols-[1.7fr_1fr]' : ''}`}
+        >
+          {mix && <ChannelSummary mix={mix} />}
+          {cartable && <CartableWidget cartable={cartable} />}
         </div>
       )}
     </div>
