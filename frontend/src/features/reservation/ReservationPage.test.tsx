@@ -116,6 +116,74 @@ describe('ReservationPage', () => {
     expect(screen.getByText('نیازمند بررسی')).toBeInTheDocument();
   });
 
+  it('BOARD_CHAIR loads agency access from the reservation API', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue([]);
+    const agencySpy = vi
+      .spyOn(reservationApi, 'fetchAgencyApiAccess')
+      .mockResolvedValue(AGENCIES);
+
+    render(<ReservationPage />);
+    await userEvent.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
+
+    expect(await screen.findByText('آژانس blujet')).toBeInTheDocument();
+    expect(screen.getByText('bjk_••••abcd')).toBeInTheDocument();
+    expect(agencySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('BOARD_CHAIR loads reservation flights and can open the managerial MD-80 seat map', async () => {
+    mockRole('BOARD_CHAIR');
+    vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
+    vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue([]);
+    const flightSpy = vi
+      .spyOn(reservationApi, 'fetchReservationFlights')
+      .mockResolvedValue([
+        {
+          ...FLIGHTS[0],
+          originCode: 'THR',
+          destCode: 'DXB',
+          soldCount: 10,
+          lockedCount: 0,
+          freeCount: 145,
+        },
+      ]);
+    vi.spyOn(reservationApi, 'fetchSeatLockAgencies').mockResolvedValue([]);
+    vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue({
+      flightInstanceId: 'fi1',
+      aircraftType: 'MD-80',
+      flightNo: 'EP-821',
+      originCode: 'THR',
+      destCode: 'DXB',
+      originCityFa: 'تهران',
+      destCityFa: 'دبی',
+      departureAt: '2026-08-01T05:00:00.000Z',
+      capacity: 1,
+      soldCount: 0,
+      lockedCount: 0,
+      freeCount: 1,
+      occupancyPct: 0,
+      cabinLayout: { ECONOMY: { aisleAfterIndex: 2 } },
+      rows: [
+        {
+          row: 20,
+          cabin: 'ECONOMY',
+          seats: [{ seatCode: '20A', status: 'FREE', lockId: null }],
+        },
+      ],
+    });
+
+    render(<ReservationPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'پروازها' }));
+    await user.click(await screen.findByRole('button', { name: /EP-821/ }));
+
+    expect(flightSpy).toHaveBeenCalledTimes(1);
+    expect(await screen.findByTestId('reservation-md80-seat-map')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '20A' }));
+    expect(await screen.findByRole('button', { name: 'قفل برای آژانس' })).toBeInTheDocument();
+  });
+
   it('renders the design four-tab shell and dashboard KPIs/services/channels', async () => {
     mockRole('IT_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);

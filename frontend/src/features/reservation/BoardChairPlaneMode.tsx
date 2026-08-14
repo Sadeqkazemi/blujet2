@@ -4,11 +4,11 @@ import {
   changeSeat,
   fetchPnrDetail,
   fetchPnrList,
+  fetchAgencyApiAccess,
   fetchReservationDashboardStats,
+  fetchReservationFlights,
   markNoShow,
 } from '../../api/reservation';
-import { fetchAgencies, fetchAgencyApiKeys } from '../../api/agencies';
-import { fetchFlightsOverview } from '../../api/flights';
 import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { dayjs, formatJalaliDateTime } from '../../lib/jalali';
@@ -22,9 +22,13 @@ import {
   panelMuted2,
   panelText,
 } from '../panel/panel-theme';
-import type { AgencyApiKey, AgencyListRow } from '../../types/agencies';
 import type { FlightRow } from '../../types/flights';
-import type { PnrDetail, PnrGroup, ReservationDashboardStats } from '../../types/reservation';
+import type {
+  PnrDetail,
+  PnrGroup,
+  ReservationDashboardStats,
+  ReservationFlightRow,
+} from '../../types/reservation';
 
 type Tab = 'dash' | 'pnr' | 'agency' | 'flights';
 
@@ -113,18 +117,6 @@ function formatFlightDateTime(iso: string): { date: string; time: string } {
   };
 }
 
-function initialsOf(name: string): string {
-  const parts = name.replace('آژانس', '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '؟';
-  if (parts.length === 1) return parts[0].slice(0, 2);
-  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`;
-}
-
-function maskApiKey(keyId: string): string {
-  const tail = keyId.replace(/-/g, '').slice(-4);
-  return `sk_live_${keyId.slice(0, 4)}••••${tail}`;
-}
-
 type AgencyCard = {
   id: string;
   name: string;
@@ -133,6 +125,25 @@ type AgencyCard = {
   calls: number;
   active: boolean;
 };
+
+function asFlightRow(row: ReservationFlightRow): FlightRow {
+  const [routeOrigin = '', routeDest = ''] = (row.route ?? '')
+    .split(/→|←/)
+    .map((part) => part.trim());
+  const sold = row.soldCount ?? row.sold ?? 0;
+  return {
+    id: row.flightInstanceId,
+    flightNo: row.flightNo,
+    originCode: row.originCode ?? routeOrigin,
+    destCode: row.destCode ?? routeDest,
+    departureAt: row.departureAt,
+    capacity: row.capacity,
+    charterSeats: 0,
+    sold,
+    basePriceIrr: row.basePriceIrr ?? null,
+    derivedStatus: row.statusKey === 'FULL' ? 'FULL' : 'SELLING',
+  };
+}
 
 type TabBtnProps = { active: boolean; label: string; onClick: () => void; children: ReactNode };
 
@@ -188,37 +199,29 @@ export default function BoardChairPlaneMode() {
 
   const loadAgencies = useCallback(async () => {
     try {
-      const list = await fetchAgencies({});
-      const cards = await Promise.all(
-        list.agencies.slice(0, 12).map(async (a: AgencyListRow) => {
-          let keys: AgencyApiKey[] = [];
-          try {
-            keys = await fetchAgencyApiKeys(a.id);
-          } catch {
-            keys = [];
-          }
-          const key = keys[0];
-          return {
-            id: a.id,
-            name: a.fullName,
-            initials: initialsOf(a.fullName),
-            apiKey: key ? maskApiKey(key.id) : '—',
-            calls: key?.callCount ?? 0,
-            active: a.isActive && (!key || key.status === 'ACTIVE'),
-          };
-        }),
+      const rows = await fetchAgencyApiAccess();
+      setAgencies(
+        rows.map((row) => ({
+          id: row.agencyId,
+          name: row.name,
+          initials: row.initials,
+          apiKey: row.keyHint,
+          calls: row.callCount,
+          active: row.status === 'ACTIVE',
+        })),
       );
-      setAgencies(cards);
     } catch {
+      setError('خطا در دریافت دسترسی API آژانس‌ها.');
       setAgencies([]);
     }
   }, []);
 
   const loadFlights = useCallback(async () => {
     try {
-      const overview = await fetchFlightsOverview();
-      setFlights(overview.active);
+      const rows = await fetchReservationFlights();
+      setFlights(rows.map(asFlightRow));
     } catch {
+      setError('خطا در دریافت فهرست پروازها.');
       setFlights([]);
     }
   }, []);
@@ -691,6 +694,7 @@ export default function BoardChairPlaneMode() {
       {seatFlight && (
         <MdSeatMapModal
           flight={seatFlight}
+          canManageOverride
           onClose={() => setSeatFlight(null)}
           onNotice={setNotice}
           onError={setError}
