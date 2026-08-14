@@ -178,4 +178,5 @@ export interface ReservationFlightRow {
   soldCount?: number;
   lockedCount?: number;
   freeCount?: number;
+  basePriceIrr?: string | null;
 }
