@@ -28,10 +28,12 @@ const NAV_PERMISSION_BY_KEY: Readonly<
   routes: 'flights',
   pricing: 'flights',
   webservice: 'flights',
+  reservation: 'flights',
   agencies: 'agencies',
   reports: 'reports',
   staff: 'reports',
   mgrreports: 'reports',
+  survey: 'reports',
   finance: 'finance',
   exports: 'finance',
   integrations: 'finance',
@@ -65,11 +67,17 @@ export function permissionForRequestPath(
   if (/^\/agencies\/requests(?:\/|$)/.test(path)) return 'approvals';
   if (/^\/agencies(?:\/|$)/.test(path)) return 'agencies';
   if (
-    /^\/(?:flightops|flights|pricing|webservice\/pricing)(?:\/|$)/.test(path)
+    /^\/(?:flightops|flights|pricing|reservation|webservice\/pricing)(?:\/|$)/.test(
+      path,
+    )
   ) {
     return 'flights';
   }
-  if (/^\/(?:passenger-reports|reporting|staff-reports)(?:\/|$)/.test(path)) {
+  if (
+    /^\/(?:audit|passenger-reports|reporting|staff-reports|survey)(?:\/|$)/.test(
+      path,
+    )
+  ) {
     return 'reports';
   }
   if (/^\/reconciliation(?:\/|$)/.test(path)) return 'finance';
