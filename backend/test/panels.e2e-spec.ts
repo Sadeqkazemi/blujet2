@@ -103,18 +103,16 @@ describe('Panels (e2e)', () => {
     const keys = res.body.data.map((t: { key: string }) => t.key);
     expect(keys).toEqual([
       'dashboard',
-      'customers',
       'admins',
       'finance',
       'cartable',
       'mgrreports',
       'vip',
       'survey',
-      'reservation',
-      'aircraft',
       'panels',
       'security',
     ]);
+    expect(keys).not.toEqual(expect.arrayContaining(['customers', 'reservation', 'aircraft']));
   });
 
   it('returns the confirmed tab set for Board Chair', async () => {

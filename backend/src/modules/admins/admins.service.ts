@@ -198,15 +198,14 @@ export class AdminsService {
       }),
     );
 
-    // Phase 14: a real send now backs this claim — SmsService logs a
-    // genuine FAILED row when the account has no phone on file (create
-    // never collects one), rather than the audit note alone asserting delivery.
+    let delivered = false;
     if (dto.delivery === 'sms') {
-      await this.sms.send(
+      const result = await this.sms.send(
         user.phone,
         `رمز عبور موقت شما در بلوجت: ${dto.password}`,
         'TEMP_PASSWORD',
       );
+      delivered = result.success;
     }
 
     await this.audit.record({
@@ -214,7 +213,7 @@ export class AdminsService {
       actorRole: actor.role,
       category: 'ACCOUNT',
       action: 'ایجاد حساب مدیر / ادمین',
-      detail: `حساب «${dto.fullName}» (${ROLE_LABEL_FA[dto.role] ?? dto.role}) توسط ${actor.fullName} ایجاد و رمز اولیه از طریق ${dto.delivery === 'sms' ? 'پیامک' : 'ایمیل سازمانی'} ارسال شد.`,
+      detail: `حساب «${dto.fullName}» (${ROLE_LABEL_FA[dto.role] ?? dto.role}) توسط ${actor.fullName} ایجاد شد.`,
       entityType: 'User',
       entityId: user.id,
     });
@@ -225,6 +224,8 @@ export class AdminsService {
       username: user.username,
       role: user.role,
       permissions: user.panelPermissions,
+      tempPassword: dto.password,
+      credentialDelivered: delivered,
     };
   }
 

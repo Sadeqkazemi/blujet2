@@ -21,7 +21,7 @@ export function createAdmin(dto: {
   stepUpCode: string;
   permissions?: string[];
 }) {
-  return apiPost<{ id: string }>('/admins', dto);
+  return apiPost<{ id: string; username: string; tempPassword?: string }>('/admins', dto);
 }
 
 export function updateAdminPermissions(

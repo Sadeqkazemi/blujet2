@@ -3474,3 +3474,9 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
   Persian/English/Arabic labels and responsive tab navigation are covered by
   `AccountPage.test.tsx`. See
   `docs/features/customer-account-responsive-sidebar.md`.
+# Senior Manager panel completion — implemented (2026-08)
+
+- Server-owned sidebar now matches the approved Senior Manager reference and excludes customers/aircraft surfaces.
+- The active admins route uses the backend-connected permission editor and role-safe create flow.
+- Initial manager credentials are generated securely, persisted with forced rotation, and exposed once after creation.
+- VIP remains backed by the real club members/card-request APIs with Senior Manager decision boundaries enforced server-side.
