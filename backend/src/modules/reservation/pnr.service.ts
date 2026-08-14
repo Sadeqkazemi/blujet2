@@ -796,6 +796,7 @@ export class PnrService {
           soldCount,
           lockedCount,
           freeCount: Math.max(0, capacity - soldCount - lockedCount),
+          basePriceIrr: instance.basePriceIrr?.toString() ?? null,
           occupancyPct,
           statusKey,
         };
