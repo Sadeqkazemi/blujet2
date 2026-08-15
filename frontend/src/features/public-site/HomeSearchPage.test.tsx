@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -322,10 +322,12 @@ describe('HomeSearchPage', () => {
     'opens a keyboard-safe mobile airport search sheet in %s without zooming the page',
     async (locale, query) => {
       const viewport = new EventTarget() as VisualViewport;
+      let visualHeight = 458;
+      let visualOffsetTop = 24;
       Object.defineProperties(viewport, {
-        height: { configurable: true, value: 458 },
+        height: { configurable: true, get: () => visualHeight },
         width: { configurable: true, value: 390 },
-        offsetTop: { configurable: true, value: 24 },
+        offsetTop: { configurable: true, get: () => visualOffsetTop },
         offsetLeft: { configurable: true, value: 0 },
       });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
@@ -342,13 +344,27 @@ describe('HomeSearchPage', () => {
       const overlay = screen.getByTestId('home-origin-mobile-overlay');
       const searchInput = screen.getByTestId('home-origin-search');
       expect(overlay.parentElement).toBe(document.body);
-      expect(overlay).toHaveStyle({ position: 'fixed', top: '24px', height: '458px' });
+      expect(overlay).toHaveStyle({ position: 'fixed', inset: '0' });
+      expect(screen.getByRole('dialog')).toHaveStyle({
+        position: 'fixed',
+        top: '0',
+        height: '458px',
+        width: '100%',
+      });
       expect(searchInput).toHaveStyle({ fontSize: '16px' });
       expect(searchInput).toHaveAttribute('inputmode', 'search');
-      expect(document.body).toHaveStyle({ overflow: 'hidden' });
+      expect(document.body).toHaveStyle({ overflow: 'hidden', position: 'fixed', width: '100%' });
+
+      visualHeight = 340;
+      visualOffsetTop = 286;
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0', height: '340px' });
 
       await userEvent.type(searchInput, query);
       expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByTestId('home-origin-mobile-close'));
+      expect(document.body).not.toHaveStyle({ position: 'fixed' });
     },
   );
 });

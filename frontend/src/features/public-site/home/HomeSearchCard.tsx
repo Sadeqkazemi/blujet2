@@ -200,21 +200,38 @@ function AirportCell({
   useEffect(() => {
     if (!open || !isMobile) return;
 
+    const scrollY = window.scrollY;
     const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyLeft = document.body.style.left;
+    const previousBodyRight = document.body.style.right;
+    const previousBodyWidth = document.body.style.width;
     const previousHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
     document.documentElement.style.overflow = 'hidden';
 
     return () => {
       document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.left = previousBodyLeft;
+      document.body.style.right = previousBodyRight;
+      document.body.style.width = previousBodyWidth;
       document.documentElement.style.overflow = previousHtmlOverflow;
+      if (scrollY > 0) window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
     };
   }, [isMobile, open]);
 
   useEffect(() => {
     if (open) {
       setQuery('');
-      const t = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
+      const t = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 50);
       return () => window.clearTimeout(t);
     }
     return undefined;
@@ -244,22 +261,17 @@ function AirportCell({
     setOpen((v) => !v);
   }
 
-  const mobileSheetInset = mobileViewport
-    ? Math.min(56, Math.max(18, Math.round(mobileViewport.visibleHeight * 0.08)))
-    : 28;
-
   const dropStyle: React.CSSProperties = isMobile
     ? {
         position: 'fixed',
-        left: mobileViewport?.offsetLeft ?? 0,
-        top: (mobileViewport?.offsetTop ?? 0) + mobileSheetInset,
-        width: mobileViewport?.visibleWidth ?? '100%',
-        height: mobileViewport
-          ? Math.max(180, mobileViewport.visibleHeight - mobileSheetInset)
-          : 'calc(100dvh - 28px)',
+        left: 0,
+        top: 0,
+        width: '100%',
+        height: mobileViewport ? Math.max(180, mobileViewport.visibleHeight) : '100dvh',
         maxWidth: '100%',
-        borderRadius: '24px 24px 0 0',
-        padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
+        borderRadius: 0,
+        padding:
+          'max(10px, env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom))',
         zIndex: 1001,
         boxSizing: 'border-box',
         display: 'flex',
@@ -339,11 +351,7 @@ function AirportCell({
             onClick={() => setOpen(false)}
             style={{
               position: 'fixed',
-              inset: isMobile ? undefined : 0,
-              left: isMobile ? (mobileViewport?.offsetLeft ?? 0) : undefined,
-              top: isMobile ? (mobileViewport?.offsetTop ?? 0) : undefined,
-              width: isMobile ? (mobileViewport?.visibleWidth ?? '100%') : undefined,
-              height: isMobile ? (mobileViewport?.visibleHeight ?? '100dvh') : undefined,
+              inset: 0,
               zIndex: isMobile ? 1000 : 38,
               background: isMobile ? 'rgba(13,38,64,.55)' : undefined,
             }}
@@ -364,16 +372,48 @@ function AirportCell({
           >
             {isMobile && (
               <div
-                aria-hidden="true"
                 style={{
-                  width: 48,
-                  height: 4,
-                  borderRadius: 999,
-                  background: '#dce2ea',
-                  margin: '0 auto 10px',
+                  position: 'relative',
+                  minHeight: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 8,
                   flex: 'none',
                 }}
-              />
+              >
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 48,
+                    height: 4,
+                    borderRadius: 999,
+                    background: '#dce2ea',
+                  }}
+                />
+                <button
+                  type="button"
+                  data-testid={`${testId}-mobile-close`}
+                  aria-label={isRTL ? 'بستن' : 'Close'}
+                  onClick={() => setOpen(false)}
+                  style={{
+                    position: 'absolute',
+                    [isRTL ? 'left' : 'right']: 0,
+                    top: 0,
+                    width: 36,
+                    height: 36,
+                    border: 0,
+                    borderRadius: 12,
+                    background: '#f1f4f8',
+                    color: '#566173',
+                    fontSize: 24,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             )}
             <input
               ref={inputRef}
