@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EmployeeCartablePage from './EmployeeCartablePage';
 import * as cartableApi from '../../api/cartable';
+import * as panelsApi from '../../api/panels';
 import type { CartableListResult } from '../../types/cartable';
 
 const LIST: CartableListResult = {
@@ -27,7 +28,15 @@ const LIST: CartableListResult = {
 
 describe('EmployeeCartablePage', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
+    vi.spyOn(panelsApi, 'fetchEmployeeContext').mockResolvedValue({
+      dept: 'commercial',
+      deptLabelFa: 'واحد بازرگانی',
+      rank: 'کارشناس',
+      permissionLabelsFa: ['مشاهدهٔ کارتابل', 'رسیدگی به کارتابل'],
+      permissionKeys: ['ct_list', 'ct_process'],
+    });
     vi.spyOn(cartableApi, 'fetchManagerRecipients').mockResolvedValue([
       {
         id: 'mgr1',
@@ -76,5 +85,25 @@ describe('EmployeeCartablePage', () => {
     });
     render(<EmployeeCartablePage />);
     expect(await screen.findByText('کار بازی در کارتابل شما نیست.')).toBeInTheDocument();
+  });
+
+  it('keeps the cartable usable for a read-only employee without calling manager-only endpoints', async () => {
+    vi.mocked(panelsApi.fetchEmployeeContext).mockResolvedValue({
+      dept: 'commercial',
+      deptLabelFa: 'واحد بازرگانی',
+      rank: 'کارشناس',
+      permissionLabelsFa: ['مشاهدهٔ کارتابل'],
+      permissionKeys: ['ct_list'],
+    });
+
+    render(<EmployeeCartablePage />);
+
+    expect(await screen.findByText('بررسی قرارداد')).toBeInTheDocument();
+    expect(screen.queryByText('خطا در دریافت کارتابل.')).not.toBeInTheDocument();
+    expect(screen.queryByText('ارسال پیام به مدیر')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'انجام شد ✓' })).not.toBeInTheDocument();
+    expect(screen.getByText('فقط مشاهده')).toBeInTheDocument();
+    expect(cartableApi.fetchManagerRecipients).not.toHaveBeenCalled();
+    expect(cartableApi.fetchSentManagerMessages).not.toHaveBeenCalled();
   });
 });

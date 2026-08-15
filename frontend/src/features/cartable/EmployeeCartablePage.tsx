@@ -10,6 +10,7 @@ import { faDigits } from '../../lib/fa-format';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import { fetchEmployeeContext } from '../../api/panels';
 import type {
   CartableListResult,
   CartableTask,
@@ -33,6 +34,7 @@ export default function EmployeeCartablePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [canProcess, setCanProcess] = useState(false);
 
   const [msgTo, setMsgTo] = useState('');
   const [msgText, setMsgText] = useState('');
@@ -41,14 +43,29 @@ export default function EmployeeCartablePage() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [cartable, mgrs, sentMsgs] = await Promise.all([
+      const [cartable, context] = await Promise.all([
         fetchCartable(),
-        fetchManagerRecipients(),
-        fetchSentManagerMessages(),
+        fetchEmployeeContext(),
       ]);
       setResult(cartable);
-      setRecipients(mgrs);
-      setSent(sentMsgs);
+      const mayProcess = context.permissionKeys.includes('ct_process');
+      setCanProcess(mayProcess);
+      if (mayProcess) {
+        try {
+          const [mgrs, sentMsgs] = await Promise.all([
+            fetchManagerRecipients(),
+            fetchSentManagerMessages(),
+          ]);
+          setRecipients(mgrs);
+          setSent(sentMsgs);
+        } catch {
+          setRecipients([]);
+          setSent([]);
+        }
+      } else {
+        setRecipients([]);
+        setSent([]);
+      }
     } catch {
       setError('خطا در دریافت کارتابل.');
     } finally {
@@ -117,7 +134,7 @@ export default function EmployeeCartablePage() {
         </p>
       )}
 
-      <section className="mb-5 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+      {canProcess && <section className="mb-5 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
         <h2 className="m-0 text-[14.5px] font-extrabold text-white">ارسال پیام به مدیر</h2>
         <p className="mt-1 text-[11px] text-[#6b7b94]">
           می‌توانید به مدیر واحد خود یا سایر مدیران پیام بدهید.
@@ -186,7 +203,7 @@ export default function EmployeeCartablePage() {
             </ul>
           </div>
         )}
-      </section>
+      </section>}
 
       {loading ? (
         <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
@@ -216,7 +233,7 @@ export default function EmployeeCartablePage() {
                     <span>از {fromName}</span>
                   </div>
                 </div>
-                {!done ? (
+                {!done && canProcess ? (
                   <button
                     type="button"
                     onClick={() => void onDone(t)}
@@ -224,8 +241,10 @@ export default function EmployeeCartablePage() {
                   >
                     انجام شد ✓
                   </button>
-                ) : (
+                ) : done ? (
                   <span className="text-[11px] font-bold text-[#34d399]">تکمیل شد</span>
+                ) : (
+                  <span className="text-[11px] font-bold text-[#9fb0c7]">فقط مشاهده</span>
                 )}
               </li>
             );

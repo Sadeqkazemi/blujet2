@@ -773,6 +773,10 @@ panels. Key ⚑ decisions:
 | PATCH | `/admins/:id/block` / `/unblock` | Toggles `User.isActive` — really enforced (staff login already rejects inactive accounts). Only within the caller's managed set; never self, never CEO/BOARD_CHAIR. Audited. |
 | POST | `/admins/:id/reset-password` | `{ password?, delivery? }` — explicit password (min 6) or a generated temp password (returned exactly once); sets `mustChangePassword`; audited; managed-set only. |
 
+The `BOARD_CHAIR` navigation exposes both `admins` and `security`: the former
+uses the server-enforced hierarchy above for manager creation/reset, while the
+latter changes the chair's own password through `POST /auth/change-password`.
+
 ### `backend/src/modules/auth/` (addition)
 
 | Method | Path | Roles | Notes |
@@ -3049,7 +3053,12 @@ Reject/transfer/chair-permission endpoints stay exec-only (class-level
 
 | Method | Path | Access | Notes |
 |--------|------|--------|-------|
-| GET | `/panels/employee-context` | EMPLOYEE | `{ dept, deptLabelFa, rank, permissionLabelsFa[] }` for dashboard KPI/chip row. |
+| GET | `/panels/employee-context` | EMPLOYEE | `{ dept, deptLabelFa, rank, permissionLabelsFa[], permissionKeys[] }` for dashboard chips and permission-aware employee surfaces. |
+
+The employee cartable loads its self-scoped task list independently from the
+manager messaging endpoints. `ct_list` therefore remains a usable read-only
+surface; the composer, sent messages and task completion controls are requested
+and rendered only when `permissionKeys` contains `ct_process`.
 
 Schema: `CartableSourceType` gains `EMPLOYEE_MESSAGE` (migration
 `20260731120000_employee_cartable_source_type`).

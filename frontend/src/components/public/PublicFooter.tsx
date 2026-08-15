@@ -152,6 +152,7 @@ function MobileAccordionSection({ title, links }: { title: string; links: { to: 
 
 export default function PublicFooter() {
   const t = useT();
+  const { locale } = useLocale();
   const isMobile = useIsMobile();
   const careersEnabled = useCareersEnabled();
 
@@ -182,7 +183,7 @@ export default function PublicFooter() {
 
       {!isMobile ? (
         <>
-          <div data-testid="public-footer-desktop" className="mx-auto grid max-w-[1480px] grid-cols-[minmax(300px,1.25fr)_repeat(3,minmax(150px,.8fr))] items-start gap-[clamp(36px,5vw,92px)] px-10 pb-8 pt-14">
+          <div data-testid="public-footer-desktop" className="mx-auto grid max-w-[1480px] grid-cols-[minmax(300px,1.25fr)_repeat(3,minmax(150px,.8fr))] items-start gap-[clamp(36px,5vw,92px)] px-10 pb-5 pt-9">
             <div className="min-w-0">
               <BrandMark />
               <p className="mb-0 mt-5 max-w-[330px] text-[13.5px] leading-8 text-[#c2d0df]">{t('footerTagline')}</p>
@@ -195,34 +196,34 @@ export default function PublicFooter() {
           </div>
           <div
             data-testid="footer-desktop-tools"
-            className="mx-auto flex max-w-[1480px] flex-col items-start px-10 pb-8"
+            className={`mx-auto flex max-w-[1480px] flex-col px-10 pb-5 ${locale === 'en' ? 'items-end' : 'items-start'}`}
             dir="ltr"
           >
             <DownloadButtons />
-            <div data-testid="footer-desktop-trust-row" className="mt-3 flex justify-start" dir="ltr">
+            <div data-testid="footer-desktop-trust-row" className={`mt-3 flex ${locale === 'en' ? 'justify-end' : 'justify-start'}`} dir="ltr">
               <TrustBadges />
             </div>
           </div>
           <div className="border-t border-white/[.07]">
-            <div className="mx-auto max-w-[1480px] px-10 py-4 text-[11.5px] text-[#7f96ae]">{t('footerCopyright')}</div>
+            <div className="mx-auto max-w-[1480px] px-10 py-3 text-[11.5px] text-[#7f96ae]">{t('footerCopyright')}</div>
           </div>
         </>
       ) : (
         <>
-          <div className="px-5 pb-7 pt-9 text-center">
+          <div className="px-5 pb-5 pt-7 text-center">
             <BrandMark />
             <p className="mx-auto mb-0 mt-4 max-w-[300px] text-[13px] leading-7 text-[#c2d0df]">{t('footerTagline')}</p>
             <DownloadButtons compact />
             <ContactRows compact />
             <SocialLinks compact />
-            <div className="mt-7"><TrustBadges compact /></div>
+            <div className="mt-5"><TrustBadges compact /></div>
           </div>
           <div className="border-t border-white/10">
             <MobileAccordionSection title={t('footerColServices')} links={serviceLinks} />
             <MobileAccordionSection title={t('footerColCompany')} links={companyLinks} />
             <MobileAccordionSection title={t('footerColSupport')} links={supportLinks} />
           </div>
-          <div className="px-5 py-4 text-center text-[11px] text-[#7f96ae]">{t('footerCopyright')}</div>
+          <div className="px-5 py-3 text-center text-[11px] text-[#7f96ae]">{t('footerCopyright')}</div>
         </>
       )}
     </footer>

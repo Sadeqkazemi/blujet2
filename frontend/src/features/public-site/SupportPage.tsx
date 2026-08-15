@@ -4,6 +4,7 @@ import { submitSupportTicket } from '../../api/support-tickets';
 import { fetchPublicSupportContact } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { latinDigits } from '../../lib/fa-format';
 
 // Support / help-center page — content matches design-reference/پشتیبانی.dc.html.
 // Phase 20 wires the ticket form to a real backend; the design's form had
@@ -208,6 +209,7 @@ export default function SupportPage() {
   const visibleFaqs = query ? FAQS.filter((f) => f.q[locale].includes(query) || f.a[locale].includes(query)) : FAQS;
 
   const canSubmit = name.trim() && phone.trim() && msg.trim();
+  const displayedSupportPhone = locale === 'en' ? latinDigits(supportContact.phone) : supportContact.phone;
 
   async function onSubmitTicket() {
     if (!canSubmit) return;
@@ -248,8 +250,8 @@ export default function SupportPage() {
           <p style={{ fontSize: 14, color: '#c9dcf3', margin: '0 0 24px', lineHeight: 1.9 }}>
             {t.heroDesc}
           </p>
-          <div className="flex gap-2" style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7, flexDirection: isMobile ? 'column' : 'row' }}>
-            <label className="flex min-w-0 flex-1 items-center gap-2">
+          <div data-testid="support-search-card" className="flex gap-2" style={{ width: '100%', maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7, boxSizing: 'border-box', flexDirection: isMobile ? 'column' : 'row' }}>
+            <label className="flex w-full min-w-0 flex-1 items-center gap-2" style={{ minHeight: isMobile ? 48 : undefined }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginInlineStart: 9, flex: 'none' }}>
                 <circle cx="11" cy="11" r="7" />
                 <path d="M21 21l-4-4" />
@@ -258,10 +260,10 @@ export default function SupportPage() {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder={t.searchPlaceholder}
-                style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 13, color: '#16202e', minWidth: 0, padding: isMobile ? '12px 8px' : 0 }}
+                style={{ width: '100%', flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 13, color: '#16202e', minWidth: 0, padding: isMobile ? '12px 8px' : 0, boxSizing: 'border-box' }}
               />
             </label>
-            <button type="button" style={{ flex: 'none', width: isMobile ? '100%' : undefined, border: 0, background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '12px 19px', borderRadius: 10, fontFamily: 'inherit' }}>{t.searchLabel}</button>
+            <button type="button" style={{ display: 'block', flex: 'none', width: isMobile ? '100%' : undefined, border: 0, background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '12px 19px', borderRadius: 10, fontFamily: 'inherit' }}>{t.searchLabel}</button>
           </div>
         </div>
       </section>
@@ -397,7 +399,7 @@ export default function SupportPage() {
             <div>
               <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0d2640' }}>{t.phone24}</div>
               <div style={{ fontSize: 13, color: '#1668c4', fontWeight: 800, marginTop: 3 }} dir="ltr">
-                {supportContact.phone}
+                {displayedSupportPhone}
               </div>
             </div>
           </div>
