@@ -124,6 +124,22 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'ادامه' })).toBeInTheDocument();
   });
 
+  it('keeps the staff credential form on the left and its LTR fields left-aligned', () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginPage();
+
+    const layout = screen.getByTestId('staff-login-layout');
+    const formPanel = screen.getByTestId('staff-login-form-panel');
+    const visualPanel = screen.getByTestId('staff-login-visual-panel');
+    const username = screen.getByLabelText('نام کاربری');
+
+    expect(layout).toHaveAttribute('dir', 'ltr');
+    expect(formPanel.compareDocumentPosition(visualPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(username).toHaveAttribute('dir', 'ltr');
+    expect(username.className).toContain('text-left');
+    expect(username.className).not.toContain('text-right');
+  });
+
   it('does not call the authentication API until the password step is submitted', async () => {
     const requestLogin = vi.fn();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ ...baseAuth, requestLogin });
