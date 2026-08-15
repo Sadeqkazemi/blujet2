@@ -2,19 +2,31 @@ import { useEffect, useState } from 'react';
 
 export type MobileVisualViewport = {
   bottomInset: number;
+  offsetLeft: number;
+  offsetTop: number;
   visibleHeight: number;
+  visibleWidth: number;
 };
 
 function readViewport(): MobileVisualViewport {
   const viewport = window.visualViewport;
   if (!viewport) {
-    return { bottomInset: 0, visibleHeight: window.innerHeight };
+    return {
+      bottomInset: 0,
+      offsetLeft: 0,
+      offsetTop: 0,
+      visibleHeight: window.innerHeight,
+      visibleWidth: window.innerWidth,
+    };
   }
 
   const visibleBottom = viewport.offsetTop + viewport.height;
   return {
     bottomInset: Math.max(0, Math.round(window.innerHeight - visibleBottom)),
+    offsetLeft: Math.max(0, Math.round(viewport.offsetLeft)),
+    offsetTop: Math.max(0, Math.round(viewport.offsetTop)),
     visibleHeight: Math.max(0, Math.round(viewport.height)),
+    visibleWidth: Math.max(0, Math.round(viewport.width)),
   };
 }
 
