@@ -191,13 +191,13 @@ export default function LoginPage() {
                 id="username"
                 placeholder="username"
                 dir="ltr"
-                className="font-num h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] py-0 ps-[13px] pe-10 text-right font-mono text-[13px] text-[#0f172a] outline-none focus:border-accent focus:bg-white"
+                className="font-num h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] py-0 pl-[13px] pr-10 text-left font-mono text-[13px] text-[#0f172a] outline-none focus:border-accent focus:bg-white"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 autoFocus
               />
-              <span className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]">
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]">
                 <UserIcon size={15} />
               </span>
             </div>
@@ -236,7 +236,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="حداقل ۸ کاراکتر"
-                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-left text-[13px] outline-none focus:border-accent focus:bg-white"
               />
             </div>
             <div>
@@ -250,7 +250,7 @@ export default function LoginPage() {
                 value={passwordConfirm}
                 onChange={(e) => setPasswordConfirm(e.target.value)}
                 placeholder="تکرار رمز عبور"
-                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+                className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-left text-[13px] outline-none focus:border-accent focus:bg-white"
               />
             </div>
             <div>
@@ -264,7 +264,7 @@ export default function LoginPage() {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 11))}
                 placeholder="09121234567"
-                className="font-num h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-right text-[13px] outline-none focus:border-accent focus:bg-white"
+                className="font-num h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] px-3.5 text-left text-[13px] outline-none focus:border-accent focus:bg-white"
               />
             </div>
             {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
@@ -307,20 +307,20 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   dir="ltr"
-                  className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] py-0 ps-[52px] pe-10 text-right text-[13px] text-[#0f172a] outline-none focus:border-accent focus:bg-white"
+                  className="h-[46px] w-full rounded-xl border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] py-0 pl-[52px] pr-10 text-left text-[13px] text-[#0f172a] outline-none focus:border-accent focus:bg-white"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
                   autoFocus
                 />
-                <span className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]">
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8]">
                   <LockIcon size={15} />
                 </span>
                 <button
                   type="button"
                   aria-label={showPassword ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور'}
                   onClick={() => setShowPassword((value) => !value)}
-                  className="absolute start-[13px] top-1/2 flex -translate-y-1/2 text-accent"
+                  className="absolute left-[13px] top-1/2 flex -translate-y-1/2 text-accent"
                 >
                   <EyeIcon hidden={showPassword} />
                 </button>
