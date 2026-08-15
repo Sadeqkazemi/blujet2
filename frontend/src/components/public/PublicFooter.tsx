@@ -186,7 +186,6 @@ export default function PublicFooter() {
             <div className="min-w-0">
               <BrandMark />
               <p className="mb-0 mt-5 max-w-[330px] text-[13.5px] leading-8 text-[#c2d0df]">{t('footerTagline')}</p>
-              <DownloadButtons />
               <ContactRows />
               <SocialLinks />
             </div>
@@ -194,8 +193,15 @@ export default function PublicFooter() {
             <FooterLinkColumn title={t('footerColCompany')} links={companyLinks} />
             <FooterLinkColumn title={t('footerColSupport')} links={supportLinks} />
           </div>
-          <div data-testid="footer-desktop-trust-row" className="mx-auto flex max-w-[1480px] justify-start px-10 pb-8" dir="ltr">
-            <TrustBadges />
+          <div
+            data-testid="footer-desktop-tools"
+            className="mx-auto flex max-w-[1480px] flex-col items-start px-10 pb-8"
+            dir="ltr"
+          >
+            <DownloadButtons />
+            <div data-testid="footer-desktop-trust-row" className="mt-3 flex justify-start" dir="ltr">
+              <TrustBadges />
+            </div>
           </div>
           <div className="border-t border-white/[.07]">
             <div className="mx-auto max-w-[1480px] px-10 py-4 text-[11.5px] text-[#7f96ae]">{t('footerCopyright')}</div>
