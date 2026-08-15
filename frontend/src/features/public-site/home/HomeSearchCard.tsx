@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
@@ -178,18 +179,37 @@ function AirportCell({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mobileViewport = useMobileVisualViewport(open && isMobile);
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(e.target as Node) &&
+        !sheetRef.current?.contains(e.target as Node)
+      )
         setOpen(false);
     }
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !isMobile) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isMobile, open]);
 
   useEffect(() => {
     if (open) {
@@ -224,23 +244,28 @@ function AirportCell({
     setOpen((v) => !v);
   }
 
+  const mobileSheetInset = mobileViewport
+    ? Math.min(56, Math.max(18, Math.round(mobileViewport.visibleHeight * 0.08)))
+    : 28;
+
   const dropStyle: React.CSSProperties = isMobile
     ? {
         position: 'fixed',
-        left: 0,
-        right: 0,
-        bottom: mobileViewport?.bottomInset ?? 0,
-        top: 'auto',
-        width: '100%',
-        maxWidth: '100vw',
-        maxHeight: mobileViewport ? Math.max(220, mobileViewport.visibleHeight - 8) : '92dvh',
-        borderRadius: '18px 18px 0 0',
-        padding: '13px 13px calc(13px + env(safe-area-inset-bottom))',
-        zIndex: 240,
+        left: mobileViewport?.offsetLeft ?? 0,
+        top: (mobileViewport?.offsetTop ?? 0) + mobileSheetInset,
+        width: mobileViewport?.visibleWidth ?? '100%',
+        height: mobileViewport
+          ? Math.max(180, mobileViewport.visibleHeight - mobileSheetInset)
+          : 'calc(100dvh - 28px)',
+        maxWidth: '100%',
+        borderRadius: '24px 24px 0 0',
+        padding: '12px 16px calc(12px + env(safe-area-inset-bottom))',
+        zIndex: 1001,
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        overscrollBehavior: 'contain',
       }
     : {
         position: 'absolute',
@@ -306,19 +331,30 @@ function AirportCell({
           {display}
         </div>
       </div>
-      {open && (
-        <>
+      {open && (() => {
+        const pickerLayer = (
+          <>
           <div
+            data-testid={isMobile ? `${testId}-mobile-overlay` : undefined}
             onClick={() => setOpen(false)}
             style={{
               position: 'fixed',
-              inset: 0,
-              zIndex: isMobile ? 238 : 38,
+              inset: isMobile ? undefined : 0,
+              left: isMobile ? (mobileViewport?.offsetLeft ?? 0) : undefined,
+              top: isMobile ? (mobileViewport?.offsetTop ?? 0) : undefined,
+              width: isMobile ? (mobileViewport?.visibleWidth ?? '100%') : undefined,
+              height: isMobile ? (mobileViewport?.visibleHeight ?? '100dvh') : undefined,
+              zIndex: isMobile ? 1000 : 38,
               background: isMobile ? 'rgba(13,38,64,.55)' : undefined,
             }}
           />
           <div
+            ref={sheetRef}
+            role={isMobile ? 'dialog' : undefined}
+            aria-modal={isMobile ? true : undefined}
+            aria-label={isMobile ? label : undefined}
             onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
             style={{
               ...dropStyle,
               background: '#fff',
@@ -326,23 +362,42 @@ function AirportCell({
               boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
             }}
           >
+            {isMobile && (
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 48,
+                  height: 4,
+                  borderRadius: 999,
+                  background: '#dce2ea',
+                  margin: '0 auto 10px',
+                  flex: 'none',
+                }}
+              />
+            )}
             <input
               ref={inputRef}
               data-testid={`${testId}-search`}
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
               placeholder={label}
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               style={{
                 width: '100%',
                 boxSizing: 'border-box',
-                height: 42,
+                height: isMobile ? 50 : 42,
                 border: '1.5px solid #e2e7ee',
-                borderRadius: 10,
-                padding: '0 12px',
-                fontSize: isMobile ? '13.5px' : '12.5px',
+                borderRadius: isMobile ? 14 : 10,
+                padding: isMobile ? '0 16px' : '0 12px',
+                fontSize: isMobile ? '16px' : '12.5px',
                 fontFamily: 'inherit',
                 outline: 'none',
-                marginBottom: 9,
+                marginBottom: isMobile ? 12 : 9,
+                flex: 'none',
               }}
             />
             <div
@@ -357,16 +412,15 @@ function AirportCell({
             </div>
             <div
               style={{
-                maxHeight: isMobile
-                  ? mobileViewport
-                    ? Math.max(112, mobileViewport.visibleHeight - 118)
-                    : '50dvh'
-                  : 220,
+                maxHeight: isMobile ? undefined : 220,
+                flex: isMobile ? '1 1 auto' : undefined,
+                minHeight: 0,
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
                 overscrollBehavior: 'contain',
                 WebkitOverflowScrolling: 'touch',
+                touchAction: 'pan-y',
               }}
             >
               {filtered.map((a) => (
@@ -454,8 +508,10 @@ function AirportCell({
               )}
             </div>
           </div>
-        </>
-      )}
+          </>
+        );
+        return isMobile ? createPortal(pickerLayer, document.body) : pickerLayer;
+      })()}
     </div>
   );
 }

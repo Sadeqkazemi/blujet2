@@ -313,6 +313,44 @@ describe('HomeSearchPage', () => {
     expect(screen.getByTestId('airport-option-THR')).toHaveTextContent('مطار مهرآباد الدولي');
     expect(screen.getByTestId('airport-option-THR')).not.toHaveTextContent('فرودگاه');
   });
+
+  it.each([
+    ['fa' as const, 'تهران'],
+    ['en' as const, 'tehran'],
+    ['ar' as const, 'طهران'],
+  ])(
+    'opens a keyboard-safe mobile airport search sheet in %s without zooming the page',
+    async (locale, query) => {
+      const viewport = new EventTarget() as VisualViewport;
+      Object.defineProperties(viewport, {
+        height: { configurable: true, value: 458 },
+        width: { configurable: true, value: 390 },
+        offsetTop: { configurable: true, value: 24 },
+        offsetLeft: { configurable: true, value: 0 },
+      });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+      mockLocale(locale);
+      mockMobile();
+      mockHomeApis();
+      renderPage();
+      await screen.findByTestId('home-origin');
+
+      await userEvent.click(screen.getByTestId('home-origin'));
+
+      const overlay = screen.getByTestId('home-origin-mobile-overlay');
+      const searchInput = screen.getByTestId('home-origin-search');
+      expect(overlay.parentElement).toBe(document.body);
+      expect(overlay).toHaveStyle({ position: 'fixed', top: '24px', height: '458px' });
+      expect(searchInput).toHaveStyle({ fontSize: '16px' });
+      expect(searchInput).toHaveAttribute('inputmode', 'search');
+      expect(document.body).toHaveStyle({ overflow: 'hidden' });
+
+      await userEvent.type(searchInput, query);
+      expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
+    },
+  );
 });
 
 /** Frozen responsive layout — do not change without explicit product approval. */
