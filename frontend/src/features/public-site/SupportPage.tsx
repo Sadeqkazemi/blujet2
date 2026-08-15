@@ -232,24 +232,36 @@ export default function SupportPage() {
   return (
     <PublicPageShell>
       {/* HERO + SEARCH */}
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '45px 22px 41px', textAlign: 'center' }}>
+      <section
+        data-testid="support-hero"
+        style={{
+          background: 'linear-gradient(150deg,#0d2640,#124a86)',
+          color: '#fff',
+          padding: isMobile ? '68px 24px 82px' : '45px 22px 41px',
+          minHeight: isMobile ? 440 : undefined,
+          boxSizing: 'border-box',
+          textAlign: 'center',
+        }}
+      >
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
           <h1 style={{ fontSize: isMobile ? 26 : 34, fontWeight: 900, margin: '0 0 12px', letterSpacing: '-.6px' }}>{t.heroTitle}</h1>
           <p style={{ fontSize: 14, color: '#c9dcf3', margin: '0 0 24px', lineHeight: 1.9 }}>
             {t.heroDesc}
           </p>
-          <div className="flex items-center gap-2 max-[420px]:flex-wrap" style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginRight: 9, flex: 'none' }}>
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4-4" />
-            </svg>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t.searchPlaceholder}
-              style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 13, color: '#16202e', minWidth: 0 }}
-            />
-            <span className="max-[420px]:w-full max-[420px]:text-center" style={{ flex: 'none', background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '10px 19px', borderRadius: 10 }}>{t.searchLabel}</span>
+          <div className="flex gap-2" style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 14, boxShadow: '0 22px 50px -18px rgba(0,0,0,.4)', padding: 7, flexDirection: isMobile ? 'column' : 'row' }}>
+            <label className="flex min-w-0 flex-1 items-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7787" strokeWidth="2.2" strokeLinecap="round" style={{ marginInlineStart: 9, flex: 'none' }}>
+                <circle cx="11" cy="11" r="7" />
+                <path d="M21 21l-4-4" />
+              </svg>
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', fontSize: 13, color: '#16202e', minWidth: 0, padding: isMobile ? '12px 8px' : 0 }}
+              />
+            </label>
+            <button type="button" style={{ flex: 'none', width: isMobile ? '100%' : undefined, border: 0, background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 800, padding: '12px 19px', borderRadius: 10, fontFamily: 'inherit' }}>{t.searchLabel}</button>
           </div>
         </div>
       </section>
@@ -258,7 +270,7 @@ export default function SupportPage() {
       <section style={{ maxWidth: 1180, margin: '-26px auto 0', padding: '0 22px', position: 'relative' }}>
         <div className="grid grid-cols-1 gap-[13px] min-[480px]:grid-cols-2 lg:grid-cols-4" data-testid="support-category-grid">
           {CATS.map((c) => (
-            <div key={c.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: '17px 15px', boxShadow: '0 14px 32px -20px rgba(13,38,102,.25)' }}>
+            <div key={c.title.fa} style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: isMobile ? '27px 24px' : '17px 15px', minHeight: isMobile ? 170 : undefined, boxShadow: '0 14px 32px -20px rgba(13,38,102,.25)' }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: c.bg, color: c.color, fontSize: 19, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 11 }}>
                 {c.icon}
               </div>

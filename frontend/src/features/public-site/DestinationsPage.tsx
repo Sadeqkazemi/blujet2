@@ -5,16 +5,12 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
+import {
+  FALLBACK_AIRPORTS,
+  airportCityName,
+  resolveAirportCode,
+} from '../../lib/airport-cities';
 import type { PublicHomeContent } from '../../types/site-content';
-
-const CITY_NAMES: Record<string, Record<StoredLocale, string>> = {
-  THR: { fa: 'تهران', en: 'Tehran', ar: 'طهران' },
-  MHD: { fa: 'مشهد', en: 'Mashhad', ar: 'مشهد' },
-  IST: { fa: 'استانبول', en: 'Istanbul', ar: 'إسطنبول' },
-  DXB: { fa: 'دبی', en: 'Dubai', ar: 'دبي' },
-  KIH: { fa: 'کیش', en: 'Kish', ar: 'كيش' },
-  SYZ: { fa: 'شیراز', en: 'Shiraz', ar: 'شيراز' },
-};
 
 /** Presentation-only metadata. Prices, availability, duration and frequency
  * are never sourced from this map. */
@@ -28,12 +24,6 @@ const DESTINATION_VISUALS: Record<
   DXB: { region: 'intl', hue: ['#1f8a5b', '#0e4a30'] },
   SYZ: { region: 'dom', hue: ['#8a5bc4', '#4a2d70'] },
 };
-
-function cityLabel(code: string, cityFa?: string): Record<StoredLocale, string> {
-  if (CITY_NAMES[code]) return CITY_NAMES[code];
-  const fa = cityFa ?? code;
-  return { fa, en: fa, ar: fa };
-}
 
 const PIN_POS = [
   { top: '40%', right: '52%' },
@@ -180,35 +170,38 @@ export default function DestinationsPage() {
 
   const destinations = useMemo(() => {
     return (homeContent?.destinations ?? []).map((d) => {
-      const visual = DESTINATION_VISUALS[d.airportCode];
+      const code = resolveAirportCode(d.airportCode, FALLBACK_AIRPORTS, d.cityFa);
+      const visual = DESTINATION_VISUALS[code];
       return {
-        code: d.airportCode,
-        name: cityLabel(d.airportCode, d.cityFa),
+        code,
+        name: airportCityName(code, locale, d.cityFa),
         region: visual?.region ?? ('intl' as const),
         hue: visual?.hue ?? (['#1668c4', '#0d3b66'] as [string, string]),
         tomanPrice: Math.round(Number(d.priceIrr) / 10),
         imageUrl: d.imageUrl,
       };
     });
-  }, [homeContent]);
+  }, [homeContent, locale]);
 
   const routes = useMemo(() => {
     return (homeContent?.routes ?? []).map((r) => {
+      const fromCode = resolveAirportCode(r.fromAirportCode, FALLBACK_AIRPORTS, r.fromCityFa);
+      const toCode = resolveAirportCode(r.toAirportCode, FALLBACK_AIRPORTS, r.toCityFa);
       return {
-        fromName: cityLabel(r.fromAirportCode, r.fromCityFa),
-        fromCode: r.fromAirportCode,
-        toName: cityLabel(r.toAirportCode, r.toCityFa),
-        toCode: r.toAirportCode,
+        fromName: airportCityName(fromCode, locale, r.fromCityFa),
+        fromCode,
+        toName: airportCityName(toCode, locale, r.toCityFa),
+        toCode,
         tomanPrice: Math.round(Number(r.priceIrr) / 10),
       };
     });
-  }, [homeContent]);
+  }, [homeContent, locale]);
 
   const query = q.trim();
   const filtered = destinations.filter(
     (d) =>
       (tab === 'all' || d.region === tab) &&
-      (!query || d.name[locale].includes(query) || d.code.toUpperCase().includes(query.toUpperCase())),
+      (!query || d.name.includes(query) || d.code.toUpperCase().includes(query.toUpperCase())),
   );
   const gridTitle = query ? t.gridTitleSearch(query) : tab === 'dom' ? t.gridTitleDom : tab === 'intl' ? t.gridTitleIntl : t.gridTitleAll;
 
@@ -220,7 +213,18 @@ export default function DestinationsPage() {
   return (
     <PublicPageShell>
       {/* HERO + SEARCH */}
-      <section style={{ background: 'linear-gradient(160deg,#0d2640 30%,#124a86)', color: '#fff', padding: '53px 22px 49px', position: 'relative', overflow: 'hidden' }}>
+      <section
+        data-testid="destinations-hero"
+        style={{
+          background: 'linear-gradient(160deg,#0d2640 30%,#124a86)',
+          color: '#fff',
+          padding: isMobile ? '70px 26px 72px' : '53px 22px 49px',
+          minHeight: isMobile ? 470 : undefined,
+          boxSizing: 'border-box',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
         <div style={{ position: 'absolute', top: -120, left: -80, width: 340, height: 340, borderRadius: '50%', background: 'rgba(255,255,255,.05)' }} />
         <div style={{ position: 'absolute', bottom: -160, right: '30%', width: 420, height: 420, borderRadius: '50%', background: 'rgba(22,104,196,.25)' }} />
         <div style={{ maxWidth: 1320, margin: '0 auto', position: 'relative', textAlign: 'center' }}>
@@ -277,7 +281,7 @@ export default function DestinationsPage() {
           <span style={{ fontSize: '11.5px', color: '#8a96a6' }}>{t.gridHint}</span>
         </div>
         {filtered.length > 0 ? (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gridAutoRows: 128, gridAutoFlow: 'dense', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gridAutoRows: 128, gridAutoFlow: 'dense', gap: 14 }}>
             {filtered.map((d) => (
               <a
                 key={d.code}
@@ -309,7 +313,7 @@ export default function DestinationsPage() {
                 <div style={{ position: 'absolute', right: 0, left: 0, bottom: 0, padding: '13px 15px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, pointerEvents: 'none' }}>
                   <span style={{ lineHeight: 1.6 }}>
                     <span style={{ display: 'block', color: '#fff', fontSize: '16.5px', fontWeight: 900, textShadow: '0 1px 6px rgba(0,0,0,.4)' }}>
-                      {d.name[locale]}{' '}
+                      {d.name}{' '}
                       <span style={{ fontSize: 10, fontWeight: 600, color: '#c9dcf3' }} dir="ltr">
                         {d.code}
                       </span>
@@ -367,7 +371,7 @@ export default function DestinationsPage() {
                 <div
                   key={d.code}
                   onClick={() => {
-                    setQ(d.name[locale]);
+                    setQ(d.name);
                     setTab('all');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -375,7 +379,7 @@ export default function DestinationsPage() {
                 >
                   <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#1668c4', border: '3px solid #fff', boxShadow: '0 2px 7px rgba(13,38,102,.45)' }} />
                   <span style={{ fontSize: 11, fontWeight: 800, color: '#0d2640', background: '#fff', padding: '2px 7px', borderRadius: 9, whiteSpace: 'nowrap', boxShadow: '0 1px 4px rgba(13,38,102,.12)' }}>
-                    {d.name[locale]}
+                    {d.name}
                   </span>
                 </div>
               ))}
@@ -402,7 +406,7 @@ export default function DestinationsPage() {
               <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <span style={{ lineHeight: 1.6 }}>
                   <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
-                    {r.fromName[locale]}{' '}
+                    {r.fromName}{' '}
                     <span style={{ fontSize: 10, color: '#8a96a6' }} dir="ltr">
                       {r.fromCode}
                     </span>
@@ -411,7 +415,7 @@ export default function DestinationsPage() {
                 <span style={{ color: '#1668c4', fontSize: 15 }}>✈</span>
                 <span style={{ lineHeight: 1.6, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
-                    {r.toName[locale]}{' '}
+                    {r.toName}{' '}
                     <span style={{ fontSize: 10, color: '#8a96a6' }} dir="ltr">
                       {r.toCode}
                     </span>
