@@ -16,6 +16,12 @@ describe('operations panel access contract', () => {
     );
   });
 
+  it('exposes manager creation and password management to the Board Chair panel', () => {
+    const keys = PANEL_NAV.BOARD_CHAIR?.map((item) => item.key) ?? [];
+    expect(keys).toContain('admins');
+    expect(keys).toContain('security');
+  });
+
   it('is controllable by CEO and senior manager', () => {
     expect(ALL_PANEL_KEYS).toContain('OPERATIONS');
     expect(PANEL_ACCESS_TOGGLE_RIGHTS.CEO).toContain('OPERATIONS');

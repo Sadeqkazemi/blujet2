@@ -147,6 +147,10 @@ export default function EmployeesPage() {
       setAddError('رمز عبور باید حداقل ۶ کاراکتر باشد.');
       return;
     }
+    if (catalogGroups.length > 0 && selectedPerms.size === 0) {
+      setAddError('حداقل یک دسترسی از دسترسی‌های واحد را انتخاب کنید.');
+      return;
+    }
     try {
       const submitted = {
         fullName: form.fullName.trim(),
@@ -468,7 +472,7 @@ export default function EmployeesPage() {
             </div>
             <button type="button" onClick={() => setAddOpen(false)} className="text-[11px] font-bold text-[#9fb0c7]">بستن</button>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           <div>
           <label className="mb-1 block text-xs font-bold text-[#e7ecf3]" htmlFor="emp-name">
             نام و نام خانوادگی
@@ -653,7 +657,10 @@ export default function EmployeesPage() {
 
           {catalogGroups.length > 0 && (
             <div className="mt-3">
-              <div className="mb-2 text-[10.5px] text-[#6b7b94]">دسترسی‌های واحد</div>
+              <div className="mb-2 flex items-center justify-between gap-3 text-[10.5px] text-[#6b7b94]">
+                <span>دسترسی‌های واحد</span>
+                <span>{faDigits(selectedPerms.size)} دسترسی انتخاب شده</span>
+              </div>
               <div className="flex flex-col gap-2">
                 {catalogGroups.map((g) => (
                   <div key={g.sectionKey}>
@@ -662,20 +669,24 @@ export default function EmployeesPage() {
                       {g.perms.map((p) => {
                         const checked = selectedPerms.has(p.key);
                         return (
-                          <button
+                          <label
                             key={p.key}
-                            type="button"
-                            onClick={() =>
-                              setSelectedPerms((prev) =>
-                                togglePermissionSelection(prev, p.key),
-                              )
-                            }
-                            className={`rounded-lg border px-2.5 py-1.5 text-right text-[11px] transition ${
+                            className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-2.5 py-2 text-right text-[11px] transition ${
                               checked ? 'border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]' : 'border-[#1f2a3d] text-[#cdd6e3]'
                             }`}
                           >
-                            {p.labelFa}
-                          </button>
+                            <span>{p.labelFa}</span>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedPerms((prev) =>
+                                  togglePermissionSelection(prev, p.key),
+                                )
+                              }
+                              className="h-4 w-4 shrink-0 accent-[#3b82f6]"
+                            />
+                          </label>
                         );
                       })}
                     </div>

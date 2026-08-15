@@ -156,7 +156,25 @@ describe('SupportPage', () => {
     renderWithRouter(<SupportPage />);
     expect(screen.getByTestId('support-hero')).toHaveStyle({ minHeight: '440px' });
     expect(screen.getByRole('button', { name: 'Search' })).toHaveStyle({ width: '100%' });
+    expect(screen.getByTestId('support-search-card')).toHaveStyle({
+      width: '100%',
+      flexDirection: 'column',
+      boxSizing: 'border-box',
+    });
     expect(screen.getByTestId('support-category-grid')).toBeInTheDocument();
+  });
+
+  it('renders the configured phone with Latin digits in English', async () => {
+    mockLocale('en');
+    vi.spyOn(settingsApi, 'fetchPublicSupportContact').mockResolvedValue({
+      phone: '۰۲۱-۴۴۶۹۴۴۷۱',
+      email: 'info@blujet.com',
+    });
+
+    renderWithRouter(<SupportPage />);
+
+    expect(await screen.findByText('021-44694471')).toBeInTheDocument();
+    expect(screen.queryByText('۰۲۱-۴۴۶۹۴۴۷۱')).not.toBeInTheDocument();
   });
 
   it('renders FAQ accordion and toggles answers', async () => {

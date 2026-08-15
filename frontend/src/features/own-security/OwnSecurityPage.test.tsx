@@ -34,6 +34,17 @@ function mockCeo() {
   });
 }
 
+function mockBoardChair() {
+  vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+    status: 'authenticated',
+    user: mockAuthUserWithRole('BOARD_CHAIR'),
+    requestLogin: vi.fn(),
+    confirmTwoFactor: vi.fn(),
+    agencyLogin: vi.fn(),
+    signOut: vi.fn(),
+  });
+}
+
 describe('OwnSecurityPage', () => {
   it('validates the confirm field, then changes the own password via the real endpoint', async () => {
     mockCeo();
@@ -93,5 +104,23 @@ describe('OwnSecurityPage', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('مدیریت رمز سایر مدیران')).toBeInTheDocument();
     expect(screen.getByText('itadmin')).toBeInTheDocument();
+  });
+
+  it('lets the Board Chair change its own password and reset a managed manager password', async () => {
+    mockBoardChair();
+    vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue(MANAGED);
+    const changeSpy = vi.spyOn(adminsApi, 'changeOwnPassword').mockResolvedValue({ changed: true });
+    vi.spyOn(adminsApi, 'resetAdminPassword').mockResolvedValue({ tempPassword: 'Chair-Temp-1' });
+
+    render(<OwnSecurityPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('رمز عبور فعلی'), 'Chair@1405');
+    await user.type(screen.getByLabelText('رمز عبور جدید'), 'Chair@1406');
+    await user.type(screen.getByLabelText('تکرار رمز عبور جدید'), 'Chair@1406');
+    await user.click(screen.getByRole('button', { name: 'ثبت رمز عبور جدید' }));
+    await waitFor(() => expect(changeSpy).toHaveBeenCalledWith('Chair@1405', 'Chair@1406'));
+
+    await user.click(screen.getByRole('button', { name: 'تغییر رمز' }));
+    expect(await screen.findByText('Chair-Temp-1')).toBeInTheDocument();
   });
 });

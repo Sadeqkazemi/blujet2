@@ -52,6 +52,9 @@ describe('PublicFooter — desktop', () => {
     expect(screen.getByText('Services')).toBeInTheDocument();
     expect(screen.getAllByText('Book a Flight')[0]).toHaveAttribute('href', '/results');
     expect(screen.getByText('© 2026 blujet. All rights reserved.')).toBeInTheDocument();
+    expect(screen.getByTestId('footer-desktop-tools')).toHaveClass('items-end');
+    expect(screen.getByTestId('footer-desktop-trust-row')).toHaveClass('justify-end');
+    expect(screen.getByTestId('public-footer-desktop')).toHaveClass('pt-9', 'pb-5');
   });
 
   it('renders app download buttons and trust badges', () => {

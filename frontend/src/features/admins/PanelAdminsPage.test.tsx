@@ -133,4 +133,24 @@ describe('PanelAdminsPage', () => {
       screen.getByRole('switch', { name: 'مدیریت پروازها' }),
     ).toHaveAttribute('aria-checked', 'false');
   });
+
+  it('lets the Board Chair open the connected manager-creation form', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUserWithRole('BOARD_CHAIR'),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(adminsApi, 'fetchAdmins').mockResolvedValue([]);
+
+    render(<PanelAdminsPage />);
+    await screen.findByText('هنوز اطلاعاتی وارد نشده است.');
+    await userEvent.click(screen.getByRole('button', { name: 'افزودن مدیر / ادمین' }));
+
+    expect(screen.getByText('مدیران و ادمین‌ها')).toBeInTheDocument();
+    expect(screen.getByLabelText(/نقش \/ سطح دسترسی/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'افزودن و تعیین دسترسی' })).toBeInTheDocument();
+  });
 });
