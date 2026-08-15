@@ -57,6 +57,8 @@ function mockAuth(status: 'authenticated' | 'unauthenticated' = 'authenticated')
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status,
     user: status === 'authenticated' ? mockAuthUser() : null,
+    requestOtp: vi.fn().mockResolvedValue('challenge-1'),
+    verifyOtp: vi.fn().mockResolvedValue(mockAuthUser()),
     requestLogin: vi.fn(),
     confirmTwoFactor: vi.fn(),
     agencyLogin: vi.fn(),
@@ -158,52 +160,35 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-saved-chip-saved-1')).toHaveTextContent('سارا احمدی');
   });
 
-  it('lets a guest complete passenger details, then opens the inline login modal', async () => {
+  it('blocks passenger information immediately for guests and returns to results on cancel', async () => {
     mockAuth('unauthenticated');
     render(
       <MemoryRouter
         initialEntries={[
+          '/results',
           {
             pathname: '/checkout/new',
             search: '?flightInstanceId=fi-1&cabin=ECONOMY',
             state: FLIGHT_STATE,
           },
         ]}
+        initialIndex={1}
       >
         <Routes>
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+          <Route path="/results" element={<div data-testid="results-page">نتایج پرواز</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
-    const next = screen.getByTestId('checkout-next');
-    expect(next).toBeDisabled();
-    expect(screen.getByTestId('checkout-disabled-hint')).toBeInTheDocument();
-
-    await userEvent.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
-    await userEvent.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
-    await userEvent.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
-    await userEvent.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
-    const selects = screen.getAllByRole('combobox');
-    await userEvent.selectOptions(selects[1]!, '1');
-    await userEvent.selectOptions(selects[2]!, '1');
-    await userEvent.selectOptions(selects[3]!, '1370');
-
-    expect(next).toBeEnabled();
-    await userEvent.click(next);
     expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
     expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-auth-gate-placeholder')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-pax-step')).not.toBeInTheDocument();
     expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('checkout-login-close'));
-    expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
-    expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
-    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
-
-    await userEvent.click(next);
-    expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
-    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
+    expect(await screen.findByTestId('results-page')).toBeInTheDocument();
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {

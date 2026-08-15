@@ -62,6 +62,10 @@ describe('PublicFooter — desktop', () => {
     expect(screen.getByTestId('footer-trust-badges')).toBeInTheDocument();
     expect(screen.getByText('نماد اعتماد الکترونیکی')).toBeInTheDocument();
     expect(screen.getByText('عضو IATA')).toBeInTheDocument();
+    const tools = screen.getByTestId('footer-desktop-tools');
+    expect(tools).toHaveAttribute('dir', 'ltr');
+    expect(tools).toContainElement(screen.getByTestId('footer-app-store'));
+    expect(tools).toContainElement(screen.getByTestId('footer-trust-badges'));
   });
 
   it('renders enabled social links supplied by site settings', () => {

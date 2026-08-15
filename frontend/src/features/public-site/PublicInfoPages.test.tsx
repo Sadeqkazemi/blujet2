@@ -11,6 +11,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as siteContentApi from '../../api/site-content';
 import * as settingsApi from '../../api/settings';
+import * as useIsMobileModule from '../../hooks/useIsMobile';
 
 const REAL_HOME_CONTENT = {
   blocks: [],
@@ -37,6 +38,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -148,6 +150,15 @@ describe('PublicClubPage', () => {
 });
 
 describe('SupportPage', () => {
+  it('keeps the mobile support hero and search layout readable without horizontal overflow', () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockLocale('en');
+    renderWithRouter(<SupportPage />);
+    expect(screen.getByTestId('support-hero')).toHaveStyle({ minHeight: '440px' });
+    expect(screen.getByRole('button', { name: 'Search' })).toHaveStyle({ width: '100%' });
+    expect(screen.getByTestId('support-category-grid')).toBeInTheDocument();
+  });
+
   it('renders FAQ accordion and toggles answers', async () => {
     renderWithRouter(<SupportPage />);
     expect(screen.getByText('چطور می‌توانیم کمک کنیم؟')).toBeInTheDocument();
