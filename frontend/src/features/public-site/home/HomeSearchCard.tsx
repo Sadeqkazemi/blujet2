@@ -5,6 +5,7 @@ import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { airportCityLabel, airportCityName, airportName } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
+import { useMobileVisualViewport } from '../../../hooks/useMobileVisualViewport';
 import {
   DomesticFlightIcon,
   IntlFlightIcon,
@@ -178,6 +179,7 @@ function AirportCell({
   const [query, setQuery] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mobileViewport = useMobileVisualViewport(open && isMobile);
 
   useEffect(() => {
     if (!open) return;
@@ -192,7 +194,7 @@ function AirportCell({
   useEffect(() => {
     if (open) {
       setQuery('');
-      const t = window.setTimeout(() => inputRef.current?.focus(), 0);
+      const t = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
       return () => window.clearTimeout(t);
     }
     return undefined;
@@ -227,13 +229,18 @@ function AirportCell({
         position: 'fixed',
         left: 0,
         right: 0,
-        bottom: 0,
+        bottom: mobileViewport?.bottomInset ?? 0,
         top: 'auto',
         width: '100%',
         maxWidth: '100vw',
+        maxHeight: mobileViewport ? Math.max(220, mobileViewport.visibleHeight - 8) : '92dvh',
         borderRadius: '18px 18px 0 0',
-        padding: 13,
+        padding: '13px 13px calc(13px + env(safe-area-inset-bottom))',
         zIndex: 240,
+        boxSizing: 'border-box',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }
     : {
         position: 'absolute',
@@ -321,6 +328,7 @@ function AirportCell({
           >
             <input
               ref={inputRef}
+              data-testid={`${testId}-search`}
               value={query}
               onChange={(ev) => setQuery(ev.target.value)}
               placeholder={label}
@@ -349,10 +357,16 @@ function AirportCell({
             </div>
             <div
               style={{
-                maxHeight: isMobile ? '50vh' : 220,
+                maxHeight: isMobile
+                  ? mobileViewport
+                    ? Math.max(112, mobileViewport.visibleHeight - 118)
+                    : '50dvh'
+                  : 220,
                 overflowY: 'auto',
                 display: 'flex',
                 flexDirection: 'column',
+                overscrollBehavior: 'contain',
+                WebkitOverflowScrolling: 'touch',
               }}
             >
               {filtered.map((a) => (

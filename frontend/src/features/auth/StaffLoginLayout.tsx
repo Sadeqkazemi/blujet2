@@ -36,8 +36,20 @@ const FEATURES = [
  * panel on the aside, white form panel). */
 export function StaffLoginLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-[#eef2f8] font-sans text-[#0f172a] md:grid-cols-[1fr_470px]">
-      <div className="relative hidden overflow-hidden bg-[#0b1526] md:block">
+    <div
+      data-testid="staff-login-layout"
+      dir="ltr"
+      className="grid min-h-screen grid-cols-1 bg-[#eef2f8] font-sans text-[#0f172a] md:grid-cols-[470px_1fr]"
+    >
+      <div
+        data-testid="staff-login-form-panel"
+        dir="rtl"
+        className="flex items-center justify-center bg-white p-9"
+      >
+        <div className="w-full max-w-[380px]">{children}</div>
+      </div>
+
+      <div data-testid="staff-login-visual-panel" dir="rtl" className="relative hidden overflow-hidden bg-[#0b1526] md:block">
         <img src="/signin-aircraft.png" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(175deg,rgba(11,21,38,.35),rgba(11,21,38,.82)_55%,#0b1526_100%)]" />
         <div className="relative flex h-full flex-col justify-between px-12 py-11">
@@ -74,9 +86,6 @@ export function StaffLoginLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <div className="flex items-center justify-center bg-white p-9">
-        <div className="w-full max-w-[380px]">{children}</div>
-      </div>
     </div>
   );
 }
