@@ -30,6 +30,10 @@ import type {
   CreateEmployeeDto,
   ListEmployeesQueryDto,
 } from './dto/employees.dtos';
+import {
+  dependentEmployeePermissionKeys,
+  expandEmployeePermissionKeys,
+} from '../../common/employee-permission-dependencies';
 
 @Injectable()
 export class EmployeesService {
@@ -173,13 +177,17 @@ export class EmployeesService {
     const isKnownCatalogDept = (CATALOG_DEPTS as readonly string[]).includes(
       catalogDept,
     );
-    const requestedPermissionKeys = dto.permissionKeys ?? [];
+    const requestedPermissionKeys = expandEmployeePermissionKeys(
+      dto.permissionKeys ?? [],
+    );
     const grantable = isKnownCatalogDept
       ? await this.permissionRepo.find({
           where: { dept: catalogDept, key: In(requestedPermissionKeys) },
         })
       : [];
-    const grantableKeys = new Set(grantable.map((permission) => permission.key));
+    const grantableKeys = new Set(
+      grantable.map((permission) => permission.key),
+    );
     const invalidPermissionKeys = requestedPermissionKeys.filter(
       (key) => !grantableKeys.has(key),
     );
@@ -388,24 +396,40 @@ export class EmployeesService {
     }
 
     if (grant) {
-      const existing = await this.employeePermissionRepo.findOneBy({
-        employeeId: id,
-        permissionId: permission.id,
+      const grantKeys = expandEmployeePermissionKeys([permissionKey]);
+      const permissions = await this.permissionRepo.find({
+        where: { dept: catalogDept, key: In(grantKeys) },
       });
-      if (!existing) {
+      const existing = await this.employeePermissionRepo.find({
+        where: {
+          employeeId: id,
+          permissionId: In(permissions.map((row) => row.id)),
+        },
+      });
+      const existingIds = new Set(existing.map((row) => row.permissionId));
+      const missing = permissions.filter((row) => !existingIds.has(row.id));
+      if (missing.length > 0) {
         await this.employeePermissionRepo.save(
-          this.employeePermissionRepo.create({
-            employeeId: id,
-            permissionId: permission.id,
-            grantedById: actor.id,
-          }),
+          missing.map((row) =>
+            this.employeePermissionRepo.create({
+              employeeId: id,
+              permissionId: row.id,
+              grantedById: actor.id,
+            }),
+          ),
         );
       }
     } else {
-      await this.employeePermissionRepo.delete({
-        employeeId: id,
-        permissionId: permission.id,
+      const revokeKeys = dependentEmployeePermissionKeys(permissionKey);
+      const permissions = await this.permissionRepo.find({
+        where: { dept: catalogDept, key: In(revokeKeys) },
       });
+      if (permissions.length > 0) {
+        await this.employeePermissionRepo.delete({
+          employeeId: id,
+          permissionId: In(permissions.map((row) => row.id)),
+        });
+      }
     }
 
     await this.audit.record({

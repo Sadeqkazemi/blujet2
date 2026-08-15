@@ -32,7 +32,8 @@ unmapped permission accidentally.
 - Revoking a grant removes the related navigation item on the next nav request
   and the protected API returns 403 immediately.
 - Read-only and write capabilities remain distinct (`fl_view` does not permit
-  flight mutations; `fl_manage` does).
+  flight mutations; `fl_manage` does). A write grant implies the read access
+  required to load that same management surface.
 - IT employees with `us_manage`, `sv_control`, `sc_manage`, or `lg_view` receive
   only the corresponding IT surface, not the full IT Manager panel.
 - The users page includes the reference employee table, access-level policy

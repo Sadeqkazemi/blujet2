@@ -32,25 +32,44 @@ const STATUS_META: Record<RowStatus, { label: string; className: string }> = {
 export default function EmployeeAgenciesPage() {
   const [agencies, setAgencies] = useState<AgencyListRow[]>([]);
   const [requests, setRequests] = useState<AgencyMembershipRequest[]>([]);
+  const [canOpenAgencyDetails, setCanOpenAgencyDetails] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       // Membership requests are gated by the `ag_requests` permission
       // server-side; only fetch them when this employee actually has it,
       // so an unprivileged employee never fires a request that 403s.
-      const ctx = await fetchEmployeeContext().catch(() => null);
-      const canSeeRequests = ctx?.permissionKeys.includes('ag_requests') ?? false;
+      const ctx = await fetchEmployeeContext();
+      const canSeeRequests = ctx.permissionKeys.includes('ag_requests');
+      const canSeeList = ctx.permissionKeys.some((key) =>
+        ['ag_list', 'ag_info', 'ag_settle', 'fn_invoices'].includes(key),
+      );
+      const canSeeDetails = ctx.permissionKeys.some((key) =>
+        ['ag_info', 'ag_settle', 'fn_invoices'].includes(key),
+      );
       const [list, reqs] = await Promise.all([
-        fetchAgencies({}),
+        canSeeList
+          ? fetchAgencies({})
+          : Promise.resolve({
+              agencies: [] as AgencyListRow[],
+              kpis: {
+                activeCount: 0,
+                totalCreditGrantedIrr: '0',
+                totalUsedIrr: '0',
+                pendingSettlementCount: 0,
+              },
+            }),
         canSeeRequests
           ? fetchAgencyRequests().catch(() => [] as AgencyMembershipRequest[])
           : Promise.resolve([] as AgencyMembershipRequest[]),
       ]);
       setAgencies(list.agencies);
       setRequests(reqs.filter((r) => r.status === 'PENDING' || r.status === 'REFERRED'));
+      setCanOpenAgencyDetails(canSeeDetails);
     } catch {
       setError('خطا در دریافت فهرست آژانس‌ها.');
     } finally {
@@ -77,10 +96,10 @@ export default function EmployeeAgenciesPage() {
       city: a.city,
       license: a.licenseNo,
       status: a.isActive ? 'active' : 'suspended',
-      href: `/panel/agencies/${a.id}`,
+      href: canOpenAgencyDetails ? `/panel/agencies/${a.id}` : undefined,
     }));
     return [...pendingRows, ...agencyRows];
-  }, [agencies, requests]);
+  }, [agencies, canOpenAgencyDetails, requests]);
 
   const rowsPager = usePagination(rows);
 
@@ -118,9 +137,15 @@ export default function EmployeeAgenciesPage() {
               <tbody>
                 {rowsPager.pageItems.map((r) => {
                   const st = STATUS_META[r.status];
-                  const inner = (
-                    <>
-                      <td className="px-4 py-3.5 font-bold text-[#e7ecf3]">{r.name}</td>
+                  return (
+                    <tr key={r.id} className="border-b border-[#1a2436] last:border-0 hover:bg-[#18223a]/50">
+                      <td className="px-4 py-3.5 font-bold text-[#e7ecf3]">
+                        {r.href ? (
+                          <Link to={r.href} className="text-accent hover:underline">
+                            {r.name}
+                          </Link>
+                        ) : r.name}
+                      </td>
                       <td className="px-4 py-3.5 text-[#9fb0c7]">{r.city}</td>
                       <td className="ltr font-num px-4 py-3.5 text-[#9fb0c7]">
                         {r.license ? faDigits(r.license) : '—'}
@@ -132,17 +157,6 @@ export default function EmployeeAgenciesPage() {
                           {st.label}
                         </span>
                       </td>
-                    </>
-                  );
-                  return (
-                    <tr key={r.id} className="border-b border-[#1a2436] last:border-0 hover:bg-[#18223a]/50">
-                      {r.href ? (
-                        <Link to={r.href} className="contents">
-                          {inner}
-                        </Link>
-                      ) : (
-                        inner
-                      )}
                     </tr>
                   );
                 })}

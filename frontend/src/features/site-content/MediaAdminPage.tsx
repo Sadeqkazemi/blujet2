@@ -71,6 +71,61 @@ function cardClass() {
   return 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]';
 }
 
+function ImageAssetPicker({
+  assets,
+  value,
+  onChange,
+}: {
+  assets: LibraryAssetRow[];
+  value: string | null | undefined;
+  onChange: (fileId: string | null) => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
+      <legend className="px-1 text-sm text-muted">تصویر</legend>
+      {assets.length === 0 ? (
+        <p className="m-0 text-xs text-muted">ابتدا یک تصویر در کتابخانه آپلود کنید.</p>
+      ) : (
+        <div className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+          <button
+            type="button"
+            aria-label="حذف تصویر انتخاب‌شده"
+            aria-pressed={!value}
+            onClick={() => onChange(null)}
+            className={`min-h-20 rounded-lg border p-2 text-xs ${
+              !value ? 'border-accent bg-accent/10 text-white' : 'border-border text-muted'
+            }`}
+          >
+            بدون تصویر
+          </button>
+          {assets.map((asset) => {
+            const selected = value === asset.fileId;
+            return (
+              <button
+                key={asset.id}
+                type="button"
+                aria-label={`انتخاب تصویر ${asset.label}`}
+                aria-pressed={selected}
+                onClick={() => onChange(asset.fileId)}
+                className={`overflow-hidden rounded-lg border text-right ${
+                  selected ? 'border-accent bg-accent/10' : 'border-border bg-panel'
+                }`}
+              >
+                <img
+                  src={siteMediaUrl(asset.fileId) ?? ''}
+                  alt=""
+                  className="h-16 w-full object-cover"
+                />
+                <span className="block truncate p-2 text-xs">{asset.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 type DeleteTarget =
   | { kind: 'asset'; id: string; label: string }
   | { kind: 'destination'; id: string; label: string }
@@ -88,7 +143,11 @@ export default function MediaAdminPage() {
   const [blockDraft, setBlockDraft] = useState<Partial<ContentBlockRow>>({});
   const [destModal, setDestModal] = useState<'create' | DestinationRow | null>(null);
   const [routeModal, setRouteModal] = useState<'create' | RouteRow | null>(null);
-  const [destDraft, setDestDraft] = useState({ airportCode: '', priceToman: '' });
+  const [destDraft, setDestDraft] = useState<{
+    airportCode: string;
+    priceToman: string;
+    imageFileId: string | null;
+  }>({ airportCode: '', priceToman: '', imageFileId: null });
   const [routeDraft, setRouteDraft] = useState({
     fromAirportCode: '',
     toAirportCode: '',
@@ -210,7 +269,7 @@ export default function MediaAdminPage() {
   }
 
   function openDestCreate() {
-    setDestDraft({ airportCode: '', priceToman: '' });
+    setDestDraft({ airportCode: '', priceToman: '', imageFileId: null });
     setDestModal('create');
   }
 
@@ -218,6 +277,7 @@ export default function MediaAdminPage() {
     setDestDraft({
       airportCode: row.airportCode,
       priceToman: String(Math.round(Number(row.priceIrr) / 10)),
+      imageFileId: row.imageFileId,
     });
     setDestModal(row);
   }
@@ -230,11 +290,16 @@ export default function MediaAdminPage() {
     }
     try {
       if (destModal === 'create') {
-        await createDestination({ airportCode: destDraft.airportCode, priceIrr });
+        await createDestination({
+          airportCode: destDraft.airportCode,
+          priceIrr,
+          imageFileId: destDraft.imageFileId ?? undefined,
+        });
       } else if (destModal) {
         await updateDestination(destModal.id, {
           airportCode: destDraft.airportCode,
           priceIrr,
+          imageFileId: destDraft.imageFileId,
         });
       }
       setDestModal(null);
@@ -397,6 +462,29 @@ export default function MediaAdminPage() {
       {error && (
         <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>
       )}
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <a
+          href="/panel/blog"
+          className={`${cardClass()} flex items-center justify-between no-underline`}
+        >
+          <div>
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">مدیریت بلاگ</h3>
+            <p className="mb-0 mt-1 text-[11px] text-[#6b7b94]">ایجاد، ویرایش، انتشار و حذف مطالب و تصویر شاخص</p>
+          </div>
+          <span className="text-lg text-accent">←</span>
+        </a>
+        <a
+          href="/panel/jobapps"
+          className={`${cardClass()} flex items-center justify-between no-underline`}
+        >
+          <div>
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">فرصت‌های شغلی</h3>
+            <p className="mb-0 mt-1 text-[11px] text-[#6b7b94]">انتشار آگهی، تصویر موقعیت و بررسی درخواست‌های استخدام</p>
+          </div>
+          <span className="text-lg text-accent">←</span>
+        </a>
+      </div>
 
       {/* Hero banner */}
       <div className={cardClass()}>
@@ -894,6 +982,11 @@ export default function MediaAdminPage() {
                 />
               </label>
             ))}
+            <ImageAssetPicker
+              assets={library}
+              value={blockDraft.imageFileId}
+              onChange={(imageFileId) => setBlockDraft((draft) => ({ ...draft, imageFileId }))}
+            />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditBlock(null)} className="rounded-lg px-4 py-2 text-sm">
                 انصراف
@@ -925,6 +1018,11 @@ export default function MediaAdminPage() {
                 onChange={(e) => setDestDraft((d) => ({ ...d, airportCode: e.target.value.toUpperCase() }))}
               />
             </label>
+            <ImageAssetPicker
+              assets={library}
+              value={destDraft.imageFileId}
+              onChange={(imageFileId) => setDestDraft((draft) => ({ ...draft, imageFileId }))}
+            />
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-muted">قیمت (تومان)</span>
               <input

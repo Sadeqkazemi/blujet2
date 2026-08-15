@@ -12,6 +12,7 @@ import { EmployeePermission } from '../../database/entities/employee-permission.
 import { REQUIRES_PERMISSION_KEY } from '../decorators/requires-permission.decorator';
 import { AuthenticatedUser } from '../types/authenticated-user';
 import { ErrorCode } from '../errors';
+import { grantsSatisfyingEmployeePermission } from '../employee-permission-dependencies';
 
 /**
  * Fine-grained backstop for the shared EMPLOYEE grant on @Roles(...): a
@@ -43,11 +44,15 @@ export class EmployeePermissionGuard implements CanActivate {
     );
     if (!keys || keys.length === 0) return true;
 
+    const acceptedKeys = [
+      ...new Set(keys.flatMap(grantsSatisfyingEmployeePermission)),
+    ];
+
     const grant = await this.employeePermissionRepo
       .createQueryBuilder('ep')
       .innerJoin('ep.permission', 'p')
       .where('ep.employeeId = :employeeId', { employeeId: user.id })
-      .andWhere('p.key IN (:...keys)', { keys })
+      .andWhere('p.key IN (:...keys)', { keys: acceptedKeys })
       .getOne();
     if (!grant) {
       throw new ForbiddenException({

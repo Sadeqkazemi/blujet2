@@ -10,6 +10,7 @@ import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as supportTicketsApi from '../../api/support-tickets';
 import * as siteContentApi from '../../api/site-content';
+import * as settingsApi from '../../api/settings';
 
 const REAL_HOME_CONTENT = {
   blocks: [],
@@ -47,6 +48,10 @@ beforeEach(() => {
   vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(
     REAL_HOME_CONTENT,
   );
+  vi.spyOn(settingsApi, 'fetchPublicSupportContact').mockResolvedValue({
+    phone: '021-44694471',
+    email: 'info@blujet.com',
+  });
 });
 
 function renderWithRouter(node: React.ReactNode) {
@@ -146,6 +151,8 @@ describe('SupportPage', () => {
   it('renders FAQ accordion and toggles answers', async () => {
     renderWithRouter(<SupportPage />);
     expect(screen.getByText('چطور می‌توانیم کمک کنیم؟')).toBeInTheDocument();
+    expect(await screen.findByText('021-44694471')).toBeInTheDocument();
+    expect(screen.getAllByText('info@blujet.com').length).toBeGreaterThan(0);
     expect(screen.getByText(/از بخش «مدیریت رزرو» با وارد کردن کد رزرو/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByText('میزان بار مجاز هر بلیط چقدر است؟'));
