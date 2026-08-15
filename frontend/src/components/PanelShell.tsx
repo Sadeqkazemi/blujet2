@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { fetchNav, fetchEmployeeContext } from '../api/panels';
@@ -33,6 +33,7 @@ import { PANEL_BRAND_PLANE_ICON, panelNavIcon } from './panel-nav-icons';
 import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import { usePanelNotify } from '../hooks/usePanelNotify';
+import { usePanelInactivityLogout } from '../hooks/usePanelInactivityLogout';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -78,7 +79,7 @@ function notificationTarget(n: NotificationRow): string {
 }
 
 export default function PanelShell() {
-  const { user, signOut } = useAuth();
+  const { status, user, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { notify } = usePanelNotify();
@@ -90,6 +91,20 @@ export default function PanelShell() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const autoAiRequestedRef = useRef(false);
+  const inactivityLogoutStartedRef = useRef(false);
+
+  const onInactivityTimeout = useCallback(() => {
+    if (inactivityLogoutStartedRef.current) return;
+    inactivityLogoutStartedRef.current = true;
+    void signOut().finally(() => {
+      navigate('/login?reason=inactive', { replace: true });
+    });
+  }, [navigate, signOut]);
+
+  usePanelInactivityLogout({
+    enabled: status === 'authenticated' && Boolean(user),
+    onTimeout: onInactivityTimeout,
+  });
 
   useEffect(() => {
     fetchNav()
