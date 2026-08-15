@@ -130,6 +130,7 @@ describe('Panels (e2e)', () => {
       'reservation',
       'mgrreports',
       'survey',
+      'security',
     ]);
   });
 
@@ -284,7 +285,7 @@ describe('Panels (e2e)', () => {
       'blog',
       'jobapps',
     ]);
-    // Product request (2026-08): never surface these in the SITE_ADMIN sidebar.
+    // Product request (2026-08): KYC and system settings stay outside the SITE_ADMIN sidebar.
     expect(keys).not.toContain('kyc');
     expect(keys).not.toContain('settings');
   });
@@ -383,3 +384,4 @@ describe('Panels (e2e)', () => {
       .send({ enabled: true });
   });
 });
+
