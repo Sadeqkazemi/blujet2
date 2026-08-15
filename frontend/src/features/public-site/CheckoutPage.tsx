@@ -100,6 +100,14 @@ export default function CheckoutPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
 
+  // Passenger information is private checkout data. A customer may search and
+  // choose a flight anonymously, but the wizard itself always starts behind
+  // the OTP gate and remains inaccessible until authentication succeeds.
+  useEffect(() => {
+    if (!isWizard || status === 'loading') return;
+    setLoginOpen(status !== 'authenticated');
+  }, [isWizard, status]);
+
   // Load held booking (legacy /payment-bound path)
   useEffect(() => {
     if (!bookingId || bookingId === 'new') return;
@@ -633,7 +641,7 @@ export default function CheckoutPage() {
           type="button"
           data-testid="checkout-login-close"
           aria-label={locale === 'en' ? 'Close' : locale === 'ar' ? 'إغلاق' : 'بستن'}
-          onClick={() => setLoginOpen(false)}
+          onClick={() => navigate(-1)}
           className="absolute start-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f5f9] text-xl text-[#66758a]"
         >
           ×
@@ -663,12 +671,11 @@ export default function CheckoutPage() {
           checkoutStyle
           onAuthenticated={() => {
             setLoginOpen(false);
-            if (step === 'pax') setStep('extras');
           }}
         />
         <button
           type="button"
-          onClick={() => setLoginOpen(false)}
+          onClick={() => navigate(-1)}
           className="mt-5 w-full text-center text-sm font-bold text-[#7d8797] transition hover:text-[#0d2640]"
         >
           {locale === 'en' ? 'Cancel' : locale === 'ar' ? 'إلغاء' : 'انصراف'}
@@ -677,7 +684,7 @@ export default function CheckoutPage() {
     </div>
   ) : null;
 
-  const stepBody = (
+  const stepBody = status === 'authenticated' ? (
     <>
       {step === 'pax' && (
         <PassengerStep
@@ -712,6 +719,12 @@ export default function CheckoutPage() {
         />
       )}
     </>
+  ) : (
+    <div
+      className="min-h-[260px] rounded-2xl border border-[#eef1f5] bg-white"
+      aria-hidden="true"
+      data-testid="checkout-auth-gate-placeholder"
+    />
   );
 
   // Explicit mobile/desktop trees (design bundle) — do not rely on Tailwind
