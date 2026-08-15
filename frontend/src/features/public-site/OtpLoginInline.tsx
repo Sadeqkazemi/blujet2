@@ -244,30 +244,6 @@ export default function OtpLoginInline({
               {t.otpDevHint(localeDigits(devCode, locale))}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={busy || !phoneReady}
-            className={checkoutStyle
-              ? 'h-16 rounded-2xl bg-[#3569be] px-4 text-base font-black text-white transition hover:bg-[#285ba9] disabled:cursor-not-allowed disabled:opacity-60'
-              : 'rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60'}
-          >
-            {busy ? t.otpRequesting : checkoutStyle ? checkoutCopy.request : t.otpRequest}
-          </button>
-          {checkoutStyle && <p className="m-0 text-center text-xs leading-6 text-[#9aa6b7]">{checkoutCopy.terms}</p>}
-        </form>
-      ) : (
-        <form onSubmit={onVerify} className="flex flex-col gap-3">
-          <p className="text-xs font-semibold text-[#059669]" data-testid="otp-sent-notice">
-            {t.otpSent(localeDigits(normalizedPhone, locale))}
-          </p>
-          {devCode && (
-            <p
-              className="rounded-lg bg-[#eff6ff] p-2.5 text-xs font-semibold text-[#1668c4]"
-              data-testid="otp-dev-hint"
-            >
-              {t.otpDevHint(localeDigits(devCode, locale))}
-            </p>
-          )}
           <input
             data-testid="otp-code"
             type="tel"
