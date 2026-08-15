@@ -281,10 +281,10 @@ describe('Panels (e2e)', () => {
       'cartable',
       'tickets',
       'media',
+      'blog',
       'jobapps',
     ]);
     // Product request (2026-08): never surface these in the SITE_ADMIN sidebar.
-    expect(keys).not.toContain('blog');
     expect(keys).not.toContain('kyc');
     expect(keys).not.toContain('settings');
   });
