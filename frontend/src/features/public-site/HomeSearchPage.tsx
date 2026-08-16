@@ -15,7 +15,7 @@ import HomeSearchCard from './home/HomeSearchCard';
 import HomePromoCarousel from './home/HomePromoCarousel';
 import { QUICK_LINK_ICONS } from './home/home-icons';
 import { HOME_EXTRA, buildSearchCopy } from './home/home-copy';
-import { airportCityName, resolveAirportCode } from '../../lib/airport-cities';
+import { airportCityName, FALLBACK_AIRPORTS, resolveAirportCode } from '../../lib/airport-cities';
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -311,7 +311,10 @@ export default function HomeSearchPage() {
         setAirports(items);
         setLoadError(false);
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {
+        setAirports(FALLBACK_AIRPORTS);
+        setLoadError(true);
+      });
     fetchPublicHomeContent(locale)
       .then(setHomeContent)
       .catch(() => {

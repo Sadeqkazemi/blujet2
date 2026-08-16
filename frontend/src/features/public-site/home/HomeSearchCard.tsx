@@ -224,7 +224,7 @@ function AirportCell({
       document.body.style.right = previousBodyRight;
       document.body.style.width = previousBodyWidth;
       document.documentElement.style.overflow = previousHtmlOverflow;
-      if (scrollY > 0) window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
     };
   }, [isMobile, open]);
 
@@ -261,17 +261,41 @@ function AirportCell({
     setOpen((v) => !v);
   }
 
+  // Qatar-style bottom sheet: rounded top, dimmed page peeks above, sheet
+  // bottom sits on the visual-viewport edge (above the soft keyboard).
+  const visibleHeight = mobileViewport?.visibleHeight ?? 0;
+  const visibleWidth = mobileViewport?.visibleWidth ?? 0;
+  const offsetTop = mobileViewport?.offsetTop ?? 0;
+  const offsetLeft = mobileViewport?.offsetLeft ?? 0;
+  const compactSheet = Boolean(mobileViewport && visibleHeight > 0 && visibleHeight < 240);
+  const sheetTopGap = compactSheet
+    ? 0
+    : Math.min(64, Math.max(28, Math.round((visibleHeight || 800) * 0.08)));
+  const mobilePickerCopy = {
+    fa: {
+      airports: 'فرودگاه‌ها',
+    },
+    en: {
+      airports: 'Airports',
+    },
+    ar: {
+      airports: 'المطارات',
+    },
+  }[locale];
+  const displayedAirports = filtered;
+
   const dropStyle: React.CSSProperties = isMobile
     ? {
         position: 'fixed',
-        left: 0,
-        top: 0,
-        width: '100%',
-        height: mobileViewport ? Math.max(180, mobileViewport.visibleHeight) : '100dvh',
+        left: offsetLeft,
+        top: offsetTop + sheetTopGap,
+        width: mobileViewport ? visibleWidth : '100%',
+        height: mobileViewport
+          ? Math.max(0, visibleHeight - sheetTopGap)
+          : `calc(100dvh - ${sheetTopGap}px)`,
         maxWidth: '100%',
-        borderRadius: 0,
-        padding:
-          'max(10px, env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom))',
+        borderRadius: compactSheet ? 0 : '22px 22px 0 0',
+        padding: compactSheet ? '8px 12px 0' : '8px 0 0',
         zIndex: 1001,
         boxSizing: 'border-box',
         display: 'flex',
@@ -351,7 +375,13 @@ function AirportCell({
             onClick={() => setOpen(false)}
             style={{
               position: 'fixed',
-              inset: 0,
+              inset: isMobile ? undefined : 0,
+              left: isMobile ? (mobileViewport?.offsetLeft ?? 0) : undefined,
+              top: isMobile ? (mobileViewport?.offsetTop ?? 0) : undefined,
+              width: isMobile ? (mobileViewport?.visibleWidth ?? '100%') : undefined,
+              height: isMobile
+                ? (mobileViewport?.visibleHeight ?? '100dvh')
+                : undefined,
               zIndex: isMobile ? 1000 : 38,
               background: isMobile ? 'rgba(13,38,64,.55)' : undefined,
             }}
@@ -361,95 +391,195 @@ function AirportCell({
             role={isMobile ? 'dialog' : undefined}
             aria-modal={isMobile ? true : undefined}
             aria-label={isMobile ? label : undefined}
+            data-testid={isMobile ? `${testId}-mobile-sheet` : undefined}
+            data-compact-sheet={isMobile && compactSheet ? 'true' : undefined}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             style={{
               ...dropStyle,
               background: '#fff',
-              border: '1px solid #e6eaf0',
-              boxShadow: '0 18px 44px -12px rgba(13,38,102,.30)',
+              border: isMobile ? 'none' : '1px solid #e6eaf0',
+              boxShadow: isMobile
+                ? '0 -18px 54px -24px rgba(8,25,48,.65)'
+                : '0 18px 44px -12px rgba(13,38,102,.30)',
             }}
           >
-            {isMobile && (
+            {isMobile ? (
+              <>
+                {!compactSheet && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      width: 40,
+                      height: 4,
+                      borderRadius: 999,
+                      background: '#cfd5de',
+                      margin: '2px auto 14px',
+                      flex: 'none',
+                    }}
+                  />
+                )}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: compactSheet ? 0 : '0 16px',
+                    marginBottom: compactSheet ? 8 : 12,
+                    flex: 'none',
+                  }}
+                >
+                  <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                    <input
+                      ref={inputRef}
+                      data-testid={`${testId}-search`}
+                      value={query}
+                      onChange={(ev) => setQuery(ev.target.value)}
+                      placeholder={label}
+                      inputMode="search"
+                      enterKeyHint="search"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        height: compactSheet ? 44 : 48,
+                        border: 'none',
+                        borderBottom: '1px solid #e6e8ec',
+                        borderRadius: 0,
+                        padding: isRTL ? '0 4px 12px 36px' : '0 36px 12px 4px',
+                        fontSize: '16px',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                        background: 'transparent',
+                        color: '#111827',
+                      }}
+                    />
+                    {query.trim().length > 0 && (
+                      <button
+                        type="button"
+                        data-testid={`${testId}-search-clear`}
+                        aria-label={isRTL ? 'پاک کردن' : 'Clear'}
+                        onClick={() => {
+                          setQuery('');
+                          inputRef.current?.focus({ preventScroll: true });
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: compactSheet ? 8 : 6,
+                          [isRTL ? 'left' : 'right']: 0,
+                          width: 28,
+                          height: 28,
+                          border: 0,
+                          borderRadius: 999,
+                          background: 'transparent',
+                          color: '#6b7280',
+                          fontSize: 20,
+                          lineHeight: 1,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    data-testid={`${testId}-mobile-close`}
+                    aria-label={isRTL ? 'بستن' : 'Close'}
+                    onClick={() => setOpen(false)}
+                    style={{
+                      flex: 'none',
+                      width: 36,
+                      height: 36,
+                      border: 0,
+                      borderRadius: 10,
+                      background: 'transparent',
+                      color: '#6b7280',
+                      fontSize: 26,
+                      lineHeight: 1,
+                      cursor: 'pointer',
+                      marginTop: compactSheet ? 0 : -8,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+                {!compactSheet && (
+                  <div
+                    data-testid={`${testId}-mobile-tabs`}
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      padding: '0 16px 12px',
+                      overflowX: 'auto',
+                      flex: 'none',
+                      WebkitOverflowScrolling: 'touch',
+                    }}
+                  >
+                    <div
+                      data-testid={`${testId}-tab-airport`}
+                      style={{
+                        height: 36,
+                        padding: '0 16px',
+                        border: '1.5px solid #0d2640',
+                        borderRadius: 999,
+                        background: '#0d2640',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        fontFamily: 'inherit',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {mobilePickerCopy.airports}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <input
+                ref={inputRef}
+                data-testid={`${testId}-search`}
+                value={query}
+                onChange={(ev) => setQuery(ev.target.value)}
+                placeholder={label}
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  height: 42,
+                  border: '1.5px solid #e2e7ee',
+                  borderRadius: 10,
+                  padding: '0 12px',
+                  fontSize: '12.5px',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  marginBottom: 9,
+                  flex: 'none',
+                }}
+              />
+            )}
+            {!isMobile && (
               <div
                 style={{
-                  position: 'relative',
-                  minHeight: 36,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 8,
+                  fontSize: '10.5px',
+                  color: '#9aa4b2',
+                  fontWeight: 700,
+                  margin: '0 4px 6px',
                   flex: 'none',
                 }}
               >
-                <div
-                  aria-hidden="true"
-                  style={{
-                    width: 48,
-                    height: 4,
-                    borderRadius: 999,
-                    background: '#dce2ea',
-                  }}
-                />
-                <button
-                  type="button"
-                  data-testid={`${testId}-mobile-close`}
-                  aria-label={isRTL ? 'بستن' : 'Close'}
-                  onClick={() => setOpen(false)}
-                  style={{
-                    position: 'absolute',
-                    [isRTL ? 'left' : 'right']: 0,
-                    top: 0,
-                    width: 36,
-                    height: 36,
-                    border: 0,
-                    borderRadius: 12,
-                    background: '#f1f4f8',
-                    color: '#566173',
-                    fontSize: 24,
-                    lineHeight: 1,
-                    cursor: 'pointer',
-                  }}
-                >
-                  ×
-                </button>
+                {cityListLabel}
               </div>
             )}
-            <input
-              ref={inputRef}
-              data-testid={`${testId}-search`}
-              value={query}
-              onChange={(ev) => setQuery(ev.target.value)}
-              placeholder={label}
-              inputMode="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              style={{
-                width: '100%',
-                boxSizing: 'border-box',
-                height: isMobile ? 50 : 42,
-                border: '1.5px solid #e2e7ee',
-                borderRadius: isMobile ? 14 : 10,
-                padding: isMobile ? '0 16px' : '0 12px',
-                fontSize: isMobile ? '16px' : '12.5px',
-                fontFamily: 'inherit',
-                outline: 'none',
-                marginBottom: isMobile ? 12 : 9,
-                flex: 'none',
-              }}
-            />
-            <div
-              style={{
-                fontSize: isMobile ? '12.5px' : '10.5px',
-                color: '#9aa4b2',
-                fontWeight: 700,
-                margin: '0 4px 6px',
-              }}
-            >
-              {cityListLabel}
-            </div>
             <div
               style={{
                 maxHeight: isMobile ? undefined : 220,
@@ -461,80 +591,98 @@ function AirportCell({
                 overscrollBehavior: 'contain',
                 WebkitOverflowScrolling: 'touch',
                 touchAction: 'pan-y',
+                padding: isMobile ? '0 16px' : undefined,
+                paddingBottom: isMobile
+                  ? 'max(8px, env(safe-area-inset-bottom))'
+                  : undefined,
+                borderTop: isMobile && !compactSheet ? '1px solid #e6e8ec' : undefined,
               }}
             >
-              {filtered.map((a) => (
-                <div
-                  key={a.id}
-                  onClick={() => {
-                    onPick(a.code);
-                    setOpen(false);
-                    setQuery('');
-                  }}
-                  data-testid={`airport-option-${a.code}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 9,
-                    padding: '8px 7px',
-                    borderRadius: 9,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span
+              {displayedAirports.map((a) => {
+                const city = airportCityName(a.code, locale, a.cityFa);
+                const name =
+                  airportName(a.code, locale, a.airportNameFa) || cityListLabel;
+                return (
+                  <div
+                    key={a.id}
+                    onClick={() => {
+                      onPick(a.code);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    data-testid={`airport-option-${a.code}`}
                     style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 8,
-                      background: '#eef4fb',
-                      color: '#1668c4',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      flex: 'none',
+                      gap: 10,
+                      padding: isMobile ? '14px 2px' : '8px 7px',
+                      borderRadius: isMobile ? 0 : 9,
+                      borderBottom: isMobile ? '1px solid #e8eaee' : undefined,
+                      cursor: 'pointer',
                     }}
                   >
-                    <PlaneIcon size={15} />
-                  </span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: isMobile ? '13.5px' : '12.5px',
-                        fontWeight: 700,
-                        color: '#16202e',
-                      }}
-                    >
-                      {airportCityName(a.code, locale, a.cityFa)}
+                    {!isMobile && (
+                      <span
+                        style={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 8,
+                          background: '#eef4fb',
+                          color: '#1668c4',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flex: 'none',
+                        }}
+                      >
+                        <PlaneIcon size={15} />
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: isMobile ? '16px' : '12.5px',
+                          fontWeight: isMobile ? 600 : 700,
+                          color: '#111827',
+                        }}
+                      >
+                        {city}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 3,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontSize: isMobile ? 13.5 : 10.5,
+                          color: isMobile ? '#4b5563' : '#9aa4b2',
+                          fontWeight: isMobile ? 600 : undefined,
+                        }}
+                      >
+                        <span dir="ltr">
+                          {a.code} - {name}
+                        </span>
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        marginTop: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontSize: isMobile ? 11.5 : 10.5,
-                        color: '#9aa4b2',
-                      }}
-                    >
-                      {airportName(a.code, locale, a.airportNameFa) || `${cityListLabel} · ${a.code}`}
-                    </div>
+                    {!isMobile && (
+                      <span
+                        dir="ltr"
+                        style={{
+                          borderRadius: 7,
+                          background: '#eef4fb',
+                          padding: '3px 7px',
+                          color: '#1668c4',
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                        }}
+                      >
+                        {a.code}
+                      </span>
+                    )}
                   </div>
-                  <span
-                    dir="ltr"
-                    style={{
-                      borderRadius: 7,
-                      background: '#eef4fb',
-                      padding: '3px 7px',
-                      color: '#1668c4',
-                      fontSize: 10.5,
-                      fontWeight: 800,
-                    }}
-                  >
-                    {a.code}
-                  </span>
-                </div>
-              ))}
-              {filtered.length === 0 && (
+                );
+              })}
+              {displayedAirports.length === 0 && (
                 <div
                   style={{
                     padding: 15,
