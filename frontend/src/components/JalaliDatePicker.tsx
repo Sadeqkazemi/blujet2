@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { fetchPriceCalendar } from "../api/publicSite";
 import type { StoredLocale } from "../hooks/useLocale";
+import { useMobileVisualViewport } from "../hooks/useMobileVisualViewport";
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../lib/jalali";
 import {
   calendarForLocale,
@@ -68,6 +70,16 @@ interface JalaliDatePickerProps {
   };
 }
 
+function CalendarPortal({
+  enabled,
+  children,
+}: {
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  return enabled ? createPortal(children, document.body) : <>{children}</>;
+}
+
 /** Jalali (شمسی) date picker — CLAUDE.md requires Jalali everywhere users pick dates. */
 export default function JalaliDatePicker({
   label,
@@ -84,9 +96,11 @@ export default function JalaliDatePicker({
   locale: localeProp,
   priceCalendar,
 }: JalaliDatePickerProps) {
+  const isPriceCalendar = Boolean(priceCalendar);
   const locale = localeProp ?? priceCalendar?.locale ?? "fa";
   const calendarSystem = calendarForLocale(locale);
   const [open, setOpen] = useState(false);
+  const mobileViewport = useMobileVisualViewport(open && isPriceCalendar);
   const [draftIso, setDraftIso] = useState<string | null>(
     value ? value.slice(0, 10) : null,
   );
@@ -118,8 +132,14 @@ export default function JalaliDatePicker({
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
+      const target = e.target as Node;
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !popupRef.current?.contains(target)
+      ) {
         setOpen(false);
+      }
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
@@ -127,10 +147,7 @@ export default function JalaliDatePicker({
 
   useLayoutEffect(() => {
     if (!open || !rootRef.current || !popupRef.current) return;
-    if (priceCalendar) {
-      setPopupPos({ bottom: 12, left: 12, top: undefined });
-      return;
-    }
+    if (isPriceCalendar) return;
     const trigger = rootRef.current.getBoundingClientRect();
     const popup = popupRef.current.getBoundingClientRect();
     const margin = 8;
@@ -146,7 +163,32 @@ export default function JalaliDatePicker({
         ? { bottom: vh - trigger.top + margin, left, top: undefined }
         : { top: trigger.bottom + margin, left, bottom: undefined },
     );
-  }, [open, isRTL, viewMonth, priceCalendar]);
+  }, [open, isRTL, viewMonth, isPriceCalendar]);
+
+  useEffect(() => {
+    if (!open || !isPriceCalendar) return;
+    const scrollY = window.scrollY;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
+    };
+  }, [open, isPriceCalendar]);
 
   useEffect(() => {
     if (!open || !priceCalendar) return;
@@ -231,6 +273,17 @@ export default function JalaliDatePicker({
   const mutedColor = dark ? "#6b7b94" : "#9aa4b2";
   const popupBg = dark ? "#141d2e" : "#fff";
   const popupBorder = dark ? "#2a3550" : "#e6eaf0";
+  const priceCalendarMargin = 12;
+  const viewportWidth =
+    mobileViewport?.visibleWidth ?? (typeof window === "undefined" ? 0 : window.innerWidth);
+  const viewportHeight =
+    mobileViewport?.visibleHeight ?? (typeof window === "undefined" ? 0 : window.innerHeight);
+  const pricePopupWidth = Math.min(840, Math.max(0, viewportWidth - priceCalendarMargin * 2));
+  const pricePopupLeft =
+    (mobileViewport?.offsetLeft ?? 0) +
+    Math.max(priceCalendarMargin, (viewportWidth - pricePopupWidth) / 2);
+  const pricePopupTop = (mobileViewport?.offsetTop ?? 0) + priceCalendarMargin;
+  const pricePopupMaxHeight = Math.max(0, viewportHeight - priceCalendarMargin * 2);
 
   return (
     <div ref={rootRef} style={{ position: "relative", height: "100%" }}>
@@ -346,18 +399,38 @@ export default function JalaliDatePicker({
       </div>
 
       {open && (
-        <div
+        <CalendarPortal enabled={isPriceCalendar}>
+          {priceCalendar && (
+            <div
+              data-testid={testId ? `${testId}-overlay` : undefined}
+              onClick={() => setOpen(false)}
+              style={{
+                position: "fixed",
+                top: mobileViewport?.offsetTop ?? 0,
+                left: mobileViewport?.offsetLeft ?? 0,
+                width: viewportWidth,
+                height: viewportHeight,
+                background: "rgba(8, 18, 36, .48)",
+                zIndex: 1199,
+              }}
+            />
+          )}
+          <div
           ref={popupRef}
           data-testid={testId ? `${testId}-popup` : undefined}
+          role={priceCalendar ? "dialog" : undefined}
+          aria-modal={priceCalendar ? true : undefined}
           style={{
             position: "fixed",
-            top: popupPos.top,
-            bottom: popupPos.bottom,
-            left: popupPos.left,
-            width: priceCalendar ? "calc(100vw - 24px)" : 300,
+            top: priceCalendar ? pricePopupTop : popupPos.top,
+            bottom: priceCalendar ? undefined : popupPos.bottom,
+            left: priceCalendar ? pricePopupLeft : popupPos.left,
+            width: priceCalendar ? pricePopupWidth : 300,
             maxWidth: priceCalendar ? 840 : "calc(100vw - 16px)",
-            maxHeight: priceCalendar ? "calc(100vh - 24px)" : undefined,
+            maxHeight: priceCalendar ? pricePopupMaxHeight : undefined,
             overflowY: priceCalendar ? "auto" : undefined,
+            overscrollBehavior: priceCalendar ? "contain" : undefined,
+            boxSizing: "border-box",
             background: popupBg,
             border: `1px solid ${popupBorder}`,
             borderRadius: 18,
@@ -365,7 +438,7 @@ export default function JalaliDatePicker({
               ? "0 24px 60px -16px rgba(0,0,0,.6)"
               : "0 24px 56px -14px rgba(13,38,102,.34)",
             padding: priceCalendar ? "18px 16px 14px" : "18px 20px",
-            zIndex: 200,
+            zIndex: priceCalendar ? 1200 : 200,
             color: dark ? "#e7ecf3" : undefined,
           }}
         >
@@ -525,7 +598,7 @@ export default function JalaliDatePicker({
                     }
                   }}
                   style={{
-                    minHeight: priceCalendar ? 58 : 36,
+                    minHeight: priceCalendar ? 44 : 36,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
@@ -631,7 +704,8 @@ export default function JalaliDatePicker({
               </button>
             </div>
           )}
-        </div>
+          </div>
+        </CalendarPortal>
       )}
     </div>
   );
