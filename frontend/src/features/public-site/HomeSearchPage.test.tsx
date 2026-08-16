@@ -13,6 +13,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 const AIRPORTS = [
   { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی مهرآباد', tz: 'Asia/Tehran' },
   { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی شهید هاشمی‌نژاد', tz: 'Asia/Tehran' },
+  { id: 'a3', code: 'KIH', cityFa: 'کیش', airportNameFa: 'فرودگاه بین‌المللی کیش', tz: 'Asia/Tehran' },
 ];
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -210,6 +211,57 @@ describe('HomeSearchPage', () => {
     });
     expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalled();
     expect(screen.getByTestId('home-date-confirm')).toBeInTheDocument();
+  });
+
+  it('keeps the mobile price calendar inside the real visual viewport', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 640 },
+      width: { configurable: true, value: 390 },
+      offsetTop: { configurable: true, value: 20 },
+      offsetLeft: { configurable: true, value: 12 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockLocale('fa');
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await pickAirport('home-origin', 'THR');
+    await pickAirport('home-dest', 'MHD');
+    await userEvent.click(screen.getByTestId('home-date'));
+
+    const popup = screen.getByTestId('home-date-popup');
+    expect(popup.parentElement).toBe(document.body);
+    expect(popup).toHaveAttribute('role', 'dialog');
+    expect(popup).toHaveStyle({
+      position: 'fixed',
+      top: '32px',
+      left: '24px',
+      width: '366px',
+      maxHeight: '616px',
+    });
+    expect(screen.getByTestId('home-date-day-1')).toHaveStyle({ minHeight: '44px' });
+  });
+
+  it('finds cities using Persian/Arabic character variants and Latin aliases', async () => {
+    mockLocale('fa');
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    const searchInput = screen.getByTestId('home-origin-search');
+    await userEvent.type(searchInput, 'كيش');
+    expect(screen.getByTestId('airport-option-KIH')).toBeInTheDocument();
+
+    await userEvent.clear(searchInput);
+    await userEvent.type(searchInput, 'mashhad');
+    expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
   });
 
   it('does not invent airports while the airports API is pending', async () => {

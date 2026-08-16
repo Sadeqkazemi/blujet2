@@ -54,6 +54,45 @@ const AIRPORT_NAMES: Record<string, { en: string; ar: string }> = {
   NJF: { en: 'Al Najaf International Airport', ar: 'مطار النجف الدولي' },
 };
 
+/**
+ * Normalizes user-entered airport queries across Persian, Arabic and Latin
+ * keyboards. Arabic ي/ك are especially common when a Persian city name is
+ * typed on mobile and must match their Persian ی/ک counterparts.
+ */
+export function normalizeAirportSearch(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '')
+    .replace(/[يى]/g, 'ی')
+    .replace(/ك/g, 'ک')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ؤ/g, 'و')
+    .replace(/[ةۀ]/g, 'ه')
+    .replace(/\u200C/g, ' ')
+    .replace(/\u200D/g, ' ')
+    .replace(/\u0640/g, ' ')
+    .toLocaleLowerCase('en-US')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Search every known localized spelling, independent of the active locale. */
+export function airportMatchesQuery(airport: Airport, query: string): boolean {
+  const normalizedQuery = normalizeAirportSearch(query);
+  if (!normalizedQuery) return true;
+
+  const code = airport.code.trim().toUpperCase();
+  const cityNames = Object.values(AIRPORT_CITY_NAMES[code] ?? {});
+  const airportNames = Object.values(AIRPORT_NAMES[code] ?? {});
+  return [
+    code,
+    airport.cityFa,
+    airport.airportNameFa ?? '',
+    ...cityNames,
+    ...airportNames,
+  ].some((candidate) => normalizeAirportSearch(candidate).includes(normalizedQuery));
+}
+
 /** Static fallback when /search/airports has not loaded yet or fails — matches the design bundle city list. */
 export const FALLBACK_AIRPORTS: Airport[] = Object.entries(AIRPORT_CITY_NAMES).map(
   ([code, names]) => ({

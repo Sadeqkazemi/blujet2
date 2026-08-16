@@ -4,7 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import type { Airport } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
-import { airportCityLabel, airportCityName, airportName } from '../../../lib/airport-cities';
+import {
+  airportCityLabel,
+  airportCityName,
+  airportMatchesQuery,
+  airportName,
+} from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import { useMobileVisualViewport } from '../../../hooks/useMobileVisualViewport';
 import {
@@ -238,20 +243,9 @@ function AirportCell({
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return airports;
-    return airports.filter((a) => {
-      const city = airportCityName(a.code, locale, a.cityFa);
-      const localizedAirport = airportName(a.code, locale, a.airportNameFa);
-      return (
-        a.code.toLowerCase().includes(q) ||
-        a.cityFa.toLowerCase().includes(q) ||
-        a.airportNameFa?.toLowerCase().includes(q) ||
-        localizedAirport.toLowerCase().includes(q) ||
-        city.toLowerCase().includes(q)
-      );
-    });
-  }, [airports, query, locale]);
+    if (!query.trim()) return airports;
+    return airports.filter((airport) => airportMatchesQuery(airport, query));
+  }, [airports, query]);
 
   function toggleOpen() {
     if (disabled) {
