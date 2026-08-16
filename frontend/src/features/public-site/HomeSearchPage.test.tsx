@@ -347,18 +347,22 @@ describe('HomeSearchPage', () => {
       expect(overlay).toHaveStyle({ position: 'fixed', inset: '0' });
       expect(screen.getByRole('dialog')).toHaveStyle({
         position: 'fixed',
-        top: '0',
+        top: '24px',
         height: '458px',
-        width: '100%',
+        width: '390px',
       });
       expect(searchInput).toHaveStyle({ fontSize: '16px' });
       expect(searchInput).toHaveAttribute('inputmode', 'search');
       expect(document.body).toHaveStyle({ overflow: 'hidden', position: 'fixed', width: '100%' });
 
+      // iOS pans the visual viewport (not the document) to keep the focused
+      // input above the keyboard. The sheet must track that pan — a fixed
+      // `top: 0` would drift the header off-screen and clip the sheet, which
+      // is the bug being guarded against here.
       visualHeight = 340;
       visualOffsetTop = 286;
       act(() => viewport.dispatchEvent(new Event('resize')));
-      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0', height: '340px' });
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '286px', height: '340px' });
 
       await userEvent.type(searchInput, query);
       expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
@@ -367,6 +371,170 @@ describe('HomeSearchPage', () => {
       expect(document.body).not.toHaveStyle({ position: 'fixed' });
     },
   );
+
+  it('tracks a horizontally panned visual viewport (pinch-zoom / landscape)', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 320 },
+      width: { configurable: true, value: 260 },
+      offsetTop: { configurable: true, value: 40 },
+      offsetLeft: { configurable: true, value: 65 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 400 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+
+    // The sheet must sit exactly over the visible (possibly zoomed/panned)
+    // slice of the screen, not the full layout viewport, or its edges spill
+    // outside what the user can actually see.
+    expect(screen.getByRole('dialog')).toHaveStyle({
+      position: 'fixed',
+      top: '40px',
+      left: '65px',
+      width: '260px',
+      height: '320px',
+    });
+  });
+
+  it(
+    'stays exactly within the visible area through resize + scroll VisualViewport events ' +
+      'on an already-scrolled page, then restores the exact scroll position on close',
+    async () => {
+      // The page was scrolled down before the sheet was ever opened.
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 });
+      const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+      const viewport = new EventTarget() as VisualViewport;
+      let visualHeight = 800;
+      let visualOffsetTop = 0;
+      Object.defineProperties(viewport, {
+        height: { configurable: true, get: () => visualHeight },
+        width: { configurable: true, value: 390 },
+        offsetTop: { configurable: true, get: () => visualOffsetTop },
+        offsetLeft: { configurable: true, value: 0 },
+      });
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+      mockMobile();
+      mockHomeApis();
+      renderPage();
+      await screen.findByTestId('home-origin');
+
+      await userEvent.click(screen.getByTestId('home-origin'));
+      // Body scroll is locked at the pre-open position — the underlying page
+      // must not move while the sheet is up.
+      expect(document.body).toHaveStyle({ position: 'fixed', top: '-240px' });
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0px', height: '800px' });
+
+      // Keyboard opens: VisualViewport fires 'resize' (height shrinks).
+      visualHeight = 400;
+      act(() => viewport.dispatchEvent(new Event('resize')));
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0px', height: '400px' });
+      // Bottom edge of the sheet must never exceed the visible viewport.
+      expect(0 + 400).toBeLessThanOrEqual(Number(window.innerHeight));
+
+      // iOS then pans to keep the focused field above the keyboard:
+      // VisualViewport fires 'scroll' (offsetTop moves), independent of the
+      // 'resize' event above.
+      visualOffsetTop = 180;
+      act(() => viewport.dispatchEvent(new Event('scroll')));
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '180px', height: '400px' });
+      // Still fully within the visible viewport after the pan.
+      expect(180 + 400).toBeLessThanOrEqual(Number(window.innerHeight));
+
+      await userEvent.click(screen.getByTestId('home-origin-mobile-close'));
+
+      expect(document.body).not.toHaveStyle({ position: 'fixed' });
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 240, left: 0, behavior: 'auto' });
+    },
+  );
+
+  it('applies no artificial minimum height — the sheet shrinks to the real space left above the keyboard', async () => {
+    // Regression guard for a since-removed `Math.max(180, visibleHeight)`
+    // floor: once visible space drops below that floor, clamping to it
+    // pushed the sheet's bottom edge back under the keyboard.
+    const viewport = new EventTarget() as VisualViewport;
+    let visualHeight = 800;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => visualHeight },
+      width: { configurable: true, value: 390 },
+      offsetTop: { configurable: true, value: 0 },
+      offsetLeft: { configurable: true, value: 0 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+
+    visualHeight = 96; // well under the old 180px floor
+    act(() => viewport.dispatchEvent(new Event('resize')));
+
+    expect(screen.getByRole('dialog')).toHaveStyle({ top: '0px', height: '96px' });
+  });
+
+  it('keeps the sheet within bounds in portrait when the keyboard opens', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    let visualHeight = 844;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => visualHeight },
+      width: { configurable: true, value: 390 },
+      offsetTop: { configurable: true, value: 0 },
+      offsetLeft: { configurable: true, value: 0 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.getByRole('dialog')).toHaveStyle({ width: '390px', height: '844px' });
+
+    visualHeight = 420; // portrait keyboard takes roughly half the screen
+    act(() => viewport.dispatchEvent(new Event('resize')));
+    expect(screen.getByRole('dialog')).toHaveStyle({ top: '0px', width: '390px', height: '420px' });
+  });
+
+  it('keeps the sheet within bounds in landscape when the keyboard opens (short viewport)', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    let visualHeight = 390;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => visualHeight },
+      width: { configurable: true, value: 844 },
+      offsetTop: { configurable: true, value: 0 },
+      offsetLeft: { configurable: true, value: 0 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 390 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.getByRole('dialog')).toHaveStyle({ width: '844px', height: '390px' });
+
+    // Landscape keyboards eat a much larger share of the (already short)
+    // viewport — this is exactly the case the removed 180px floor broke.
+    visualHeight = 120;
+    act(() => viewport.dispatchEvent(new Event('resize')));
+    expect(screen.getByRole('dialog')).toHaveStyle({ top: '0px', width: '844px', height: '120px' });
+  });
 });
 
 /** Frozen responsive layout — do not change without explicit product approval. */
