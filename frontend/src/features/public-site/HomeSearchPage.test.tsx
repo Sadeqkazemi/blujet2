@@ -323,15 +323,19 @@ describe('HomeSearchPage', () => {
     async (locale, query) => {
       const viewport = new EventTarget() as VisualViewport;
       let visualHeight = 458;
+      let visualWidth = 390;
       let visualOffsetTop = 24;
+      let visualOffsetLeft = 0;
       Object.defineProperties(viewport, {
         height: { configurable: true, get: () => visualHeight },
-        width: { configurable: true, value: 390 },
+        width: { configurable: true, get: () => visualWidth },
         offsetTop: { configurable: true, get: () => visualOffsetTop },
-        offsetLeft: { configurable: true, value: 0 },
+        offsetLeft: { configurable: true, get: () => visualOffsetLeft },
       });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
       Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+      Object.defineProperty(window, 'scrollY', { configurable: true, get: () => 160 });
+      const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
 
       mockLocale(locale);
       mockMobile();
@@ -343,30 +347,120 @@ describe('HomeSearchPage', () => {
 
       const overlay = screen.getByTestId('home-origin-mobile-overlay');
       const searchInput = screen.getByTestId('home-origin-search');
+      const sheet = screen.getByTestId('home-origin-mobile-sheet');
+      const topGap = (h: number) => Math.min(64, Math.max(28, Math.round(h * 0.08)));
       expect(overlay.parentElement).toBe(document.body);
-      expect(overlay).toHaveStyle({ position: 'fixed', inset: '0' });
-      expect(screen.getByRole('dialog')).toHaveStyle({
+      expect(overlay).toHaveStyle({
         position: 'fixed',
-        top: '0',
+        top: '24px',
+        left: '0px',
         height: '458px',
-        width: '100%',
+        width: '390px',
+      });
+      expect(sheet).toHaveStyle({
+        position: 'fixed',
+        top: `${24 + topGap(458)}px`,
+        left: '0px',
+        height: `${458 - topGap(458)}px`,
+        width: '390px',
       });
       expect(searchInput).toHaveStyle({ fontSize: '16px' });
       expect(searchInput).toHaveAttribute('inputmode', 'search');
-      expect(document.body).toHaveStyle({ overflow: 'hidden', position: 'fixed', width: '100%' });
+      expect(screen.getByTestId('home-origin-mobile-tabs')).toBeInTheDocument();
+      expect(document.body).toHaveStyle({ overflow: 'hidden', position: 'fixed', top: '-160px', width: '100%' });
 
+      // Keyboard opens further and iOS pans the visual viewport.
       visualHeight = 340;
       visualOffsetTop = 286;
-      act(() => viewport.dispatchEvent(new Event('resize')));
-      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0', height: '340px' });
+      visualOffsetLeft = 12;
+      visualWidth = 366;
+      act(() => {
+        viewport.dispatchEvent(new Event('resize'));
+        viewport.dispatchEvent(new Event('scroll'));
+      });
+      expect(sheet).toHaveStyle({
+        top: `${286 + topGap(340)}px`,
+        left: '12px',
+        height: `${340 - topGap(340)}px`,
+        width: '366px',
+      });
+      expect(overlay).toHaveStyle({
+        top: '286px',
+        left: '12px',
+        height: '340px',
+        width: '366px',
+      });
 
       await userEvent.type(searchInput, query);
       expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
 
       await userEvent.click(screen.getByTestId('home-origin-mobile-close'));
       expect(document.body).not.toHaveStyle({ position: 'fixed' });
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 160, left: 0, behavior: 'auto' });
     },
   );
+
+  it('keeps the sheet inside a very short visualViewport (no 180px min overflow)', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    let visualHeight = 140;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => visualHeight },
+      width: { configurable: true, value: 390 },
+      offsetTop: { configurable: true, value: 520 },
+      offsetLeft: { configurable: true, value: 0 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockLocale('fa');
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+    await userEvent.click(screen.getByTestId('home-origin'));
+
+    const sheet = screen.getByTestId('home-origin-mobile-sheet');
+    expect(sheet).toHaveAttribute('data-compact-sheet', 'true');
+    expect(sheet).toHaveStyle({ top: '520px', height: '140px', width: '390px' });
+    // Must NOT expand to 180px (would paint under the keyboard).
+    expect(sheet).not.toHaveStyle({ height: '180px' });
+  });
+
+  it('tracks Android-style keyboard resize (height shrinks, offsetTop stays 0)', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    let visualHeight = 780;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => visualHeight },
+      width: { configurable: true, value: 412 },
+      offsetTop: { configurable: true, value: 0 },
+      offsetLeft: { configurable: true, value: 0 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 915 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockLocale('en');
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+    await userEvent.click(screen.getByTestId('home-origin'));
+
+    const topGap = (h: number) => Math.min(64, Math.max(28, Math.round(h * 0.08)));
+    const sheet = screen.getByTestId('home-origin-mobile-sheet');
+    expect(sheet).toHaveStyle({
+      top: `${topGap(780)}px`,
+      height: `${780 - topGap(780)}px`,
+      width: '412px',
+    });
+
+    visualHeight = 420;
+    act(() => viewport.dispatchEvent(new Event('resize')));
+    expect(sheet).toHaveStyle({
+      top: `${topGap(420)}px`,
+      height: `${420 - topGap(420)}px`,
+      width: '412px',
+    });
+  });
 });
 
 /** Frozen responsive layout — do not change without explicit product approval. */
