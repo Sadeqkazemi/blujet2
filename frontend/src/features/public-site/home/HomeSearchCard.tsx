@@ -264,9 +264,16 @@ function AirportCell({
   const dropStyle: React.CSSProperties = isMobile
     ? {
         position: 'fixed',
-        left: 0,
-        top: 0,
-        width: '100%',
+        // iOS Safari pans the *visual* viewport (not the document) to keep the
+        // focused input above the keyboard, offsetting it from the layout
+        // viewport's top-left. A `fixed` element left at top:0/left:0 then
+        // drifts out of view by that same offset — the address-bar "peek"
+        // pill appears and the sheet's header scrolls out above the visible
+        // screen. Anchoring to the live visualViewport offsets keeps the
+        // sheet pinned to what's actually on screen, keyboard included.
+        left: mobileViewport ? mobileViewport.offsetLeft : 0,
+        top: mobileViewport ? mobileViewport.offsetTop : 0,
+        width: mobileViewport ? mobileViewport.visibleWidth : '100%',
         height: mobileViewport ? Math.max(180, mobileViewport.visibleHeight) : '100dvh',
         maxWidth: '100%',
         borderRadius: 0,

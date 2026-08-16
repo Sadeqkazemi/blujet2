@@ -347,18 +347,22 @@ describe('HomeSearchPage', () => {
       expect(overlay).toHaveStyle({ position: 'fixed', inset: '0' });
       expect(screen.getByRole('dialog')).toHaveStyle({
         position: 'fixed',
-        top: '0',
+        top: '24px',
         height: '458px',
-        width: '100%',
+        width: '390px',
       });
       expect(searchInput).toHaveStyle({ fontSize: '16px' });
       expect(searchInput).toHaveAttribute('inputmode', 'search');
       expect(document.body).toHaveStyle({ overflow: 'hidden', position: 'fixed', width: '100%' });
 
+      // iOS pans the visual viewport (not the document) to keep the focused
+      // input above the keyboard. The sheet must track that pan — a fixed
+      // `top: 0` would drift the header off-screen and clip the sheet, which
+      // is the bug being guarded against here.
       visualHeight = 340;
       visualOffsetTop = 286;
       act(() => viewport.dispatchEvent(new Event('resize')));
-      expect(screen.getByRole('dialog')).toHaveStyle({ top: '0', height: '340px' });
+      expect(screen.getByRole('dialog')).toHaveStyle({ top: '286px', height: '340px' });
 
       await userEvent.type(searchInput, query);
       expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
@@ -367,6 +371,54 @@ describe('HomeSearchPage', () => {
       expect(document.body).not.toHaveStyle({ position: 'fixed' });
     },
   );
+
+  it('tracks a horizontally panned visual viewport (pinch-zoom / landscape)', async () => {
+    const viewport = new EventTarget() as VisualViewport;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 320 },
+      width: { configurable: true, value: 260 },
+      offsetTop: { configurable: true, value: 40 },
+      offsetLeft: { configurable: true, value: 65 },
+    });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 400 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+
+    // The sheet must sit exactly over the visible (possibly zoomed/panned)
+    // slice of the screen, not the full layout viewport, or its edges spill
+    // outside what the user can actually see.
+    expect(screen.getByRole('dialog')).toHaveStyle({
+      position: 'fixed',
+      top: '40px',
+      left: '65px',
+      width: '260px',
+      height: '320px',
+    });
+  });
+
+  it('restores the page scroll position after closing, even if the page was already scrolled', async () => {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 240 });
+    const scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+
+    mockMobile();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(document.body).toHaveStyle({ position: 'fixed', top: '-240px' });
+
+    await userEvent.click(screen.getByTestId('home-origin-mobile-close'));
+
+    expect(document.body).not.toHaveStyle({ position: 'fixed' });
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 240, left: 0, behavior: 'auto' });
+  });
 });
 
 /** Frozen responsive layout — do not change without explicit product approval. */
