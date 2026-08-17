@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AgencyDetailPage from './AgencyDetailPage';
 import * as agenciesApi from '../../api/agencies';
+import * as agenciesMockApi from '../../api/agencies-mock';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AgencyDetail, AgencyDocument } from '../../types/agencies';
@@ -32,6 +33,18 @@ const DETAIL: AgencyDetail = {
 const DETAIL_WITH_SCORE: AgencyDetail = {
   ...DETAIL,
   activityScore: { score: 210, badge: 'BRONZE' },
+};
+
+const DETAIL_WITH_EXTRAS: AgencyDetail = {
+  ...DETAIL_WITH_SCORE,
+  commercialExtras: {
+    flightsSold: [],
+    purchasedServices: [],
+    financeSummary: { paidTotalIrr: 800000000, unpaidTotalIrr: 0 },
+    transactions: [
+      { id: 't1', titleFa: 'فروش بلیط پرواز W5-101', occurredAt: '2026-07-10T09:00:00.000Z', signedAmountIrr: 320000000, ref: 'BJ1234' },
+    ],
+  },
 };
 
 function mockRole(role: Role) {
@@ -162,6 +175,51 @@ describe('AgencyDetailPage', () => {
     expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('پیام خود را به این آژانس بنویسید…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ارسال' })).toBeInTheDocument();
+  });
+
+  it('Commercial Manager: تاریخچه (History) tab shows real payment history and mock seat-request history', async () => {
+    mockRole('COMMERCIAL_MANAGER');
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_EXTRAS);
+    stubStaffReviewFetches();
+    vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAgencyMessages').mockResolvedValue([]);
+    vi.spyOn(agenciesMockApi, 'fetchAggregateSeatRequests').mockResolvedValue([
+      {
+        id: 'sr1',
+        agencyId: 'a1',
+        agencyName: 'آژانس blujet',
+        managerName: 'کامران یوسفی',
+        phone: '09120000000',
+        city: 'تهران',
+        licenseNo: 'AG-10234',
+        routeFa: 'تهران - کیش',
+        seats: 6,
+        months: 3,
+        aircraftType: 'ATR 72',
+        unitPriceIrr: '4200000',
+        totalIrr: '25200000',
+        payMethod: 'CREDIT',
+        status: 'APPROVED',
+        invoiceNo: 'INV-1400100',
+        dueAt: null,
+        flights: [],
+        createdAt: '2026-07-01T00:00:00.000Z',
+      },
+    ]);
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+    await screen.findByRole('button', { name: 'سابقه' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'سابقه' }));
+    expect(await screen.findByText('تاریخچهٔ پرداخت')).toBeInTheDocument();
+    expect(screen.getByText('فروش بلیط پرواز W5-101')).toBeInTheDocument();
+    expect(screen.getByText('سابقهٔ درخواست‌های خرید صندلی')).toBeInTheDocument();
+    expect(screen.getByText('تهران - کیش')).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText('جستجو در سابقه بر اساس مسیر یا شماره…'), 'کیش');
+    expect(screen.getByText('تهران - کیش')).toBeInTheDocument();
+    expect(screen.queryByText('فروش بلیط پرواز W5-101')).not.toBeInTheDocument();
   });
 
   it('EMPLOYEE with fn_invoices sees credit/settle + the invoices table (no صدور فاکتور button, no API-key/messages)', async () => {
