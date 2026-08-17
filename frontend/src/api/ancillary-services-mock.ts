@@ -1,8 +1,9 @@
 /**
- * TEMPORARY MOCK ADAPTER — no backend module exists yet for ancillary/
- * seat-type service pricing (see types/ancillary-services.ts for the
- * documented real contract this stands in for, and docs/API.md's
- * "Phase — Ancillary services pricing" section).
+ * TEMP/DEV ONLY — MOCK ADAPTER. No backend module exists yet for
+ * ancillary/seat-type service pricing (see types/ancillary-services.ts
+ * for the documented real contract this stands in for, and docs/API.md's
+ * "Phase — Ancillary services pricing" section). Local/design-review use
+ * only.
  *
  * Every function has the same async signature a real `api/ancillary-
  * services.ts` would have, so swapping this import for a real one later

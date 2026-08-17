@@ -1,5 +1,8 @@
 /**
- * TEMPORARY MOCK ADAPTER — no backend endpoint exists for these two reads yet.
+ * TEMP/DEV ONLY — MOCK ADAPTER. No backend endpoint exists for these two
+ * reads yet. Local/design-review use only; never imported by production
+ * data paths outside the two agencies pages that need it while the real
+ * backend is pending.
  *
  * `docs/API.md` documents the intended real contract this file stands in
  * for ("Phase — Commercial agency cross-view aggregates"):
