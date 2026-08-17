@@ -53,6 +53,7 @@ import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import PanelAdminsPage from './features/admins/PanelAdminsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
+import AncillaryServicesPage from './features/ancillary-services/AncillaryServicesPage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
 import ReferralsRouter from './components/ReferralsRouter';
@@ -168,6 +169,11 @@ export default function App() {
               <Route path="webservice" element={<TabGate tabKey="webservice" />}>
                 <Route index element={<CommercialWebservicePage />} />
               </Route>
+              {/* TEMP: not TabGate-wrapped — no server nav key exists yet for
+                  this tab (see PanelShell.tsx's ANCILLARY_SERVICES_TEMP_NAV
+                  comment). AncillaryServicesPage does its own client-side
+                  COMMERCIAL_MANAGER role check until the real nav key lands. */}
+              <Route path="ancillary-services" element={<AncillaryServicesPage />} />
               <Route path="survey" element={<TabGate tabKey="survey" />}>
                 <Route index element={<SurveyRouter />} />
               </Route>
