@@ -10,6 +10,9 @@ import type {
   AgencyMembershipRequest,
   AgencyMembershipStatus,
   AgencyMessage,
+  AgencyAggregateInvoiceRow,
+  AgencySeatRequestRow,
+  AggregateInvoiceStatus,
 } from '../types/agencies';
 
 export function requestAgencySignupOtp(phone: string) {
@@ -179,5 +182,25 @@ export function decideAgencyWebserviceRequest(
   return apiPatch<import('../types/agency-portal').AgencyWebserviceRequest>(
     `/agencies/${id}/webservice-requests/${reqId}/decide`,
     dto,
+  );
+}
+
+export function fetchAggregateInvoices(status?: AggregateInvoiceStatus) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiGet<AgencyAggregateInvoiceRow[]>(`/agencies/invoices${qs}`);
+}
+
+export function fetchAggregateSeatRequests() {
+  return apiGet<AgencySeatRequestRow[]>('/agencies/seat-requests');
+}
+
+export function decideAggregateSeatRequest(
+  id: string,
+  approve: boolean,
+  dueAt?: string,
+) {
+  return apiPatch<{ id: string; status: 'APPROVED' | 'REJECTED' }>(
+    `/agencies/seat-requests/${id}/decide`,
+    { approve, ...(dueAt ? { dueAt } : {}) },
   );
 }

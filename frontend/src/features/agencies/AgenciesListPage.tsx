@@ -7,8 +7,9 @@ import {
   fetchAllWebserviceRequests,
   notifyAllDebtors,
   settleAgency,
+  fetchAggregateInvoices,
+  fetchAggregateSeatRequests,
 } from '../../api/agencies';
-import { fetchAggregateInvoices, fetchAggregateSeatRequests } from '../../api/agencies-mock';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import Pagination from '../../components/Pagination';

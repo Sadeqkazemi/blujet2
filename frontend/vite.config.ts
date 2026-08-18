@@ -29,6 +29,7 @@ const API_PROXY_PREFIXES = [
   'pricing',
   'refunds',
   'agencies',
+  'ancillary-services',
   'cartable',
   'referrals',
   'manager-messages',

@@ -169,12 +169,9 @@ export interface AgencyMessage {
 }
 
 // ---------------------------------------------------------------------------
-// TEMP MOCK-BACKED TYPES — no backend endpoint exists yet for these two
-// shapes (no cross-agency invoice aggregate, no manager-side seat-request
-// read/decide surface). Shapes mirror the documented future contract in
-// docs/API.md ("Phase — Commercial agency cross-view aggregates"); see
-// api/agencies-mock.ts. Money fields stay decimal STRINGs to match every
-// other IRR field on the wire once a real endpoint lands.
+// Cross-agency invoice aggregate + manager seat-request queue
+// (GET /agencies/invoices, GET /agencies/seat-requests, PATCH .../decide).
+// Money fields stay decimal STRINGs to match every other IRR field.
 // ---------------------------------------------------------------------------
 
 export type AggregateInvoiceStatus = 'UNPAID' | 'PAID' | 'VOIDED';
@@ -209,7 +206,8 @@ export interface AgencySeatRequestRow {
   licenseNo: string;
   routeFa: string;
   seats: number;
-  months: 1 | 3 | 12;
+  /** 1|3|12 in the commercial UI; 6 remains valid for the legacy portal contract. */
+  months: 1 | 3 | 6 | 12;
   aircraftType: string;
   unitPriceIrr: string;
   totalIrr: string;

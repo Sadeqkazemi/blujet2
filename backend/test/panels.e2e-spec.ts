@@ -64,6 +64,7 @@ describe('Panels (e2e)', () => {
       'staff',
       'clubrules',
       'webservice',
+      'ancillary-services',
       'finance',
       'cartable',
     ]);
@@ -112,7 +113,9 @@ describe('Panels (e2e)', () => {
       'panels',
       'security',
     ]);
-    expect(keys).not.toEqual(expect.arrayContaining(['customers', 'reservation', 'aircraft']));
+    expect(keys).not.toEqual(
+      expect.arrayContaining(['customers', 'reservation', 'aircraft']),
+    );
   });
 
   it('returns the confirmed tab set for Board Chair', async () => {
@@ -253,7 +256,9 @@ describe('Panels (e2e)', () => {
     nav = await request(app.getHttpServer())
       .get('/panels/nav')
       .set('Authorization', `Bearer ${employee.accessToken}`);
-    expect(nav.body.data.map((item: { key: string }) => item.key)).not.toContain('flights');
+    expect(
+      nav.body.data.map((item: { key: string }) => item.key),
+    ).not.toContain('flights');
     expect(
       (
         await request(app.getHttpServer())
@@ -384,4 +389,3 @@ describe('Panels (e2e)', () => {
       .send({ enabled: true });
   });
 });
-

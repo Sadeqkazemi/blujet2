@@ -28,6 +28,7 @@ import { AgencyAllotment } from '../../database/entities/agency-allotment.entity
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AuditService } from '../audit/audit.service';
+import { AncillaryServicesService } from '../ancillary-services/ancillary-services.service';
 import { ErrorCode } from '../../common/errors';
 import {
   encryptPii,
@@ -115,6 +116,7 @@ export class BookingService {
     @InjectRepository(TravelExtraSetting)
     private readonly travelExtraRepo: Repository<TravelExtraSetting>,
     private readonly audit: AuditService,
+    private readonly ancillary: AncillaryServicesService,
     private readonly search: SearchService,
     private readonly priceLocks: PriceLockService,
     private readonly wallet: WalletService,
@@ -341,9 +343,12 @@ export class BookingService {
     const configuredExtras = requestedExtraIds.length
       ? await this.travelExtraRepo.findBy({ id: In(requestedExtraIds) })
       : [];
+    const pricedExtras = requestedExtraIds.length
+      ? await this.ancillary.overlayTravelExtras(configuredExtras)
+      : [];
     if (
-      configuredExtras.length !== requestedExtraIds.length ||
-      configuredExtras.some((extra) => !extra.active || !extra.purchaseEnabled)
+      pricedExtras.length !== requestedExtraIds.length ||
+      pricedExtras.some((extra) => !extra.active || !extra.purchaseEnabled)
     ) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -351,7 +356,7 @@ export class BookingService {
       });
     }
     const configuredById = new Map(
-      configuredExtras.map((extra) => [extra.id, extra]),
+      pricedExtras.map((extra) => [extra.id, extra]),
     );
     const extrasSnapshot = requestedExtras.map((selection) => {
       const extra = configuredById.get(selection.id)!;

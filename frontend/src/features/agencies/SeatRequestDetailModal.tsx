@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
-import { decideAggregateSeatRequest } from '../../api/agencies-mock';
+import { decideAggregateSeatRequest } from '../../api/agencies';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { AgencySeatRequestRow } from '../../types/agencies';
@@ -25,11 +25,7 @@ interface SeatRequestDetailModalProps {
 }
 
 /**
- * Design: SEAT REQUEST DETAIL MODAL. TEMP MOCK — no manager-side seat-request
- * endpoint exists yet; approve/reject resolve via api/agencies-mock.ts's
- * decideAggregateSeatRequest (see docs/API.md for the documented real
- * contract this stands in for). Agency identity fields (name/manager/city/
- * license) are real; request-specific fields are synthesized placeholders.
+ * Design: SEAT REQUEST DETAIL MODAL.
  */
 export default function SeatRequestDetailModal({ request, onClose, onDecided }: SeatRequestDetailModalProps) {
   const [dueDraft, setDueDraft] = useState(request.dueAt ?? '');
@@ -39,7 +35,7 @@ export default function SeatRequestDetailModal({ request, onClose, onDecided }: 
   async function decide(approve: boolean) {
     setBusy(approve ? 'approve' : 'reject');
     try {
-      await decideAggregateSeatRequest(request.id, approve);
+      await decideAggregateSeatRequest(request.id, approve, approve ? dueDraft || undefined : undefined);
       onDecided();
     } finally {
       setBusy(null);

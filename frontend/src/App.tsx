@@ -169,11 +169,9 @@ export default function App() {
               <Route path="webservice" element={<TabGate tabKey="webservice" />}>
                 <Route index element={<CommercialWebservicePage />} />
               </Route>
-              {/* TEMP: not TabGate-wrapped — no server nav key exists yet for
-                  this tab (see PanelShell.tsx's ANCILLARY_SERVICES_TEMP_NAV
-                  comment). AncillaryServicesPage does its own client-side
-                  COMMERCIAL_MANAGER role check until the real nav key lands. */}
-              <Route path="ancillary-services" element={<AncillaryServicesPage />} />
+              <Route path="ancillary-services" element={<TabGate tabKey="ancillary-services" />}>
+                <Route index element={<AncillaryServicesPage />} />
+              </Route>
               <Route path="survey" element={<TabGate tabKey="survey" />}>
                 <Route index element={<SurveyRouter />} />
               </Route>

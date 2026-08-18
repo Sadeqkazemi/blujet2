@@ -3611,10 +3611,12 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   occupied seats in DRAFT/HELD/PAID/TICKETED bookings.
 - `POST /agency-portal/seat-requests` (`AGENCY`) accepts
   `{ flightInstanceId, seats, preferredWeekdays?, termMonths? }`, validates the
-  current capacity again, and creates a real cartable task for every active
-  `COMMERCIAL_MANAGER`. It does not directly reserve inventory; the existing
-  commercial commitment workflow remains the only path that activates and
-  locks agency inventory.
+  current capacity again, persists a structured `agency_seat_requests` row
+  (plus `agency_seat_request_flights`), and creates a cartable notification
+  for every active `COMMERCIAL_MANAGER` (`sourceId` = the structured row id).
+  `termMonths` accepts `1 | 3 | 6 | 12`. It does not directly reserve inventory;
+  the existing commercial commitment workflow remains the only path that
+  activates and locks agency inventory.
 - Guest desktop checkout now completes phone/OTP authentication inside the
   results-page modal and resumes the stored flight/cabin/passenger selection.
   Mobile retains its existing login-or-sign-up choice. Desktop passenger,
@@ -3660,77 +3662,60 @@ own clock.
 - `POST /admins` returns the one-time initial credential in `tempPassword` after step-up verification; the account is persisted with `mustChangePassword=true`.
 - Manager permission payloads additionally accept `dashboard`, `priorities`, `approvals`, and `cartable`; `dashboard` and `cartable` are enforced by the server navigation/access guard.
 
-# Commercial panel design refresh — required backend endpoints (2026-08-16, NOT YET IMPLEMENTED)
+# Commercial panel design refresh — backend (2026-08-18)
 
-This phase's frontend work (`claude/frontend-overhaul-20260816`) implemented
-the updated design's new Commercial Manager screens against real endpoints
-wherever one already existed, and against a clearly-commented, isolated
-temporary mock adapter (`frontend/src/api/agencies-mock.ts`,
-`frontend/src/api/ancillary-services-mock.ts`) everywhere one did not,
-per explicit instruction to ship the frontend ahead of backend. **Every
-endpoint below is a documented contract only — none of it exists on the
-backend yet.** A future backend phase should implement this section, then
-swap the two mock adapters for real `api/*.ts` calls (same function
-signatures, so the swap is a type-checked one-line import change per call
-site) and delete the mock adapter files.
+Implemented on `cursor/backend-commercial-overhaul-20260818` (from
+`claude/frontend-overhaul-20260816`). Frontend mock adapters are swapped
+for real `api/agencies.ts` / `api/ancillary-services.ts` calls.
 
 ## Cross-agency invoice aggregate (used by: AgenciesListPage "همه فاکتورها")
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Cross-agency invoice list, mirrors the existing per-agency `GET /agencies/:id/invoices` row shape plus `agencyId`/`agencyName`. Optional `?status=UNPAID\|PAID\|VOIDED` filter (server-side, not client aggregation — CLAUDE.md's reporting rule). |
+| GET | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Server-side `SELECT` over existing `agency_invoices` (no new table). Optional `?status=UNPAID\|PAID\|VOIDED`. Amounts are decimal strings. |
 
-Today only `agency_invoices` filtered by one `agencyId` exists — this is a
-straight cross-agency `SELECT` with no new table, but note the design's
-three sub-tabs (`صادرشده`/`پرداخت‌شده`/`باطل‌شده`) imply a `VOIDED` status
-that `AgencyInvoiceStatus` (`UNPAID | PAID | OVERDUE`) does not have today;
-decide whether "باطل‌شده" maps to a new status or is dropped from the real
-implementation.
+**OVERDUE vs VOIDED:** `AgencyInvoiceStatus` is `UNPAID | PAID | OVERDUE | VOIDED`.
+OVERDUE is **never** mapped to VOIDED. The UNPAID filter/response includes both
+`UNPAID` and `OVERDUE` (issued / still payable). VOIDED is a new enum value for
+the باطل‌شده tab; existing create/pay/remind flows still write UNPAID/PAID.
+`descriptionFa` is an optional column; when null the aggregate returns `فاکتور آژانس`.
 
-## Manager-side seat-request queue (used by: AgenciesListPage "همه درخواست‌های صندلی", SeatRequestDetailModal, AgencyDetailPage "سابقه" tab)
+## Manager-side seat-request queue
 
-A partial building block already exists: `POST /agency-portal/seat-requests`
-(`AGENCY` role, see "Agency seat requests" phase above) creates a
-**cartable task** (`sourceType='AGENCY_REQUEST'`) with a free-text Persian
-description — visible today only through the generic `GET /cartable` +
-approve/reject flow, with no structured fields (unit price, aircraft type,
-invoice number, due date, the list of requested flight instances) and no
-per-request detail read. The design's richer modal needs a real entity:
+`POST /agency-portal/seat-requests` now inserts `agency_seat_requests` +
+`agency_seat_request_flights` and keeps the cartable task as a notification
+(`sourceType='AGENCY_REQUEST'`, `sourceId` = the structured row id).
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER` | Structured queue row per request: agency identity, route, seats, term (months), aircraft type, unit/total price, pay method, status, invoice number, due date, requested flight instances. |
-| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Approving should create a real `AgencyInvoice` (reusing the existing invoice machinery) rather than only closing the cartable task. |
-
-Recommend a new `agency_seat_requests` table (see `docs/DB_SCHEMA.md` note
-below) that `POST /agency-portal/seat-requests` writes to directly, with the
-cartable task becoming a notification pointer (`sourceId` = the new row's
-id) instead of the sole record.
-
-## Ancillary services pricing — new module (used by: AncillaryServicesPage, «خدمات»)
-
-Wholly new domain — distinct from `webservice-pricing` (which prices B2B
-agency API plans, not passenger-facing ancillaries).
+**termMonths:** accepted values are `1 | 3 | 6 | 12` (smallint). The legacy
+portal contract was `3|6|12`; the commercial UI uses `1|3|12`. `6` remains
+valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | Returns `{ seatServices: SeatServiceRow[], otherServices: AncillaryServiceRow[] }` — shapes in `frontend/src/types/ancillary-services.ts`. |
-| PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (decimal string, matches every other IRR field). |
-| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`. Only enabled services are shown to passengers at checkout — this is the actual source of truth for the existing checkout "services" step, which today likely reads a hardcoded list; that call site needs to switch to this table once it exists. |
-| POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` — creates a custom service (`isCustom=true`). |
-| DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom services only (`isCustom=true`); built-in seat-type/other rows can be disabled but not deleted. |
+| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER` | Structured queue. Money fields are decimal strings. |
+| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` / `PENDING_FINANCE` may be decided; repeats return `409 CONFLICT`. Approval creates exactly one `AgencyInvoice` via the existing invoice service (`descriptionFa` = فاکتور تعهد صندلی چارتری) and links `invoiceId`. Rejection creates no invoice. Cartable tasks for that `sourceId` are closed. Audit records actor, old/new status, and invoice reference. Missing `dueAt` on approve defaults to +7 days. |
 
-Seed the eight built-in `otherServices` rows (baggage, meal, insurance, CIP,
-refund fee, pet, wheelchair, seat selection) and three `seatServices` rows
-(normal, extra-legroom, window/aisle) — see the mock adapter's `seed()` for
-the exact Persian copy already approved for the UI.
+## Ancillary services pricing — manager + public
 
-## Panel nav entry for «خدمات» (used by: PanelShell.tsx temp client-side nav item)
+Distinct from `webservice-pricing` (B2B API plans) and complementary to
+`travel_extra_settings` (checkout purchase ids). Mapped built-in OTHER keys
+overlay checkout extras: baggage→EXTRA_BAGGAGE, meal→SPECIAL_MEAL,
+insurance→TRAVEL_INSURANCE, cip→CIP, refund-fee→REFUND_FEE,
+seat-selection→SEAT_SELECTION. Seat-type rows are manager-only. Pet,
+wheelchair, and custom OTHER rows appear on the public ancillary list but
+are not added to the checkout extras catalog (closed `TravelExtraCode` enum).
 
-`backend/src/modules/panels/panel-nav.config.ts`'s `COMMERCIAL_MANAGER` array
-needs a new `{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`
-entry. Once added, delete the temporary client-side append in
-`PanelShell.tsx` (`visibleNav` useMemo) and drop the `ancillary-services`
-route out from under its current non-`TabGate` mount in `App.tsx`, moving it
-under a normal `<TabGate tabKey="ancillary-services">` wrapper like every
-other tab.
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ seatServices, otherServices }`. |
+| PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (≥ 0 decimal string). |
+| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`. |
+| POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`. |
+| DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`. |
+| GET | `/public/ancillary-services` | public | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |
+
+## Panel nav
+
+`GET /panels/nav` for `COMMERCIAL_MANAGER` includes
+`{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`.
+

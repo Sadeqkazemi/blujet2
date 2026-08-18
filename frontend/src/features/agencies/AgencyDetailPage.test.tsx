@@ -3,7 +3,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AgencyDetailPage from './AgencyDetailPage';
 import * as agenciesApi from '../../api/agencies';
-import * as agenciesMockApi from '../../api/agencies-mock';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AgencyDetail, AgencyDocument } from '../../types/agencies';
@@ -177,13 +176,13 @@ describe('AgencyDetailPage', () => {
     expect(screen.getByRole('button', { name: 'ارسال' })).toBeInTheDocument();
   });
 
-  it('Commercial Manager: تاریخچه (History) tab shows real payment history and mock seat-request history', async () => {
+  it('Commercial Manager: تاریخچه (History) tab shows real payment history and seat-request history', async () => {
     mockRole('COMMERCIAL_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_EXTRAS);
     stubStaffReviewFetches();
     vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([]);
     vi.spyOn(agenciesApi, 'fetchAgencyMessages').mockResolvedValue([]);
-    vi.spyOn(agenciesMockApi, 'fetchAggregateSeatRequests').mockResolvedValue([
+    vi.spyOn(agenciesApi, 'fetchAggregateSeatRequests').mockResolvedValue([
       {
         id: 'sr1',
         agencyId: 'a1',

@@ -2811,26 +2811,30 @@ sales continue to be stored in `ledger_entries`.
 
 Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.
 
-# Commercial panel design refresh — required schema (2026-08-16, NOT YET IMPLEMENTED)
+# Commercial panel design refresh — schema (2026-08-18)
 
-Backing tables for `docs/API.md`'s "Commercial panel design refresh" section
-— none of this exists yet; the frontend for this phase runs against a
-temporary mock adapter instead (see that section for details).
+Migration `1787731200000-CommercialSeatRequestsAncillaries`:
 
-- `agency_seat_requests`: `id`, `agency_id` (FK), `flight_instance_ids`
-  (join table or array — mirrors `AgencySeatCommitment`'s existing pattern),
-  `seats int`, `term_months smallint`, `unit_price_irr bigint`,
-  `pay_method` (`CREDIT`|`INVOICE`), `status`
-  (`PENDING`|`PENDING_FINANCE`|`APPROVED`|`REJECTED`), `invoice_id` (FK,
-  nullable), `due_at` (nullable), `created_at`. Promote today's
-  `cartable_tasks(sourceType='AGENCY_REQUEST')` free-text notification into
-  a real row this table's `POST /agency-portal/seat-requests` writes to.
-- `ancillary_services`: `key` (PK), `title_fa`, `description_fa`,
-  `price_irr bigint`, `enabled boolean`, `is_custom boolean`. Seed the 3
-  seat-type + 8 built-in rows listed in `docs/API.md`. The public checkout
-  "services" step should read from this table once it exists rather than
-  any hardcoded list.
-- Cross-agency invoice aggregate needs no new table — `GET
-  /agencies/invoices` is a plain cross-agency `SELECT` over the existing
-  `agency_invoices` table. Confirm whether the design's "باطل‌شده" (voided)
-  sub-tab needs a new `AgencyInvoiceStatus` value or should be dropped.
+- `agency_invoices.descriptionFa text NULL`
+- `AgencyInvoiceStatus` gains `VOIDED` (OVERDUE is unchanged and is **not**
+  VOIDED). `GET /agencies/invoices?status=UNPAID` matches `UNPAID` and `OVERDUE`.
+- `agency_seat_requests`: `id`, `agencyId` (agency user id, indexed, no FK so
+  the UAT sandbox identity without a profile can still persist a request),
+  `routeId` FK nullable, `aircraftType`, `seats int`, `termMonths smallint`
+  nullable (accepted `1|3|6|12`), `unitPriceIrr bigint`, `payMethod`
+  (`CREDIT|INVOICE`), `status` (`PENDING|PENDING_FINANCE|APPROVED|REJECTED`),
+  `invoiceId` FK nullable, `dueAt` nullable, `decidedById` nullable,
+  `decidedAt` nullable, `createdAt`, `updatedAt`. Indexes on
+  `(agencyId, status)` and `(status, createdAt)`.
+- `agency_seat_request_flights`: `id`, `seatRequestId` FK CASCADE,
+  `flightInstanceId` FK RESTRICT, `createdAt`. Unique
+  `(seatRequestId, flightInstanceId)`.
+- `ancillary_services`: `key` PK (URL-safe), `category` (`SEAT|OTHER`),
+  `titleFa`, `descriptionFa`, `priceIrr bigint`, `enabled`, `isCustom`,
+  `updatedById` nullable, `createdAt`, `updatedAt`. Built-in 3 seat + 8 other
+  rows are inserted by the migration (Persian copy from the design mock).
+  Index `(category, enabled)`.
+
+`POST /agency-portal/seat-requests` writes these tables; `cartable_tasks`
+remain notifications (`sourceType=AGENCY_REQUEST`, `sourceId` = request id).
+Cross-agency invoices still use `agency_invoices` only.
