@@ -63,16 +63,59 @@ describe('useLocale', () => {
     expect(localStorage.getItem('blujet_lang')).toBe('ar');
   });
 
-  it('adopts the DB preferredLocale on login when it differs from the current localStorage value', async () => {
-    localStorage.setItem('blujet_lang', 'fa');
+  it('keeps the public-site locale selected before login and syncs it to the user account', async () => {
+    localStorage.setItem('blujet_lang', 'en');
     mockAuth({
       status: 'authenticated',
-      user: { id: 'u1', fullName: 'کاربر تست', role: 'USER', preferredLocale: 'EN' },
+      user: { id: 'u1', fullName: 'کاربر تست', role: 'USER', preferredLocale: 'FA' },
     });
+    const update = vi.spyOn(authApi, 'updateMyLocale').mockResolvedValue({ preferredLocale: 'EN' });
     const { result } = renderHook(() => useLocale(), { wrapper: LocaleProvider });
 
     await waitFor(() => expect(result.current.locale).toBe('en'));
     expect(localStorage.getItem('blujet_lang')).toBe('en');
+    expect(update).toHaveBeenCalledWith('EN');
+  });
+
+  it('keeps an agency locale selected before login instead of reverting to Persian', async () => {
+    localStorage.setItem('blujet_lang', 'ar');
+    mockAuth({
+      status: 'authenticated',
+      user: { id: 'a1', fullName: 'آژانس تست', role: 'AGENCY', preferredLocale: 'FA' },
+    });
+    const update = vi.spyOn(authApi, 'updateMyLocale').mockResolvedValue({ preferredLocale: 'AR' });
+    const { result } = renderHook(() => useLocale(), { wrapper: LocaleProvider });
+
+    await waitFor(() => expect(result.current.locale).toBe('ar'));
+    expect(localStorage.getItem('blujet_lang')).toBe('ar');
+    expect(update).toHaveBeenCalledWith('AR');
+  });
+
+  it('adopts the account locale when this browser has no public-site locale yet', async () => {
+    mockAuth({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: 'کاربر تست', role: 'USER', preferredLocale: 'EN' },
+    });
+    const update = vi.spyOn(authApi, 'updateMyLocale');
+    const { result } = renderHook(() => useLocale(), { wrapper: LocaleProvider });
+
+    await waitFor(() => expect(result.current.locale).toBe('en'));
+    expect(localStorage.getItem('blujet_lang')).toBe('en');
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('forces manager and employee panels to Persian even if a public locale was stored', async () => {
+    localStorage.setItem('blujet_lang', 'en');
+    mockAuth({
+      status: 'authenticated',
+      user: { id: 'm1', fullName: 'مدیر تست', role: 'COMMERCIAL_MANAGER', preferredLocale: 'EN' },
+    });
+    const update = vi.spyOn(authApi, 'updateMyLocale');
+    const { result } = renderHook(() => useLocale(), { wrapper: LocaleProvider });
+
+    await waitFor(() => expect(result.current.locale).toBe('fa'));
+    expect(localStorage.getItem('blujet_lang')).toBe('fa');
+    expect(update).not.toHaveBeenCalled();
   });
 
   it('keeps the root document language and direction in sync', async () => {
