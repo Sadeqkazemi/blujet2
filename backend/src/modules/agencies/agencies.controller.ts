@@ -22,6 +22,8 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { DecideCreditRequestDto } from './dto/decide-credit-request.dto';
 import { DecideWebserviceRequestDto } from './dto/decide-webservice-request.dto';
 import { DecideDocumentDto } from './dto/decide-document.dto';
+import { ListAggregateInvoicesQueryDto } from './dto/list-aggregate-invoices-query.dto';
+import { DecideSeatRequestDto } from './dto/decide-seat-request.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -140,6 +142,39 @@ export class AgenciesController {
   @ApiOperation({ summary: 'ارسال اعلان به همه آژانس‌های بدهکار' })
   async notifyAllDebtors(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.agencies.notifyAllDebtors(actor);
+    return { success: true, data };
+  }
+
+  @Get('invoices')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary:
+      'فهرست تجمیعی فاکتورهای همه آژانس‌ها. ?status=UNPAID شامل OVERDUE داخلی است و OVERDUE هرگز VOIDED نیست.',
+  })
+  async listAggregateInvoices(@Query() query: ListAggregateInvoicesQueryDto) {
+    const data = await this.agencies.listAggregateInvoices(query.status);
+    return { success: true, data };
+  }
+
+  @Get('seat-requests')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({ summary: 'صف درخواست‌های خرید صندلی همه آژانس‌ها' })
+  async listSeatRequests() {
+    const data = await this.agencies.listSeatRequests();
+    return { success: true, data };
+  }
+
+  @Patch('seat-requests/:id/decide')
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary: 'تأیید (صدور یک فاکتور واقعی) یا رد درخواست خرید صندلی',
+  })
+  async decideSeatRequest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: DecideSeatRequestDto,
+  ) {
+    const data = await this.agencies.decideSeatRequest(actor, id, dto);
     return { success: true, data };
   }
 

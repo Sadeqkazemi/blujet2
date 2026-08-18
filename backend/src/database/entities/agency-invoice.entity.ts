@@ -61,6 +61,9 @@ export class AgencyInvoice {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   amountIrr!: bigint;
 
+  @Column({ type: 'text', nullable: true })
+  descriptionFa!: string | null;
+
   @Column({
     type: 'enum',
     enum: AgencyInvoiceStatus,
