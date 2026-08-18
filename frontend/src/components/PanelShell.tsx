@@ -50,6 +50,20 @@ const ROLE_LABELS: Record<string, string> = {
 /** Must stay in sync with backend `SITE_ADMIN_SIDEBAR_DENYLIST`. */
 const SITE_ADMIN_SIDEBAR_DENYLIST = new Set(['kyc', 'settings']);
 
+/**
+ * Frontend-only nav preview for IT_MANAGER — this is a frontend review
+ * phase ahead of backend work (see docs/features/it-api-access-management.md).
+ * Backend `PANEL_NAV` (backend/src/modules/panels/panel-nav.config.ts)
+ * doesn't know about these tabs yet; each is injected here, additively,
+ * only for IT_MANAGER, and never changes any other role's real nav
+ * response. Once the real endpoints land, move these into PANEL_NAV and
+ * delete this constant.
+ */
+const IT_MANAGER_PREVIEW_NAV: { after: string; item: PanelNavItem }[] = [
+  { after: 'survey', item: { key: 'support', labelFa: 'پشتیبانی', implemented: true } },
+  { after: 'settings', item: { key: 'apiaccess', labelFa: 'وب‌سرویس‌ها / دسترسی API آژانس‌ها', implemented: true } },
+];
+
 /** Brand subtitle under «blujet» — sampled from each panel's design sidebar. */
 const ROLE_BRAND_SUB: Record<string, string> = {
   IT_MANAGER: 'پنل فناوری اطلاعات',
@@ -153,6 +167,14 @@ export default function PanelShell() {
     let items = nav;
     if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
       items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    }
+    if (user?.role === 'IT_MANAGER') {
+      items = [...items];
+      for (const { after, item } of IT_MANAGER_PREVIEW_NAV) {
+        if (items.some((existing) => existing.key === item.key)) continue;
+        const afterIdx = items.findIndex((existing) => existing.key === after);
+        items.splice(afterIdx === -1 ? items.length : afterIdx + 1, 0, item);
+      }
     }
     return items;
   }, [nav, user?.role, user?.isSuperAdmin]);

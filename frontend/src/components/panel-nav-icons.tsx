@@ -260,6 +260,17 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
     </NavIcon>
   ),
+  support: (
+    <NavIcon>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.5 21a2 2 0 0 1-3 0" />
+    </NavIcon>
+  ),
+  apiaccess: (
+    <NavIcon>
+      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+    </NavIcon>
+  ),
 };
 
 export function panelNavIcon(key: string): ReactNode {
