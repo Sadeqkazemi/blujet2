@@ -3481,47 +3481,22 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 - Initial manager credentials are generated securely, persisted with forced rotation, and exposed once after creation.
 - VIP remains backed by the real club members/card-request APIs with Senior Manager decision boundaries enforced server-side.
 
-# Commercial panel design refresh — frontend-only, backend pending (2026-08-16)
+# Commercial panel design refresh — backend (2026-08-18)
 
-Branch `claude/frontend-overhaul-20260816` (frontend-only per explicit
-instruction: no `backend/`, migrations, or deploy-workflow changes; not
-merged to `main`). A new design handoff (5,547-line prototype, superseding
-`design-reference-v2/پنل مدیر بازرگانی.dc.html`) was diffed against the
-already-shipped Commercial Manager panel — most of it already matched;
-this phase closes the concrete gap list found:
+Branch `cursor/backend-commercial-overhaul-20260818` (from
+`claude/frontend-overhaul-20260816`). Implements the previously documented
+contracts and retires the production mock adapters.
 
-- [x] Agencies page reworked into the design's 3-pill tab bar (آژانس‌های
-  همکار / درخواست همکاری / آژانس‌های دارای بدهی), all on real endpoints.
-  Non-Commercial roles' branch is untouched. See
-  `docs/features/commercial-agencies-cross-view.md`.
-- [x] Web-service purchase-request preview + detail modal wired to the
-  already-permitted-but-previously-unused `GET /agencies/webservice-requests`
-  (real data, real decide + step-up flow).
-- [x] Agency detail page gains a تاریخچه (History) tab, reusing real
-  ledger data already fetched by the page (search + Jalali date filter).
-- [x] "همه فاکتورها" / "همه درخواست‌های صندلی" drill-downs +
-  `SeatRequestDetailModal` — **temp mock-backed**, isolated in
-  `frontend/src/api/agencies-mock.ts` (tagged `TEMP/DEV ONLY`, every row
-  anchored to a real agency, never fabricated inline in a component); no
-  backend endpoint exists for these two reads.
-- [x] New «خدمات» (ancillary services pricing) page — **wholly new
-  domain, entirely temp mock-backed** (`frontend/src/api/ancillary-services-mock.ts`,
-  localStorage-persisted for reviewer convenience only). Reachable at
-  `/panel/ancillary-services` with a client-side `COMMERCIAL_MANAGER`
-  guard and a temporary client-side sidebar entry, since the route/nav
-  key can't be added to `backend/panel-nav.config.ts` on a frontend-only
-  branch. See `docs/features/ancillary-services-pricing.md`.
-- [x] `docs/API.md` documents the exact endpoints/payloads a backend
-  phase needs to implement to retire both mock adapters (cross-agency
-  invoice aggregate, manager-side seat-request queue + decide, ancillary
-  services CRUD, the `panel-nav.config.ts` key); `docs/DB_SCHEMA.md` notes
-  the one new table (`agency_seat_requests`) and the ancillary-services
-  table.
-- [x] Frontend tests (Vitest+RTL) for every changed/new page and modal;
-  `npm run lint` (oxlint) and `npm run build` (`tsc -b && vite build`)
-  clean.
-- [ ] **Not done, by design**: no backend endpoints, no migration, no
-  `panel-nav.config.ts` change, no merge to `main`, no deploy. Follow-up
-  backend phase should implement `docs/API.md`'s new section, then delete
-  both mock adapter files and swap the handful of call sites to real
-  `api/agencies.ts` / a new `api/ancillary-services.ts`.
+- [x] `GET /agencies/invoices` aggregate + `VOIDED` enum; OVERDUE stays
+  OVERDUE internally and serializes as UNPAID on the aggregate tabs.
+- [x] Structured `agency_seat_requests` + flight join table; portal POST
+  persists a row; manager GET/PATCH decide; approval creates one
+  `AgencyInvoice`; cartable `sourceId` sync; audit events.
+- [x] `ancillary_services` CRUD + public read; checkout extras overlay
+  mapped travel-cost codes from this table.
+- [x] `panel-nav.config.ts` `ancillary-services` tab; TabGate; mocks
+  unused by production pages.
+- [ ] Follow-up after PR #168 merges: rebase onto `main` and retarget the
+  PR. Pet/wheelchair/custom ancillaries are on `GET /public/ancillary-services`
+  but not in the checkout extras catalog (`TravelExtraCode` remains closed).
+
