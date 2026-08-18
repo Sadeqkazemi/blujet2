@@ -2810,3 +2810,27 @@ sales continue to be stored in `ledger_entries`.
 # Senior Manager permission catalog (2026-08)
 
 Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.
+
+# Commercial panel design refresh — required schema (2026-08-16, NOT YET IMPLEMENTED)
+
+Backing tables for `docs/API.md`'s "Commercial panel design refresh" section
+— none of this exists yet; the frontend for this phase runs against a
+temporary mock adapter instead (see that section for details).
+
+- `agency_seat_requests`: `id`, `agency_id` (FK), `flight_instance_ids`
+  (join table or array — mirrors `AgencySeatCommitment`'s existing pattern),
+  `seats int`, `term_months smallint`, `unit_price_irr bigint`,
+  `pay_method` (`CREDIT`|`INVOICE`), `status`
+  (`PENDING`|`PENDING_FINANCE`|`APPROVED`|`REJECTED`), `invoice_id` (FK,
+  nullable), `due_at` (nullable), `created_at`. Promote today's
+  `cartable_tasks(sourceType='AGENCY_REQUEST')` free-text notification into
+  a real row this table's `POST /agency-portal/seat-requests` writes to.
+- `ancillary_services`: `key` (PK), `title_fa`, `description_fa`,
+  `price_irr bigint`, `enabled boolean`, `is_custom boolean`. Seed the 3
+  seat-type + 8 built-in rows listed in `docs/API.md`. The public checkout
+  "services" step should read from this table once it exists rather than
+  any hardcoded list.
+- Cross-agency invoice aggregate needs no new table — `GET
+  /agencies/invoices` is a plain cross-agency `SELECT` over the existing
+  `agency_invoices` table. Confirm whether the design's "باطل‌شده" (voided)
+  sub-tab needs a new `AgencyInvoiceStatus` value or should be dropped.

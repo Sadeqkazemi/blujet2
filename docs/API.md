@@ -3659,3 +3659,78 @@ own clock.
 - `GET /panels/nav` returns the approved Senior Manager sidebar without `customers`, `reservation`, or `aircraft`.
 - `POST /admins` returns the one-time initial credential in `tempPassword` after step-up verification; the account is persisted with `mustChangePassword=true`.
 - Manager permission payloads additionally accept `dashboard`, `priorities`, `approvals`, and `cartable`; `dashboard` and `cartable` are enforced by the server navigation/access guard.
+
+# Commercial panel design refresh — required backend endpoints (2026-08-16, NOT YET IMPLEMENTED)
+
+This phase's frontend work (`claude/frontend-overhaul-20260816`) implemented
+the updated design's new Commercial Manager screens against real endpoints
+wherever one already existed, and against a clearly-commented, isolated
+temporary mock adapter (`frontend/src/api/agencies-mock.ts`,
+`frontend/src/api/ancillary-services-mock.ts`) everywhere one did not,
+per explicit instruction to ship the frontend ahead of backend. **Every
+endpoint below is a documented contract only — none of it exists on the
+backend yet.** A future backend phase should implement this section, then
+swap the two mock adapters for real `api/*.ts` calls (same function
+signatures, so the swap is a type-checked one-line import change per call
+site) and delete the mock adapter files.
+
+## Cross-agency invoice aggregate (used by: AgenciesListPage "همه فاکتورها")
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Cross-agency invoice list, mirrors the existing per-agency `GET /agencies/:id/invoices` row shape plus `agencyId`/`agencyName`. Optional `?status=UNPAID\|PAID\|VOIDED` filter (server-side, not client aggregation — CLAUDE.md's reporting rule). |
+
+Today only `agency_invoices` filtered by one `agencyId` exists — this is a
+straight cross-agency `SELECT` with no new table, but note the design's
+three sub-tabs (`صادرشده`/`پرداخت‌شده`/`باطل‌شده`) imply a `VOIDED` status
+that `AgencyInvoiceStatus` (`UNPAID | PAID | OVERDUE`) does not have today;
+decide whether "باطل‌شده" maps to a new status or is dropped from the real
+implementation.
+
+## Manager-side seat-request queue (used by: AgenciesListPage "همه درخواست‌های صندلی", SeatRequestDetailModal, AgencyDetailPage "سابقه" tab)
+
+A partial building block already exists: `POST /agency-portal/seat-requests`
+(`AGENCY` role, see "Agency seat requests" phase above) creates a
+**cartable task** (`sourceType='AGENCY_REQUEST'`) with a free-text Persian
+description — visible today only through the generic `GET /cartable` +
+approve/reject flow, with no structured fields (unit price, aircraft type,
+invoice number, due date, the list of requested flight instances) and no
+per-request detail read. The design's richer modal needs a real entity:
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER` | Structured queue row per request: agency identity, route, seats, term (months), aircraft type, unit/total price, pay method, status, invoice number, due date, requested flight instances. |
+| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Approving should create a real `AgencyInvoice` (reusing the existing invoice machinery) rather than only closing the cartable task. |
+
+Recommend a new `agency_seat_requests` table (see `docs/DB_SCHEMA.md` note
+below) that `POST /agency-portal/seat-requests` writes to directly, with the
+cartable task becoming a notification pointer (`sourceId` = the new row's
+id) instead of the sole record.
+
+## Ancillary services pricing — new module (used by: AncillaryServicesPage, «خدمات»)
+
+Wholly new domain — distinct from `webservice-pricing` (which prices B2B
+agency API plans, not passenger-facing ancillaries).
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | Returns `{ seatServices: SeatServiceRow[], otherServices: AncillaryServiceRow[] }` — shapes in `frontend/src/types/ancillary-services.ts`. |
+| PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (decimal string, matches every other IRR field). |
+| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`. Only enabled services are shown to passengers at checkout — this is the actual source of truth for the existing checkout "services" step, which today likely reads a hardcoded list; that call site needs to switch to this table once it exists. |
+| POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` — creates a custom service (`isCustom=true`). |
+| DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom services only (`isCustom=true`); built-in seat-type/other rows can be disabled but not deleted. |
+
+Seed the eight built-in `otherServices` rows (baggage, meal, insurance, CIP,
+refund fee, pet, wheelchair, seat selection) and three `seatServices` rows
+(normal, extra-legroom, window/aisle) — see the mock adapter's `seed()` for
+the exact Persian copy already approved for the UI.
+
+## Panel nav entry for «خدمات» (used by: PanelShell.tsx temp client-side nav item)
+
+`backend/src/modules/panels/panel-nav.config.ts`'s `COMMERCIAL_MANAGER` array
+needs a new `{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`
+entry. Once added, delete the temporary client-side append in
+`PanelShell.tsx` (`visibleNav` useMemo) and drop the `ancillary-services`
+route out from under its current non-`TabGate` mount in `App.tsx`, moving it
+under a normal `<TabGate tabKey="ancillary-services">` wrapper like every
+other tab.
