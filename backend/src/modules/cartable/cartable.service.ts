@@ -419,6 +419,25 @@ export class CartableService {
 
   // ── Internal API for sibling modules (referrals/messages/agencies) ─────
 
+  /** Close every OPEN cartable item pointing at a structured source. */
+  async resolveOpenBySource(
+    sourceType: 'AGENCY_REQUEST',
+    sourceId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note: string,
+    manager?: import('typeorm').EntityManager,
+  ) {
+    const repo = manager ? manager.getRepository(CartableTask) : this.taskRepo;
+    await repo.update(
+      { sourceType, sourceId, status: 'OPEN' },
+      {
+        status: decision,
+        resolutionNote: note,
+        resolvedAt: new Date(),
+      },
+    );
+  }
+
   async createTask(input: {
     assigneeId: string;
     category: CartableCategory;

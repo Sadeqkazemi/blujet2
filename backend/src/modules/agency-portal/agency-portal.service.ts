@@ -27,6 +27,8 @@ import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { ErrorCode } from '../../common/errors';
+import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
 import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -74,6 +76,10 @@ export class AgencyPortalService {
     private readonly agencySeatCommitmentRepo: Repository<AgencySeatCommitment>,
     @InjectRepository(CharterCommitment)
     private readonly charterCommitmentRepo: Repository<CharterCommitment>,
+    @InjectRepository(AgencySeatRequest)
+    private readonly seatRequestRepo: Repository<AgencySeatRequest>,
+    @InjectRepository(AgencySeatRequestFlight)
+    private readonly seatRequestFlightRepo: Repository<AgencySeatRequestFlight>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
@@ -689,7 +695,7 @@ export class AgencyPortalService {
       flightInstanceId: string;
       seats: number;
       preferredWeekdays?: number[];
-      termMonths?: 3 | 6 | 12;
+      termMonths?: 1 | 3 | 6 | 12;
     },
   ) {
     const uatUser = await this.loadUatSandboxAgencyUser(actor);
@@ -704,6 +710,12 @@ export class AgencyPortalService {
         message: 'مسیر یا پرواز فعال و قابل درخواست یافت نشد.',
       });
     }
+    if (dto.seats < 1 || !Number.isInteger(dto.seats)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تعداد صندلی باید عدد صحیح مثبت باشد.',
+      });
+    }
     if (dto.seats > option.availableToRequest) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -711,12 +723,54 @@ export class AgencyPortalService {
       });
     }
 
+    const instance = await this.flightInstanceRepo.findOne({
+      where: { id: dto.flightInstanceId },
+      relations: { flight: { route: true } },
+    });
+    if (!instance?.flight.routeId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'مسیر یا پرواز فعال و قابل درخواست یافت نشد.',
+      });
+    }
+
+    const unitPriceIrr = toIrr(option.pricePerSeatIrr ?? 0n);
+    if (unitPriceIrr < ZERO_IRR) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'قیمت صندلی نامعتبر است.',
+      });
+    }
+
     const requestId = randomUUID();
+    await this.seatRequestRepo.manager.transaction(async (tx) => {
+      await tx.save(
+        tx.create(AgencySeatRequest, {
+          id: requestId,
+          agencyId: actor.id,
+          routeId: instance.flight.routeId,
+          aircraftType: option.aircraftType,
+          seats: dto.seats,
+          termMonths: dto.termMonths ?? null,
+          unitPriceIrr,
+          payMethod: 'INVOICE',
+          status: 'PENDING',
+        }),
+      );
+      await tx.save(
+        tx.create(AgencySeatRequestFlight, {
+          seatRequestId: requestId,
+          flightInstanceId: dto.flightInstanceId,
+        }),
+      );
+    });
+
     const weekdays = dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
     const term = dto.termMonths ? `${dto.termMonths} ماه` : 'تک‌پرواز';
     const senderLabel =
       profile?.managerName ?? uatUser?.fullName ?? actor.fullName;
     const description = `آژانس «${senderLabel}» برای پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
+
     const recipientCount = await this.cartable.createTasksForRoles(
       ['COMMERCIAL_MANAGER'],
       {
@@ -730,6 +784,7 @@ export class AgencyPortalService {
       },
     );
     if (recipientCount === 0) {
+      await this.seatRequestRepo.delete({ id: requestId });
       throw new BadRequestException({
         code: ErrorCode.NOT_FOUND,
         message: 'مدیر بازرگانی فعالی برای دریافت درخواست یافت نشد.',
