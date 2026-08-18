@@ -53,6 +53,8 @@ import ManagerReportsPage from './features/manager-reports/ManagerReportsPage';
 import PanelAdminsPage from './features/admins/PanelAdminsPage';
 import SettingsPage from './features/settings/SettingsPage';
 import CommercialWebservicePage from './features/webservice/CommercialWebservicePage';
+import ItWebserviceAccessPage from './features/it-webservice/ItWebserviceAccessPage';
+import ItSupportPage from './features/it-manager/SupportPage';
 import SecurityRouter from './components/SecurityRouter';
 import LogsRouter from './components/LogsRouter';
 import ReferralsRouter from './components/ReferralsRouter';
@@ -255,6 +257,12 @@ export default function App() {
               </Route>
               <Route path="settings" element={<TabGate tabKey="settings" />}>
                 <Route index element={<SettingsPage />} />
+              </Route>
+              <Route path="support" element={<TabGate tabKey="support" />}>
+                <Route index element={<ItSupportPage />} />
+              </Route>
+              <Route path="apiaccess" element={<TabGate tabKey="apiaccess" />}>
+                <Route index element={<ItWebserviceAccessPage />} />
               </Route>
               <Route path=":tabKey" element={<ComingSoonPage />} />
             </Route>

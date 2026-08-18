@@ -315,4 +315,55 @@ describe('PanelShell', () => {
     expect(screen.queryByText('احراز هویت مشتریان')).not.toBeInTheDocument();
     expect(screen.queryByText('تنظیمات سامانه')).not.toBeInTheDocument();
   });
+
+  it('injects the preview support/apiaccess tabs for IT_MANAGER only, after survey/settings', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u4', fullName: 'مدیر فناوری اطلاعات', role: 'IT_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+      { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
+      { key: 'backup', labelFa: 'پشتیبان‌گیری', implemented: true },
+      { key: 'settings', labelFa: 'تنظیمات سامانه', implemented: true },
+    ]);
+
+    renderShell();
+
+    const supportLink = await screen.findByRole('link', { name: 'پشتیبانی' });
+    const apiaccessLink = await screen.findByRole('link', { name: /دسترسی API آژانس‌ها/ });
+    expect(supportLink).toHaveAttribute('href', '/panel/support');
+    expect(apiaccessLink).toHaveAttribute('href', '/panel/apiaccess');
+
+    const links = screen.getAllByRole('link').map((l) => l.textContent);
+    // support lands right after survey (before backup); apiaccess after settings (last).
+    expect(links.indexOf('نظرسنجی مسافران')).toBeLessThan(links.indexOf('پشتیبانی'));
+    expect(links.indexOf('پشتیبانی')).toBeLessThan(links.indexOf('پشتیبان‌گیری'));
+    expect(links.indexOf('تنظیمات سامانه')).toBeLessThan(links.indexOf('وب‌سرویس‌ها / دسترسی API آژانس‌ها'));
+  });
+
+  it('does not inject the IT_MANAGER preview tabs for other roles', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u1', fullName: 'مدیر مالی', role: 'FINANCE_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+      { key: 'finance', labelFa: 'مالی', implemented: true },
+    ]);
+
+    renderShell();
+
+    expect(await screen.findByText('مالی')).toBeInTheDocument();
+    expect(screen.queryByText('پشتیبانی')).not.toBeInTheDocument();
+    expect(screen.queryByText('وب‌سرویس‌ها / دسترسی API آژانس‌ها')).not.toBeInTheDocument();
+  });
 });

@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-const TEN_MINUTES_MS = 10 * 60 * 1_000;
+/** Exported so status UI (e.g. SecurityPage) can display the real value
+ * instead of a hardcoded duplicate. */
+export const PANEL_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1_000;
+const TEN_MINUTES_MS = PANEL_INACTIVITY_TIMEOUT_MS;
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'mousemove',
   'mousedown',
