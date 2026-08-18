@@ -167,7 +167,7 @@ async function ensureSeeded(): Promise<void> {
         maskedKey: maskKey(raw),
         status: status === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
         createdAt: isoDaysAgo(idx + 1),
-        lastUsedAt: status === 'ACTIVE' ? isoDaysAgo(0) : null,
+        lastUsedAt: status === 'APPROVED' ? isoDaysAgo(0) : null,
         config: defaultConfig(scopes, routeKeys),
       });
     }
