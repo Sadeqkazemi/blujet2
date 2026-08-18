@@ -17,6 +17,7 @@ import { usePagination } from '../../hooks/usePagination';
 import { useOptionalAuth } from '../../hooks/useAuth';
 import type { EmployeeDetail, EmployeeListRow, PermissionCatalog } from '../../types/it-manager';
 import { togglePermissionSelection } from './employee-permission-dependencies';
+import BoardChairAccountSection from './BoardChairAccountSection';
 
 const DEPT_OPTIONS = [
   { value: 'commercial', label: 'واحد بازرگانی', manager: 'مدیر بازرگانی', color: '#38bdf8' },
@@ -380,6 +381,12 @@ export default function EmployeesPage() {
           variant="dark"
         />
       </section>
+
+      {canManageAccess && (
+        <div className="order-4 mb-6">
+          <BoardChairAccountSection />
+        </div>
+      )}
 
       <section className="order-5 mb-6">
         <div className="mb-3 flex items-start gap-2">
