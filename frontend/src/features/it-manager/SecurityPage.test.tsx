@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import SecurityPage from './SecurityPage';
 import * as itApi from '../../api/it-manager';
 import * as authApi from '../../api/auth';
+import * as failedLoginApi from '../../api/it-failed-logins-mock';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
+import type { FailedLoginEvent } from '../../types/it-failed-logins';
 
 const POLICY: SecurityPolicy = {
   id: 1,
@@ -63,5 +65,41 @@ describe('SecurityPage', () => {
     await user.click(toggle);
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalledWith({ requireSymbol: false }));
+  });
+
+  it('shows the real 10-minute inactivity-logout status and the failed-login events list', async () => {
+    vi.spyOn(itApi, 'fetchSecurityPolicy').mockResolvedValue(POLICY);
+    vi.spyOn(itApi, 'fetchActiveSessions').mockResolvedValue([]);
+    const events: FailedLoginEvent[] = [
+      { id: 'fl_1', usernameMasked: 're**.ka*emi', ip: '185.143.xx.44', reasonFa: 'رمز عبور نادرست', createdAt: '2026-08-01T08:00:00.000Z' },
+    ];
+    vi.spyOn(failedLoginApi, 'fetchFailedLoginEvents').mockResolvedValue(events);
+
+    render(<SecurityPage />);
+
+    expect(await screen.findByText('خروج خودکار پس از عدم فعالیت')).toBeInTheDocument();
+    expect(screen.getByText('فعال · ۱۰ دقیقه')).toBeInTheDocument();
+
+    const row = await screen.findByTestId('failed-login-row');
+    expect(within(row).getByText('re**.ka*emi')).toBeInTheDocument();
+    expect(within(row).getByText('رمز عبور نادرست')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when there are no failed-login events', async () => {
+    vi.spyOn(itApi, 'fetchSecurityPolicy').mockResolvedValue(POLICY);
+    vi.spyOn(itApi, 'fetchActiveSessions').mockResolvedValue([]);
+    vi.spyOn(failedLoginApi, 'fetchFailedLoginEvents').mockResolvedValue([]);
+
+    render(<SecurityPage />);
+    expect(await screen.findByText('رویداد ورود ناموفقی ثبت نشده است.')).toBeInTheDocument();
+  });
+
+  it('shows an error banner when the failed-login service is unavailable', async () => {
+    vi.spyOn(itApi, 'fetchSecurityPolicy').mockResolvedValue(POLICY);
+    vi.spyOn(itApi, 'fetchActiveSessions').mockResolvedValue([]);
+    vi.spyOn(failedLoginApi, 'fetchFailedLoginEvents').mockRejectedValue(new Error('down'));
+
+    render(<SecurityPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('سرویس رویدادهای ورود ناموفق در دسترس نیست.');
   });
 });

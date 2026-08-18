@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fetchActiveSessions, fetchSecurityPolicy, logoutAllSessions, updateSecurityPolicy } from '../../api/it-manager';
+import { fetchFailedLoginEvents } from '../../api/it-failed-logins-mock';
 import { faDigits } from '../../lib/fa-format';
+import { formatJalaliDateTime } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import { useOptionalAuth } from '../../hooks/useAuth';
+import { PANEL_INACTIVITY_TIMEOUT_MS } from '../../hooks/usePanelInactivityLogout';
 import type { ActiveSession, SecurityPolicy } from '../../types/it-manager';
+import type { FailedLoginEvent } from '../../types/it-failed-logins';
 
 const TOGGLES: { key: keyof SecurityPolicy; title: string; desc: string }[] = [
   { key: 'requireUppercase', title: 'الزام حروف بزرگ', desc: 'رمز عبور باید حداقل یک حرف بزرگ داشته باشد' },
@@ -50,10 +54,13 @@ export default function SecurityPage() {
   const readOnly = user?.role === 'EMPLOYEE';
   const [policy, setPolicy] = useState<SecurityPolicy | null>(null);
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
+  const [failedLogins, setFailedLogins] = useState<FailedLoginEvent[] | null>(null);
+  const [failedLoginsError, setFailedLoginsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
   const stepUp = useStepUp('SESSION_REVOKE');
+  const inactivityMinutes = Math.round(PANEL_INACTIVITY_TIMEOUT_MS / 60_000);
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +72,11 @@ export default function SecurityPage() {
       setSessions(s);
     } catch {
       setError('خطا در دریافت اطلاعات امنیتی.');
+    }
+    try {
+      setFailedLogins(await fetchFailedLoginEvents());
+    } catch {
+      setFailedLoginsError('سرویس رویدادهای ورود ناموفق در دسترس نیست.');
     }
   }, [readOnly]);
 
@@ -153,6 +165,15 @@ export default function SecurityPage() {
                   اجباری برای مدیران
                 </span>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#cdd6e3]">خروج خودکار پس از عدم فعالیت</span>
+                <span className="rounded-[14px] bg-[rgba(16,185,129,.14)] px-2.5 py-1 text-[10.5px] font-bold text-[#34d399]">
+                  فعال · {faDigits(inactivityMinutes)} دقیقه
+                </span>
+              </div>
+              <p className="border-t border-[#1f2a3d] pt-3 text-[10.5px] leading-6 text-[#6b7b94]">
+                بازنشانی رمز از صفحهٔ «کاربران و دسترسی‌ها»، تغییر رمز را در ورود بعدی برای همان حساب اجباری می‌کند.
+              </p>
             </div>
           </section>}
 
@@ -196,6 +217,30 @@ export default function SecurityPage() {
           </section>
         </div>
       </div>
+
+      <section className="mt-[15px] rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[17px]">
+        <h2 className="m-0 text-[14.5px] font-extrabold text-white">رویدادهای ورود ناموفق</h2>
+        <p className="mb-3 mt-1 text-[11px] text-[#6b7b94]">آخرین تلاش‌های ناموفق برای ورود به حساب‌های سامانه</p>
+        {failedLoginsError && (
+          <p role="alert" className="mb-3 rounded-lg bg-[rgba(248,113,113,.12)] p-3 text-xs text-[#f87171]">{failedLoginsError}</p>
+        )}
+        {failedLogins === null ? (
+          <p className="py-4 text-center text-[11.5px] text-[#6b7b94]">در حال بارگذاری…</p>
+        ) : failedLogins.length === 0 ? (
+          <p className="py-4 text-center text-[11.5px] text-[#6b7b94]">رویداد ورود ناموفقی ثبت نشده است.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {failedLogins.map((f) => (
+              <li key={f.id} data-testid="failed-login-row" className="flex items-center gap-2.5 rounded-lg border border-[#1f2a3d] px-3 py-2.5 text-[11px]">
+                <span className="font-num font-bold text-[#e7ecf3]" dir="ltr">{f.usernameMasked}</span>
+                <span className="text-[#9fb0c7]">{f.reasonFa}</span>
+                {f.ip && <span className="font-num text-[#6b7b94]" dir="ltr">{f.ip}</span>}
+                <span className="font-num mr-auto text-[10px] text-[#6b7b94]">{formatJalaliDateTime(f.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {confirmLogoutAll && !readOnly && (
         <div
