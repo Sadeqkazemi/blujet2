@@ -3403,6 +3403,17 @@ a passing test — see `docs/features/panel-shell-dashboard.md` for Phase 1.
   booking, pricing, seat-lock, executive-approval, finance logic, or database
   migration was introduced. See `docs/features/api-gateway.md`.
 
+- [x] **Commercial fare-class sales control (2026-08-19)** — completed the
+  approved Commercial Manager handoff: public-sale visibility per flight,
+  independent public-site price and bounded agency release per fare class,
+  real sold/remaining/revenue aggregates and audited price history, agency
+  commitments in Add Flight, and separate CEO/Operations/Commercial notes.
+  Public search, booking and payment re-price now honor the same site price;
+  the schema migration preserves legacy visibility while new staff-created
+  flights start disabled. Coverage includes endpoint auth/validation/not-found,
+  component loading/error/empty/interactions, full unit suites, lint and builds.
+  See `docs/features/commercial-fare-class-sales-control.md`.
+
 - [ ] **Production backend artifact paths (2026-08-05)** - fix the stale
   `dist/src/` paths used by the production Docker command and TypeORM
   migration/seed scripts, add regression coverage, and verify the rebuilt

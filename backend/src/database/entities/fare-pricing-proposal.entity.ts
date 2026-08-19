@@ -61,6 +61,15 @@ export class FarePricingProposal {
   @Column({ type: 'text', nullable: true })
   note!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  ceoNote!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  operationsNote!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  commercialNote!: string | null;
+
   @Column({ type: 'text' })
   proposedById!: string;
 

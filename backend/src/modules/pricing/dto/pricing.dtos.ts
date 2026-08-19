@@ -41,6 +41,21 @@ export class UpsertProposalDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @ApiPropertyOptional({ description: 'یادداشت مدیرعامل (اختیاری)' })
+  @IsOptional()
+  @IsString()
+  ceoNote?: string;
+
+  @ApiPropertyOptional({ description: 'یادداشت مدیر عملیات (اختیاری)' })
+  @IsOptional()
+  @IsString()
+  operationsNote?: string;
+
+  @ApiPropertyOptional({ description: 'یادداشت مدیر بازرگانی (اختیاری)' })
+  @IsOptional()
+  @IsString()
+  commercialNote?: string;
 }
 
 export class SetLegalRateDto {

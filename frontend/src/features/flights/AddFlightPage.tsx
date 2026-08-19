@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  createCommitment,
   createFareRule,
   createFlight,
+  deleteCommitment,
   fetchAircraftTypes,
   fetchAllotmentsSummary,
   fetchAirports,
+  fetchCommitments,
   fetchFlightDefinition,
   resolveScheduleTemplate,
   submitFlightToOperations,
@@ -61,6 +64,11 @@ import ChargeRulesEditor from "./components/ChargeRulesEditor";
 import DurationFields from "./components/DurationFields";
 import FlightNumberInput from "./components/FlightNumberInput";
 import AgencyAllotmentsSummaryCard from "./components/AgencyAllotmentsSummaryCard";
+import AgencyCommitmentsEditor, {
+  commitmentToDraft,
+  draftToCreatePayload,
+  type AgencyCommitmentDraft,
+} from "./components/AgencyCommitmentsEditor";
 
 type Channel = "SYSTEM" | "CHARTER" | "AGENCY";
 
@@ -226,6 +234,10 @@ export default function AddFlightPage({
     useState<ResolvedScheduleTemplate | null>(null);
   const [agencySummary, setAgencySummary] =
     useState<AllotmentSummary | null>(null);
+  const [agencyCommitments, setAgencyCommitments] = useState<
+    AgencyCommitmentDraft[]
+  >([]);
+  const [initialCommitmentIds, setInitialCommitmentIds] = useState<string[]>([]);
   const [routeResolving, setRouteResolving] = useState(false);
   const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
@@ -239,7 +251,9 @@ export default function AddFlightPage({
   const [compToman, setCompToman] = useState("");
   const [proposedToman, setProposedToman] = useState("");
   const [legalToman, setLegalToman] = useState("");
-  const [note, setNote] = useState("");
+  const [ceoNote, setCeoNote] = useState("");
+  const [operationsNote, setOperationsNote] = useState("");
+  const [commercialNote, setCommercialNote] = useState("");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -268,11 +282,21 @@ export default function AddFlightPage({
       ),
     [cabinRows],
   );
-  const agencyCommittedSeats = agencySummary?.agencySeats ?? 0;
+  const agencyCommittedSeats = useMemo(
+    () =>
+      agencyCommitments
+        .filter((row) => row.status !== "CANCELLED")
+        .reduce(
+          (sum, row) => sum + (Number(latinDigits(row.seats)) || 0),
+          0,
+        ),
+    [agencyCommitments],
+  );
   const charterCommittedSeats = Number(latinDigits(charter)) || 0;
-  const publicSaleSeats =
-    agencySummary?.freeSeats ??
-    Math.max(0, capacity - charterCommittedSeats - agencyCommittedSeats);
+  const publicSaleSeats = Math.max(
+    0,
+    capacity - charterCommittedSeats - agencyCommittedSeats,
+  );
   const agencyCommittedRevenueIrr = agencySummary?.agencyRevenueIrr ?? "0";
 
   const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
@@ -348,9 +372,38 @@ export default function AddFlightPage({
         if (def.basePriceIrr) {
           setBaseToman(formatTomanGrouped(irrToTomanInput(def.basePriceIrr)));
         }
-        return fetchAllotmentsSummary(flightId)
-          .then(setAgencySummary)
-          .catch(() => setAgencySummary(null));
+        if (def.pricingProposal) {
+          setProposedToman(
+            formatTomanGrouped(
+              irrToTomanInput(def.pricingProposal.proposedPriceIrr),
+            ),
+          );
+          if (def.pricingProposal.legalRateIrr) {
+            setLegalToman(
+              formatTomanGrouped(
+                irrToTomanInput(def.pricingProposal.legalRateIrr),
+              ),
+            );
+          }
+          setCeoNote(def.pricingProposal.ceoNote ?? "");
+          setOperationsNote(def.pricingProposal.operationsNote ?? "");
+          setCommercialNote(def.pricingProposal.commercialNote ?? "");
+        }
+        return Promise.all([
+          fetchAllotmentsSummary(flightId).catch(() => null),
+          fetchCommitments(flightId).catch(() => []),
+        ]).then(([summary, rows]) => {
+          setAgencySummary(summary);
+          const agencyRows = rows
+            .filter((row) => row.type === "AGENCY")
+            .map(commitmentToDraft);
+          setAgencyCommitments(agencyRows);
+          setInitialCommitmentIds(
+            agencyRows.flatMap((row) =>
+              row.commitmentId ? [row.commitmentId] : [],
+            ),
+          );
+        });
       })
       .catch((e) => {
         setError(
@@ -645,7 +698,7 @@ export default function AddFlightPage({
       setError("تعهد چارتری باید کمتر از تعداد صندلی موجود باشد.");
       return;
     }
-    const agencySeatsSum = agencySummary?.agencySeats ?? 0;
+    const agencySeatsSum = agencyCommittedSeats;
     if (charterSeats + agencySeatsSum > capacity) {
       setError("مجموع تعهد چارتری و تعهدات آژانس از ظرفیت پرواز بیشتر است.");
       return;
@@ -679,15 +732,36 @@ export default function AddFlightPage({
       competitorPriceIrr: compIrr ?? undefined,
     };
 
+    let createdFlightId: string | null = null;
     setSaving(true);
     try {
       if (isEdit && flightId) {
         const updated = await updateFlightDefinition(flightId, payload);
+        const retainedCommitmentIds = new Set(
+          agencyCommitments.flatMap((row) =>
+            row.commitmentId ? [row.commitmentId] : [],
+          ),
+        );
+        for (const commitmentId of initialCommitmentIds) {
+          if (!retainedCommitmentIds.has(commitmentId)) {
+            await deleteCommitment(flightId, commitmentId);
+          }
+        }
+        for (const commitment of agencyCommitments) {
+          if (!commitment.commitmentId) {
+            await createCommitment(
+              flightId,
+              draftToCreatePayload(commitment),
+            );
+          }
+        }
         const legalIrr = moneyInputToRialString(legalToman);
         await upsertProposal(flightId, {
           proposedPriceIrr: proposedIrr,
           legalRateIrr: legalIrr ?? undefined,
-          note: note.trim() || undefined,
+          ceoNote: ceoNote.trim() || undefined,
+          operationsNote: operationsNote.trim() || undefined,
+          commercialNote: commercialNote.trim() || undefined,
         });
         await submitFlightToOperations(flightId, updated.version);
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
@@ -700,6 +774,7 @@ export default function AddFlightPage({
       }
 
       const created = await createFlight(payload);
+      createdFlightId = created.id;
 
       for (const f of fares) {
         const farePayload: CreateFareRulePayload = {
@@ -720,11 +795,20 @@ export default function AddFlightPage({
         await createFareRule(created.id, farePayload);
       }
 
+      for (const commitment of agencyCommitments) {
+        await createCommitment(
+          created.id,
+          draftToCreatePayload(commitment),
+        );
+      }
+
       const legalIrr = moneyInputToRialString(legalToman);
       await upsertProposal(created.id, {
         proposedPriceIrr: proposedIrr,
         legalRateIrr: legalIrr ?? undefined,
-        note: note.trim() || undefined,
+        ceoNote: ceoNote.trim() || undefined,
+        operationsNote: operationsNote.trim() || undefined,
+        commercialNote: commercialNote.trim() || undefined,
       });
       await submitFlightToOperations(created.id, created.version);
 
@@ -733,13 +817,19 @@ export default function AddFlightPage({
         `پرواز جدید ثبت و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
       );
     } catch (e) {
-      setError(
+      const message =
         e instanceof ApiRequestError
           ? e.message
           : e instanceof Error
             ? e.message
-            : "خطا در ثبت پرواز.",
-      );
+            : "خطا در ثبت پرواز.";
+      if (createdFlightId) {
+        onSuccess(
+          `⚠️ پرواز ایجاد شد، اما تکمیل اطلاعات آن ناموفق بود: ${message} رکورد ذخیره شده و از فهرست پروازها قابل ویرایش است.`,
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setSaving(false);
     }
@@ -996,6 +1086,14 @@ export default function AddFlightPage({
                 <AgencyAllotmentsSummaryCard
                   summary={agencySummary}
                   loading={routeResolving}
+                />
+              </div>
+              <div className="mt-4">
+                <AgencyCommitmentsEditor
+                  capacity={capacity}
+                  charterSeats={charterCommittedSeats}
+                  value={agencyCommitments}
+                  onChange={setAgencyCommitments}
                 />
               </div>
             </section>
@@ -1497,17 +1595,43 @@ export default function AddFlightPage({
                   testId="af-legal-money"
                 />
               </div>
-              <div className="mt-[13px]">
-                <label className={labelClass} htmlFor="af-note">
-                  یادداشت برای گردش تأیید (اختیاری)
-                </label>
-                <textarea
-                  id="af-note"
-                  placeholder="توضیح دلیل قیمت پیشنهادی…"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
-                />
+              <div className="mt-[13px] grid grid-cols-1 gap-3">
+                <div>
+                  <label className={labelClass} htmlFor="af-ceo-note">
+                    یادداشت برای مدیرعامل (اختیاری)
+                  </label>
+                  <textarea
+                    id="af-ceo-note"
+                    placeholder="توضیح دلیل قیمت پیشنهادی برای مدیرعامل…"
+                    value={ceoNote}
+                    onChange={(e) => setCeoNote(e.target.value)}
+                    className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="af-operations-note">
+                    یادداشت برای مدیر عملیات (اختیاری)
+                  </label>
+                  <textarea
+                    id="af-operations-note"
+                    placeholder="نکات عملیاتی این پرواز…"
+                    value={operationsNote}
+                    onChange={(e) => setOperationsNote(e.target.value)}
+                    className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="af-commercial-note">
+                    یادداشت مدیر بازرگانی (اختیاری)
+                  </label>
+                  <textarea
+                    id="af-commercial-note"
+                    placeholder="توضیح داخلی برای پیگیری تیم بازرگانی…"
+                    value={commercialNote}
+                    onChange={(e) => setCommercialNote(e.target.value)}
+                    className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                  />
+                </div>
               </div>
             </section>
 

@@ -86,15 +86,26 @@ export async function resolveFareClass(
   const now = new Date();
   const allRules = await manager.find(FareRule, {
     where: { flightInstanceId, cabin },
-    order: { priceIrr: 'ASC' },
   });
-  const rules = allRules.filter(
-    (r) =>
-      (!r.validFrom || r.validFrom <= now) &&
-      (!r.validUntil || r.validUntil >= now) &&
-      ((r.allowedChannels ?? []).length === 0 ||
-        (r.allowedChannels ?? []).includes(channel)),
-  );
+  const priceForChannel = (rule: FareRule): Irr =>
+    channel === 'SYSTEM' && rule.sitePriceIrr != null
+      ? rule.sitePriceIrr
+      : rule.priceIrr;
+  const rules = allRules
+    .filter(
+      (r) =>
+        (!r.validFrom || r.validFrom <= now) &&
+        (!r.validUntil || r.validUntil >= now) &&
+        ((r.allowedChannels ?? []).length === 0 ||
+          (r.allowedChannels ?? []).includes(channel)),
+    )
+    .sort((a, b) =>
+      priceForChannel(a) < priceForChannel(b)
+        ? -1
+        : priceForChannel(a) > priceForChannel(b)
+          ? 1
+          : 0,
+    );
   if (rules.length === 0) return null;
 
   const usageRows = await manager
@@ -122,7 +133,7 @@ export async function resolveFareClass(
     if ((used.get(rule.classCode) ?? 0) < rule.seatsAllocated) {
       return {
         classCode: rule.classCode,
-        priceIrr: rule.priceIrr,
+        priceIrr: priceForChannel(rule),
         taxIrr: rule.taxIrr,
       };
     }
@@ -133,7 +144,7 @@ export async function resolveFareClass(
   const last = rules[rules.length - 1];
   return {
     classCode: last.classCode,
-    priceIrr: last.priceIrr,
+    priceIrr: priceForChannel(last),
     taxIrr: last.taxIrr,
   };
 }

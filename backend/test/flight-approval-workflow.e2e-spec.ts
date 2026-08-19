@@ -168,7 +168,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     expect(after.definitionStatus).toBe('PENDING_CEO');
   });
 
-  it('6) CEO register → PUBLISHED + appears in /search/flights', async () => {
+  it('6) CEO register → PUBLISHED; commercial visibility makes it searchable', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const draft = await createDraft(comm);
     const date = String(draft.departureAt).slice(0, 10);
@@ -195,6 +195,21 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     expect(live.definitionStatus).toBe(FlightDefinitionStatus.PUBLISHED);
     expect(live.publishedAt).not.toBeNull();
     expect(live.publishedByUserId).toBeTruthy();
+
+    const hiddenSearch = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'MHD', date });
+    expect(
+      (hiddenSearch.body.data as { flightInstanceId: string }[]).some(
+        (r) => r.flightInstanceId === draft.id,
+      ),
+    ).toBe(false);
+
+    const visible = await request(app.getHttpServer())
+      .patch(`/flights/${draft.id}/sales-visibility`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ enabled: true });
+    expect(visible.status).toBe(200);
 
     const search = await request(app.getHttpServer())
       .get('/search/flights')
@@ -369,7 +384,8 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     // Force legacy label if the PG enum still has APPROVED (migration keeps it).
     await dataSource.query(
       `UPDATE flight_instances
-       SET "definitionStatus" = 'APPROVED'::"public"."FlightDefinitionStatus"
+       SET "definitionStatus" = 'APPROVED'::"public"."FlightDefinitionStatus",
+           "publicSaleEnabled" = true
        WHERE id = $1`,
       [draft.id],
     );

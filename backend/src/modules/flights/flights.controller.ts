@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Put,
@@ -321,6 +322,43 @@ class UpdateFareRuleDto {
   @IsArray()
   @IsIn(['SYSTEM', 'CHARTER', 'AGENCY'], { each: true })
   allowedChannels?: ('SYSTEM' | 'CHARTER' | 'AGENCY')[];
+}
+
+class UpdateSalesVisibilityDto {
+  @ApiProperty({ description: 'نمایش و فروش این پرواز در سایت عمومی' })
+  @IsBoolean()
+  enabled: boolean;
+}
+
+class UpdateFareClassSitePriceDto {
+  @ApiProperty({ type: String, example: '38000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  priceIrr: Irr;
+
+  @ApiProperty({ example: 'افزایش تقاضا در این کلاس' })
+  @IsString()
+  reason: string;
+}
+
+class UpsertAgencyFareReleaseDto {
+  @ApiProperty({ description: 'تعداد صندلی آزادشده برای آژانس‌ها' })
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  seats: number;
+
+  @ApiProperty({ type: String, example: '32000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  priceIrr: Irr;
+
+  @ApiProperty({ required: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  specialOffer?: boolean;
 }
 
 class CreateAllotmentDto {
@@ -812,6 +850,34 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Get(':instanceId/commercial-control')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
+  @RequiresPermission('fl_view')
+  @ApiOperation({ summary: 'کنترل فروش عمومی و تفکیک فروش کلاس‌های نرخی' })
+  async commercialControl(
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+  ) {
+    const data = await this.flights.commercialControl(instanceId);
+    return { success: true, data };
+  }
+
+  @Patch(':instanceId/sales-visibility')
+  @Roles('COMMERCIAL_MANAGER')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'فعال یا غیرفعال کردن فروش پرواز در سایت عمومی' })
+  async updateSalesVisibility(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Body() dto: UpdateSalesVisibilityDto,
+  ) {
+    const data = await this.flights.updateSalesVisibility(
+      actor,
+      instanceId,
+      dto.enabled,
+    );
+    return { success: true, data };
+  }
+
   @Patch(':instanceId/plan')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fl_manage')
@@ -856,6 +922,45 @@ export class FlightsController {
   @ApiOperation({ summary: 'فهرست کلاس‌های نرخی این پرواز' })
   async listFareRules(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listFareRules(instanceId);
+    return { success: true, data };
+  }
+
+  @Patch(':instanceId/fare-rules/:ruleId/site-price')
+  @Roles('COMMERCIAL_MANAGER')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'ثبت قیمت فروش سایت برای یک کلاس نرخی' })
+  async updateFareClassSitePrice(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() dto: UpdateFareClassSitePriceDto,
+  ) {
+    const data = await this.flights.updateFareClassSitePrice(
+      actor,
+      instanceId,
+      ruleId,
+      dto.priceIrr,
+      dto.reason,
+    );
+    return { success: true, data };
+  }
+
+  @Put(':instanceId/fare-rules/:ruleId/agency-release')
+  @Roles('COMMERCIAL_MANAGER')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({ summary: 'آزادسازی صندلی یک کلاس برای فروش آژانسی' })
+  async upsertAgencyFareRelease(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() dto: UpsertAgencyFareReleaseDto,
+  ) {
+    const data = await this.flights.upsertAgencyFareRelease(
+      actor,
+      instanceId,
+      ruleId,
+      dto,
+    );
     return { success: true, data };
   }
 

@@ -15,6 +15,8 @@ import { Airport } from '../src/database/entities/airport.entity';
 import { Route } from '../src/database/entities/route.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
+import { FareRule } from '../src/database/entities/fare-rule.entity';
+import { CabinClass } from '../src/database/enums';
 import {
   PRICE_SUGGESTION_PROVIDER,
   type PriceSuggestionProvider,
@@ -139,6 +141,96 @@ describe('Flights (e2e)', () => {
     );
   }
 
+  it('commercial fare-class controls enforce auth, validation, not-found and successful mutations', async () => {
+    const instance = await createInstance();
+    const fareRuleRepo = dataSource.getRepository(FareRule);
+    const rule = await fareRuleRepo.save(
+      fareRuleRepo.create({
+        flightInstanceId: instance.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: `Y${Date.now()}`,
+        priceIrr: 30_000_000n,
+        taxIrr: 0n,
+        seatsAllocated: 20,
+      }),
+    );
+
+    const unauthenticated = await request(app.getHttpServer()).get(
+      `/flights/${instance.id}/commercial-control`,
+    );
+    expect(unauthenticated.status).toBe(401);
+
+    const finance = await loginAs(app, 'finance');
+    const forbidden = await request(app.getHttpServer())
+      .get(`/flights/${instance.id}/commercial-control`)
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    expect(forbidden.status).toBe(403);
+
+    const { accessToken } = await loginAs(app, 'comm');
+    const invalidUuid = await request(app.getHttpServer())
+      .get('/flights/not-a-uuid/commercial-control')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(invalidUuid.status).toBe(400);
+
+    const missing = await request(app.getHttpServer())
+      .get(`/flights/${crypto.randomUUID()}/commercial-control`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(missing.status).toBe(404);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/flights/${instance.id}/commercial-control`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.fareClasses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ruleId: rule.id,
+          classCode: rule.classCode,
+          remainingSeats: 20,
+        }),
+      ]),
+    );
+
+    const visibility = await request(app.getHttpServer())
+      .patch(`/flights/${instance.id}/sales-visibility`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ enabled: false });
+    expect(visibility.status).toBe(200);
+    expect(visibility.body.data.publicSaleEnabled).toBe(false);
+
+    const invalidPrice = await request(app.getHttpServer())
+      .patch(`/flights/${instance.id}/fare-rules/${rule.id}/site-price`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ priceIrr: '38000000', reason: '' });
+    expect(invalidPrice.status).toBe(400);
+
+    const updatedPrice = await request(app.getHttpServer())
+      .patch(`/flights/${instance.id}/fare-rules/${rule.id}/site-price`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ priceIrr: '38000000', reason: 'افزایش تقاضا' });
+    expect(updatedPrice.status).toBe(200);
+    expect(updatedPrice.body.data.sitePriceIrr).toBe('38000000');
+
+    const excessiveRelease = await request(app.getHttpServer())
+      .put(`/flights/${instance.id}/fare-rules/${rule.id}/agency-release`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ seats: 21, priceIrr: '32000000', specialOffer: true });
+    expect(excessiveRelease.status).toBe(400);
+
+    const agencyRelease = await request(app.getHttpServer())
+      .put(`/flights/${instance.id}/fare-rules/${rule.id}/agency-release`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ seats: 5, priceIrr: '32000000', specialOffer: true });
+    expect(agencyRelease.status).toBe(200);
+    expect(agencyRelease.body.data).toEqual(
+      expect.objectContaining({
+        agencySeatsReleased: 5,
+        agencyReleasePriceIrr: '32000000',
+        agencySpecialOffer: true,
+      }),
+    );
+  });
+
   it('overview: KPI figures reconcile with the rows; statuses derived from real state; future rows split off', async () => {
     const near = await createInstance({
       departureAt: new Date(Date.now() + 2 * 24 * 3_600_000),
@@ -180,7 +272,9 @@ describe('Flights (e2e)', () => {
 
   it('completed report aggregates REAL per-channel revenue; سود/ضرر vs the base rate; KPIs reconcile', async () => {
     const departed = await createInstance({
-      departureAt: new Date(Date.now() - 3 * 24 * 3_600_000),
+      // Keep this fixture among the 30 most recent completed flights even as
+      // the rolling seed data advances with the calendar.
+      departureAt: new Date(Date.now() - 60_000),
       status: 'DEPARTED',
       basePriceIrr: 30_000_000,
     });

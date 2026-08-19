@@ -3667,6 +3667,44 @@ for a repeated idempotency key.
 
 ## Commercial active-inventory projection (2026-08-13)
 
+## Commercial fare-class sales control (2026-08-19)
+
+The approved Commercial Manager handoff adds a second, explicit sale gate and
+class-level commercial controls without bypassing the existing CEO publication
+workflow. Workflow publication answers whether a flight is approved; the sale
+gate answers whether the approved inventory is currently exposed on the public
+site.
+
+- `PATCH /flights/:instanceId/sales-visibility` — `COMMERCIAL_MANAGER` —
+  `{ enabled: boolean }`. Returns `{ flightInstanceId, publicSaleEnabled,
+  version }`, writes an audit row and invalidates route/date search cache.
+  Enabling requires a sellable workflow state; disabling is always allowed.
+- `GET /flights/:instanceId/commercial-control` — `COMMERCIAL_MANAGER`,
+  `SENIOR_MANAGER` — returns the real per-class projection:
+  `{ flightInstanceId, publicSaleEnabled, fareClasses[] }`. Each class contains
+  `{ ruleId, cabin, classCode, seatsAllocated, soldSeats, remainingSeats,
+  revenueIrr, basePriceIrr, sitePriceIrr, agencySeatsReleased,
+  agencyReleasePriceIrr, agencySpecialOffer, priceHistory[] }`. All IRR values
+  are decimal strings.
+- `PATCH /flights/:instanceId/fare-rules/:ruleId/site-price` —
+  `COMMERCIAL_MANAGER` — `{ priceIrr: string, reason: string }`. Updates the
+  live public price for that fare class, records previous/new values and reason
+  in `audit_logs`, and invalidates search cache. The endpoint never changes an
+  ML suggestion or authorizes a workflow transition.
+- `PUT /flights/:instanceId/fare-rules/:ruleId/agency-release` —
+  `COMMERCIAL_MANAGER` — `{ seats: integer, priceIrr: string,
+  specialOffer?: boolean }`. Upserts the single current agency offer for the
+  class. `seats` must not exceed current unsold class capacity. `seats=0`
+  clears the offer.
+- `PUT /pricing/flights/:flightInstanceId/proposal` keeps its existing fields
+  and additionally accepts `ceoNote?`, `operationsNote?`, `commercialNote?`.
+  The legacy `note?` remains readable/writable for compatibility.
+
+Public search, fare selection and pre-payment re-price resolve a fare-rule price
+as `sitePriceIrr ?? priceIrr` and require `publicSaleEnabled=true` in addition to
+the existing publish status and sale-window checks. Internal staff reservation
+flows are unaffected by this extra public-site gate.
+
 `GET /flights/overview` exposes only commercially sellable instances in its
 `active` and `future` arrays. Every active row also returns `salesHealth` with
 `isWeak`, `occupancyPct`, `hoursToDeparture`, `thresholdPct`, `windowHours`, and

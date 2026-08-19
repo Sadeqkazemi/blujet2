@@ -20,6 +20,9 @@ export function upsertProposal(
     proposedPriceIrr: string | number;
     legalRateIrr?: string | number;
     note?: string;
+    ceoNote?: string;
+    operationsNote?: string;
+    commercialNote?: string;
   },
 ) {
   return apiRequest<PricingProposal>(

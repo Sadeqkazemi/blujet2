@@ -299,6 +299,9 @@ export class FlightDefinitionService {
   }
 
   async toDefinitionDetail(instance: FlightInstance) {
+    const pricingProposal = await this.proposalRepo.findOne({
+      where: { flightInstanceId: instance.id },
+    });
     const activeRules = await this.chargeRuleRepo.find({
       where: { flightInstanceId: instance.id, isPendingRevision: false },
       order: { createdAt: 'ASC' },
@@ -425,6 +428,15 @@ export class FlightDefinitionService {
       version: instance.version,
       publishedAt: instance.publishedAt?.toISOString() ?? null,
       publishedByUserId: instance.publishedByUserId,
+      pricingProposal: pricingProposal
+        ? {
+            proposedPriceIrr: pricingProposal.proposedPriceIrr.toString(),
+            legalRateIrr: pricingProposal.legalRateIrr?.toString() ?? null,
+            ceoNote: pricingProposal.ceoNote,
+            operationsNote: pricingProposal.operationsNote,
+            commercialNote: pricingProposal.commercialNote,
+          }
+        : null,
     };
   }
 
@@ -544,6 +556,7 @@ export class FlightDefinitionService {
           competitorPriceIrr: dto.competitorPriceIrr ?? null,
           cabinCapacities,
           definitionStatus: FlightDefinitionStatus.DRAFT,
+          publicSaleEnabled: false,
           rejectionReason: null,
           approvedSnapshot: null,
           pendingRevisionSnapshot: null,
@@ -566,6 +579,9 @@ export class FlightDefinitionService {
           proposedPriceIrr: dto.basePriceIrr,
           legalRateIrr: null,
           note: null,
+          ceoNote: null,
+          operationsNote: null,
+          commercialNote: null,
           proposedById: actor.id,
           status: PricingProposalStatus.PENDING,
           updatedAt: new Date(),

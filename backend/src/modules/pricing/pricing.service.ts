@@ -182,7 +182,14 @@ export class PricingService {
   async upsertProposal(
     actor: AuthenticatedUser,
     flightInstanceId: string,
-    dto: { proposedPriceIrr: Irr; legalRateIrr?: Irr; note?: string },
+    dto: {
+      proposedPriceIrr: Irr;
+      legalRateIrr?: Irr;
+      note?: string;
+      ceoNote?: string;
+      operationsNote?: string;
+      commercialNote?: string;
+    },
   ) {
     const existing = await this.proposalRepo
       .createQueryBuilder('p')
@@ -222,6 +229,13 @@ export class PricingService {
           lockedExisting.legalRateIrr = dto.legalRateIrr;
         }
         if (dto.note !== undefined) lockedExisting.note = dto.note;
+        if (dto.ceoNote !== undefined) lockedExisting.ceoNote = dto.ceoNote;
+        if (dto.operationsNote !== undefined) {
+          lockedExisting.operationsNote = dto.operationsNote;
+        }
+        if (dto.commercialNote !== undefined) {
+          lockedExisting.commercialNote = dto.commercialNote;
+        }
         lockedExisting.proposedById = actor.id;
         lockedExisting.status = PricingProposalStatus.PENDING;
         lockedExisting.rejectionReason = null;
@@ -247,6 +261,9 @@ export class PricingService {
             proposedPriceIrr: dto.proposedPriceIrr,
             legalRateIrr: dto.legalRateIrr,
             note: dto.note,
+            ceoNote: dto.ceoNote,
+            operationsNote: dto.operationsNote,
+            commercialNote: dto.commercialNote,
             proposedById: actor.id,
             status: PricingProposalStatus.PENDING,
             updatedAt: new Date(),

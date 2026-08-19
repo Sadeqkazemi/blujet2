@@ -250,6 +250,12 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .send({ source: 'PROPOSED' });
     expect(reg1.status).toBe(200);
 
+    const visible = await request(app.getHttpServer())
+      .patch(`/flights/${id}/sales-visibility`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ enabled: true });
+    expect(visible.status).toBe(200);
+
     // Prime the search cache for the flight's original date, exactly as a
     // customer browsing نتایج پرواز would before the revision below.
     const primed = await request(app.getHttpServer())
@@ -487,6 +493,12 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
       .set('Authorization', `Bearer ${ceo}`)
       .send({ source: 'PROPOSED' });
     expect(reg.status).toBe(200);
+
+    const visible = await request(app.getHttpServer())
+      .patch(`/flights/${id}/sales-visibility`)
+      .set('Authorization', `Bearer ${comm}`)
+      .send({ enabled: true });
+    expect(visible.status).toBe(200);
 
     const search = await request(app.getHttpServer())
       .get('/search/flights')

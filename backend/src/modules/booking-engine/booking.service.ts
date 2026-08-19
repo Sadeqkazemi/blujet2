@@ -248,7 +248,11 @@ export class BookingService {
       .leftJoinAndSelect('fi.flight', 'flight')
       .where('fi.id = :id', { id: dto.flightInstanceId })
       .getOne();
-    if (!instance || instance.status !== 'SCHEDULED') {
+    if (
+      !instance ||
+      instance.status !== 'SCHEDULED' ||
+      !instance.publicSaleEnabled
+    ) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'پرواز یافت نشد یا دیگر قابل رزرو نیست.',

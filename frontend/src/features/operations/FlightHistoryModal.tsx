@@ -57,10 +57,22 @@ export default function FlightHistoryModal({
           </div>
         </div>
 
-        {flight.proposal?.note && (
-          <section className="mb-4 rounded-xl border border-blue-400/20 bg-blue-400/5 p-4">
-            <h3 className="mb-1 text-xs font-bold text-blue-300">توضیح مدیر بازرگانی</h3>
-            <p className="text-sm leading-7">{flight.proposal.note}</p>
+        {flight.proposal && [
+          ["یادداشت برای مدیرعامل", flight.proposal.ceoNote],
+          ["یادداشت برای مدیر عملیات", flight.proposal.operationsNote],
+          ["یادداشت داخلی بازرگانی", flight.proposal.commercialNote ?? flight.proposal.note],
+        ].some(([, value]) => Boolean(value)) && (
+          <section className="mb-4 space-y-3 rounded-xl border border-blue-400/20 bg-blue-400/5 p-4">
+            {[
+              ["یادداشت برای مدیرعامل", flight.proposal.ceoNote],
+              ["یادداشت برای مدیر عملیات", flight.proposal.operationsNote],
+              ["یادداشت داخلی بازرگانی", flight.proposal.commercialNote ?? flight.proposal.note],
+            ].filter(([, value]) => Boolean(value)).map(([label, value]) => (
+              <div key={label}>
+                <h3 className="mb-1 text-xs font-bold text-blue-300">{label}</h3>
+                <p className="text-sm leading-7">{value}</p>
+              </div>
+            ))}
           </section>
         )}
 
