@@ -37,7 +37,7 @@ import ClubPage from './features/club/ClubPage';
 import ClubTierRulesPage from './features/club/ClubTierRulesPage';
 import SiteAdminCustomersPage from './features/customers/SiteAdminCustomersPage';
 import EmployeesPage from './features/it-manager/EmployeesPage';
-import ServicesPage from './features/it-manager/ServicesPage';
+import ServicesRouter from './features/services/ServicesRouter';
 import WebservicesApiPage from './features/it-manager/WebservicesApiPage';
 import BackupsPage from './features/it-manager/BackupsPage';
 import PricingPage from './features/pricing/PricingPage';
@@ -179,7 +179,7 @@ export default function App() {
                 <Route index element={<SecurityRouter />} />
               </Route>
               <Route path="services" element={<TabGate tabKey="services" />}>
-                <Route index element={<ServicesPage />} />
+                <Route index element={<ServicesRouter />} />
               </Route>
               <Route path="webservices" element={<TabGate tabKey="webservices" />}>
                 <Route index element={<WebservicesApiPage />} />
