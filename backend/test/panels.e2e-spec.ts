@@ -145,6 +145,7 @@ describe('Panels (e2e)', () => {
       'users',
       'security',
       'services',
+      'webservices',
       'reservation',
       'panels',
       'logs',
