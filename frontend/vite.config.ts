@@ -90,18 +90,22 @@ export default defineConfig(({ mode }) => {
   )
 
   return {
-  server: {
-    host: '0.0.0.0',
-    port: 5173,
-    strictPort: true,
-    // Cloudflare quick tunnels / Cursor port previews send a non-localhost Host.
-    allowedHosts: true,
-    proxy: devProxy,
-  },
-  plugins: [
-    react(),
-    tailwindcss(),
-    VitePWA({
+    // Keep Vite's disposable dependency cache outside node_modules. On Windows
+    // the package manager or an earlier preview can keep node_modules/.vite
+    // files locked, which otherwise prevents the local frontend from starting.
+    cacheDir: '.vite-cache',
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      strictPort: true,
+      // Cloudflare quick tunnels / Cursor port previews send a non-localhost Host.
+      allowedHosts: true,
+      proxy: devProxy,
+    },
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
@@ -129,7 +133,7 @@ export default defineConfig(({ mode }) => {
         // 2 MiB default; API responses remain excluded from runtime caching.
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
-    }),
-  ],
+      }),
+    ],
   }
 })
