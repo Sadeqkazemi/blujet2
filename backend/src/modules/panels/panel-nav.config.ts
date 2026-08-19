@@ -130,6 +130,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },
     { key: 'services', labelFa: 'سرویس‌های سایت', implemented: true },
+    { key: 'webservices', labelFa: 'وب‌سرویس‌ها و API', implemented: true },
     { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'logs', labelFa: 'لاگ و رویدادها', implemented: true },

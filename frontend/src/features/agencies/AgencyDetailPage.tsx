@@ -332,7 +332,8 @@ export default function AgencyDetailPage() {
         const fields = await stepUp.confirm();
         dto = { approve: true, ...fields };
       }
-      await decideAgencyWebserviceRequest(agencyId, req.id, dto);
+      const result = await decideAgencyWebserviceRequest(agencyId, req.id, dto);
+      if (result.apiKey?.rawKey) setFreshRawKey(result.apiKey.rawKey);
       setNotice(approve ? 'درخواست وب‌سرویس تأیید و کلید صادر شد ✓' : 'درخواست وب‌سرویس رد شد.');
       setWebserviceRequests(await fetchAgencyWebserviceRequests(agencyId));
     } catch (err) {
@@ -642,10 +643,14 @@ export default function AgencyDetailPage() {
         activeKey && (
           <span
             className={`rounded-full px-3 py-1 text-[10px] font-bold ${
-              activeKey.status === 'ACTIVE' ? 'bg-[#34d39924] text-[#34d399]' : 'bg-[#f59e0b24] text-[#b45309]'
+              activeKey.status === 'ACTIVE'
+                ? 'bg-[#34d39924] text-[#34d399]'
+                : activeKey.status === 'REVOKED'
+                  ? 'bg-danger/10 text-danger'
+                  : 'bg-[#f59e0b24] text-[#b45309]'
             }`}
           >
-            {activeKey.status === 'ACTIVE' ? 'فعال' : 'معلق'}
+            {activeKey.status === 'ACTIVE' ? 'فعال' : activeKey.status === 'REVOKED' ? 'لغوشده' : 'معلق'}
           </span>
         )
       }
@@ -692,7 +697,7 @@ export default function AgencyDetailPage() {
           <div>
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-panel-canvas p-3">
               <span className="text-[10px] text-panel-muted">API Key</span>
-              <code className="ltr font-num text-xs text-panel-ink">{activeKey.keyHash.slice(0, 11)}••••••</code>
+              <code className="ltr font-num text-xs text-panel-ink">{activeKey.keyHint}</code>
               <span className="mr-auto text-[10px] font-bold text-panel-muted">
                 {API_SCOPE_OPTIONS.find((o) => o.value === activeKey.scope)?.label}
               </span>
@@ -712,22 +717,33 @@ export default function AgencyDetailPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => void onApiKeyAction(activeKey, 'toggle')}
-                className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
-                  activeKey.status === 'ACTIVE'
-                    ? 'bg-danger/10 text-danger hover:bg-danger/20'
-                    : 'bg-[#34d39915] text-[#34d399] hover:bg-[#34d39925]'
-                }`}
-              >
-                {activeKey.status === 'ACTIVE' ? 'تعلیق دسترسی' : 'فعال‌سازی دسترسی'}
-              </button>
-              <button
-                onClick={() => void onApiKeyAction(activeKey, 'regenerate')}
-                className="rounded-lg border border-accent/40 px-3 py-2 text-xs font-bold text-accent transition hover:bg-accent/5"
-              >
-                تولید کلید جدید
-              </button>
+              {activeKey.status === 'REVOKED' ? (
+                <button
+                  onClick={() => void onIssueApiKey()}
+                  className="rounded-lg bg-accent px-3 py-2 text-xs font-bold text-white transition hover:bg-accent/90"
+                >
+                  صدور کلید تازه
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => void onApiKeyAction(activeKey, 'toggle')}
+                    className={`rounded-lg px-3 py-2 text-xs font-bold transition ${
+                      activeKey.status === 'ACTIVE'
+                        ? 'bg-danger/10 text-danger hover:bg-danger/20'
+                        : 'bg-[#34d39915] text-[#34d399] hover:bg-[#34d39925]'
+                    }`}
+                  >
+                    {activeKey.status === 'ACTIVE' ? 'تعلیق دسترسی' : 'فعال‌سازی دسترسی'}
+                  </button>
+                  <button
+                    onClick={() => void onApiKeyAction(activeKey, 'regenerate')}
+                    className="rounded-lg border border-accent/40 px-3 py-2 text-xs font-bold text-accent transition hover:bg-accent/5"
+                  >
+                    تولید کلید جدید
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )

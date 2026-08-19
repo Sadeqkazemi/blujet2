@@ -630,6 +630,28 @@ describe('IT Manager (e2e)', () => {
     expect(Array.isArray(res.body.data.recentEvents)).toBe(true);
   });
 
+  it('GET /it/webservices returns the real API request/client overview without key hashes', async () => {
+    const { accessToken } = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/it/webservices')
+      .set(auth(accessToken));
+    expect(res.status).toBe(200);
+    expect(res.body.data.kpis).toEqual(
+      expect.objectContaining({
+        activeClients: expect.any(Number),
+        issuedKeys: expect.any(Number),
+        pendingRequests: expect.any(Number),
+      }),
+    );
+    expect(Array.isArray(res.body.data.requests)).toBe(true);
+    expect(Array.isArray(res.body.data.clients)).toBe(true);
+    for (const client of res.body.data.clients) {
+      expect(client).toHaveProperty('keyHint');
+      expect(client).not.toHaveProperty('keyHash');
+      expect(client).not.toHaveProperty('rawKey');
+    }
+  });
+
   it('a non-IT_MANAGER role gets 403 on every /it/* endpoint', async () => {
     const { accessToken } = await loginAs(app, 'ceo');
     const paths = [
@@ -640,6 +662,7 @@ describe('IT Manager (e2e)', () => {
       '/it/services',
       '/it/backups',
       '/it/dashboard',
+      '/it/webservices',
     ];
     for (const path of paths) {
       const res = await request(app.getHttpServer())

@@ -260,6 +260,25 @@ not implement it faster.
 |---|---|---|
 | GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
 
+### `backend/src/modules/it-manager/` — webservices/API ("وب‌سرویس‌ها و API")
+
+The updated IT panel bundle adds a dedicated operational view over the
+already-existing B2B entities. It does not introduce a second API-key store:
+requests remain `AgencyWebserviceRequest`, credentials remain `AgencyApiKey`,
+and events remain append-only `AuditLog` rows. Every endpoint is
+`IT_MANAGER`-only. Raw keys are returned exactly once after issue/rotation and
+are never persisted or included in list responses.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/it/webservices` | One real-data payload for the page: KPI counts, pending/recent requests, API clients, eligible registered agencies, usage counters and API-related audit/security events. Empty database collections produce honest zeros/empty states. |
+| PATCH | `/it/webservices/requests/:id/decide` | `{ approve, stepUpChallengeId?, stepUpCode? }`; approval requires `API_KEY_ROTATE` step-up, reuses the existing request-decision transaction and returns the raw key once. Rejection changes only the request state. |
+| POST | `/it/webservices/clients` | `{ agencyId, scope, stepUpChallengeId, stepUpCode }`; issues a key for an existing active agency through the existing key service. Free-text/fake agencies are not accepted. |
+| PATCH | `/it/webservices/clients/:id` | Suspend/activate/revoke or rotate. Rotation and irreversible revoke require `API_KEY_ROTATE` step-up. `REVOKED` credentials can never be reactivated. |
+
+The production partner endpoints remain `/api/v2/*`; their guard continues to
+enforce status, expiry, agency status and scope on every request.
+
 ### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
 
 Both already exist from Phase 1 — `GET /audit/logs` and `GET /panels/access`

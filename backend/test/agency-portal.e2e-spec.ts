@@ -538,7 +538,9 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(senior.accessToken))
       .send({ approve: true, ...stepUp });
     expect(approveRes.status).toBe(200);
-    expect(approveRes.body.data.status).toBe('APPROVED');
+    expect(approveRes.body.data.request.status).toBe('APPROVED');
+    expect(approveRes.body.data.apiKey.rawKey).toMatch(/^bjk_/);
+    expect(approveRes.body.data.apiKey).not.toHaveProperty('keyHash');
 
     const keyRow = await dataSource.getRepository(AgencyApiKey).findOne({
       where: { agencyId: agency.id },
@@ -549,11 +551,11 @@ describe('Agency Portal (e2e)', () => {
     const inboxRes = await request(app.getHttpServer())
       .get('/agency-portal/inbox')
       .set('Authorization', auth(accessToken));
-    const keyMessage = inboxRes.body.data.find((m: { body: string }) =>
-      m.body.includes('کلید دسترسی API شما'),
+    const approvalMessage = inboxRes.body.data.find((m: { body: string }) =>
+      m.body.includes('درخواست وب‌سرویس شما تأیید شد'),
     );
-    expect(keyMessage).toBeDefined();
-    expect(keyMessage.body).toContain('bjk_');
+    expect(approvalMessage).toBeDefined();
+    expect(approvalMessage.body).not.toContain('bjk_');
 
     const apiKeysRes = await request(app.getHttpServer())
       .get('/agency-portal/api-keys')
@@ -586,7 +588,7 @@ describe('Agency Portal (e2e)', () => {
       .set('Authorization', auth(commercial.accessToken))
       .send({ approve: false });
     expect(rejectRes.status).toBe(200);
-    expect(rejectRes.body.data.status).toBe('REJECTED');
+    expect(rejectRes.body.data.request.status).toBe('REJECTED');
 
     const keyRow = await dataSource
       .getRepository(AgencyApiKey)

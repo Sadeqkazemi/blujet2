@@ -166,3 +166,65 @@ export interface AuditLogRow {
   unit: string;
   level: 'info' | 'warn' | 'error';
 }
+
+export type ItApiScope = 'FULL' | 'SEARCH_BOOK' | 'SEARCH_ONLY';
+export type ItApiClientStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+
+export interface ItWebserviceRequestRow {
+  id: string;
+  agencyId: string;
+  agency: string;
+  scope: ItApiScope;
+  months: number;
+  priceIrr: string;
+  note: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+export interface ItApiClientRow {
+  id: string;
+  agencyId: string;
+  agency: string;
+  keyHint: string;
+  scope: ItApiScope;
+  status: ItApiClientStatus;
+  activatedAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  callCount: number;
+}
+
+export interface ItApiEventRow {
+  id: string;
+  actor: string;
+  action: string;
+  detail: string | null;
+  category: string;
+  type: 'SECURITY' | 'AUDIT';
+  level: 'INFO' | 'WARN' | 'ERROR';
+  createdAt: string;
+}
+
+export interface ItWebservicesOverview {
+  kpis: {
+    activeClients: number;
+    issuedKeys: number;
+    pendingRequests: number;
+    securityEventsToday: number;
+  };
+  requests: ItWebserviceRequestRow[];
+  clients: ItApiClientRow[];
+  eligibleAgencies: { id: string; name: string }[];
+  events: ItApiEventRow[];
+}
+
+export interface IssuedItApiKey {
+  id: string;
+  agencyId: string;
+  keyHint: string;
+  scope: ItApiScope;
+  status: ItApiClientStatus;
+  rawKey?: string;
+}

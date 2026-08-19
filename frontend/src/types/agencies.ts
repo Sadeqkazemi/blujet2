@@ -2,7 +2,7 @@ export type AgencyTier = 'NORMAL' | 'SILVER' | 'GOLD';
 export type AgencyMembershipStatus = 'PENDING' | 'REFERRED' | 'APPROVED' | 'REJECTED';
 export type AgencyMembershipApprovalStage = 'AWAITING_COMMERCIAL' | 'AWAITING_FINANCE' | 'APPROVED' | 'REJECTED';
 export type AgencyApiScope = 'FULL' | 'SEARCH_BOOK' | 'SEARCH_ONLY';
-export type AgencyApiKeyStatus = 'ACTIVE' | 'SUSPENDED';
+export type AgencyApiKeyStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
 export type AgencyInvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE';
 export type AgencyDocumentType = 'LICENSE' | 'CONTRACT' | 'OTHER';
 export type AgencyDocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -128,7 +128,7 @@ export interface AgencyMembershipRequest {
 export interface AgencyApiKey {
   id: string;
   agencyId: string;
-  keyHash: string;
+  keyHint: string;
   scope: AgencyApiScope;
   status: AgencyApiKeyStatus;
   activatedAt: string;

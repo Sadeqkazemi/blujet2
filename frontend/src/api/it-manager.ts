@@ -8,7 +8,11 @@ import type {
   EmployeeListRow,
   ExternalService,
   ItDashboardData,
+  IssuedItApiKey,
+  ItApiClientStatus,
+  ItApiScope,
   ItServicesResult,
+  ItWebservicesOverview,
   PermissionCatalog,
   SecurityPolicy,
   ServiceReportResult,
@@ -153,4 +157,46 @@ export function fetchSystemLogs(query: {
   if (query.limit != null) params.set('limit', String(query.limit));
   const qs = params.toString();
   return apiGet<AuditLogRow[]>(`/audit/logs${qs ? `?${qs}` : ''}`);
+}
+
+export function fetchItWebservices() {
+  return apiGet<ItWebservicesOverview>('/it/webservices');
+}
+
+export function decideItWebserviceRequest(
+  id: string,
+  dto: {
+    approve: boolean;
+    stepUpChallengeId?: string;
+    stepUpCode?: string;
+  },
+) {
+  return apiPatch<{
+    request: { id: string; status: 'APPROVED' | 'REJECTED' };
+    apiKey?: IssuedItApiKey;
+  }>(`/it/webservices/requests/${id}/decide`, dto);
+}
+
+export function issueItApiClient(
+  agencyId: string,
+  scope: ItApiScope,
+  stepUp: { stepUpChallengeId: string; stepUpCode: string },
+) {
+  return apiPost<IssuedItApiKey>('/it/webservices/clients', {
+    agencyId,
+    scope,
+    ...stepUp,
+  });
+}
+
+export function updateItApiClient(
+  id: string,
+  dto: {
+    status?: ItApiClientStatus;
+    regenerate?: boolean;
+    stepUpChallengeId?: string;
+    stepUpCode?: string;
+  },
+) {
+  return apiPatch<IssuedItApiKey>(`/it/webservices/clients/${id}`, dto);
 }

@@ -19,6 +19,13 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **IT Manager webservices/API bundle update (2026-08-19)** — added the
+  missing dedicated «وب‌سرویس‌ها و API» page and IT-only endpoints over the
+  existing agency request, API-key and audit entities; added safe one-time key
+  issue/rotation, irreversible step-up-gated revoke, real usage/event views,
+  typed frontend actions and regression coverage. No parallel mock store was
+  introduced. Checklist: `docs/features/it-webservices-api.md`.
+
 - [x] **Phase 71 — Flight approval workflow (ops → CEO → PUBLISHED)** — backend merged in #128 and UAT account provisioned in #129. Extends `FlightInstance.definitionStatus` with `PENDING_OPERATIONS` / `OPERATIONS_REJECTED` / `PUBLISHED`, role `OPERATIONS_MANAGER`, `FlightReview` history, version locking, create=`DRAFT`, CEO register → `PUBLISHED` + search sellability. React operations dashboard/cartable/history and the commercial handoff are included in the frontend follow-up. Pricing-alerts / loans / outbox remain separate scoped phases. Checklist: `docs/features/flight-approval-workflow.md`.
 - [ ] **Production data integrity + operational golden path (2026-08-05)** — remove production-visible demo fallbacks, prevent production seed/mock provider execution, add a dry-run-first seed audit/cleanup path, and prove flight search → details → passenger → seat → booking → payment → ticket/refund plus operational role visibility. Acceptance and release gates: `docs/features/production-data-integrity.md`.
 - [x] **Sandbox multi-role operational UAT gate (2026-08-05)** — converted the cross-role acceptance audit into a repeatable, flow-selectable runner (`scripts/run-sandbox-multirole-uat.mjs`) over the existing database-backed E2E and Playwright proofs, with a fail-closed guard against accidental browser mutations on a non-local environment. Live smoke evaluation against `http://202.133.90.31` is recorded in `docs/features/sandbox-multirole-operational-uat.md`. Release decision is **NO-GO for real passenger sales** until HTTPS, production seed cleanup, real SMS/OTP, a certified payment gateway, and the documented agency/incomplete-profile product gaps are resolved.
