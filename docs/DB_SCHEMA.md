@@ -337,6 +337,27 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   real `pg_dump` invocation. Restore stays a manual RUNBOOK step (see
   `docs/API.md`'s note) — no destructive one-click endpoint.
 
+### IT webservices/API bundle update (2026-08-19)
+
+The new «وب‌سرویس‌ها و API» screen is a management projection over existing
+tables, not a parallel mock-data model:
+
+- `AgencyWebserviceRequest` remains the request/approval source of truth.
+- `AgencyApiKey` remains the only credential record. Its status enum gains
+  `REVOKED` for the bundle's irreversible «لغو کلید» action. The key hash,
+  existing scope, expiry, last-use timestamp and call counter are reused.
+- `AuditLog` remains the event stream for issue, rotate, suspend, activate,
+  revoke and request decisions.
+- No raw key, plaintext secret, fake error-rate or fabricated request row is
+  added. A raw credential exists only in the single issue/rotation response.
+
+The bundle's free-text client creation is deliberately constrained to an
+existing active `AgencyProfile`, preserving tenant ownership and foreign-key
+integrity. Environment/IP/rate-limit controls shown by the prototype are not
+stored as cosmetic fields: the current production partner API has one deployed
+environment and a real Nest throttler limit. Those controls require a separate
+infrastructure policy phase if the product later needs per-key overrides.
+
 ## Phase 9 — Reservation system (seat lock / PNR)
 
 Shared `ReservationSystem` component contract, confirmed from

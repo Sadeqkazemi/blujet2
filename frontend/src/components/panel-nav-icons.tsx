@@ -260,6 +260,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
     </NavIcon>
   ),
+  webservices: (
+    <NavIcon>
+      <path d="M8 9l-4 3 4 3M16 9l4 3-4 3" />
+      <path d="M14 5l-4 14" />
+    </NavIcon>
+  ),
 };
 
 export function panelNavIcon(key: string): ReactNode {

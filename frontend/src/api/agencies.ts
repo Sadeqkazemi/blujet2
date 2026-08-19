@@ -100,7 +100,7 @@ export function updateAgencyApiKey(
   id: string,
   keyId: string,
   dto: {
-    status?: 'ACTIVE' | 'SUSPENDED';
+    status?: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
     regenerate?: boolean;
     stepUpChallengeId?: string;
     stepUpCode?: string;
@@ -176,7 +176,10 @@ export function decideAgencyWebserviceRequest(
   reqId: string,
   dto: { approve: boolean; stepUpChallengeId?: string; stepUpCode?: string },
 ) {
-  return apiPatch<import('../types/agency-portal').AgencyWebserviceRequest>(
+  return apiPatch<{
+    request: import('../types/agency-portal').AgencyWebserviceRequest;
+    apiKey?: AgencyApiKey;
+  }>(
     `/agencies/${id}/webservice-requests/${reqId}/decide`,
     dto,
   );

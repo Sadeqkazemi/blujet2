@@ -68,6 +68,21 @@ function generateSixDigitCode(): string {
   return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0');
 }
 
+function apiKeyView(key: AgencyApiKey, rawKey?: string) {
+  return {
+    id: key.id,
+    agencyId: key.agencyId,
+    keyHint: `bjk_••••${key.id.replace(/-/g, '').slice(0, 4)}`,
+    scope: key.scope,
+    status: key.status,
+    activatedAt: key.activatedAt,
+    expiresAt: key.expiresAt,
+    lastUsedAt: key.lastUsedAt,
+    callCount: key.callCount,
+    ...(rawKey ? { rawKey } : {}),
+  };
+}
+
 const DECIDABLE_STATUSES: AgencyMembershipStatus[] = ['PENDING', 'REFERRED'];
 const REQUEST_OTP_TTL_MS = 2 * 60 * 1000;
 const REQUEST_OTP_MAX_ATTEMPTS = 5;
@@ -1152,10 +1167,11 @@ export class AgenciesService {
 
   async listApiKeys(id: string) {
     await this.getProfileOrThrow(id);
-    return this.apiKeyRepo.find({
+    const keys = await this.apiKeyRepo.find({
       where: { agencyId: id },
       order: { activatedAt: 'DESC' },
     });
+    return keys.map((key) => apiKeyView(key));
   }
 
   async issueApiKey(
@@ -1193,7 +1209,7 @@ export class AgenciesService {
     });
 
     // Shown once — DB only ever stores keyHash from here on.
-    return { ...created, rawKey };
+    return apiKeyView(created, rawKey);
   }
 
   async updateApiKey(
@@ -1216,6 +1232,12 @@ export class AgenciesService {
     }
 
     if (dto.regenerate) {
+      if (key.status === 'REVOKED') {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'کلید لغوشده قابل صدور مجدد نیست؛ کلید تازه‌ای صادر کنید.',
+        });
+      }
       await this.stepUp.verify(
         actor,
         dto.stepUpChallengeId ?? '',
@@ -1237,10 +1259,24 @@ export class AgenciesService {
         entityType: 'AgencyApiKey',
         entityId: keyId,
       });
-      return { ...updated, rawKey };
+      return apiKeyView(updated, rawKey);
     }
 
     if (dto.status) {
+      if (key.status === 'REVOKED' && dto.status !== 'REVOKED') {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'کلید لغوشده قابل فعال‌سازی مجدد نیست.',
+        });
+      }
+      if (dto.status === 'REVOKED') {
+        await this.stepUp.verify(
+          actor,
+          dto.stepUpChallengeId ?? '',
+          dto.stepUpCode ?? '',
+          'API_KEY_ROTATE',
+        );
+      }
       key.status = dto.status;
       const updated = await this.apiKeyRepo.save(key);
       await this.audit.record({
@@ -1250,12 +1286,14 @@ export class AgenciesService {
         action:
           dto.status === 'ACTIVE'
             ? 'فعال‌سازی کلید API آژانس'
-            : 'تعلیق کلید API آژانس',
+            : dto.status === 'REVOKED'
+              ? 'لغو دائمی کلید API آژانس'
+              : 'تعلیق کلید API آژانس',
         detail: `وضعیت کلید API توسط ${actor.fullName} به ${dto.status} تغییر یافت.`,
         entityType: 'AgencyApiKey',
         entityId: keyId,
       });
-      return updated;
+      return apiKeyView(updated);
     }
 
     throw new BadRequestException({
@@ -1587,27 +1625,27 @@ export class AgenciesService {
       ? 'APPROVED'
       : 'REJECTED';
 
+    let issuedKey: ReturnType<typeof apiKeyView> | null = null;
     if (approve) {
       // Issued BEFORE the status flip below: if step-up verification fails
       // here, the request is untouched and stays PENDING for a retry —
       // never left APPROVED with no key actually issued. Reuses the
       // existing, already-audited, step-up-gated key issuance path
       // verbatim rather than duplicating it.
-      const { rawKey } = await this.issueApiKey(
+      issuedKey = await this.issueApiKey(
         actor,
         id,
         request.scope,
         stepUpChallengeId ?? '',
         stepUpCode ?? '',
       );
-      // AgencyApiKey only ever stores keyHash, so the raw key is
-      // deliverable exactly once — through the agency's own message
-      // thread, already visible via GET .../messages and the agency
-      // portal's GET inbox.
+      // Never persist the raw credential in the agency message thread.
+      // It is returned once to the approving operator and cannot be
+      // recovered from the stored hash afterwards.
       await this.postMessage(
         actor,
         id,
-        `درخواست وب‌سرویس شما تأیید شد. کلید دسترسی API شما: ${rawKey}\nاین کلید فقط همین یک‌بار نمایش داده می‌شود؛ لطفاً آن را در جای امنی ذخیره کنید.`,
+        'درخواست وب‌سرویس شما تأیید شد. برای دریافت امن کلید دسترسی API با مدیر فناوری اطلاعات هماهنگ کنید.',
       );
     }
 
@@ -1636,10 +1674,14 @@ export class AgenciesService {
       entityId: requestId,
     });
 
-    return this.webserviceRequestRepo
+    const decidedRequest = await this.webserviceRequestRepo
       .createQueryBuilder('r')
       .where('r.id = :id', { id: requestId })
       .getOneOrFail();
+    return {
+      request: decidedRequest,
+      ...(issuedKey ? { apiKey: issuedKey } : {}),
+    };
   }
 
   // ── Agency Portal: uploaded document review (staff-side) ───────────────

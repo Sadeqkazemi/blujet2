@@ -25,6 +25,12 @@ import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PanelsModule } from '../panels/panels.module';
 import { AuthModule } from '../auth/auth.module';
+import { AgenciesModule } from '../agencies/agencies.module';
+import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
+import { ItWebservicesController } from './it-webservices.controller';
+import { ItWebservicesService } from './it-webservices.service';
 
 @Module({
   imports: [
@@ -40,11 +46,15 @@ import { AuthModule } from '../auth/auth.module';
       SmsLog,
       BackupRecord,
       AuditLog,
+      AgencyApiKey,
+      AgencyProfile,
+      AgencyWebserviceRequest,
     ]),
     AuditModule,
     NotificationsModule,
     PanelsModule,
     AuthModule,
+    AgenciesModule,
   ],
   controllers: [
     EmployeesController,
@@ -52,6 +62,7 @@ import { AuthModule } from '../auth/auth.module';
     ItServicesController,
     BackupsController,
     ItDashboardController,
+    ItWebservicesController,
   ],
   providers: [
     EmployeesService,
@@ -59,6 +70,7 @@ import { AuthModule } from '../auth/auth.module';
     ItServicesService,
     BackupsService,
     ItDashboardService,
+    ItWebservicesService,
   ],
 })
 export class ItManagerModule {}

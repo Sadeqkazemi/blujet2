@@ -247,6 +247,7 @@ export type AgencyApiScope =
 export const AgencyApiKeyStatus = {
   ACTIVE: 'ACTIVE',
   SUSPENDED: 'SUSPENDED',
+  REVOKED: 'REVOKED',
 } as const;
 export type AgencyApiKeyStatus =
   (typeof AgencyApiKeyStatus)[keyof typeof AgencyApiKeyStatus];
