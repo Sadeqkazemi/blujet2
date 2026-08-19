@@ -19,6 +19,17 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Commercial panel ZIP alignment — service catalog and fare classes
+  (2026-08-19)** — reconciled the supplied commercial-panel handoff and
+  screenshot set with the current React/NestJS implementation. The services
+  screen now exposes the complete fixed catalog plus audited custom services
+  through the existing `/travel-costs` API (no browser-only mock store), and
+  the backend contract accepts collision-resistant `CUSTOM_...` codes while
+  rejecting arbitrary codes. Flight pricing/fare-class controls from the newer
+  handoff remain integrated with the existing flight workflow. Regression
+  coverage proves fixed/custom/invalid service codes and the RTL creation flow.
+  Checklist: `docs/features/commercial-services.md`.
+
 - [x] **IT Manager webservices/API bundle update (2026-08-19)** — added the
   missing dedicated «وب‌سرویس‌ها و API» page and IT-only endpoints over the
   existing agency request, API-key and audit entities; added safe one-time key

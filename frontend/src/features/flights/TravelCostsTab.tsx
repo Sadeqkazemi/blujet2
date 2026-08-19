@@ -12,6 +12,8 @@ const CODE_OPTIONS: Array<{ value: TravelExtraCode; label: string }> = [
   { value: 'DATE_CHANGE', label: 'تغییر تاریخ پرواز' },
   { value: 'REFUND_FEE', label: 'کارمزد استرداد' },
   { value: 'CIP', label: 'خدمات CIP' },
+  { value: 'PET', label: 'حیوان خانگی' },
+  { value: 'WHEELCHAIR', label: 'ویلچر' },
 ];
 
 const UNIT_OPTIONS: Array<{ value: TravelExtraBillingUnit; label: string }> = [

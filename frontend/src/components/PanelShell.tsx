@@ -34,6 +34,7 @@ import SuperAdminSandboxAccess from './SuperAdminSandboxAccess';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import { usePanelNotify } from '../hooks/usePanelNotify';
 import { usePanelInactivityLogout } from '../hooks/usePanelInactivityLogout';
+import { commercialNavWithServices } from './commercial-nav';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -153,6 +154,9 @@ export default function PanelShell() {
     let items = nav;
     if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
       items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
+    }
+    if (user?.role === 'COMMERCIAL_MANAGER') {
+      items = commercialNavWithServices(items);
     }
     return items;
   }, [nav, user?.role, user?.isSuperAdmin]);

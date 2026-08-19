@@ -13,7 +13,7 @@ import {
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { User } from './user.entity';
 
-export const TRAVEL_EXTRA_CODES = [
+export const TRAVEL_EXTRA_FIXED_CODES = [
   'EXTRA_BAGGAGE',
   'SEAT_SELECTION',
   'TRAVEL_INSURANCE',
@@ -21,9 +21,17 @@ export const TRAVEL_EXTRA_CODES = [
   'DATE_CHANGE',
   'REFUND_FEE',
   'CIP',
+  'PET',
+  'WHEELCHAIR',
 ] as const;
 
-export type TravelExtraCode = (typeof TRAVEL_EXTRA_CODES)[number];
+export const TRAVEL_EXTRA_CODES = TRAVEL_EXTRA_FIXED_CODES;
+
+export type TravelExtraFixedCode = (typeof TRAVEL_EXTRA_FIXED_CODES)[number];
+export type TravelExtraCode = TravelExtraFixedCode | `CUSTOM_${string}`;
+
+export const TRAVEL_EXTRA_CODE_PATTERN =
+  /^(?:EXTRA_BAGGAGE|SEAT_SELECTION|TRAVEL_INSURANCE|SPECIAL_MEAL|DATE_CHANGE|REFUND_FEE|CIP|PET|WHEELCHAIR|CUSTOM_[A-Za-z0-9-]{8,64})$/;
 
 export const TRAVEL_EXTRA_BILLING_UNITS = [
   'PER_BOOKING',

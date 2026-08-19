@@ -2858,6 +2858,16 @@ confirmed paid/ticketed passenger seats, active managerial `seat_locks`, and
 company blocks (`seat_locks.classification=FREE`). The public 15-minute hold
 deadline continues to be stored in `bookings.holdExpiresAt`; immutable financial
 sales continue to be stored in `ledger_entries`.
+
+## Commercial travel services (2026-08-19)
+
+No migration is required. The existing `travel_extra_settings` table already
+stores a unique text `code`, Persian `title` and `description`, IRR `price`,
+`billingUnit`, `isActive`, and `availableForPurchase`. The text code supports
+the newly documented fixed `PET` and `WHEELCHAIR` values as well as unique
+`CUSTOM_<identifier>` values for manager-created services. Public visibility is
+derived from the two persisted boolean gates; no duplicate service or pricing
+table is introduced.
 # Senior Manager permission catalog (2026-08)
 
 Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.
