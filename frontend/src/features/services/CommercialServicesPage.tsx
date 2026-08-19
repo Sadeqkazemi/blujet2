@@ -12,7 +12,10 @@ import type {
   TravelCostPayload,
   TravelExtraBillingUnit,
   TravelExtraCode,
+  TravelExtraFixedCode,
 } from '../../types/travel-costs';
+
+type AddServiceChoice = TravelExtraFixedCode | 'CUSTOM';
 
 type ServiceMeta = {
   label: string;
@@ -21,7 +24,7 @@ type ServiceMeta = {
   icon: ReactNode;
 };
 
-const serviceMeta: Record<TravelExtraCode, ServiceMeta> = {
+const serviceMeta: Record<TravelExtraFixedCode, ServiceMeta> = {
   EXTRA_BAGGAGE: {
     label: 'اضافه بار',
     description: 'خرید بار اضافه فراتر از سهمیه بلیت',
@@ -52,6 +55,18 @@ const serviceMeta: Record<TravelExtraCode, ServiceMeta> = {
     billingUnit: 'PER_BOOKING',
     icon: <path d="M9 8H5V4M5 8a8 8 0 1 1-1 8" />,
   },
+  PET: {
+    label: 'حیوان خانگی',
+    description: 'جابجایی حیوان خانگی در کابین یا انبار',
+    billingUnit: 'PER_BOOKING',
+    icon: <path d="M8 11c-2 0-3 2-2 4 1 2 3 4 6 4s5-2 6-4c1-2 0-4-2-4-1 0-2 .7-4 2-2-1.3-3-2-4-2Zm-2-5a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm6-2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm6 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm4 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />,
+  },
+  WHEELCHAIR: {
+    label: 'افزودن ویلچر',
+    description: 'درخواست خدمات ویلچر در فرودگاه و هواپیما',
+    billingUnit: 'PER_PASSENGER',
+    icon: <path d="M10 4a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm0 2v7h5l3 6m-8-9H6m4 3a5 5 0 1 1-4-4" />,
+  },
   SEAT_SELECTION: {
     label: 'انتخاب صندلی',
     description: 'هزینه انتخاب صندلی دلخواه هنگام خرید',
@@ -66,7 +81,27 @@ const serviceMeta: Record<TravelExtraCode, ServiceMeta> = {
   },
 };
 
-const serviceOrder = Object.keys(serviceMeta) as TravelExtraCode[];
+const serviceOrder: TravelExtraFixedCode[] = [
+  'EXTRA_BAGGAGE',
+  'SPECIAL_MEAL',
+  'TRAVEL_INSURANCE',
+  'CIP',
+  'REFUND_FEE',
+  'PET',
+  'WHEELCHAIR',
+  'SEAT_SELECTION',
+];
+
+const customServiceMeta: ServiceMeta = {
+  label: 'خدمت سفارشی',
+  description: 'خدمت سفارشی قابل خرید همراه بلیت',
+  billingUnit: 'PER_BOOKING',
+  icon: <path d="M12 8v8m-4-4h8M4 12a8 8 0 1 0 16 0 8 8 0 0 0-16 0Z" />,
+};
+
+function getServiceMeta(code: TravelExtraCode): ServiceMeta {
+  return code.startsWith('CUSTOM_') ? customServiceMeta : serviceMeta[code as TravelExtraFixedCode] ?? customServiceMeta;
+}
 
 const unitLabels: Record<TravelExtraBillingUnit, string> = {
   PER_BOOKING: 'برای هر رزرو',
@@ -78,7 +113,7 @@ function ServiceIcon({ code }: { code: TravelExtraCode }) {
   return (
     <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[10px] bg-[#18223a] text-[#9fb0c7]">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        {serviceMeta[code].icon}
+        {getServiceMeta(code).icon}
       </svg>
     </span>
   );
@@ -113,7 +148,7 @@ export default function CommercialServicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addCode, setAddCode] = useState<TravelExtraCode>('EXTRA_BAGGAGE');
+  const [addCode, setAddCode] = useState<AddServiceChoice>('EXTRA_BAGGAGE');
   const [addTitle, setAddTitle] = useState('');
   const [addDescription, setAddDescription] = useState('');
   const [addPrice, setAddPrice] = useState('');
@@ -135,7 +170,7 @@ export default function CommercialServicesPage() {
   }, [rows]);
 
   useEffect(() => {
-    if (availableCodes.length > 0 && !availableCodes.includes(addCode)) {
+    if (addCode !== 'CUSTOM' && availableCodes.length > 0 && !availableCodes.includes(addCode)) {
       setAddCode(availableCodes[0]);
     }
   }, [addCode, availableCodes]);
@@ -180,14 +215,11 @@ export default function CommercialServicesPage() {
   }
 
   function startAdd() {
-    if (availableCodes.length === 0) {
-      setError('همه انواع خدمت پشتیبانی‌شده قبلاً ثبت شده‌اند.');
-      return;
-    }
-    const code = availableCodes[0];
+    const code: AddServiceChoice = availableCodes.length > 0 ? availableCodes[0] : 'CUSTOM';
     setAddCode(code);
-    setAddTitle(serviceMeta[code].label);
-    setAddDescription(serviceMeta[code].description);
+    const meta = code === 'CUSTOM' ? customServiceMeta : serviceMeta[code];
+    setAddTitle(code === 'CUSTOM' ? '' : meta.label);
+    setAddDescription(code === 'CUSTOM' ? '' : meta.description);
     setAddPrice('');
     setAddOpen(true);
     setError(null);
@@ -201,11 +233,14 @@ export default function CommercialServicesPage() {
     }
     setBusyId('new');
     setError(null);
+    const meta = addCode === 'CUSTOM' ? customServiceMeta : serviceMeta[addCode];
     const payload: TravelCostPayload = {
-      code: addCode,
+      code: addCode === 'CUSTOM'
+        ? `CUSTOM_${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+        : addCode,
       titleFa: addTitle.trim(),
-      descriptionFa: addDescription.trim() || serviceMeta[addCode].description,
-      billingUnit: serviceMeta[addCode].billingUnit,
+      descriptionFa: addDescription.trim() || meta.description,
+      billingUnit: meta.billingUnit,
       priceIrr: String(priceIrr),
       active: true,
       purchaseEnabled: true,
@@ -279,14 +314,16 @@ export default function CommercialServicesPage() {
                 aria-label="نوع خدمت"
                 value={addCode}
                 onChange={(event) => {
-                  const code = event.target.value as TravelExtraCode;
+                  const code = event.target.value as AddServiceChoice;
                   setAddCode(code);
-                  setAddTitle(serviceMeta[code].label);
-                  setAddDescription(serviceMeta[code].description);
+                  const meta = code === 'CUSTOM' ? customServiceMeta : serviceMeta[code];
+                  setAddTitle(code === 'CUSTOM' ? '' : meta.label);
+                  setAddDescription(code === 'CUSTOM' ? '' : meta.description);
                 }}
                 className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white"
               >
                 {availableCodes.map((code) => <option key={code} value={code}>{serviceMeta[code].label}</option>)}
+                <option value="CUSTOM">خدمت سفارشی</option>
               </select>
             </label>
             <label className="text-[11px] text-[#9fb0c7]">
@@ -313,7 +350,7 @@ export default function CommercialServicesPage() {
           <p className="p-10 text-center text-xs leading-6 text-[#6b7b94]">هنوز خدمتی ثبت نشده است. برای شروع «افزودن خدمت جدید» را انتخاب کنید.</p>
         ) : (
           rows.map((row) => {
-            const meta = serviceMeta[row.code];
+            const meta = getServiceMeta(row.code);
             const disabled = busyId === row.id;
             return (
               <article key={row.id} className="grid grid-cols-1 gap-4 border-b border-[#1f2a3d] px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1fr)_minmax(300px,420px)] lg:items-center">
@@ -337,9 +374,11 @@ export default function CommercialServicesPage() {
                   <button type="button" disabled={disabled} onClick={() => void savePrice(row)} className="h-10 rounded-[9px] bg-[linear-gradient(135deg,#7c3aed,#8b5cf6)] px-4 text-xs font-extrabold text-white disabled:opacity-50">ثبت قیمت</button>
                   <span className={`min-w-[48px] text-[11px] font-bold ${row.active ? 'text-[#34d399]' : 'text-[#6b7b94]'}`}>{row.active ? 'فعال' : 'غیرفعال'}</span>
                   <Toggle checked={row.active} disabled={disabled} onChange={() => void toggle(row)} />
-                  <button type="button" disabled={disabled} onClick={() => setDeleteTarget(row)} aria-label={`حذف ${row.titleFa}`} className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[rgba(248,113,113,.1)] text-[#f87171] disabled:opacity-50">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6" /></svg>
-                  </button>
+                  {row.code.startsWith('CUSTOM_') && (
+                    <button type="button" disabled={disabled} onClick={() => setDeleteTarget(row)} aria-label={`حذف ${row.titleFa}`} className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-[rgba(248,113,113,.1)] text-[#f87171] disabled:opacity-50">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V4h6v3m-9 0 1 14h10l1-14M10 11v6m4-6v6" /></svg>
+                    </button>
+                  )}
                 </div>
               </article>
             );

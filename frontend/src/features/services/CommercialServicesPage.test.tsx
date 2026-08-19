@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as travelCostsApi from '../../api/travel-costs';
+import type { TravelCost } from '../../types/travel-costs';
 import CommercialServicesPage from './CommercialServicesPage';
 
 vi.mock('../../api/travel-costs');
@@ -60,5 +61,44 @@ describe('CommercialServicesPage', () => {
         purchaseEnabled: false,
       });
     });
+  });
+
+  it('creates a custom service with a backend-valid stable code', async () => {
+    const user = userEvent.setup();
+    const customService: TravelCost = {
+      ...insurance,
+      id: 'cost-custom-1',
+      code: 'CUSTOM_test-12345678',
+      titleFa: 'خدمت سفارشی تست',
+      descriptionFa: 'شرح خدمت سفارشی',
+      billingUnit: 'PER_BOOKING',
+      priceIrr: '750000',
+      sortOrder: 1,
+    };
+    vi.mocked(travelCostsApi.createTravelCost).mockResolvedValue(customService);
+
+    render(<CommercialServicesPage />);
+    await screen.findByText('بیمه مسافرتی');
+
+    await user.click(screen.getByRole('button', { name: /افزودن خدمت جدید/ }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'نوع خدمت' }), 'CUSTOM');
+    await user.type(screen.getByRole('textbox', { name: 'عنوان خدمت' }), 'خدمت سفارشی تست');
+    await user.type(screen.getByRole('textbox', { name: 'توضیح خدمت' }), 'شرح خدمت سفارشی');
+    await user.type(screen.getByRole('textbox', { name: 'قیمت خدمت جدید' }), '75000');
+    await user.click(screen.getByRole('button', { name: 'ثبت خدمت' }));
+
+    await waitFor(() => {
+      expect(travelCostsApi.createTravelCost).toHaveBeenCalledWith({
+        code: expect.stringMatching(/^CUSTOM_[A-Za-z0-9-]{8,64}$/),
+        titleFa: 'خدمت سفارشی تست',
+        descriptionFa: 'شرح خدمت سفارشی',
+        billingUnit: 'PER_BOOKING',
+        priceIrr: '750000',
+        active: true,
+        purchaseEnabled: true,
+        sortOrder: 1,
+      });
+    });
+    expect(await screen.findByText('خدمت «خدمت سفارشی تست» اضافه شد.')).toBeInTheDocument();
   });
 });

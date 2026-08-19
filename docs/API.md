@@ -3711,6 +3711,30 @@ flows are unaffected by this extra public-site gate.
 a Persian reason. This server decision is separate from the persisted advisory
 `aiSuggestion`; the browser must not recompute weak-sale eligibility from its
 own clock.
+
+## Commercial travel services (2026-08-19)
+
+Commercial Managers configure optional passenger services through the existing
+travel-cost endpoints. Fixed service codes are `EXTRA_BAGGAGE`,
+`SPECIAL_MEAL`, `TRAVEL_INSURANCE`, `CIP`, `REFUND_FEE`, `PET`,
+`WHEELCHAIR`, `SEAT_SELECTION`, and the legacy `DATE_CHANGE`. Custom service
+codes use `CUSTOM_<identifier>` where the identifier is 8–64 ASCII letters,
+digits, or hyphens. The display name and description remain server-owned data,
+so clients must render unknown valid custom codes without relying on a local
+enum.
+
+| Method | Path | Role | Notes |
+|---|---|---|---|
+| GET | `/travel-costs` | COMMERCIAL_MANAGER | All fixed and custom services |
+| POST | `/travel-costs` | COMMERCIAL_MANAGER | Create a unique fixed or custom service |
+| PATCH | `/travel-costs/:id` | COMMERCIAL_MANAGER | Update title, price, billing unit, active and purchase flags |
+| DELETE | `/travel-costs/:id` | COMMERCIAL_MANAGER | Remove a service definition |
+| GET | `/public/travel-costs` | public | Active services enabled for purchase |
+
+Money remains an IRR decimal string on the wire. The Commercial UI converts
+the screenshot's تومان values at its boundary. A service is offered publicly
+only when both `isActive` and `availableForPurchase` are true.
+
 # Senior Manager panel completion (2026-08)
 
 - `GET /panels/nav` returns the approved Senior Manager sidebar without `customers`, `reservation`, or `aircraft`.

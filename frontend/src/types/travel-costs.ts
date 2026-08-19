@@ -1,5 +1,15 @@
-export type TravelExtraCode =
-  'EXTRA_BAGGAGE' | 'SEAT_SELECTION' | 'TRAVEL_INSURANCE' | 'SPECIAL_MEAL' | 'DATE_CHANGE' | 'REFUND_FEE' | 'CIP';
+export type TravelExtraFixedCode =
+  | 'EXTRA_BAGGAGE'
+  | 'SEAT_SELECTION'
+  | 'TRAVEL_INSURANCE'
+  | 'SPECIAL_MEAL'
+  | 'DATE_CHANGE'
+  | 'REFUND_FEE'
+  | 'CIP'
+  | 'PET'
+  | 'WHEELCHAIR';
+
+export type TravelExtraCode = TravelExtraFixedCode | `CUSTOM_${string}`;
 
 export type TravelExtraBillingUnit = 'PER_BOOKING' | 'PER_PASSENGER' | 'PER_KG';
 

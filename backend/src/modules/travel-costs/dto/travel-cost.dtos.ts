@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  Matches,
   IsOptional,
   IsString,
   Max,
@@ -18,14 +19,19 @@ import {
 import type { Irr } from '../../../common/money';
 import {
   TRAVEL_EXTRA_BILLING_UNITS,
-  TRAVEL_EXTRA_CODES,
+  TRAVEL_EXTRA_CODE_PATTERN,
   type TravelExtraBillingUnit,
   type TravelExtraCode,
 } from '../../../database/entities/travel-extra-setting.entity';
 
 export class CreateTravelCostDto {
-  @ApiProperty({ enum: TRAVEL_EXTRA_CODES })
-  @IsIn(TRAVEL_EXTRA_CODES)
+  @ApiProperty({
+    type: String,
+    example: 'CUSTOM_priority-service',
+    description:
+      'کد ثابت خدمت یا کد سفارشی با پیشوند CUSTOM_ و شناسه ۸ تا ۶۴ کاراکتری',
+  })
+  @Matches(TRAVEL_EXTRA_CODE_PATTERN)
   code!: TravelExtraCode;
 
   @ApiProperty({ example: 'بار اضافه' })

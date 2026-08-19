@@ -86,4 +86,60 @@ describe('Travel costs (e2e)', () => {
       .expect(200);
     expect(await dataSource.getRepository(TravelExtraSetting).count()).toBe(0);
   });
+
+  it('supports pet, wheelchair and multiple custom commercial services', async () => {
+    const commercial = await loginAs(app, 'comm');
+    const auth = { Authorization: `Bearer ${commercial.accessToken}` };
+    const services = [
+      { code: 'PET', titleFa: 'حیوان خانگی', billingUnit: 'PER_BOOKING' },
+      {
+        code: 'WHEELCHAIR',
+        titleFa: 'افزودن ویلچر',
+        billingUnit: 'PER_PASSENGER',
+      },
+      {
+        code: 'CUSTOM_LOUNGE-2026',
+        titleFa: 'لانژ اختصاصی',
+        billingUnit: 'PER_PASSENGER',
+      },
+      {
+        code: 'CUSTOM_FASTTRACK-2026',
+        titleFa: 'فست ترک',
+        billingUnit: 'PER_BOOKING',
+      },
+    ];
+
+    for (const service of services) {
+      await request(app.getHttpServer())
+        .post('/travel-costs')
+        .set(auth)
+        .send({
+          ...service,
+          priceIrr: '500000',
+          active: true,
+          purchaseEnabled: true,
+        })
+        .expect(201);
+    }
+
+    await request(app.getHttpServer())
+      .get('/public/travel-costs')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.data.map((item: { code: string }) => item.code)).toEqual(
+          expect.arrayContaining(services.map(({ code }) => code)),
+        );
+      });
+
+    await request(app.getHttpServer())
+      .post('/travel-costs')
+      .set(auth)
+      .send({
+        code: 'CUSTOM_bad code',
+        titleFa: 'نامعتبر',
+        billingUnit: 'PER_BOOKING',
+        priceIrr: '500000',
+      })
+      .expect(400);
+  });
 });
