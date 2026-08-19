@@ -66,6 +66,7 @@ export interface FlightRow {
   // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
   // on the backend — a JS number can't safely hold IRR amounts above 2^53).
   basePriceIrr: string | null;
+  publicSaleEnabled?: boolean;
   derivedStatus: DerivedFlightStatus;
   durationMinutes?: number;
   cabinCapacities?: CabinCapacity[];
@@ -211,6 +212,35 @@ export interface FareRuleRow {
   allowedChannels: ("SYSTEM" | "CHARTER" | "AGENCY")[];
 }
 
+export interface FareClassPriceHistory {
+  previousPriceIrr: string;
+  newPriceIrr: string;
+  reason: string;
+  changedAt: string;
+}
+
+export interface CommercialFareClassControl {
+  ruleId: string;
+  cabin: CabinKind;
+  classCode: string;
+  seatsAllocated: number;
+  soldSeats: number;
+  remainingSeats: number;
+  revenueIrr: string;
+  basePriceIrr: string;
+  sitePriceIrr: string | null;
+  agencySeatsReleased: number;
+  agencyReleasePriceIrr: string | null;
+  agencySpecialOffer: boolean;
+  priceHistory: FareClassPriceHistory[];
+}
+
+export interface CommercialFlightControl {
+  flightInstanceId: string;
+  publicSaleEnabled: boolean;
+  fareClasses: CommercialFareClassControl[];
+}
+
 export interface CreateFareRulePayload {
   cabin: CabinKind;
   classCode: string;
@@ -261,6 +291,13 @@ export interface FlightDefinitionDetail extends FlightRow {
   uiStatus?: string;
   version: number;
   publishedAt?: string | null;
+  pricingProposal?: {
+    proposedPriceIrr: string;
+    legalRateIrr: string | null;
+    ceoNote: string | null;
+    operationsNote: string | null;
+    commercialNote: string | null;
+  } | null;
 }
 
 export type OperationsFlightStatus =
@@ -286,6 +323,9 @@ export interface OperationsFlightRow {
     proposedPriceIrr: string;
     legalRateIrr: string | null;
     note: string | null;
+    ceoNote?: string | null;
+    operationsNote?: string | null;
+    commercialNote?: string | null;
     status: string;
     proposedBy: { id: string; fullName: string } | null;
   } | null;

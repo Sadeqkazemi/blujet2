@@ -728,6 +728,9 @@ describe('Agency Portal (e2e)', () => {
       .createQueryBuilder('instance')
       .leftJoinAndSelect('instance.flight', 'flight')
       .where('instance.status = :status', { status: 'SCHEDULED' })
+      .andWhere(
+        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
+      )
       .getOneOrFail();
     await dataSource
       .createQueryBuilder()
@@ -796,6 +799,9 @@ describe('Agency Portal (e2e)', () => {
       .getRepository(FlightInstance)
       .createQueryBuilder('instance')
       .where('instance.status = :status', { status: 'SCHEDULED' })
+      .andWhere(
+        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
+      )
       .getOneOrFail();
     await dataSource
       .createQueryBuilder()
@@ -879,6 +885,9 @@ describe('Agency Portal (e2e)', () => {
       .getRepository(FlightInstance)
       .createQueryBuilder('instance')
       .where('instance.status = :status', { status: 'SCHEDULED' })
+      .andWhere(
+        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
+      )
       .getOneOrFail();
     await dataSource
       .createQueryBuilder()

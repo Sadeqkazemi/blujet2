@@ -49,8 +49,21 @@ export class FareRule {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   priceIrr!: bigint;
 
+  /** Optional public-site price, independent from the approved base price. */
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  sitePriceIrr!: bigint | null;
+
   @Column({ type: 'int' })
   seatsAllocated!: number;
+
+  @Column({ type: 'int', default: 0 })
+  agencySeatsReleased!: number;
+
+  @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
+  agencyReleasePriceIrr!: bigint | null;
+
+  @Column({ type: 'boolean', default: false })
+  agencySpecialOffer!: boolean;
 
   @Column({ type: 'boolean', default: true })
   refundable!: boolean;

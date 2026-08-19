@@ -759,9 +759,9 @@ function CeoPricing() {
                     </button>
                   </div>
                 ) : (
-                  p.note && (
+                  (p.ceoNote ?? p.note) && (
                     <p className="mt-[11px] text-xs leading-[1.9] text-[#8494ac]">
-                      یادداشت مدیر بازرگانی: {p.note}
+                      یادداشت برای مدیرعامل: {p.ceoNote ?? p.note}
                     </p>
                   )
                 )}

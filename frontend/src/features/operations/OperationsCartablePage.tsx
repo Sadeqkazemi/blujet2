@@ -83,7 +83,7 @@ export default function OperationsCartablePage() {
               <Metric label="نرخ قانونی" value={money(row.proposal?.legalRateIrr)} />
             </div>
 
-            {row.proposal?.note && <p className="mt-4 rounded-xl border border-blue-400/20 bg-blue-400/5 p-3 text-xs leading-7 text-blue-100">یادداشت مدیر بازرگانی: {row.proposal.note}</p>}
+            {(row.proposal?.operationsNote ?? row.proposal?.note) && <p className="mt-4 rounded-xl border border-blue-400/20 bg-blue-400/5 p-3 text-xs leading-7 text-blue-100">یادداشت برای مدیر عملیات: {row.proposal?.operationsNote ?? row.proposal?.note}</p>}
             <label className="mt-4 block text-xs font-bold text-[#9fb0c7]" htmlFor={`ops-comment-${row.id}`}>نظر / دلیل تصمیم</label>
             <textarea id={`ops-comment-${row.id}`} value={comments[row.id] ?? ""} onChange={(event) => setComments((current) => ({ ...current, [row.id]: event.target.value }))} rows={3} placeholder="نظر یا دلیل تصمیم خود را بنویسید…" className="mt-2 w-full rounded-xl border border-[#2b3850] bg-[#0e1625] px-4 py-3 text-sm text-white outline-none focus:border-blue-400" />
             <div className="mt-4 flex flex-wrap gap-3">

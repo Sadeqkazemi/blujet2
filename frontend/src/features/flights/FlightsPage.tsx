@@ -37,6 +37,7 @@ import FlightCitiesTab from "./FlightCitiesTab";
 import TravelCostsTab from "./TravelCostsTab";
 import AddFlightPage from "./AddFlightPage";
 import FlightLifecycleModal from "./FlightLifecycleModal";
+import CommercialFareClassControls from "./components/CommercialFareClassControls";
 import MdSeatMapModal from "../reservation/MdSeatMapModal";
 import { updatePublishedPrice } from "../../api/pricing";
 import type {
@@ -1518,6 +1519,12 @@ export default function FlightsPage() {
           </div>
 
           <FareRulesSection instanceId={detail.id} readOnly={!canManageFlights} />
+          <CommercialFareClassControls
+            instanceId={detail.id}
+            canManage={canPublishFareAndControlSeats && canManageFlights}
+            onNotice={setNotice}
+            onError={setError}
+          />
           </div>
           {detailTab === "seats" && (
             <MdSeatMapModal

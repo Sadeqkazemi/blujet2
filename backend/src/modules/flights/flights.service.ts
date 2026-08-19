@@ -22,6 +22,7 @@ import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
@@ -91,8 +92,7 @@ export function commercialSalesHealth(
     capacity > 0 ? Math.round((Math.max(0, sold) / capacity) * 100) : 0;
   const hoursToDeparture = Math.max(
     0,
-    Math.round(((departureAt.getTime() - now.getTime()) / 3_600_000) * 10) /
-      10,
+    Math.round(((departureAt.getTime() - now.getTime()) / 3_600_000) * 10) / 10,
   );
   const isWeak =
     departureAt > now &&
@@ -190,6 +190,7 @@ export class FlightsService {
       charterSeats: i.charterSeats,
       sold,
       basePriceIrr: i.basePriceIrr,
+      publicSaleEnabled: i.publicSaleEnabled,
     };
   }
 
@@ -1094,6 +1095,286 @@ export class FlightsService {
       where: { flightInstanceId: instanceId },
       order: { cabin: 'ASC', priceIrr: 'ASC' },
     });
+  }
+
+  private async loadCommercialInstance(instanceId: string) {
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :instanceId', { instanceId })
+      .getOne();
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+    return instance;
+  }
+
+  private async invalidateFlightSearch(instance: FlightInstance) {
+    const route = instance.flight?.route;
+    if (!route) return;
+    const date = instance.departureAt.toISOString().slice(0, 10);
+    await this.redis.del(
+      `search:flights:${route.originCode.toUpperCase()}:${route.destCode.toUpperCase()}:${date}`,
+    );
+  }
+
+  async updateSalesVisibility(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    enabled: boolean,
+  ) {
+    const instance = await this.loadCommercialInstance(instanceId);
+    if (
+      enabled &&
+      (instance.status !== FlightInstanceStatus.SCHEDULED ||
+        !isSellableDefinitionStatus(
+          instance.definitionStatus,
+          instance.approvedSnapshot != null,
+        ))
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'فقط پرواز تأییدشده و زمان‌بندی‌شده قابل نمایش در سایت است.',
+      });
+    }
+    const previous = instance.publicSaleEnabled;
+    instance.publicSaleEnabled = enabled;
+    instance.version += 1;
+    const saved = await this.instanceRepo.save(instance);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'تغییر وضعیت فروش عمومی پرواز',
+      detail: `فروش عمومی پرواز ${instance.flight.flightNo} توسط ${actor.fullName} ${enabled ? 'فعال' : 'غیرفعال'} شد.`,
+      entityType: 'FlightInstance',
+      entityId: instance.id,
+      metadata: { previous, enabled },
+    });
+    await this.invalidateFlightSearch(instance);
+    return {
+      flightInstanceId: saved.id,
+      publicSaleEnabled: saved.publicSaleEnabled,
+      version: saved.version,
+    };
+  }
+
+  async commercialControl(instanceId: string) {
+    const instance = await this.loadCommercialInstance(instanceId);
+    const rules = await this.listFareRules(instanceId);
+    const soldRows = await this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select('b.cabin', 'cabin')
+      .addSelect('b.fareClassCode', 'classCode')
+      .addSelect('COUNT(p.id)', 'soldSeats')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .andWhere('p.occupiesSeat = true')
+      .andWhere('p.deletedAt IS NULL')
+      .groupBy('b.cabin')
+      .addGroupBy('b.fareClassCode')
+      .getRawMany<{
+        cabin: CabinClass;
+        classCode: string | null;
+        soldSeats: string;
+      }>();
+    const revenueRows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.cabin', 'cabin')
+      .addSelect('b.fareClassCode', 'classCode')
+      .addSelect('SUM(b.priceIrr)', 'revenueIrr')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .groupBy('b.cabin')
+      .addGroupBy('b.fareClassCode')
+      .getRawMany<{
+        cabin: CabinClass;
+        classCode: string | null;
+        revenueIrr: string | null;
+      }>();
+
+    const ruleIds = rules.map((rule) => rule.id);
+    const history =
+      ruleIds.length > 0
+        ? await this.dataSource
+            .getRepository(AuditLog)
+            .createQueryBuilder('a')
+            .where('a.entityType = :entityType', { entityType: 'FareRule' })
+            .andWhere('a.entityId IN (:...ruleIds)', { ruleIds })
+            .andWhere('a.action = :action', {
+              action: 'تغییر قیمت فروش سایت کلاس نرخی',
+            })
+            .orderBy('a.createdAt', 'DESC')
+            .getMany()
+        : [];
+
+    return {
+      flightInstanceId: instance.id,
+      publicSaleEnabled: instance.publicSaleEnabled,
+      fareClasses: rules.map((rule) => {
+        const sold = soldRows.find(
+          (row) => row.cabin === rule.cabin && row.classCode === rule.classCode,
+        );
+        const revenue = revenueRows.find(
+          (row) => row.cabin === rule.cabin && row.classCode === rule.classCode,
+        );
+        const priceHistory = history
+          .filter((entry) => entry.entityId === rule.id)
+          .map((entry) => {
+            const metadata =
+              entry.metadata &&
+              !Array.isArray(entry.metadata) &&
+              typeof entry.metadata === 'object'
+                ? entry.metadata
+                : {};
+            return {
+              previousPriceIrr:
+                typeof metadata.previousPriceIrr === 'string'
+                  ? metadata.previousPriceIrr
+                  : '0',
+              newPriceIrr:
+                typeof metadata.newPriceIrr === 'string'
+                  ? metadata.newPriceIrr
+                  : '0',
+              reason:
+                typeof metadata.reason === 'string' ? metadata.reason : '',
+              changedAt: entry.createdAt.toISOString(),
+            };
+          });
+        const soldSeats = Number(sold?.soldSeats ?? 0);
+        return {
+          ruleId: rule.id,
+          cabin: rule.cabin,
+          classCode: rule.classCode,
+          seatsAllocated: rule.seatsAllocated,
+          soldSeats,
+          remainingSeats: Math.max(0, rule.seatsAllocated - soldSeats),
+          revenueIrr: String(revenue?.revenueIrr ?? '0'),
+          basePriceIrr: rule.priceIrr.toString(),
+          sitePriceIrr: rule.sitePriceIrr?.toString() ?? null,
+          agencySeatsReleased: rule.agencySeatsReleased,
+          agencyReleasePriceIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
+          agencySpecialOffer: rule.agencySpecialOffer,
+          priceHistory,
+        };
+      }),
+    };
+  }
+
+  private async loadFareRuleForCommercialControl(
+    instanceId: string,
+    ruleId: string,
+  ) {
+    const rule = await this.fareRuleRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+      .leftJoinAndSelect('flightInstance.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('r.id = :ruleId', { ruleId })
+      .getOne();
+    if (!rule || rule.flightInstanceId !== instanceId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کلاس نرخی یافت نشد.',
+      });
+    }
+    return rule;
+  }
+
+  async updateFareClassSitePrice(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    ruleId: string,
+    priceIrr: Irr,
+    reason: string,
+  ) {
+    const trimmedReason = reason.trim();
+    if (trimmedReason.length < 2) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'دلیل تغییر قیمت را وارد کنید.',
+      });
+    }
+    const rule = await this.loadFareRuleForCommercialControl(
+      instanceId,
+      ruleId,
+    );
+    const previousPriceIrr = rule.sitePriceIrr ?? rule.priceIrr;
+    rule.sitePriceIrr = priceIrr;
+    const saved = await this.fareRuleRepo.save(rule);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'تغییر قیمت فروش سایت کلاس نرخی',
+      detail: `قیمت فروش سایت کلاس ${rule.classCode} پرواز ${rule.flightInstance.flight.flightNo} توسط ${actor.fullName} تغییر کرد.`,
+      entityType: 'FareRule',
+      entityId: rule.id,
+      metadata: {
+        previousPriceIrr: previousPriceIrr.toString(),
+        newPriceIrr: priceIrr.toString(),
+        reason: trimmedReason,
+      },
+    });
+    await this.invalidateFlightSearch(rule.flightInstance);
+    return saved;
+  }
+
+  async upsertAgencyFareRelease(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    ruleId: string,
+    dto: { seats: number; priceIrr: Irr; specialOffer?: boolean },
+  ) {
+    const rule = await this.loadFareRuleForCommercialControl(
+      instanceId,
+      ruleId,
+    );
+    const soldRow = await this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select('COUNT(p.id)', 'soldSeats')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.cabin = :cabin', { cabin: rule.cabin })
+      .andWhere('b.fareClassCode = :classCode', { classCode: rule.classCode })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .andWhere('p.occupiesSeat = true')
+      .andWhere('p.deletedAt IS NULL')
+      .getRawOne<{ soldSeats: string }>();
+    const remaining = Math.max(
+      0,
+      rule.seatsAllocated - Number(soldRow?.soldSeats ?? 0),
+    );
+    if (dto.seats > remaining) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `حداکثر ${remaining} صندلی از این کلاس قابل آزادسازی است.`,
+      });
+    }
+    rule.agencySeatsReleased = dto.seats;
+    rule.agencyReleasePriceIrr = dto.seats > 0 ? dto.priceIrr : null;
+    rule.agencySpecialOffer = dto.seats > 0 && (dto.specialOffer ?? false);
+    const saved = await this.fareRuleRepo.save(rule);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'آزادسازی آژانسی کلاس نرخی',
+      detail: `${dto.seats} صندلی از کلاس ${rule.classCode} پرواز ${rule.flightInstance.flight.flightNo} برای فروش آژانسی تنظیم شد.`,
+      entityType: 'FareRule',
+      entityId: rule.id,
+      metadata: {
+        seats: dto.seats,
+        priceIrr: dto.priceIrr.toString(),
+        specialOffer: dto.specialOffer ?? false,
+      },
+    });
+    return saved;
   }
 
   /** Physical seat count for one cabin — prefers flight-definition

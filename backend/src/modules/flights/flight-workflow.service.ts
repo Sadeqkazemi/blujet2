@@ -231,6 +231,9 @@ export class FlightWorkflowService {
               proposedPriceIrr: proposal.proposedPriceIrr.toString(),
               legalRateIrr: proposal.legalRateIrr?.toString() ?? null,
               note: proposal.note,
+              ceoNote: proposal.ceoNote,
+              operationsNote: proposal.operationsNote,
+              commercialNote: proposal.commercialNote,
               status: proposal.status,
               proposedBy: proposal.proposedBy
                 ? {

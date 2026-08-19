@@ -101,6 +101,10 @@ export class FlightInstance {
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   saleStartsAt!: Date | null;
 
+  /** Explicit commercial gate for exposing this flight on the public site. */
+  @Column({ type: 'boolean', default: true })
+  publicSaleEnabled!: boolean;
+
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   niraSubmittedAt!: Date | null;
 

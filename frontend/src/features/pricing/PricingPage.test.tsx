@@ -190,7 +190,7 @@ describe("PricingPage", () => {
       1,
     );
     expect(screen.getByText("تحلیل کامل هوش مصنوعی")).toBeInTheDocument();
-    expect(screen.getByText(/یادداشت مدیر بازرگانی/)).toBeInTheDocument();
+    expect(screen.getByText(/یادداشت برای مدیرعامل/)).toBeInTheDocument();
     // Registered list with the locked badge.
     expect(screen.getByText("قیمت‌های ثبت‌شده")).toBeInTheDocument();
     expect(screen.getByText("قفل‌شده")).toBeInTheDocument();

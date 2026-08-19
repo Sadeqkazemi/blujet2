@@ -187,6 +187,7 @@ export class SearchService {
       .leftJoinAndSelect('fi.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route')
       .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.publicSaleEnabled = true')
       .andWhere('fi.departureAt >= :dayStart', { dayStart })
       .andWhere('fi.departureAt < :dayEnd', { dayEnd })
       .andWhere('LOWER(route.originCode) = LOWER(:origin)', { origin })
@@ -290,6 +291,7 @@ export class SearchService {
       .leftJoinAndSelect('fi.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route')
       .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.publicSaleEnabled = true')
       .andWhere('fi.departureAt >= :dayStart', { dayStart })
       .andWhere('fi.departureAt < :dayEnd', { dayEnd })
       .andWhere('LOWER(route.originCode) = LOWER(:origin)', { origin });
@@ -301,6 +303,7 @@ export class SearchService {
       .leftJoinAndSelect('fi.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route')
       .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.publicSaleEnabled = true')
       .andWhere('fi.departureAt >= :dayStart', { dayStart })
       .andWhere('LOWER(route.destCode) = LOWER(:dest)', { dest });
     this.applySaleWindowOpen(secondLegsQb, 'fi', now);

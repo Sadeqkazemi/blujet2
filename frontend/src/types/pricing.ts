@@ -33,6 +33,9 @@ export interface PricingProposal {
   proposedPriceIrr: string;
   legalRateIrr: string | null;
   note: string | null;
+  ceoNote?: string | null;
+  operationsNote?: string | null;
+  commercialNote?: string | null;
   status: PricingStatus;
   registeredPriceIrr: string | null;
   approvedAt: string | null;
