@@ -3,10 +3,13 @@ import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
+  ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsObject,
   IsString,
+  MaxLength,
   Max,
   Min,
   ValidateNested,
@@ -18,6 +21,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { SITE_RULE_IDS } from './settings.service';
 
 export class UpdateSettingsDto {
   @ApiProperty({
@@ -49,6 +53,32 @@ export class UpdateRefundRulesDto {
   rules: RefundRuleUpdate[];
 }
 
+export class SiteRuleCategoryDto {
+  @ApiProperty({ enum: SITE_RULE_IDS })
+  @IsIn(SITE_RULE_IDS)
+  id!: string;
+
+  @ApiProperty({ maxLength: 120 })
+  @IsString()
+  @MaxLength(120)
+  title!: string;
+
+  @ApiProperty({ maxLength: 12000 })
+  @IsString()
+  @MaxLength(12000)
+  text!: string;
+}
+
+export class UpdateSiteRulesDto {
+  @ApiProperty({ type: [SiteRuleCategoryDto] })
+  @IsArray()
+  @ArrayMinSize(7)
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => SiteRuleCategoryDto)
+  categories!: SiteRuleCategoryDto[];
+}
+
 @ApiTags('settings')
 @Controller('settings')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
@@ -75,6 +105,26 @@ export class SettingsController {
     return {
       success: true,
       data: await this.settings.update(actor, dto.patch),
+    };
+  }
+
+  @Get('site-rules')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({ summary: 'دریافت هفت دستهٔ قابل‌ویرایش قوانین سایت' })
+  async getSiteRules() {
+    return { success: true, data: await this.settings.getSiteRules() };
+  }
+
+  @Patch('site-rules')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({ summary: 'ذخیره و انتشار دسته‌های قوانین سایت' })
+  async updateSiteRules(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: UpdateSiteRulesDto,
+  ) {
+    return {
+      success: true,
+      data: await this.settings.updateSiteRules(actor, dto),
     };
   }
 

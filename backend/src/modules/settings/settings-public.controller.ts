@@ -47,4 +47,17 @@ export class SettingsPublicController {
       data: await this.settings.getPublicSiteContent(loc),
     };
   }
+
+  @Get('site-rules/public')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  @ApiOperation({ summary: 'قوانین منتشرشده برای صفحهٔ عمومی سایت' })
+  @ApiQuery({ name: 'locale', required: false, enum: ['fa', 'en', 'ar'] })
+  async getSiteRules(@Query('locale') locale?: PublicContentLocale) {
+    const loc =
+      locale === 'en' || locale === 'ar' || locale === 'fa' ? locale : 'fa';
+    return {
+      success: true,
+      data: await this.settings.getPublicSiteRules(loc),
+    };
+  }
 }

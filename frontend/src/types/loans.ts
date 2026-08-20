@@ -31,6 +31,11 @@ export interface LoanApplication {
   updatedAt: string;
   lastSyncedAt: string | null;
   userId?: string;
+  customer?: {
+    id: string;
+    fullName: string;
+    phone: string | null;
+  } | null;
   statusSummary?: Record<string, unknown> | null;
   walletCreditReference?: string | null;
 }

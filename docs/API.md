@@ -3719,3 +3719,16 @@ are not added to the checkout extras catalog (closed `TravelExtraCode` enum).
 `GET /panels/nav` for `COMMERCIAL_MANAGER` includes
 `{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`.
 
+## Site-admin rules editor and loan projection (2026-08-20)
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/settings/site-rules` | `SITE_ADMIN` | Returns the seven ordered rule categories from the server-owned `siteRules` setting. |
+| PATCH | `/settings/site-rules` | `SITE_ADMIN` | Accepts `{ categories: [{ id, title, text }] }`; requires each fixed id exactly once, persists atomically, and audits the update. |
+| GET | `/settings/site-rules/public?locale=fa` | public | Returns the saved Persian rules. Non-Persian locales return no editable override so the client retains its approved translated fallback. |
+
+`GET /admin/loan-applications` and
+`GET /admin/loan-applications/:id` remain read-only and additionally return
+`customer: { id, fullName, phone }` from the related real user when present.
+No loan decision endpoint is introduced.
+

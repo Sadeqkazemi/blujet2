@@ -6,6 +6,7 @@ import * as argon2 from 'argon2';
 import { DataSource } from 'typeorm';
 import { User } from '../src/database/entities/user.entity';
 import { RefundPenaltyRule } from '../src/database/entities/refund-penalty-rule.entity';
+import { SystemSetting } from '../src/database/entities/system-setting.entity';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { Role } from '../src/database/enums';
@@ -311,6 +312,53 @@ describe('Phase 12 — admins, security, settings, CEO logs, IT panels (e2e)', (
       .get('/settings')
       .set('Authorization', auth(chair.accessToken));
     expect(chairForbidden.status).toBe(403);
+  });
+
+  it('site admin saves exactly seven rule categories and the public Persian projection reads the same row', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const categories = [
+      ['purchase', 'خرید تست', 'متن خرید'],
+      ['refund', 'استرداد تست', 'متن استرداد'],
+      ['change', 'تغییر تست', 'متن تغییر'],
+      ['baggage', 'بار تست', 'متن بار'],
+      ['club', 'باشگاه تست', 'متن باشگاه'],
+      ['privacy', 'حریم تست', 'متن حریم'],
+      ['pets', 'حیوان تست', 'متن حیوان'],
+    ].map(([id, title, text]) => ({ id, title, text }));
+
+    const saved = await request(app.getHttpServer())
+      .patch('/settings/site-rules')
+      .set('Authorization', auth(siteAdmin.accessToken))
+      .send({ categories });
+    expect(saved.status).toBe(200);
+    expect(saved.body.data.categories).toHaveLength(7);
+
+    const persisted = await dataSource
+      .getRepository(SystemSetting)
+      .findOneByOrFail({ key: 'siteRules' });
+    expect(persisted.updatedById).toBeTruthy();
+
+    const publicRules = await request(app.getHttpServer()).get(
+      '/settings/site-rules/public?locale=fa',
+    );
+    expect(publicRules.status).toBe(200);
+    expect(publicRules.body.data.categories[0].title).toBe('خرید تست');
+
+    const invalid = await request(app.getHttpServer())
+      .patch('/settings/site-rules')
+      .set('Authorization', auth(siteAdmin.accessToken))
+      .send({
+        categories: categories.map((item) => ({ ...item, id: 'purchase' })),
+      });
+    expect(invalid.status).toBe(400);
+
+    const it = await loginAs(app, 'itadmin');
+    const forbidden = await request(app.getHttpServer())
+      .get('/settings/site-rules')
+      .set('Authorization', auth(it.accessToken));
+    expect(forbidden.status).toBe(403);
+
+    await dataSource.getRepository(SystemSetting).delete({ key: 'siteRules' });
   });
 
   it('IT_MANAGER can only write its own operational keys — payment-gateway/brand keys are Board Chair-only', async () => {

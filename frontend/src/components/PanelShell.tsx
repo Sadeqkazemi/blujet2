@@ -20,6 +20,7 @@ import {
 } from '../api/notifications';
 import { fetchSupportTickets } from '../api/support-tickets';
 import { fetchCustomersIncompleteCount } from '../api/customers';
+import { fetchAdminLoanApplications } from '../api/loans';
 import { fetchFinancialIntegrations } from '../api/finance-manager';
 import type { NotificationRow } from '../types/notifications';
 import { faDigits } from '../lib/fa-format';
@@ -439,6 +440,24 @@ export default function PanelShell() {
       );
     }
 
+    if (navKeys.has('loans') && user?.role === 'SITE_ADMIN') {
+      tasks.push(
+        fetchAdminLoanApplications(1, 100)
+          .then((result) => {
+            const pending = result.items.filter((item) =>
+              ['processing', 'awaiting_bank', 'under_review'].includes(item.displayStatus),
+            ).length;
+            if (pending > 0) {
+              next.loans = {
+                count: pending,
+                className: 'bg-[#f59e0b] text-[#0f1623]',
+              };
+            }
+          })
+          .catch(() => undefined),
+      );
+    }
+
     void Promise.all(tasks).then(() => {
       setBadges(next);
       // The bell is a strict unread inbox. Operational counters stay on their
@@ -579,7 +598,7 @@ export default function PanelShell() {
                   <button
                     type="button"
                     onClick={() => setLogoutConfirmOpen(true)}
-                    className="text-[10.5px] text-[#9fb0c7] transition hover:text-white"
+                    className={`text-[10.5px] transition ${user?.role === 'SITE_ADMIN' ? 'font-bold text-[#f87171] hover:text-[#fca5a5]' : 'text-[#9fb0c7] hover:text-white'}`}
                   >
                     خروج از حساب
                   </button>
@@ -605,7 +624,7 @@ export default function PanelShell() {
           <div className="mt-auto border-t border-panel-border pt-3">
             <button
               onClick={() => setLogoutConfirmOpen(true)}
-              className="w-full rounded-[11px] border border-panel-border py-2 text-xs text-panel-muted transition hover:bg-white/5"
+              className={`w-full rounded-[11px] border py-2 text-xs transition ${user?.role === 'SITE_ADMIN' ? 'border-red-400/20 text-[#f87171] hover:bg-red-400/5' : 'border-panel-border text-panel-muted hover:bg-white/5'}`}
             >
               خروج از حساب
             </button>

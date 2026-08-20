@@ -44,6 +44,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
     { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
     { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
+    { key: 'rules', labelFa: 'قوانین سایت', implemented: true },
   ],
   // Order matches design-reference-v2/پنل مدیر عامل.dc.html sidebar
   // (settings is display:none there). clubrules stays on COMMERCIAL_MANAGER;

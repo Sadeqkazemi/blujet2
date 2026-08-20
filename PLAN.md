@@ -3529,3 +3529,17 @@ contracts and retires the production mock adapters.
   PR. Pet/wheelchair/custom ancillaries are on `GET /public/ancillary-services`
   but not in the checkout extras catalog (`TravelExtraCode` remains closed).
 
+# Site-admin uploaded design sync (2026-08-20)
+
+- [x] Added a server-owned seven-category site-rules contract, authenticated
+  SITE_ADMIN editor, public Persian projection, validation, and audit logging
+  on the existing `system_settings` JSONB store.
+- [x] Added the rules navigation/route and aligned the rules, loans, sidebar,
+  badge, and sign-out presentation with the uploaded handoff while retaining
+  real APIs and secure read-only bank behavior.
+- [x] Enriched admin loan reads with the related customer name/phone and kept
+  bank decision mutations out of the panel.
+- [x] Verified with 30 focused frontend tests, 42 backend e2e tests, frontend
+  and backend production builds, lint, and `git diff --check`. See
+  `docs/features/site-admin-rules-sync.md`.
+

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import PublicPageShell from '../../components/public/PublicPageShell';
-import { fetchPublicSiteContent } from '../../api/settings';
+import { fetchPublicSiteContent, fetchPublicSiteRules } from '../../api/settings';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
+import type { SiteRuleCategory } from '../../types/site-pages';
 
 // اطلاعات سفر / قوانین و مقررات — content matches
 // design-reference/قوانین و مقررات.dc.html verbatim (fa/en/ar all provided
@@ -95,6 +96,7 @@ export default function TravelInfoPage() {
   const t = STR[locale];
   const [active, setActive] = useState(0);
   const [termsIntro, setTermsIntro] = useState<string | null>(null);
+  const [publishedRules, setPublishedRules] = useState<SiteRuleCategory[] | null>(null);
   const sectionRefs = useRef<Array<HTMLDivElement | null>>([]);
 
   useEffect(() => {
@@ -104,6 +106,31 @@ export default function TravelInfoPage() {
         /* static fallback */
       });
   }, [locale]);
+
+  useEffect(() => {
+    setPublishedRules(null);
+    fetchPublicSiteRules(locale)
+      .then((result) => {
+        if (locale === 'fa' && result.categories.length > 0) {
+          setPublishedRules(result.categories);
+        }
+      })
+      .catch(() => {
+        /* approved static fallback */
+      });
+  }, [locale]);
+
+  const displayedSections: Section[] =
+    locale === 'fa' && publishedRules
+      ? publishedRules.map((rule) => ({
+          title: { fa: rule.title, en: rule.title, ar: rule.title },
+          items: rule.text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => ({ fa: line, en: line, ar: line })),
+        }))
+      : SECTIONS;
 
   return (
     <PublicPageShell>
@@ -121,7 +148,7 @@ export default function TravelInfoPage() {
         {/* TOC */}
         <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 15, padding: 9, position: isMobile ? 'static' : 'sticky', top: 100 }}>
           <div style={{ fontSize: 11.5, fontWeight: 800, color: '#8a96a6', padding: '8px 11px 6px' }}>{t.toc}</div>
-          {SECTIONS.map((s, i) => (
+          {displayedSections.map((s, i) => (
             <button
               key={s.title.fa}
               onClick={() => {
@@ -150,7 +177,7 @@ export default function TravelInfoPage() {
 
         {/* SECTIONS */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {SECTIONS.map((s, i) => (
+          {displayedSections.map((s, i) => (
             <div
               key={s.title.fa}
               ref={(el) => {
