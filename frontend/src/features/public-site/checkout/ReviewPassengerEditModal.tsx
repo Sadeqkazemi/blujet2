@@ -4,6 +4,7 @@ import type { StoredLocale } from '../../../hooks/useLocale';
 import PassengerStep from './PassengerStep';
 import { CHECKOUT_COPY } from './checkout-copy';
 import type { PassengerFormDraft } from './checkout-types';
+import type { SavedPassenger } from '../../../types/public-site';
 
 export default function ReviewPassengerEditModal({
   locale,
@@ -15,7 +16,7 @@ export default function ReviewPassengerEditModal({
 }: {
   locale: StoredLocale;
   passengers: PassengerFormDraft[];
-  savedPassengers: PassengerFormDraft[];
+  savedPassengers: SavedPassenger[];
   departureAt: string;
   onSave: (passengers: PassengerFormDraft[]) => void;
   onClose: () => void;

@@ -181,7 +181,7 @@ export function extraTitle(
 /** Public travel-cost API exposes `descriptionFa` only; fall back for en/ar. */
 export function extraDescription(
   extra: ExtraServiceState,
-  locale: 'fa' | 'en' | 'ar',
+  _locale: 'fa' | 'en' | 'ar',
 ): string | null {
   if (!extra.descriptionFa) return null;
   return extra.descriptionFa;
