@@ -14,7 +14,7 @@ import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { ErrorCode } from '../../common/errors';
 import { FilesService } from '../files/files.service';
 import { AuditService } from '../audit/audit.service';
-import { decryptPii } from '../../common/pii-crypto';
+import { tryDecryptPii } from '../../common/pii-crypto';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CustomerIdentityStatus } from '../../database/enums';
 
@@ -211,9 +211,7 @@ export class IdentityVerificationService {
       id: r.id,
       fullName: r.user.fullName,
       phone: r.user.phone,
-      nationalId: r.user.nationalIdEnc
-        ? decryptPii(r.user.nationalIdEnc)
-        : null,
+      nationalId: tryDecryptPii(r.user.nationalIdEnc),
       birthDate: r.user.birthDate,
       status: r.status,
       submittedAt: r.submittedAt,

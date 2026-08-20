@@ -37,7 +37,7 @@ import { changeOwnPassword, setPassword } from '../../api/auth';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
 import { tomanAmountInWords } from '../../lib/amount-in-words';
 import { localeDigits } from '../../lib/locale-format';
-import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
+import { formatLocaleDate, formatLocaleDateTime, parseLocaleDateToIso } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail, PriceLock, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
@@ -868,9 +868,25 @@ export default function AccountPage() {
     setPassengerFormError(null);
     setPassengerFormBusy(true);
     try {
+      if (!form.gender) {
+        setPassengerFormError(locale === 'en' ? 'Gender is required.' : 'انتخاب جنسیت الزامی است.');
+        throw new Error('gender');
+      }
+      const birthDate = parseLocaleDateToIso(
+        `${form.birthYear}/${form.birthMonth}/${form.birthDay}`,
+        locale,
+      )?.slice(0, 10);
+      if (!birthDate) {
+        setPassengerFormError(
+          locale === 'en' ? 'Invalid date of birth.' : 'تاریخ تولد نامعتبر است.',
+        );
+        throw new Error('birthDate');
+      }
       const dto = {
         fullName: form.fullName.trim(),
         latinName: form.latinName.trim(),
+        gender: form.gender,
+        birthDate,
         nationalId: form.nationalId.trim() || undefined,
         passportNo: form.passportNo.trim() || undefined,
         mobile: form.mobile.trim() || undefined,
@@ -887,6 +903,9 @@ export default function AccountPage() {
       }
       setPassengerFormKey((k) => k + 1);
     } catch (err) {
+      if (err instanceof Error && (err.message === 'gender' || err.message === 'birthDate')) {
+        throw err;
+      }
       setPassengerFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
       throw err;
     } finally {

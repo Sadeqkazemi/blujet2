@@ -3,8 +3,13 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { formatToman } from '../../../lib/fa-format';
+import { publicCabinLabel } from '../../../lib/flight-definition';
 import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SearchCabinOption, SearchFlightResult } from '../../../types/public-site';
+import {
+  passengerMixTotal,
+  type PassengerMix,
+} from '../checkout/checkout-types';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -78,4 +83,27 @@ export function sortFlights(
 
 export function cabinKey(flightInstanceId: string, cabin: CabinClass): string {
   return `${flightInstanceId}:${cabin}`;
+}
+
+export function parseCabinParam(raw: string | null): CabinClass {
+  const value = (raw ?? 'ECONOMY').toUpperCase();
+  if (value === 'BUSINESS' || value === 'COMFORT' || value === 'ECONOMY') {
+    return value;
+  }
+  return 'ECONOMY';
+}
+
+/** Search summary meta: «۴ مسافر · اکونومی» / «4 passengers · Economy». */
+export function formatPaxCabinMeta(
+  mix: PassengerMix,
+  cabin: CabinClass,
+  locale: StoredLocale,
+): string {
+  const total = passengerMixTotal(mix);
+  const cabinLabel = publicCabinLabel(cabin, locale);
+  const paxLabel =
+    locale === 'en'
+      ? `${total} passenger${total === 1 ? '' : 's'}`
+      : `${localeDigits(total, locale)} مسافر`;
+  return `${paxLabel} · ${cabinLabel}`;
 }

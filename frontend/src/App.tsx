@@ -90,6 +90,7 @@ import {
   PetTravelInfoPage,
   WheelchairInfoPage,
 } from './features/public-site/services/PublicServicePages';
+import SelectServicesPage from './features/public-site/services/SelectServicesPage';
 import CareersAdminPage from './features/careers/CareersAdminPage';
 import BlogAdminPage from './features/blog/BlogAdminPage';
 import MediaAdminPage from './features/site-content/MediaAdminPage';
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="/travel-info" element={<TravelInfoPage />} />
           <Route path="/services/seat-selection" element={<SeatSelectionInfoPage />} />
           <Route path="/services/extra-baggage" element={<ExtraBaggageInfoPage />} />
+          <Route path="/services/select" element={<SelectServicesPage />} />
           <Route path="/services/refund-info" element={<RefundInfoPage />} />
           <Route path="/services/pet-travel" element={<PetTravelInfoPage />} />
           <Route path="/services/wheelchair" element={<WheelchairInfoPage />} />

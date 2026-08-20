@@ -95,6 +95,75 @@ export function emptyPassenger(
   };
 }
 
+/** Search / checkout passenger counts — adults ≥ 1, infants ≤ adults. */
+export function normalizePassengerMix(mix: PassengerMix): PassengerMix {
+  const adults = Math.max(1, Math.floor(Number(mix.adults)) || 1);
+  const children = Math.max(0, Math.floor(Number(mix.children)) || 0);
+  const infants = Math.max(
+    0,
+    Math.min(Math.floor(Number(mix.infants)) || 0, adults),
+  );
+  return { adults, children, infants };
+}
+
+export function passengerMixTotal(mix: PassengerMix): number {
+  const normalized = normalizePassengerMix(mix);
+  return normalized.adults + normalized.children + normalized.infants;
+}
+
+export function mixFromPassengers(
+  passengers: PassengerFormDraft[],
+): PassengerMix {
+  return normalizePassengerMix({
+    adults: passengers.filter((p) => p.passengerType === 'ADULT').length,
+    children: passengers.filter((p) => p.passengerType === 'CHILD').length,
+    infants: passengers.filter((p) => p.passengerType === 'INFANT').length,
+  });
+}
+
+/**
+ * Build one form card per search mix slot. Reuses previous rows of the same
+ * type so editing is not wiped when the mix is re-applied.
+ */
+export function buildPassengersFromMix(
+  mix: PassengerMix,
+  previous: PassengerFormDraft[] = [],
+): PassengerFormDraft[] {
+  const normalized = normalizePassengerMix(mix);
+  const pools: Record<PassengerType, PassengerFormDraft[]> = {
+    ADULT: previous.filter((p) => p.passengerType === 'ADULT'),
+    CHILD: previous.filter((p) => p.passengerType === 'CHILD'),
+    INFANT: previous.filter((p) => p.passengerType === 'INFANT'),
+  };
+  const take = (passengerType: PassengerType): PassengerFormDraft => {
+    const existing = pools[passengerType].shift();
+    if (!existing) return emptyPassenger('', passengerType);
+    return {
+      ...existing,
+      passengerType,
+      seatCode: passengerType === 'INFANT' ? '' : existing.seatCode,
+    };
+  };
+  return [
+    ...Array.from({ length: normalized.adults }, () => take('ADULT')),
+    ...Array.from({ length: normalized.children }, () => take('CHILD')),
+    ...Array.from({ length: normalized.infants }, () => take('INFANT')),
+  ];
+}
+
+/** 1-based ordinal within the same passenger type (design: adultN/childN/infantN). */
+export function passengerTypeOrdinal(
+  passengers: PassengerFormDraft[],
+  index: number,
+): number {
+  const type = passengers[index]?.passengerType ?? 'ADULT';
+  let ordinal = 0;
+  for (let i = 0; i <= index; i += 1) {
+    if (passengers[i]?.passengerType === type) ordinal += 1;
+  }
+  return ordinal;
+}
+
 export function passengerFullName(p: PassengerFormDraft): string {
   return `${p.firstNameLatin.trim()} ${p.lastNameLatin.trim()}`.trim();
 }

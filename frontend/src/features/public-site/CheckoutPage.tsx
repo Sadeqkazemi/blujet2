@@ -19,6 +19,7 @@ import { useLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { localeMoney } from '../../lib/fa-format';
 import { parseLocaleDateToIso } from '../../lib/locale-format';
+import { nationalIdsExceedingSeatLimit } from './checkout/national-id-seat-limit';
 import type {
   BookingDetail,
   CabinClass,
@@ -42,8 +43,10 @@ import ReviewStep from './checkout/ReviewStep';
 import ReviewPassengerEditModal from './checkout/ReviewPassengerEditModal';
 import OtpLoginInline from './OtpLoginInline';
 import {
+  buildPassengersFromMix,
   emptyPassenger,
   extraTotalIrr,
+  normalizePassengerMix,
   passengerTotalIrr,
   validatePassengerAges,
   passengerFullName,
@@ -102,6 +105,11 @@ export default function CheckoutPage() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [editPaxOpen, setEditPaxOpen] = useState(false);
 
+  useEffect(() => {
+    if (!isWizard || !draft) return;
+    if (params.get('step') === 'extras') setStep('extras');
+  }, [isWizard, draft, params]);
+
   // Load held booking (legacy /payment-bound path)
   useEffect(() => {
     if (!bookingId || bookingId === 'new') return;
@@ -130,11 +138,23 @@ export default function CheckoutPage() {
       'ECONOMY';
     const originFromQuery = (params.get('origin') || '').toUpperCase();
     const destFromQuery = (params.get('dest') || '').toUpperCase();
-    const passengerMix = fromStorage?.passengerMix ?? {
-      adults: Math.max(1, Number(params.get('adults') || 1)),
-      children: Math.max(0, Number(params.get('children') || 0)),
-      infants: Math.max(0, Number(params.get('infants') || 0)),
-    };
+    const hasUrlMix =
+      params.has('adults') ||
+      params.has('children') ||
+      params.has('infants');
+    const passengerMix = normalizePassengerMix(
+      hasUrlMix
+        ? {
+            adults: Number(params.get('adults') || 1),
+            children: Number(params.get('children') || 0),
+            infants: Number(params.get('infants') || 0),
+          }
+        : (fromStorage?.passengerMix ?? {
+            adults: 1,
+            children: 0,
+            infants: 0,
+          }),
+    );
 
     const mergeFlight = (base: FlightSnapshot): FlightSnapshot => ({
       ...base,
@@ -221,27 +241,8 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!draft) return;
-    const types = [
-      ...Array.from(
-        { length: draft.passengerMix.adults },
-        () => 'ADULT' as const,
-      ),
-      ...Array.from(
-        { length: draft.passengerMix.children },
-        () => 'CHILD' as const,
-      ),
-      ...Array.from(
-        { length: draft.passengerMix.infants },
-        () => 'INFANT' as const,
-      ),
-    ];
     setPassengers((previous) =>
-      types.map((passengerType, index) => ({
-        ...(previous[index] ?? emptyPassenger('', passengerType)),
-        passengerType,
-        seatCode:
-          passengerType === 'INFANT' ? '' : (previous[index]?.seatCode ?? ''),
-      })),
+      buildPassengersFromMix(draft.passengerMix, previous),
     );
   }, [
     draft?.passengerMix.adults,
@@ -355,6 +356,10 @@ export default function CheckoutPage() {
         setError(t.completePaxError);
         return;
       }
+      if (nationalIdsExceedingSeatLimit(passengers).length > 0) {
+        setError(t.nidSeatLimitError);
+        return;
+      }
       const ageError = passengerAgeError();
       if (ageError) {
         setError(ageError);
@@ -434,6 +439,11 @@ export default function CheckoutPage() {
       setStep('pax');
       return;
     }
+    if (nationalIdsExceedingSeatLimit(passengers).length > 0) {
+      setError(t.nidSeatLimitError);
+      setStep('pax');
+      return;
+    }
     const ageError = passengerAgeError();
     if (ageError) {
       setError(ageError);
@@ -485,10 +495,13 @@ export default function CheckoutPage() {
             fullName: passengerFullName(p),
             passengerType: p.passengerType,
             birthDate,
+            gender: p.gender || undefined,
             nationalId:
               p.docType === 'NATIONAL_ID'
                 ? p.nationalId || undefined
                 : undefined,
+            passportNo:
+              p.docType === 'PASSPORT' ? p.passportNo || undefined : undefined,
             seatCode:
               p.passengerType === 'INFANT'
                 ? undefined
@@ -537,10 +550,13 @@ export default function CheckoutPage() {
             fullName: passengerFullName(p),
             passengerType: p.passengerType,
             birthDate,
+            gender: p.gender || undefined,
             nationalId:
               p.docType === 'NATIONAL_ID'
                 ? p.nationalId || undefined
                 : undefined,
+            passportNo:
+              p.docType === 'PASSPORT' ? p.passportNo || undefined : undefined,
             seatCode:
               p.passengerType === 'INFANT'
                 ? undefined
@@ -565,7 +581,13 @@ export default function CheckoutPage() {
         });
         return;
       }
-      setError(err instanceof ApiRequestError ? err.message : t.notFound);
+      setError(
+        err instanceof ApiRequestError
+          ? err.message
+          : locale === 'en'
+            ? 'Booking failed. Please try again.'
+            : 'ثبت رزرو ناموفق بود. لطفاً دوباره تلاش کنید.',
+      );
     } finally {
       setBusy(false);
     }
@@ -677,33 +699,33 @@ export default function CheckoutPage() {
 
   const loginModal = loginOpen ? (
     <div
-      className="fixed inset-0 z-[150] flex items-center justify-center overflow-y-auto bg-[#0d1b33]/65 px-4 py-6 backdrop-blur-[4px]"
+      className="fixed inset-0 z-[150] flex items-center justify-center overflow-y-auto bg-[#0d1b33]/65 px-3 py-4 backdrop-blur-[4px]"
       role="dialog"
       aria-modal="true"
       data-testid="checkout-login-modal"
     >
-      <div className="relative my-auto w-full max-w-[500px] rounded-[28px] bg-white px-6 pb-9 pt-12 shadow-[0_28px_80px_rgba(8,20,40,.3)] sm:px-9">
+      <div className="relative my-auto w-full max-w-[340px] rounded-[18px] bg-white px-4 pb-5 pt-8 shadow-[0_20px_56px_rgba(8,20,40,.28)] sm:max-w-[360px] sm:px-5">
         <button
           type="button"
           data-testid="checkout-login-close"
           aria-label={locale === 'en' ? 'Close' : locale === 'ar' ? 'إغلاق' : 'بستن'}
           onClick={() => setLoginOpen(false)}
-          className="absolute start-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f5f9] text-xl text-[#66758a]"
+          className="absolute start-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-[#f2f5f9] text-lg text-[#66758a]"
         >
           ×
         </button>
-        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[#eef4fb] text-3xl text-[#1668c4]">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4fb] text-xl text-[#1668c4]">
           ✈
         </div>
-        <div className="mb-5 text-center">
-          <h2 className="m-0 text-xl font-black text-[#0d2640]">
+        <div className="mb-3.5 text-center">
+          <h2 className="m-0 text-base font-black text-[#0d2640]">
             {locale === 'en'
               ? 'Sign in or register'
               : locale === 'ar'
                 ? 'تسجيل الدخول أو إنشاء حساب'
                 : 'ورود یا ثبت‌نام'}
           </h2>
-          <p className="mt-2 text-sm text-[#7b8798]">
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[#7b8798]">
             {locale === 'en'
               ? 'Enter your mobile number to continue your booking.'
               : locale === 'ar'
@@ -724,7 +746,7 @@ export default function CheckoutPage() {
         <button
           type="button"
           onClick={() => setLoginOpen(false)}
-          className="mt-5 w-full text-center text-sm font-bold text-[#7d8797] transition hover:text-[#0d2640]"
+          className="mt-3.5 w-full text-center text-[12.5px] font-bold text-[#7d8797] transition hover:text-[#0d2640]"
         >
           {locale === 'en' ? 'Cancel' : locale === 'ar' ? 'إلغاء' : 'انصراف'}
         </button>
@@ -759,6 +781,7 @@ export default function CheckoutPage() {
           savedPassengers={savedPassengers}
           savedPassengersEnabled={isAuthenticated}
           departureAt={draft.flight.departureAt}
+          lockPassengerCount
         />
       )}
       {step === 'extras' && (
@@ -840,6 +863,7 @@ export default function CheckoutPage() {
             locale={locale}
             priceIrr={ticketIrr.toString()}
             paxCount={Math.max(1, passengers.length)}
+            passengerMix={draft.passengerMix}
             extras={extras}
             nextLabel={nextLabel}
             onNext={goNext}
@@ -914,6 +938,7 @@ export default function CheckoutPage() {
           locale={locale}
           priceIrr={ticketIrr.toString()}
           paxCount={Math.max(1, passengers.length)}
+          passengerMix={draft.passengerMix}
           extras={extras}
           nextLabel={nextLabel}
           onNext={goNext}

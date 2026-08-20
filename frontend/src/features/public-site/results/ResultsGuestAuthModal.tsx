@@ -68,26 +68,26 @@ export default function ResultsGuestAuthModal({
       <div
         role="presentation"
         onClick={onClose}
-        className="fixed inset-0 z-[300] flex items-center justify-center bg-[#0d2640]/65 p-5 backdrop-blur-[3px]"
+        className="fixed inset-0 z-[300] flex items-center justify-center bg-[#0d2640]/65 p-3 backdrop-blur-[3px]"
       >
         <section
           role="dialog"
           aria-modal="true"
           aria-labelledby="guest-auth-title"
           onClick={(event) => event.stopPropagation()}
-          className="relative w-full max-w-[500px] rounded-[22px] bg-white px-8 pb-9 pt-8 text-center shadow-[0_32px_80px_-22px_rgba(0,0,0,.55)]"
+          className="relative w-full max-w-[340px] rounded-[18px] bg-white px-4 pb-5 pt-7 text-center shadow-[0_24px_64px_-20px_rgba(0,0,0,.5)] sm:max-w-[360px]"
           data-testid="desktop-guest-otp-modal"
         >
           <button
             type="button"
             aria-label={copy.close}
             onClick={onClose}
-            className="absolute left-5 top-5 flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#f2f5f9] text-xl text-[#6b7b94]"
+            className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-[#f2f5f9] text-lg text-[#6b7b94]"
           >
             ×
           </button>
-          <div className="mx-auto mb-2 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#eef4fb] text-[#1668c4]">
-            <svg aria-hidden="true" width="31" height="31" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-[#eef4fb] text-[#1668c4]">
+            <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="m4 19 16-14M7 8l4 4M13 14l4 4M5 5l14 14" />
             </svg>
           </div>

@@ -40,3 +40,37 @@ export function refundSubmittedNotificationInput(input: {
     dedupeKey: `refund:${input.refundId}:SUBMITTED`,
   };
 }
+
+export function refundPaidNotificationInput(input: {
+  recipientId: string;
+  refundId: string;
+  pnr: string;
+}): NotifyInput {
+  return {
+    recipientId: input.recipientId,
+    category: 'SYSTEM',
+    action: 'REFUND_PAID',
+    title: 'استرداد پرداخت شد',
+    body: `مبلغ استرداد رزرو ${input.pnr} تأیید و واریز شد.`,
+    entityType: 'REFUND',
+    entityId: input.refundId,
+    dedupeKey: `refund:${input.refundId}:PAID`,
+  };
+}
+
+export function walletTopupNotificationInput(input: {
+  recipientId: string;
+  amountIrr: string;
+  entryId: string;
+}): NotifyInput {
+  return {
+    recipientId: input.recipientId,
+    category: 'SYSTEM',
+    action: 'WALLET_TOPUP',
+    title: 'شارژ کیف پول',
+    body: `کیف پول شما به مبلغ ${input.amountIrr} ریال شارژ شد.`,
+    entityType: 'WALLET',
+    entityId: input.entryId,
+    dedupeKey: `wallet:${input.entryId}:TOPUP`,
+  };
+}

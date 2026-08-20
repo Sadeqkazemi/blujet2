@@ -24,7 +24,12 @@ import type {
   SearchAdvisoryResult,
   SearchFlightResult,
 } from '../../types/public-site';
-import type { CheckoutDraft, FlightSnapshot } from './checkout/checkout-types';
+import {
+  normalizePassengerMix,
+  type CheckoutDraft,
+  type FlightSnapshot,
+  type PassengerMix,
+} from './checkout/checkout-types';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
@@ -36,6 +41,8 @@ import { RESULTS_COPY } from './results/results-copy';
 import {
   depHourBucket,
   flightAirlineLabel,
+  formatPaxCabinMeta,
+  parseCabinParam,
   primaryCabin,
   sortFlights,
 } from './results/results-utils';
@@ -87,11 +94,13 @@ export default function ResultsPage() {
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
   const returnDate = params.get('returnDate') ?? '';
-  const passengerMix = {
-    adults: Math.max(1, Number(params.get('adults') || 1)),
-    children: Math.max(0, Number(params.get('children') || 0)),
-    infants: Math.max(0, Number(params.get('infants') || 0)),
-  };
+  const cabinClass = parseCabinParam(params.get('cabin'));
+  const passengerMix = normalizePassengerMix({
+    adults: Number(params.get('adults') || 1),
+    children: Number(params.get('children') || 0),
+    infants: Number(params.get('infants') || 0),
+  });
+  const paxCabinSummary = formatPaxCabinMeta(passengerMix, cabinClass, locale);
 
   const [airports, setAirports] = useState<Airport[]>([]);
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
@@ -313,13 +322,20 @@ export default function ResultsPage() {
     nextOrigin: string,
     nextDest: string,
     nextDate: string,
-    nextReturnDate?: string,
+    nextReturnDate: string | undefined,
+    nextMix: PassengerMix,
+    nextCabin: CabinClass,
   ) {
     if (nextOrigin === nextDest) return;
+    const mix = normalizePassengerMix(nextMix);
     const next = new URLSearchParams(params);
     next.set('origin', nextOrigin);
     next.set('dest', nextDest);
     next.set('date', nextDate);
+    next.set('adults', String(mix.adults));
+    next.set('children', String(mix.children));
+    next.set('infants', String(mix.infants));
+    next.set('cabin', nextCabin);
     if (nextReturnDate) next.set('returnDate', nextReturnDate);
     else next.delete('returnDate');
     setSelectedOutbound(null);
@@ -611,8 +627,11 @@ export default function ResultsPage() {
                     background: '#cbd6e4',
                   }}
                 />
-                <span style={{ color: '#7a8696' }}>
-                  {copy.onePassengerEconomy}
+                <span
+                  style={{ color: '#7a8696' }}
+                  data-testid="results-pax-cabin-summary"
+                >
+                  {paxCabinSummary}
                 </span>
               </div>
             </div>
@@ -975,6 +994,7 @@ export default function ResultsPage() {
                   club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''),
                 )}
                 passengerMix={passengerMix}
+                preferredCabin={cabinClass}
                 buyLabel={
                   returnDate && !isReturnLeg
                     ? copy.selectOutboundActionLabel
@@ -1090,6 +1110,8 @@ export default function ResultsPage() {
         dest={dest}
         date={date}
         returnDate={returnDate}
+        passengerMix={passengerMix}
+        cabin={cabinClass}
         onClose={() => setEditOpen(false)}
         onApply={applyEditSearch}
       />

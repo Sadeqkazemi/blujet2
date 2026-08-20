@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { isoDateToFormParts, localeDigits } from '../../lib/locale-format';
 import type { SavedPassenger } from '../../types/public-site';
 
 const STR: Record<
@@ -19,9 +20,18 @@ const STR: Record<
     passportNo: string;
     mobile: string;
     isChild: string;
+    gender: string;
+    male: string;
+    female: string;
+    dateOfBirth: string;
+    day: string;
+    month: string;
+    year: string;
     modalAdd: string;
     modalEdit: string;
     idRequired: string;
+    genderRequired: string;
+    birthRequired: string;
   }
 > = {
   fa: {
@@ -39,9 +49,18 @@ const STR: Record<
     passportNo: 'شماره گذرنامه',
     mobile: 'موبایل',
     isChild: 'مسافر کودک',
+    gender: 'جنسیت',
+    male: 'مرد',
+    female: 'زن',
+    dateOfBirth: 'تاریخ تولد',
+    day: 'روز',
+    month: 'ماه',
+    year: 'سال',
     modalAdd: 'افزودن مسافر',
     modalEdit: 'ویرایش مسافر',
     idRequired: 'حداقل یکی از کد ملی یا گذرنامه الزامی است.',
+    genderRequired: 'انتخاب جنسیت الزامی است.',
+    birthRequired: 'تاریخ تولد را کامل وارد کنید.',
   },
   en: {
     hdr: 'Saved Passengers',
@@ -58,9 +77,18 @@ const STR: Record<
     passportNo: 'Passport number',
     mobile: 'Mobile',
     isChild: 'Child passenger',
+    gender: 'Gender',
+    male: 'Male',
+    female: 'Female',
+    dateOfBirth: 'Date of birth',
+    day: 'Day',
+    month: 'Month',
+    year: 'Year',
     modalAdd: 'Add passenger',
     modalEdit: 'Edit passenger',
     idRequired: 'At least one of national ID or passport is required.',
+    genderRequired: 'Gender is required.',
+    birthRequired: 'Please complete the date of birth.',
   },
   ar: {
     hdr: 'المسافرون المحفوظون',
@@ -77,15 +105,28 @@ const STR: Record<
     passportNo: 'رقم جواز السفر',
     mobile: 'الجوال',
     isChild: 'مسافر طفل',
+    gender: 'الجنس',
+    male: 'ذكر',
+    female: 'أنثى',
+    dateOfBirth: 'تاريخ الميلاد',
+    day: 'يوم',
+    month: 'شهر',
+    year: 'سنة',
     modalAdd: 'إضافة مسافر',
     modalEdit: 'تعديل المسافر',
     idRequired: 'مطلوب الرقم الوطني أو جواز السفر على الأقل.',
+    genderRequired: 'الجنس مطلوب.',
+    birthRequired: 'يرجى إكمال تاريخ الميلاد.',
   },
 };
 
 export interface SavedPassengerForm {
   fullName: string;
   latinName: string;
+  gender: '' | 'male' | 'female';
+  birthDay: string;
+  birthMonth: string;
+  birthYear: string;
   nationalId: string;
   passportNo: string;
   mobile: string;
@@ -95,6 +136,10 @@ export interface SavedPassengerForm {
 export const emptyPassengerForm = (): SavedPassengerForm => ({
   fullName: '',
   latinName: '',
+  gender: '',
+  birthDay: '',
+  birthMonth: '',
+  birthYear: '',
   nationalId: '',
   passportNo: '',
   mobile: '',
@@ -161,10 +206,17 @@ export default function AccountPassengersTab({
   }
 
   function openEdit(p: SavedPassenger) {
+    const birth = p.birthDate
+      ? isoDateToFormParts(p.birthDate, locale)
+      : { birthDay: '', birthMonth: '', birthYear: '' };
     setEditingId(p.id);
     setForm({
       fullName: p.fullName,
       latinName: p.latinName,
+      gender: p.gender ?? '',
+      birthDay: birth.birthDay,
+      birthMonth: birth.birthMonth,
+      birthYear: birth.birthYear,
       nationalId: p.nationalId ?? '',
       passportNo: p.passportNo ?? '',
       mobile: p.mobile ?? '',
@@ -184,6 +236,14 @@ export default function AccountPassengersTab({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.fullName.trim() || !form.latinName.trim()) return;
+    if (!form.gender) {
+      setLocalError(t.genderRequired);
+      return;
+    }
+    if (!form.birthDay || !form.birthMonth || !form.birthYear) {
+      setLocalError(t.birthRequired);
+      return;
+    }
     if (!form.nationalId.trim() && !form.passportNo.trim()) {
       setLocalError(t.idRequired);
       return;
@@ -407,6 +467,73 @@ export default function AccountPassengersTab({
                   style={inputStyle}
                 />
               </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.gender}</span>
+                <select
+                  required
+                  data-testid="passengers-form-gender"
+                  value={form.gender}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      gender: e.target.value as SavedPassengerForm['gender'],
+                    }))
+                  }
+                  style={inputStyle}
+                >
+                  <option value="">—</option>
+                  <option value="male">{t.male}</option>
+                  <option value="female">{t.female}</option>
+                </select>
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.dateOfBirth}</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr', gap: 8 }}>
+                  <select
+                    data-testid="passengers-form-birth-day"
+                    value={form.birthDay}
+                    onChange={(e) => setForm((f) => ({ ...f, birthDay: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="">{t.day}</option>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={String(d)}>
+                        {localeDigits(d, locale)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid="passengers-form-birth-month"
+                    value={form.birthMonth}
+                    onChange={(e) => setForm((f) => ({ ...f, birthMonth: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="">{t.month}</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <option key={m} value={String(m)}>
+                        {localeDigits(m, locale)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    data-testid="passengers-form-birth-year"
+                    value={form.birthYear}
+                    onChange={(e) => setForm((f) => ({ ...f, birthYear: e.target.value }))}
+                    style={inputStyle}
+                  >
+                    <option value="">{t.year}</option>
+                    {Array.from({ length: 90 }, (_, i) => {
+                      const year =
+                        locale === 'fa' ? 1405 - i : new Date().getFullYear() - i;
+                      return (
+                        <option key={year} value={String(year)}>
+                          {localeDigits(year, locale)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.nationalId}</span>
                 <input

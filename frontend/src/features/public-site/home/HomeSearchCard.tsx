@@ -12,6 +12,7 @@ import {
 } from '../../../lib/airport-cities';
 import { formatToman } from '../../../lib/fa-format';
 import { useMobileVisualViewport } from '../../../hooks/useMobileVisualViewport';
+import { useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll';
 import {
   DomesticFlightIcon,
   IntlFlightIcon,
@@ -716,6 +717,7 @@ export default function HomeSearchCard({
   popularRoutes: RouteItem[];
 }) {
   const navigate = useNavigate();
+  const routesScrollRef = useHorizontalDragScroll<HTMLDivElement>(isMobile);
   const [topTab, setTopTab] = useState<TopTab>('book');
   const [service, setService] = useState<ServiceType>('domestic');
   const [tripType, setTripType] = useState<TripType>('one');
@@ -1867,10 +1869,21 @@ export default function HomeSearchCard({
             </span>
           </div>
           <div
+            ref={routesScrollRef}
+            data-testid="home-popular-routes"
+            className={isMobile ? 'hscroll' : undefined}
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5,1fr)',
+              display: isMobile ? 'flex' : 'grid',
+              gridTemplateColumns: isMobile ? undefined : 'repeat(5,1fr)',
               gap: 10,
+              overflowX: isMobile ? 'auto' : 'visible',
+              scrollSnapType: isMobile ? 'x mandatory' : undefined,
+              paddingBottom: isMobile ? 4 : 0,
+              WebkitOverflowScrolling: isMobile ? 'touch' : undefined,
+              width: '100%',
+              maxWidth: '100%',
+              minWidth: 0,
+              flexWrap: isMobile ? 'nowrap' : undefined,
             }}
           >
             {popularRoutes.map((r) => (
@@ -1895,6 +1908,10 @@ export default function HomeSearchCard({
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 10,
+                  flex: isMobile ? 'none' : undefined,
+                  width: isMobile ? 'calc((100% - 10px) / 2)' : undefined,
+                  minWidth: isMobile ? 'calc((100% - 10px) / 2)' : undefined,
+                  scrollSnapAlign: isMobile ? 'start' : undefined,
                 }}
               >
                 <div

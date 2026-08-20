@@ -34,6 +34,8 @@ describe('Saved passengers (e2e)', () => {
       .send({
         fullName: 'محمد رضایی',
         latinName: 'Mohammad Rezaei',
+        gender: 'male',
+        birthDate: '1990-05-15',
         passportNo: 'A22113344',
       });
     expect(create.status).toBe(201);
@@ -52,6 +54,8 @@ describe('Saved passengers (e2e)', () => {
       .send({
         fullName: 'سارا احمدی',
         latinName: 'Sara Ahmadi',
+        gender: 'female',
+        birthDate: '1994-08-20',
         nationalId: '0012345679',
       });
     expect(withNid.status).toBe(201);
@@ -62,6 +66,8 @@ describe('Saved passengers (e2e)', () => {
       .send({
         fullName: 'تکراری',
         latinName: 'Duplicate',
+        gender: 'female',
+        birthDate: '1994-08-20',
         nationalId: '0012345679',
       });
     expect(dup.status).toBe(409);
@@ -95,6 +101,8 @@ describe('Saved passengers (e2e)', () => {
       .send({
         fullName: 'بدون مدرک',
         latinName: 'No Doc',
+        gender: 'male',
+        birthDate: '2000-01-01',
       });
     expect(bad.status).toBe(400);
 
@@ -104,6 +112,8 @@ describe('Saved passengers (e2e)', () => {
       .send({
         fullName: 'کیان رضایی',
         latinName: 'Kian Rezaei',
+        gender: 'male',
+        birthDate: '2015-03-10',
         passportNo: 'C55667788',
         isChild: true,
       });

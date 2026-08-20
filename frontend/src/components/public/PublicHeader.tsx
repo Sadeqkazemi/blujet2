@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
@@ -774,7 +775,16 @@ export default function PublicHeader() {
     ) : null;
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 50 }}>
+    <header
+      style={{
+        position: 'sticky',
+        top: 0,
+        // Home announcement bar uses z-index 60. Full-screen overlays rendered
+        // inside this header must raise the header stacking context above it,
+        // otherwise the banner paints on top of the login drawer / mobile menu.
+        zIndex: loginDrawerOpen || mobileMenuOpen ? 220 : 50,
+      }}
+    >
       <div
         style={{
           background: isMobile ? '#1668c4' : '#fff',
@@ -1506,95 +1516,98 @@ export default function PublicHeader() {
         </div>
       )}
 
-      {loginDrawerOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'linear-gradient(165deg,#0d2640,#1668c4)',
-            color: '#fff',
-            zIndex: 210,
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{t('loginDrawerTitle')}</span>
-            <span
-              data-testid="public-login-drawer-close"
-              onClick={() => setLoginDrawerOpen(false)}
-              style={{
-                position: 'absolute',
-                [isRTL ? 'left' : 'right']: 20,
-                top: 22,
-                width: 34,
-                height: 34,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 24,
-                color: '#fff',
-                cursor: 'pointer',
-              }}
-            >
-              ×
-            </span>
-          </div>
-          <div style={{ padding: '34px 28px 0', textAlign: 'center' }}>
-            <p style={{ fontSize: 16, lineHeight: 1.7, color: '#dbe7f7', margin: '8px 0 34px' }}>{t('loginWelcome')}</p>
-            <Link
-              to="/signin"
-              onClick={() => setLoginDrawerOpen(false)}
-              style={{
-                display: 'block',
-                padding: 16,
-                background: '#fff',
-                color: '#0d2640',
-                borderRadius: 30,
-                fontSize: '15.5px',
-                fontWeight: 800,
-                textDecoration: 'none',
-                marginBottom: 14,
-              }}
-            >
-              {t('btnLoginOnly')}
-            </Link>
-            <Link
-              to="/club"
-              onClick={() => setLoginDrawerOpen(false)}
-              style={{
-                display: 'block',
-                padding: 16,
-                background: 'transparent',
-                color: '#fff',
-                border: '1.5px solid rgba(255,255,255,.6)',
-                borderRadius: 30,
-                fontSize: '15.5px',
-                fontWeight: 800,
-                textDecoration: 'none',
-                marginBottom: 22,
-              }}
-            >
-              {t('btnJoinClub')}
-            </Link>
-            <Link
-              to="/club"
-              onClick={() => setLoginDrawerOpen(false)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 7,
-                color: '#fff',
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 700,
-              }}
-            >
-              {t('discoverMoreLabel')} <span>{isRTL ? '←' : '→'}</span>
-            </Link>
-          </div>
-        </div>
-      )}
+      {loginDrawerOpen &&
+        createPortal(
+          <div
+            data-testid="public-login-drawer"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'linear-gradient(165deg,#0d2640,#1668c4)',
+              color: '#fff',
+              zIndex: 230,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
+              <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{t('loginDrawerTitle')}</span>
+              <span
+                data-testid="public-login-drawer-close"
+                onClick={() => setLoginDrawerOpen(false)}
+                style={{
+                  position: 'absolute',
+                  [isRTL ? 'left' : 'right']: 20,
+                  top: 22,
+                  width: 34,
+                  height: 34,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 24,
+                  color: '#fff',
+                  cursor: 'pointer',
+                }}
+              >
+                ×
+              </span>
+            </div>
+            <div style={{ padding: '34px 28px 0', textAlign: 'center' }}>
+              <p style={{ fontSize: 16, lineHeight: 1.7, color: '#dbe7f7', margin: '8px 0 34px' }}>{t('loginWelcome')}</p>
+              <Link
+                to="/signin"
+                onClick={() => setLoginDrawerOpen(false)}
+                style={{
+                  display: 'block',
+                  padding: 16,
+                  background: '#fff',
+                  color: '#0d2640',
+                  borderRadius: 30,
+                  fontSize: '15.5px',
+                  fontWeight: 800,
+                  textDecoration: 'none',
+                  marginBottom: 14,
+                }}
+              >
+                {t('btnLoginOnly')}
+              </Link>
+              <Link
+                to="/club"
+                onClick={() => setLoginDrawerOpen(false)}
+                style={{
+                  display: 'block',
+                  padding: 16,
+                  background: 'transparent',
+                  color: '#fff',
+                  border: '1.5px solid rgba(255,255,255,.6)',
+                  borderRadius: 30,
+                  fontSize: '15.5px',
+                  fontWeight: 800,
+                  textDecoration: 'none',
+                  marginBottom: 22,
+                }}
+              >
+                {t('btnJoinClub')}
+              </Link>
+              <Link
+                to="/club"
+                onClick={() => setLoginDrawerOpen(false)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  color: '#fff',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {t('discoverMoreLabel')} <span>{isRTL ? '←' : '→'}</span>
+              </Link>
+            </div>
+          </div>,
+          document.body,
+        )}
       <ConfirmActionDialog
         open={logoutConfirmOpen}
         title={logoutCopy.title}

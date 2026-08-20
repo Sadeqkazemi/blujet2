@@ -58,6 +58,7 @@ export default function ReviewPassengerEditModal({
           onChange={setDraft}
           savedPassengers={savedPassengers}
           departureAt={departureAt}
+          lockPassengerCount
         />
         <div className={`mt-4 flex gap-2.5 ${isMobile ? 'flex-col' : 'flex-wrap'}`}>
           <button

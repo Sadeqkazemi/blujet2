@@ -79,6 +79,8 @@ describe('CheckoutPage', () => {
         id: 'saved-1',
         fullName: 'سارا احمدی',
         latinName: 'SARA AHMADI',
+        gender: 'female',
+        birthDate: '1994-08-20',
         nationalId: '0499370899',
         passportNo: null,
         mobile: null,
@@ -133,6 +135,30 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-step-pax')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-from-saved-0')).toHaveTextContent('از مسافران ذخیره‌شده');
+  });
+
+  it('shows the actual adult, child, and infant mix in the pricing sidebar', async () => {
+    mockAuth();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search:
+              '?flightInstanceId=fi-1&cabin=ECONOMY&adults=2&children=1&infants=1',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-pricing-sidebar')).toHaveTextContent(
+      'قیمت بلیط (بزرگسال × ۲، کودک × ۱، نوزاد × ۱)',
+    );
   });
 
   it('opens saved-passenger chips from the passenger step', async () => {
@@ -356,6 +382,7 @@ describe('CheckoutPage', () => {
           expect.objectContaining({
             fullName: 'ALI REZAEI',
             nationalId: '0012345678',
+            gender: 'male',
             seatCode: '7A',
           }),
         ],

@@ -16,6 +16,7 @@ import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { refundSubmittedNotificationInput } from '../notifications/customer-notification-copy';
+import { refundPaidNotificationInput } from '../notifications/customer-notification-copy';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii, encryptPii } from '../../common/pii-crypto';
 import { matchesLastName } from '../../common/passenger-name.util';
@@ -327,6 +328,16 @@ export class RefundsService {
         bookingId: request.bookingId,
       },
     });
+
+    if (request.booking?.userId) {
+      await this.notifications.notify(
+        refundPaidNotificationInput({
+          recipientId: request.booking.userId,
+          refundId: id,
+          pnr: request.booking.pnr,
+        }),
+      );
+    }
 
     return toListRow(updated);
   }

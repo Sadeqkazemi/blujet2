@@ -441,7 +441,8 @@ export default function PaymentPage() {
 
   const earnPoints = useMemo(() => {
     if (!booking) return 0;
-    return Math.floor(Number(booking.priceIrr) / 10 / 20_000);
+    // Matches backend ClubPointsService IRR_PER_EARNED_POINT = 100_000.
+    return Math.floor(Number(booking.priceIrr) / 100_000);
   }, [booking]);
 
   async function onPay(confirmedPriceIrr?: string | number) {

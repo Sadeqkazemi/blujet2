@@ -1,4 +1,6 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { localeDigits } from '../../../lib/locale-format';
+import type { PassengerMix } from './checkout-types';
 
 export const CHECKOUT_COPY: Record<
   StoredLocale,
@@ -17,7 +19,7 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: string;
     description: string;
     amountToman: string;
-    ticketPrice: (count: number) => string;
+    ticketPrice: (mix: PassengerMix) => string;
     taxesFees: string;
     total: string;
     securePayment: string;
@@ -29,7 +31,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: string;
     backStep: string;
     completePaxError: string;
+    nidSeatLimitError: string;
     adultLabel: (n: number) => string;
+    childLabel: (n: number) => string;
+    infantLabel: (n: number) => string;
     nationalId: string;
     passport: string;
     scanDocument: string;
@@ -89,7 +94,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'جزئیات پرداخت',
     description: 'شرح',
     amountToman: 'مبلغ (تومان)',
-    ticketPrice: (n) => `قیمت بلیط (بزرگسال × ${n})`,
+    ticketPrice: (mix) =>
+      `قیمت بلیط (${[
+        mix.adults > 0 ? `بزرگسال × ${localeDigits(mix.adults, 'fa')}` : null,
+        mix.children > 0 ? `کودک × ${localeDigits(mix.children, 'fa')}` : null,
+        mix.infants > 0 ? `نوزاد × ${localeDigits(mix.infants, 'fa')}` : null,
+      ]
+        .filter(Boolean)
+        .join('، ')})`,
     taxesFees: 'مالیات و عوارض',
     total: 'جمع کل',
     securePayment: 'پرداخت امن و رمزگذاری‌شده',
@@ -101,7 +113,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'ادامه به پرداخت',
     backStep: 'بازگشت به مرحله قبل',
     completePaxError: 'لطفاً اطلاعات همه مسافران را کامل کنید.',
+    nidSeatLimitError: 'با یک کد ملی حداکثر ۲ صندلی قابل خرید است.',
     adultLabel: (n) => `${n}. بزرگسال`,
+    childLabel: (n) => `${n}. کودک`,
+    infantLabel: (n) => `${n}. نوزاد`,
     nationalId: 'کد ملی',
     passport: 'گذرنامه',
     scanDocument: 'اسکن مدرک',
@@ -169,7 +184,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'Payment details',
     description: 'Description',
     amountToman: 'Amount (Toman)',
-    ticketPrice: (n) => `Ticket price (adult × ${n})`,
+    ticketPrice: (mix) =>
+      `Ticket price (${[
+        mix.adults > 0 ? `adult × ${mix.adults}` : null,
+        mix.children > 0 ? `child × ${mix.children}` : null,
+        mix.infants > 0 ? `infant × ${mix.infants}` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')})`,
     taxesFees: 'Taxes & fees',
     total: 'Total',
     securePayment: 'Secure encrypted payment',
@@ -181,7 +203,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'Continue to payment',
     backStep: 'Back to previous step',
     completePaxError: 'Please complete all passenger information.',
+    nidSeatLimitError: 'A national ID may occupy at most 2 seats.',
     adultLabel: (n) => `${n}. Adult`,
+    childLabel: (n) => `${n}. Child`,
+    infantLabel: (n) => `${n}. Infant`,
     nationalId: 'National ID',
     passport: 'Passport',
     scanDocument: 'Scan document',
@@ -249,7 +274,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'تفاصيل الدفع',
     description: 'الوصف',
     amountToman: 'المبلغ (تومان)',
-    ticketPrice: (n) => `سعر التذكرة (بالغ × ${n})`,
+    ticketPrice: (mix) =>
+      `سعر التذكرة (${[
+        mix.adults > 0 ? `بالغ × ${localeDigits(mix.adults, 'ar')}` : null,
+        mix.children > 0 ? `طفل × ${localeDigits(mix.children, 'ar')}` : null,
+        mix.infants > 0 ? `رضيع × ${localeDigits(mix.infants, 'ar')}` : null,
+      ]
+        .filter(Boolean)
+        .join('، ')})`,
     taxesFees: 'الضرائب والرسوم',
     total: 'الإجمالي',
     securePayment: 'دفع آمن ومشفر',
@@ -261,7 +293,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'المتابعة إلى الدفع',
     backStep: 'العودة للخطوة السابقة',
     completePaxError: 'يرجى إكمال بيانات جميع المسافرين.',
+    nidSeatLimitError: 'لا يجوز لرقم وطني واحد حجز أكثر من مقعدين.',
     adultLabel: (n) => `${n}. بالغ`,
+    childLabel: (n) => `${n}. طفل`,
+    infantLabel: (n) => `${n}. رضيع`,
     nationalId: 'بطاقة الهوية',
     passport: 'جواز السفر',
     scanDocument: 'مسح المستند',

@@ -142,6 +142,8 @@ const SAVED_PASSENGER: SavedPassenger = {
   id: 'sp-1',
   fullName: 'محمد رضایی',
   latinName: 'MOHAMMAD REZAEI',
+  gender: 'male',
+  birthDate: '1990-05-15',
   nationalId: null,
   passportNo: 'A22113344',
   mobile: null,
@@ -347,12 +349,18 @@ describe('AccountPage', () => {
     await userEvent.click(await screen.findByTestId('passengers-add-open'));
     await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'سارا احمدی');
     await userEvent.type(screen.getByLabelText('نام لاتین (روی بلیط)'), 'Sara Ahmadi');
+    await userEvent.selectOptions(screen.getByTestId('passengers-form-gender'), 'female');
+    await userEvent.selectOptions(screen.getByTestId('passengers-form-birth-day'), '20');
+    await userEvent.selectOptions(screen.getByTestId('passengers-form-birth-month'), '5');
+    await userEvent.selectOptions(screen.getByTestId('passengers-form-birth-year'), '1373');
     await userEvent.type(screen.getByLabelText('شماره گذرنامه'), 'B99887766');
     await userEvent.click(screen.getByTestId('passengers-form-save'));
     await vi.waitFor(() => expect(create).toHaveBeenCalled());
     expect(create).toHaveBeenCalledWith({
       fullName: 'سارا احمدی',
       latinName: 'Sara Ahmadi',
+      gender: 'female',
+      birthDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       nationalId: undefined,
       passportNo: 'B99887766',
       mobile: undefined,

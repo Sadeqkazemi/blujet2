@@ -1,18 +1,19 @@
 import { Link } from 'react-router-dom';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { localeMoney } from '../../../lib/fa-format';
-import { localeDigits } from '../../../lib/locale-format';
 import { CHECKOUT_COPY } from './checkout-copy';
 import {
   extraTitle,
   extraTotalIrr,
   type ExtraServiceState,
+  type PassengerMix,
 } from './checkout-types';
 
 export default function PricingSidebar({
   locale,
   priceIrr,
   paxCount,
+  passengerMix,
   extras,
   nextLabel,
   onNext,
@@ -28,6 +29,7 @@ export default function PricingSidebar({
   locale: StoredLocale;
   priceIrr: string;
   paxCount: number;
+  passengerMix: PassengerMix;
   extras: ExtraServiceState[];
   nextLabel: string;
   onNext: () => void;
@@ -60,13 +62,7 @@ export default function PricingSidebar({
           <span>{t.amountToman}</span>
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3.5 py-2.5 text-[13px] text-[#5a6678]">
-          <span>
-            {locale === 'en'
-              ? t.ticketPrice(paxCount)
-              : t
-                  .ticketPrice(paxCount)
-                  .replace(String(paxCount), localeDigits(paxCount, locale))}
-          </span>
+          <span>{t.ticketPrice(passengerMix)}</span>
           <span className="font-bold text-[#16202e]">
             {localeMoney(ticketIrr.toString(), locale)}
           </span>

@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsDateString,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -20,6 +22,17 @@ export class CreateSavedPassengerDto {
   @MinLength(2)
   @MaxLength(120)
   latinName: string;
+
+  @ApiProperty({ example: 'male', enum: ['male', 'female'] })
+  @IsIn(['male', 'female'])
+  gender: 'male' | 'female';
+
+  @ApiProperty({
+    example: '1990-05-15',
+    description: 'Gregorian birth date (YYYY-MM-DD)',
+  })
+  @IsDateString()
+  birthDate: string;
 
   @ApiPropertyOptional({ example: '0012345679' })
   @IsOptional()
@@ -59,6 +72,16 @@ export class UpdateSavedPassengerDto {
   @MinLength(2)
   @MaxLength(120)
   latinName?: string;
+
+  @ApiPropertyOptional({ example: 'male', enum: ['male', 'female'] })
+  @IsOptional()
+  @IsIn(['male', 'female'])
+  gender?: 'male' | 'female';
+
+  @ApiPropertyOptional({ example: '1990-05-15' })
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
 
   @ApiPropertyOptional({ example: '0012345679', nullable: true })
   @IsOptional()

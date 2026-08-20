@@ -1,6 +1,8 @@
 import {
+  refundPaidNotificationInput,
   refundSubmittedNotificationInput,
   ticketedNotificationInput,
+  walletTopupNotificationInput,
 } from './customer-notification-copy';
 
 describe('customer-notification-copy', () => {
@@ -41,5 +43,22 @@ describe('customer-notification-copy', () => {
       entityId: 'r1',
       dedupeKey: 'refund:r1:SUBMITTED',
     });
+  });
+
+  it('builds refund-paid and wallet-topup notifications', () => {
+    expect(
+      refundPaidNotificationInput({
+        recipientId: 'u1',
+        refundId: 'r1',
+        pnr: 'BJABC123',
+      }).action,
+    ).toBe('REFUND_PAID');
+    expect(
+      walletTopupNotificationInput({
+        recipientId: 'u1',
+        amountIrr: '5000000',
+        entryId: 'w1',
+      }).dedupeKey,
+    ).toBe('wallet:w1:TOPUP');
   });
 });

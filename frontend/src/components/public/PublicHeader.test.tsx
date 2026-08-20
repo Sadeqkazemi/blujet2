@@ -384,4 +384,26 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.getByRole('link', { name: /انتخاب صندلی/ })).toHaveAttribute('href', '/services/seat-selection');
     expect(screen.getByRole('link', { name: /اضافه بار/ })).toHaveAttribute('href', '/services/extra-baggage');
   });
+
+  it('portals the login drawer above the home announcement stacking context', async () => {
+    mockLocale();
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-mobile-menu-toggle'));
+    await userEvent.click(screen.getByTestId('public-login-drawer-open'));
+
+    const drawer = screen.getByTestId('public-login-drawer');
+    expect(drawer).toHaveStyle({ zIndex: '230' });
+    expect(drawer.parentElement).toBe(document.body);
+    expect(screen.getByText(/به باشگاه مشتریان blujet خوش آمدید/)).toBeInTheDocument();
+  });
 });

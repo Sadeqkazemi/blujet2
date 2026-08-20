@@ -1200,6 +1200,10 @@ and tier-benefits grid. BluBank block deferred (no backing schema).
   pointsNeededForCard }`. `balance` is the authoritative ledger sum
   (`ClubPointsEntry`), not the staff display cache. `cardRequest` is the
   latest non-REJECTED request (SUBMITTED/REFERRED/APPROVED).
+- `POST /my/club/join` (`USER` role, `@Throttle` 5/min) — self-join as
+  `SILVER` `ClubMember` linked via `userId`. Requires a valid national ID
+  on the user profile (email or phone used for the member email field).
+  Idempotent if already a member; links an existing NID row when orphaned.
 - `POST /my/club/card-request` (new, `USER` role, `@Throttle` 5/min per
   account) — member-initiated card request: requires linked `ClubMember`,
   `balance >= cardRequestMinPoints`, `cardStatus === NONE`, and no pending
@@ -1255,26 +1259,22 @@ Closes the «مسافران ذخیره‌شده» section in
 checkout autofill (autofill wiring on `BookPage` deferred).
 
 - `GET /my/saved-passengers` (new, `USER` role) — newest first; each row
-  `{ id, fullName, latinName, nationalId, passportNo, mobile, isChild,
-  createdAt }`. PII decrypted for the owner only.
+  `{ id, fullName, latinName, gender, birthDate, nationalId, passportNo, mobile, isChild,
+  createdAt, updatedAt }`. PII decrypted for the owner only.
 - `POST /my/saved-passengers` (new, `USER` role, `@Throttle` 30/min) — body
-  `{ fullName, latinName, nationalId?, passportNo?, mobile?, isChild? }`;
-  at least one of `nationalId` or `passportNo` required; national ID
-  checksum validated when present. Max 20 rows per user. `409` when the same
-  national ID is already saved for this user.
+  `{ fullName, latinName, gender, birthDate, nationalId?, passportNo?, mobile?, isChild? }`;
+  `gender` is `male`|`female`; `birthDate` is Gregorian `YYYY-MM-DD`. At least one of
+  `nationalId` or `passportNo` required; national ID checksum validated when present.
+  Max 20 rows per user. `409` when the same national ID is already saved for this user.
 - `PATCH /my/saved-passengers/:id` (new, `USER` role) — same field shape as
   POST (all optional except at least one id doc must remain); owner-only;
   `404` otherwise.
 - `DELETE /my/saved-passengers/:id` (new, `USER` role) — owner-only; `404`
   otherwise.
-- Frontend: replace booking-name stub on `AccountPage.tsx` `passengers` tab
-  with `AccountPassengersTab` (list + add/edit modal + remove).
-- Frontend: `BookPage.tsx` shows saved-passenger autofill chips (logged-in
-  `USER` only) above the passenger form; chip fills the focused seat row
-  with `fullName`, `nationalId`, and `mobile`.
-- Frontend: `AccountPage.tsx` profile tab includes a read-only saved-passengers
-  preview (`AccountProfileSavedPax`); «+ افزودن مسافر» switches to the
-  `passengers` tab and opens the add modal.
+- Frontend: `AccountPassengersTab` on `AccountPage` (list + add/edit modal with
+  gender + DOB + remove). Profile preview + «+ افزودن مسافر» still open the modal.
+- Frontend checkout: selecting a saved passenger fills Latin names, gender, DOB,
+  and identity document fields on the passenger form.
 
 ### پنل کاربر — نشست‌های فعال (`/account` → تب `security`)
 Closes the «نشست‌های فعال / دستگاه‌های متصل» block in
@@ -1999,7 +1999,7 @@ the frontend UI closure, and the found-and-fixed bugs are in
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT` — CLAUDE.md: "fee/risk suggested by the ML service but authorized and computed by NestJS"; the AI-suggested variable fee stays deferred). **The fee is computed and stored but never charged anywhere** — see the ⚑ note in `docs/features/wallet-price-lock.md`; this phase's frontend surfaces the fee as a plain data field without asserting it was billed. |
+| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin **or wallet balance can't cover the fee**. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT`). **Fee is debited from the wallet** (`PURCHASE` ledger row, `feeCharged=true`) on create and refunded (`TOPUP`) on cancel when previously charged. |
 | GET | `/my/price-locks` | Own locks, newest first. **Phase 34 addition**: each row now also includes `flight: { flightNo, originCode, destCode, departureAt }` (joined via `FlightInstance → Flight → Route`) — previously only raw fields, giving the frontend no way to show which flight a lock is for. |
 | DELETE | `/my/price-locks/:id` | Owner-only; 404 otherwise; 400 if not currently `ACTIVE` → `CANCELLED`. |
 
@@ -3589,7 +3589,7 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 ## Passenger-aware public booking (2026-08-10)
 
 - `GET /search/flights` additionally accepts `adults` (minimum 1), `children`, and `infants`. Each cabin keeps `priceIrr` as the adult unit fare and adds `totalPriceIrr` for that passenger mix.
-- `POST /bookings` passengers additionally send `passengerType: ADULT|CHILD|INFANT`, ISO `birthDate`, and optional `seatCode`. A seat is required for adults/children and omitted for lap infants.
+- `POST /bookings` passengers additionally send `passengerType: ADULT|CHILD|INFANT`, ISO `birthDate`, optional `gender: male|female`, optional `passportNo`, and optional `seatCode`. `nationalId` remains optional for passport-based travellers. A seat is required for adults/children and omitted for lap infants. `gender` and encrypted `passportNo` are persisted on the resulting `Passenger` row.
 - The server classifies age at `FlightInstance.departureAt`: infant `<2`, child `2..11`, adult `>=12`. A type mismatch and more lap infants than adults return `VALIDATION_FAILED`.
 - Public SYSTEM fares use adult 100%, child 50%, infant 10%; CHARTER child fares use 100%. Payment re-price repeats the same passenger-aware calculation.
 ## Manager panel permission restrictions

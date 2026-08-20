@@ -61,6 +61,8 @@ export interface CreateBookingPassenger {
   passengerType: 'ADULT' | 'CHILD' | 'INFANT';
   birthDate: string;
   nationalId?: string;
+  passportNo?: string;
+  gender?: 'male' | 'female';
   mobile?: string;
   seatCode?: string;
 }
@@ -161,6 +163,10 @@ export function submitClubCardRequest() {
   return apiPost<ClubCardRequestView>('/my/club/card-request', {});
 }
 
+export function joinClub() {
+  return apiPost<ClubMembershipView>('/my/club/join', {});
+}
+
 export function fetchMyPriceLocks() {
   return apiGet<PriceLock[]>('/my/price-locks');
 }
@@ -192,6 +198,8 @@ export function fetchSavedPassengers() {
 export function createSavedPassenger(dto: {
   fullName: string;
   latinName: string;
+  gender: 'male' | 'female';
+  birthDate: string;
   nationalId?: string;
   passportNo?: string;
   mobile?: string;
@@ -205,6 +213,8 @@ export function updateSavedPassenger(
   dto: {
     fullName?: string;
     latinName?: string;
+    gender?: 'male' | 'female';
+    birthDate?: string;
     nationalId?: string | null;
     passportNo?: string | null;
     mobile?: string | null;

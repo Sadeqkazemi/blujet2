@@ -173,7 +173,7 @@ export default function OtpLoginInline({
     <div
       className={
         embedded
-          ? `mx-auto w-full bg-white font-sans ${checkoutStyle ? 'max-w-[430px] p-0' : 'max-w-sm px-1 pb-1 pt-2'}`
+          ? `mx-auto w-full bg-white font-sans ${checkoutStyle ? 'max-w-[320px] p-0' : 'max-w-sm px-1 pb-1 pt-2'}`
           : 'mx-auto max-w-sm rounded-2xl border border-[#eef1f5] bg-white p-6 font-sans shadow-sm'
       }
     >
@@ -190,13 +190,13 @@ export default function OtpLoginInline({
             e.preventDefault();
             void sendOtp();
           }}
-          className={`flex flex-col ${checkoutStyle ? 'gap-4' : 'gap-3'}`}
+          className={`flex flex-col ${checkoutStyle ? 'gap-3' : 'gap-3'}`}
         >
           {checkoutStyle ? (
-            <label className="flex flex-col gap-2 text-start text-sm font-bold text-[#8a96a6]">
+            <label className="flex flex-col gap-1.5 text-start text-[12.5px] font-bold text-[#8a96a6]">
               <span>{checkoutCopy.label}</span>
-              <span className="flex h-16 overflow-hidden rounded-2xl border border-[#dce3ec] bg-[#f7f9fc] focus-within:border-[#1668c4] focus-within:ring-2 focus-within:ring-[#1668c4]/10" dir="ltr">
-                <span className="flex items-center border-e border-[#dce3ec] px-4 text-base font-bold text-[#4d596b]">+98</span>
+              <span className="flex h-12 overflow-hidden rounded-xl border border-[#dce3ec] bg-[#f7f9fc] focus-within:border-[#1668c4] focus-within:ring-2 focus-within:ring-[#1668c4]/10" dir="ltr">
+                <span className="flex items-center border-e border-[#dce3ec] px-3 text-sm font-bold text-[#4d596b]">+98</span>
                 <input
                   data-testid="otp-phone"
                   type="tel"
@@ -208,7 +208,7 @@ export default function OtpLoginInline({
                     setPhone(local ? `0${local.slice(0, 10)}` : '');
                   }}
                   placeholder="9xxxxxxxxx"
-                  className="min-w-0 flex-1 bg-transparent px-4 text-base font-semibold text-[#16202e] outline-none placeholder:text-[#9aa6b7]"
+                  className="min-w-0 flex-1 bg-transparent px-3 text-sm font-semibold text-[#16202e] outline-none placeholder:text-[#9aa6b7]"
                 />
               </span>
             </label>
@@ -228,16 +228,16 @@ export default function OtpLoginInline({
             type="submit"
             disabled={busy || !phoneReady}
             className={checkoutStyle
-              ? 'h-16 rounded-2xl bg-[#3569be] px-4 text-base font-black text-white transition hover:bg-[#285ba9] disabled:cursor-not-allowed disabled:opacity-60'
+              ? 'h-12 rounded-xl bg-[#3569be] px-4 text-sm font-black text-white transition hover:bg-[#285ba9] disabled:cursor-not-allowed disabled:opacity-60'
               : 'rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60'}
           >
             {busy ? t.otpRequesting : checkoutStyle ? checkoutCopy.request : t.otpRequest}
           </button>
-          {checkoutStyle && <p className="m-0 text-center text-xs leading-6 text-[#9aa6b7]">{checkoutCopy.terms}</p>}
+          {checkoutStyle && <p className="m-0 text-center text-[11px] leading-5 text-[#9aa6b7]">{checkoutCopy.terms}</p>}
         </form>
       ) : (
-        <form onSubmit={onVerify} className={`flex flex-col ${checkoutStyle ? 'gap-5' : 'gap-3'}`}>
-          <p className={`${checkoutStyle ? 'text-center text-sm text-[#59677a]' : 'text-xs font-semibold text-[#059669]'}`} data-testid="otp-sent-notice">
+        <form onSubmit={onVerify} className={`flex flex-col ${checkoutStyle ? 'gap-3.5' : 'gap-3'}`}>
+          <p className={`${checkoutStyle ? 'text-center text-[12.5px] text-[#59677a]' : 'text-xs font-semibold text-[#059669]'}`} data-testid="otp-sent-notice">
             {t.otpSent(localeDigits(normalizedPhone, locale))}
           </p>
           {devCode && (
@@ -261,11 +261,11 @@ export default function OtpLoginInline({
                 onChange={(e) => setCode(normalizeIranMobile(e.target.value).slice(0, 6))}
                 className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0"
               />
-              <span className="grid grid-cols-6 gap-2">
+              <span className="grid grid-cols-6 gap-1.5">
                 {Array.from({ length: 6 }, (_, index) => (
                   <span
                     key={index}
-                    className="font-num flex h-16 items-center justify-center rounded-2xl border border-[#dce3ec] bg-[#f7f9fc] text-xl font-black text-[#0d2640] transition group-focus-within:border-[#79a6e3]"
+                    className="font-num flex h-11 items-center justify-center rounded-xl border border-[#dce3ec] bg-[#f7f9fc] text-base font-black text-[#0d2640] transition group-focus-within:border-[#79a6e3]"
                   >
                     {code[index] ? localeDigits(code[index]!, locale) : ''}
                   </span>
@@ -289,7 +289,7 @@ export default function OtpLoginInline({
             type="submit"
             disabled={busy || code.length < 6}
             className={checkoutStyle
-              ? 'h-16 rounded-2xl bg-[#3569be] px-4 text-base font-black text-white disabled:cursor-not-allowed disabled:opacity-60'
+              ? 'h-12 rounded-xl bg-[#3569be] px-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-60'
               : 'rounded-lg bg-[#1668c4] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60'}
           >
             {busy ? t.otpRequesting : t.otpVerify}

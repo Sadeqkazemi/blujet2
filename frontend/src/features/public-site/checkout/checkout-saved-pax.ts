@@ -1,4 +1,5 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { isoDateToFormParts } from '../../../lib/locale-format';
 import type { SavedPassenger } from '../../../types/public-site';
 import type { Gender, PassengerFormDraft } from './checkout-types';
 
@@ -87,23 +88,31 @@ function splitLatinName(latinName: string): { first: string; last: string } {
   return { first: parts[0]!, last: parts.slice(1).join(' ') };
 }
 
+function mapGender(value: SavedPassenger['gender']): Gender {
+  if (value === 'male' || value === 'female') return value;
+  return '';
+}
+
 export function apiToCheckoutSavedOptions(
   rows: SavedPassenger[],
-  _locale: StoredLocale,
+  locale: StoredLocale,
 ): CheckoutSavedPaxOption[] {
   return rows.map((row) => {
     const { first, last } = splitLatinName(row.latinName || '');
+    const birth = row.birthDate
+      ? isoDateToFormParts(row.birthDate, locale)
+      : { birthDay: '', birthMonth: '', birthYear: '' };
     return {
       id: row.id,
       label: row.fullName,
       firstNameLatin: first,
       lastNameLatin: last,
-      gender: '',
+      gender: mapGender(row.gender),
       nationalId: row.nationalId ?? '',
       passportNo: row.passportNo ?? '',
-      birthDay: '',
-      birthMonth: '',
-      birthYear: '',
+      birthDay: birth.birthDay,
+      birthMonth: birth.birthMonth,
+      birthYear: birth.birthYear,
     };
   });
 }

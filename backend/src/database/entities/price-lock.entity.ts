@@ -64,6 +64,10 @@ export class PriceLock {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   feeIrr!: bigint;
 
+  /** True once the fee was debited from the member wallet. */
+  @Column({ type: 'boolean', default: false })
+  feeCharged = false;
+
   @Column({
     type: 'enum',
     enum: PriceLockStatus,

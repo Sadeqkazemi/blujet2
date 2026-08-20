@@ -273,7 +273,34 @@ describe('ResultsPage', () => {
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
   });
 
+  it('shows passenger mix and cabin from the search URL in the summary', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=2&children=1&infants=1&cabin=ECONOMY',
+    );
+    expect(
+      await screen.findByTestId('results-pax-cabin-summary'),
+    ).toHaveTextContent('۴ مسافر · اکونومی');
+  });
+
+  it('scales flight card price by the passenger mix from the URL', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    // 380_000_000 IRR adult unit → 38_000_000 تومان × 2 adults = 76_000_000
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=2&children=0&infants=0',
+    );
+    await screen.findByTestId('result-card');
+    expect(screen.getAllByText(/۷۶٬۰۰۰٬۰۰۰/).length).toBeGreaterThan(0);
+  });
+
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
+    mockLocale('fa');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
@@ -286,9 +313,33 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('edit-search-origin')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-dest')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-date')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-search-pax')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('edit-search-date'));
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
+  });
+
+  it('applies passenger mix from edit search into the results summary', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=1&children=0&infants=0',
+    );
+    await screen.findByTestId('result-card');
+    expect(screen.getByTestId('results-pax-cabin-summary')).toHaveTextContent(
+      '۱ مسافر · اکونومی',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
+    await userEvent.click(screen.getByTestId('edit-search-pax-adults-inc'));
+    await userEvent.click(screen.getByTestId('edit-search-pax-children-inc'));
+    await userEvent.click(screen.getByRole('button', { name: 'جستجوی پرواز' }));
+
+    expect(
+      await screen.findByTestId('results-pax-cabin-summary'),
+    ).toHaveTextContent('۳ مسافر · اکونومی');
   });
 
   it('calls advisory API and shows buy recommendation', async () => {

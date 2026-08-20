@@ -9,6 +9,7 @@ import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useHorizontalDragScroll } from '../../hooks/useHorizontalDragScroll';
 import { formatToman } from '../../lib/fa-format';
 import { destinationGradient } from './site-content-shared';
 import HomeSearchCard from './home/HomeSearchCard';
@@ -295,6 +296,8 @@ export default function HomeSearchPage() {
   const navigate = useNavigate();
   const { locale } = useLocale();
   const isMobile = useIsMobile();
+  const servicesScrollRef = useHorizontalDragScroll<HTMLDivElement>(isMobile);
+  const destinationsScrollRef = useHorizontalDragScroll<HTMLDivElement>(isMobile);
   const isRTL = locale !== 'en';
   const t = STR[locale];
   const extra = HOME_EXTRA[locale];
@@ -489,17 +492,24 @@ export default function HomeSearchPage() {
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 10px' : '28px 26px 14px' }}>
         <div
+          ref={servicesScrollRef}
           data-testid="home-services"
           className={isMobile ? 'hscroll' : undefined}
           style={{
             display: isMobile ? 'flex' : 'grid',
             gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
+            gap: isMobile ? 10 : 0,
             background: '#fff',
             border: '1px solid #eef2f7',
             borderRadius: 16,
             overflowX: isMobile ? 'auto' : 'visible',
             scrollSnapType: isMobile ? 'x mandatory' : undefined,
-            paddingBottom: isMobile ? 8 : 0,
+            paddingBottom: isMobile ? 4 : 0,
+            WebkitOverflowScrolling: isMobile ? 'touch' : undefined,
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            flexWrap: isMobile ? 'nowrap' : undefined,
           }}
         >
           {t.quickLinks.map((label, i) => {
@@ -520,7 +530,9 @@ export default function HomeSearchPage() {
                   fontFamily: 'inherit',
                   background: 'transparent',
                   border: 'none',
-                  flex: isMobile ? '0 0 calc(50% - 6.5px)' : undefined,
+                  flex: isMobile ? 'none' : undefined,
+                  width: isMobile ? 'calc((100% - 10px) / 2)' : undefined,
+                  minWidth: isMobile ? 'calc((100% - 10px) / 2)' : undefined,
                   scrollSnapAlign: isMobile ? 'start' : undefined,
                   ...(!isMobile && i > 0 ? { borderLeft: '1px solid #eef2f7' } : {}),
                 }}
@@ -579,14 +591,21 @@ export default function HomeSearchPage() {
           </button>
         </div>
         <div
+          ref={destinationsScrollRef}
+          data-testid="home-popular-destinations"
           className={isMobile ? 'hscroll' : undefined}
           style={{
             display: isMobile ? 'flex' : 'grid',
             gridTemplateColumns: isMobile ? undefined : 'repeat(4, 1fr)',
-            gap: 18,
+            gap: isMobile ? 12 : 18,
             overflowX: isMobile ? 'auto' : 'visible',
             scrollSnapType: isMobile ? 'x mandatory' : undefined,
-            paddingBottom: isMobile ? 8 : 0,
+            paddingBottom: isMobile ? 4 : 0,
+            WebkitOverflowScrolling: isMobile ? 'touch' : undefined,
+            width: '100%',
+            maxWidth: '100%',
+            minWidth: 0,
+            flexWrap: isMobile ? 'nowrap' : undefined,
           }}
         >
           {popularDests.map((d) => (
@@ -598,25 +617,27 @@ export default function HomeSearchPage() {
               style={{
                 textAlign: locale === 'en' ? 'left' : 'right',
                 background: '#fff',
-                borderRadius: 16,
+                borderRadius: isMobile ? 14 : 16,
                 overflow: 'hidden',
                 boxShadow: '0 10px 30px -18px rgba(13,38,102,.25)',
                 cursor: 'pointer',
                 border: 'none',
                 fontFamily: 'inherit',
                 padding: 0,
-                flex: isMobile ? '0 0 calc(50% - 9px)' : undefined,
+                flex: isMobile ? 'none' : undefined,
+                width: isMobile ? 'calc((100% - 12px) / 2)' : undefined,
+                minWidth: isMobile ? 'calc((100% - 12px) / 2)' : undefined,
                 scrollSnapAlign: isMobile ? 'start' : undefined,
               }}
             >
               <div
                 style={{
-                  height: 190,
+                  height: isMobile ? 148 : 168,
                   background: d.grad,
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'flex-end',
-                  padding: 13,
+                  padding: isMobile ? 10 : 13,
                   ...(('imageUrl' in d && d.imageUrl)
                     ? {
                         backgroundImage: `linear-gradient(180deg, transparent 20%, rgba(13,38,64,.75)), url(${d.imageUrl})`,
@@ -626,16 +647,16 @@ export default function HomeSearchPage() {
                     : {}),
                 }}
               >
-                <span style={{ background: '#ffffffe6', padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, color: '#0d3b66' }}>{t.flightHours(d.hours)}</span>
+                <span style={{ background: '#ffffffe6', padding: isMobile ? '4px 10px' : '5px 12px', borderRadius: 20, fontSize: isMobile ? 11 : 12, fontWeight: 700, color: '#0d3b66' }}>{t.flightHours(d.hours)}</span>
               </div>
-              <div style={{ padding: '14px 15px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ fontSize: 15, fontWeight: 800, color: '#16202e' }}>{cityName(d.code)}</span>
-                  <span style={{ fontSize: 12, color: '#9aa4b2' }}>{COUNTRY_NAMES[d.code]?.[locale]}</span>
+              <div style={{ padding: isMobile ? '11px 12px' : '14px 15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? 4 : 6 }}>
+                  <span style={{ fontSize: isMobile ? 13.5 : 15, fontWeight: 800, color: '#16202e' }}>{cityName(d.code)}</span>
+                  <span style={{ fontSize: isMobile ? 11 : 12, color: '#9aa4b2' }}>{COUNTRY_NAMES[d.code]?.[locale]}</span>
                 </div>
-                <div style={{ fontSize: '12.5px', color: '#6b7585' }}>
+                <div style={{ fontSize: isMobile ? 11.5 : '12.5px', color: '#6b7585' }}>
                   {t.from}{' '}
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#1668c4' }}>
+                  <span style={{ fontSize: isMobile ? 13 : 14, fontWeight: 800, color: '#1668c4' }}>
                     {formatToman(d.tomanPrice, locale)}
                   </span>{' '}
                   {t.toman}

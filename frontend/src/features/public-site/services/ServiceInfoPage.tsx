@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { fetchMyBookings } from '../../../api/publicSite';
 import PublicPageShell from '../../../components/public/PublicPageShell';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocale } from '../../../hooks/useLocale';
@@ -11,22 +12,49 @@ import {
   SERVICE_SHARED_COPY,
   type ServicePageId,
 } from './service-pages-copy';
+import { filterServiceEligibleBookings } from './service-eligible-bookings';
 
 type Props = { pageId: ServicePageId };
+
+const FLIGHT_GATED_PAGES = new Set<ServicePageId>([
+  'seat-selection',
+  'extra-baggage',
+]);
 
 export default function ServiceInfoPage({ pageId }: Props) {
   const page = SERVICE_PAGES[pageId];
   const { locale } = useLocale();
   const { status } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const [loginOpen, setLoginOpen] = useState(false);
   const [noFlightOpen, setNoFlightOpen] = useState(false);
+  const [ctaBusy, setCtaBusy] = useState(false);
+  const postLoginHandled = useRef(false);
 
   const s = SERVICE_SHARED_COPY;
   const grid2 = isMobile ? '1fr' : '1.1fr 0.9fr';
+  const returnPath = `${page.path}?postLogin=1`;
 
-  function handlePrimaryCta() {
+  async function proceedSeatOrBaggage() {
+    setCtaBusy(true);
+    try {
+      const bookings = await fetchMyBookings();
+      const upcoming = filterServiceEligibleBookings(bookings);
+      if (upcoming.length === 0) {
+        setNoFlightOpen(true);
+        return;
+      }
+      navigate(`/services/select?from=${pageId}`);
+    } catch {
+      setNoFlightOpen(true);
+    } finally {
+      setCtaBusy(false);
+    }
+  }
+
+  async function handlePrimaryCta() {
     if (pageId === 'refund-info') {
       navigate('/manage-booking');
       return;
@@ -35,12 +63,30 @@ export default function ServiceInfoPage({ pageId }: Props) {
       navigate('/support');
       return;
     }
+    if (FLIGHT_GATED_PAGES.has(pageId)) {
+      if (status !== 'authenticated') {
+        setLoginOpen(true);
+        return;
+      }
+      await proceedSeatOrBaggage();
+      return;
+    }
     if (status !== 'authenticated') {
       setLoginOpen(true);
       return;
     }
     navigate('/manage-booking');
   }
+
+  useEffect(() => {
+    if (!FLIGHT_GATED_PAGES.has(pageId)) return;
+    if (status !== 'authenticated') return;
+    if (searchParams.get('postLogin') !== '1') return;
+    if (postLoginHandled.current) return;
+    postLoginHandled.current = true;
+    void proceedSeatOrBaggage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pageId, searchParams]);
 
   return (
     <PublicPageShell>
@@ -110,7 +156,8 @@ export default function ServiceInfoPage({ pageId }: Props) {
               <button
                 type="button"
                 data-testid="service-primary-cta"
-                onClick={handlePrimaryCta}
+                disabled={ctaBusy}
+                onClick={() => void handlePrimaryCta()}
                 style={{
                   padding: '12px 22px',
                   background: '#1668c4',
@@ -118,6 +165,7 @@ export default function ServiceInfoPage({ pageId }: Props) {
                   border: 'none',
                   borderRadius: 12,
                   fontSize: 13.5,
+                  opacity: ctaBusy ? 0.7 : 1,
                   fontWeight: 800,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
@@ -374,7 +422,7 @@ export default function ServiceInfoPage({ pageId }: Props) {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/signin')}
+              onClick={() => navigate('/signin', { state: { from: returnPath } })}
               style={{
                 width: '100%',
                 padding: 14,

@@ -3,13 +3,15 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { SavedPassenger } from '../../../types/public-site';
 import PassengerStep from './PassengerStep';
-import { emptyPassenger } from './checkout-types';
+import { buildPassengersFromMix, emptyPassenger } from './checkout-types';
 
 describe('PassengerStep — saved passengers', () => {
   const realSavedPassenger: SavedPassenger = {
     id: 'api-1',
     fullName: 'سارا احمدی',
     latinName: 'SARA AHMADI',
+    gender: 'female',
+    birthDate: '1994-08-20',
     nationalId: '0499370899',
     passportNo: null,
     mobile: null,
@@ -51,7 +53,7 @@ describe('PassengerStep — saved passengers', () => {
     expect(screen.queryByTestId(/checkout-saved-chip/)).not.toBeInTheDocument();
   });
 
-  it('autofills only fields actually returned by the saved-passenger API', async () => {
+  it('autofills all checkout fields returned by the saved-passenger API', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(
@@ -71,13 +73,13 @@ describe('PassengerStep — saved passengers', () => {
     expect(next[0]).toMatchObject({
       firstNameLatin: 'SARA',
       lastNameLatin: 'AHMADI',
-      gender: '',
+      gender: 'female',
       nationalId: '0499370899',
       docType: 'NATIONAL_ID',
-      birthDay: '',
-      birthMonth: '',
-      birthYear: '',
     });
+    expect(next[0]?.birthDay).not.toBe('');
+    expect(next[0]?.birthMonth).not.toBe('');
+    expect(next[0]?.birthYear).not.toBe('');
     expect(screen.queryByTestId('checkout-saved-panel-0')).not.toBeInTheDocument();
   });
 
@@ -128,5 +130,27 @@ describe('PassengerStep — saved passengers', () => {
     expect(screen.getByTestId('checkout-passenger-age-notice-1')).toHaveTextContent(
       'رده سنی مسافر و قیمت بلیط بر اساس تاریخ تولد در روز پرواز محاسبه می‌شود.',
     );
+  });
+
+  it('labels each passenger with a per-type ordinal from the search mix', () => {
+    render(
+      <PassengerStep
+        locale="fa"
+        passengers={buildPassengersFromMix({
+          adults: 2,
+          children: 1,
+          infants: 1,
+        })}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+        lockPassengerCount
+      />,
+    );
+
+    expect(screen.getByText('1. بزرگسال')).toBeInTheDocument();
+    expect(screen.getByText('2. بزرگسال')).toBeInTheDocument();
+    expect(screen.getByText('1. کودک')).toBeInTheDocument();
+    expect(screen.getByText('1. نوزاد')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-add-pax')).not.toBeInTheDocument();
   });
 });
