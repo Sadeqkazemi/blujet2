@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useAuth } from "../../hooks/useAuth";
 import { fetchEmployeeContext } from "../../api/panels";
 import {
@@ -10,6 +10,7 @@ import {
   fetchAllotments,
   fetchFlightDetail,
   fetchFlightsOverview,
+  patchCommercialPanelSettings,
   planFlight,
   runFlightsAiAnalysis,
 } from "../../api/flights";
@@ -27,17 +28,18 @@ import {
   type FlightApprovalStatus,
 } from "../../lib/flight-definition";
 import { dayjs, formatJalaliDateTime } from "../../lib/jalali";
+import { downloadCsv } from "../../lib/download-csv";
 import Modal from "../../components/Modal";
 import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import FareRulesSection from "../../components/FareRulesSection";
+import CommercialFareClassControls from "./components/CommercialFareClassControls";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
 import PricingPage from "../pricing/PricingPage";
 import FlightCitiesTab from "./FlightCitiesTab";
 import TravelCostsTab from "./TravelCostsTab";
 import AddFlightPage from "./AddFlightPage";
 import FlightLifecycleModal from "./FlightLifecycleModal";
-import CommercialFareClassControls from "./components/CommercialFareClassControls";
 import MdSeatMapModal from "../reservation/MdSeatMapModal";
 import { updatePublishedPrice } from "../../api/pricing";
 import type {
@@ -77,13 +79,31 @@ function occupancyBarClass(pct: number) {
 
 const WEEKDAYS_FA = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
+function pctOf(n: number, cap: number) {
+  return cap > 0 ? Math.max(0, Math.min(100, Math.round((n / cap) * 100))) : 0;
+}
+
+function weakestClassLabel(rows: { label: string; capacity: number; sold: number }[]) {
+  if (rows.length === 0) return "";
+  let minFill = Infinity;
+  let label = rows[0].label;
+  for (const row of rows) {
+    const fill = row.capacity > 0 ? row.sold / row.capacity : 0;
+    if (fill < minFill) {
+      minFill = fill;
+      label = row.label;
+    }
+  }
+  return label;
+}
+
 export default function FlightsPage() {
   const { user } = useAuth();
   const [employeePermissionKeys, setEmployeePermissionKeys] = useState<string[]>([]);
   const [data, setData] = useState<FlightsOverview | null>(null);
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [subTab, setSubTab] = useState<
-    "active" | "done" | "history" | "future" | "cities" | "costs"
+    "active" | "done" | "history" | "future" | "ops" | "cities" | "costs"
   >("active");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +121,12 @@ export default function FlightsPage() {
   const [salePriceBusy, setSalePriceBusy] = useState(false);
   const [lifecycleFlight, setLifecycleFlight] = useState<FlightRow | CompletedFlightRow | null>(null);
   const [expandedDone, setExpandedDone] = useState<string | null>(null);
+  const [expandedActiveId, setExpandedActiveId] = useState<string | null>(null);
+  const [commercialBusy, setCommercialBusy] = useState(false);
+  const [classPriceDraft, setClassPriceDraft] = useState<Record<string, string>>({});
+  const [agencyReleaseDraft, setAgencyReleaseDraft] = useState<
+    Record<string, { seats: string; price: string }>
+  >({});
 
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
   const [aircraftChangeOpen, setAircraftChangeOpen] = useState(false);
@@ -112,6 +138,7 @@ export default function FlightsPage() {
   const aircraftStepUp = useStepUp("PRICE_CAPACITY_CHANGE");
 
   const [futureDay, setFutureDay] = useState<string | null>(null);
+  const [historyQuery, setHistoryQuery] = useState("");
   const [calOpen, setCalOpen] = useState(false);
   const [expandedFuture, setExpandedFuture] = useState<string | null>(null);
   const [plan, setPlan] = useState<FutureFlightRow | null>(null);
@@ -182,6 +209,8 @@ export default function FlightsPage() {
       setSelectedAircraftType(d.aircraftType);
       setSalePriceToman(d.basePriceIrr ? irrToTomanInput(d.basePriceIrr) : "");
       setSalePriceReason("");
+      setClassPriceDraft({});
+      setAgencyReleaseDraft({});
     } catch {
       setError("خطا در دریافت جزئیات پرواز.");
     }
@@ -374,6 +403,106 @@ export default function FlightsPage() {
     }
   }
 
+  async function onToggleSiteVisible(
+    flight: FlightRow,
+    event?: MouseEvent,
+  ) {
+    event?.stopPropagation();
+    const nextVisible = !(flight.siteVisible ?? true);
+    setCommercialBusy(true);
+    setError(null);
+    try {
+      await patchCommercialPanelSettings(flight.id, { siteVisible: nextVisible });
+      setNotice(
+        nextVisible ? "پرواز در سایت نمایش داده می‌شود" : "پرواز از سایت مخفی شد",
+      );
+      await load();
+      if (detail?.id === flight.id) {
+        const refreshed = await fetchFlightDetail(flight.id);
+        setDetail(refreshed);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در تغییر وضعیت نمایش.");
+    } finally {
+      setCommercialBusy(false);
+    }
+  }
+
+  async function onSaveClassSitePrice(classLabel: string) {
+    if (!detail) return;
+    const priceIrr = parseTomanToRialString(classPriceDraft[classLabel] ?? "");
+    if (!priceIrr) {
+      setError("قیمت کلاس معتبر وارد کنید.");
+      return;
+    }
+    setCommercialBusy(true);
+    setError(null);
+    try {
+      const result = await patchCommercialPanelSettings(detail.id, {
+        classSitePrices: { [classLabel]: priceIrr },
+      });
+      setDetail({ ...detail, ...result, classSitePrices: result.classSitePrices });
+      setNotice(`قیمت ${classLabel} ذخیره شد.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در ذخیره قیمت کلاس.");
+    } finally {
+      setCommercialBusy(false);
+    }
+  }
+
+  async function onSaveAgencyRelease(classLabel: string) {
+    if (!detail) return;
+    const draft = agencyReleaseDraft[classLabel];
+    const seats = Number(latinDigits(draft?.seats ?? "0"));
+    const priceIrr = parseTomanToRialString(draft?.price ?? "");
+    if (!Number.isFinite(seats) || seats <= 0 || !priceIrr) {
+      setError("صندلی و قیمت آزادسازی آژانس را کامل کنید.");
+      return;
+    }
+    setCommercialBusy(true);
+    setError(null);
+    try {
+      const result = await patchCommercialPanelSettings(detail.id, {
+        agencyRelease: {
+          [classLabel]: { seats, priceIrr },
+        },
+      });
+      setDetail({ ...detail, ...result, agencyRelease: result.agencyRelease });
+      setAgencyReleaseDraft((current) => {
+        const next = { ...current };
+        delete next[classLabel];
+        return next;
+      });
+      setNotice(`آزادسازی ${classLabel} برای آژانس ثبت شد.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در آزادسازی آژانس.");
+    } finally {
+      setCommercialBusy(false);
+    }
+  }
+
+  async function onToggleAgencyReleaseSpecial(classLabel: string) {
+    if (!detail) return;
+    const current = detail.agencyRelease?.[classLabel];
+    if (!current) return;
+    setCommercialBusy(true);
+    try {
+      const result = await patchCommercialPanelSettings(detail.id, {
+        agencyRelease: {
+          [classLabel]: { ...current, special: !current.special },
+        },
+      });
+      setDetail({ ...detail, ...result, agencyRelease: result.agencyRelease });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "خطا در تغییر وضعیت فوق‌العاده.");
+    } finally {
+      setCommercialBusy(false);
+    }
+  }
+
   const future = useMemo(() => data?.future ?? [], [data]);
 
   // Jalali calendar for the month of the first future flight (falls back to
@@ -420,15 +549,94 @@ export default function FlightsPage() {
   const canManageFlights =
     user?.role !== "EMPLOYEE" || employeePermissionKeys.includes("fl_manage");
   const isCeo = user?.role === "CEO";
-  const showFuturePanel =
-    subTab === "future" || (isCommercial && subTab === "active");
+  const showFuturePanel = subTab === "future";
+  const opsFlights = useMemo(() => {
+    const OPS: ReadonlySet<string> = new Set([
+      "PENDING_OPERATIONS",
+      "OPERATIONS_REJECTED",
+      "PENDING_CEO",
+      "PENDING_REVISION",
+      "REJECTED",
+      "APPROVED",
+      "PUBLISHED",
+    ]);
+    return future.filter(
+      (row) =>
+        Boolean(row.pricingRegistered) ||
+        (row.approvalStatus != null && OPS.has(row.approvalStatus)),
+    );
+  }, [future]);
+  const opsPager = usePagination(opsFlights);
+  const historyFlights = useMemo(() => {
+    const rows = [
+      ...(data?.active ?? [])
+        .filter((row) => row.derivedStatus !== "CANCELLED")
+        .map((row) => ({ kind: "active" as const, row })),
+      ...(data?.completed?.rows ?? []).map((row) => ({
+        kind: "completed" as const,
+        row,
+      })),
+    ];
+    const q = historyQuery.trim().toLowerCase();
+    if (!q) return rows;
+    const qLatin = latinDigits(q);
+    return rows.filter(({ row }) => {
+      const route = routeLabel(row.originCode, row.destCode).toLowerCase();
+      const flightNo = latinDigits(row.flightNo).toLowerCase();
+      return (
+        route.includes(q) ||
+        flightNo.includes(qLatin) ||
+        row.originCode.toLowerCase().includes(qLatin) ||
+        row.destCode.toLowerCase().includes(qLatin)
+      );
+    });
+  }, [data, historyQuery, routeLabel]);
+
+  function exportCompletedFlights() {
+    const rows = data?.completed?.rows ?? [];
+    if (rows.length === 0) {
+      setNotice("پروازی برای خروجی وجود ندارد.");
+      return;
+    }
+    downloadCsv(
+      "completed-flights.csv",
+      [
+        "مسیر",
+        "شماره پرواز",
+        "تاریخ پرواز",
+        "بلیط",
+        "قیمت استاندارد",
+        "فروش سیستمی",
+        "فروش چارتری",
+        "فروش آژانس",
+        "سود",
+        "زیان",
+      ],
+      rows.map((d) => [
+        routeLabel(d.originCode, d.destCode),
+        d.flightNo,
+        formatJalaliDateTime(d.departureAt),
+        String(d.tickets),
+        faMoney(d.basePriceIrr),
+        faMoney(d.channelRevenueIrr.SYSTEM),
+        faMoney(d.channelRevenueIrr.CHARTER),
+        faMoney(d.channelRevenueIrr.AGENCY),
+        faMoney(d.profitIrr),
+        faMoney(d.lossIrr),
+      ]),
+    );
+    setNotice("خروجی Excel پروازهای انجام‌شده دانلود شد ✓");
+  }
+
   const subTabs = isCommercial
     ? ([
         ["active", "پروازهای فعال"],
+        ["future", "تعیین پرواز"],
         ["done", "پروازهای انجام‌شده"],
-        ["history", "تاریخچه پرواز"],
         ["cities", "شهرهای پروازی"],
         ["costs", "هزینه‌های سفر"],
+        ["history", "تاریخچه پرواز"],
+        ["ops", "عملیات"],
       ] as const)
     : ([
         ["active", "پروازهای فعال"],
@@ -468,11 +676,14 @@ export default function FlightsPage() {
   }
 
   function openPricingView() {
-    if (isCommercial && subTab === "active") {
-      pricingSectionRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+    if (isCommercial) {
+      setSubTab("ops");
+      window.setTimeout(() => {
+        pricingSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 0);
       return;
     }
     if (isCeo) {
@@ -586,7 +797,142 @@ export default function FlightsPage() {
                 </div>
               )}
               <div className="overflow-x-auto">
-                <div className="min-w-[760px]">
+                <div className={isCommercial ? "min-w-[920px]" : "min-w-[760px]"}>
+                  {isCommercial ? (
+                    <>
+                      <div className="grid grid-cols-[1.6fr_1.4fr_1.5fr_1fr] gap-3 border-b border-panel-border px-5 py-2 text-[11px] font-bold text-panel-muted">
+                        <span>مسیر / پرواز</span>
+                        <span>وضعیت ظرفیت</span>
+                        <span>تفکیک کلاس</span>
+                        <span>قیمت و نمایش سایت</span>
+                      </div>
+                      <ul data-testid="commercial-active-flights">
+                        {activePager.pageItems.map((f) => {
+                          const pct =
+                            f.capacity > 0
+                              ? Math.round((f.sold / f.capacity) * 100)
+                              : 0;
+                          const st = STATUS_META[f.derivedStatus];
+                          const classes = f.classBreakdown ?? [];
+                          const weakLabel = weakestClassLabel(classes);
+                          const relSeats = f.agencyReleaseSeats ?? 0;
+                          const locked = f.lockedSeats ?? 0;
+                          const avail = Math.max(
+                            0,
+                            f.capacity - f.sold - relSeats - locked,
+                          );
+                          const pubOn = f.siteVisible ?? true;
+                          const expanded = expandedActiveId === f.id;
+                          return (
+                            <li key={f.id}>
+                              <button
+                                type="button"
+                                onClick={() => void openDetail(f.id)}
+                                className={`grid w-full grid-cols-[1.6fr_1.4fr_1.5fr_1fr] items-start gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50 ${f.salesHealth?.isWeak ? "bg-[#f8717112]" : ""}`}
+                              >
+                                <span>
+                                  <span className="block font-bold text-panel-ink">
+                                    {routeLabel(f.originCode, f.destCode)}
+                                  </span>
+                                  <span className="ltr font-num mt-1 block text-[10px] text-panel-muted">
+                                    {f.flightNo}
+                                  </span>
+                                  <span className="font-num mt-1 block text-[10px] text-panel-muted">
+                                    {formatJalaliDateTime(f.departureAt)}
+                                  </span>
+                                  {f.routeAgencyPriceIrr ? (
+                                    <span className="mt-2 inline-block rounded-md bg-[#8b5cf624] px-2 py-0.5 text-[9px] font-bold text-[#a78bfa]">
+                                      وب‌سرویس مسیر: {faMoney(f.routeAgencyPriceIrr)} تومان
+                                    </span>
+                                  ) : (
+                                    <span className="mt-2 inline-block rounded-md bg-panel-surface-2 px-2 py-0.5 text-[9px] text-panel-muted">
+                                      وب‌سرویس: تعریف‌نشده
+                                    </span>
+                                  )}
+                                </span>
+                                <span>
+                                  <span className="font-num mb-1 block text-[10px] text-panel-muted">
+                                    فروخته {faDigits(f.sold)} · آژانس {faDigits(relSeats)} · قفل {faDigits(locked)} · آزاد {faDigits(avail)}
+                                  </span>
+                                  <span className="flex h-2 overflow-hidden rounded bg-panel-surface-2">
+                                    <span className="h-full bg-[#60a5fa]" style={{ width: `${pctOf(f.sold, f.capacity)}%` }} />
+                                    <span className="h-full bg-[#a855f7]" style={{ width: `${pctOf(relSeats, f.capacity)}%` }} />
+                                    <span className="h-full bg-[#f59e0b]" style={{ width: `${pctOf(locked, f.capacity)}%` }} />
+                                  </span>
+                                  <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${st.className}`}>
+                                    {st.label}
+                                  </span>
+                                </span>
+                                <span>
+                                  {classes.length > 0 ? (
+                                    <span className="flex flex-col gap-1">
+                                      {(expanded ? classes : classes.slice(0, 2)).map((c) => (
+                                        <span
+                                          key={c.label}
+                                          className={`flex items-center justify-between rounded px-2 py-1 text-[10px] ${c.label === weakLabel ? "bg-[#f8717120] text-[#f87171]" : "bg-panel-canvas text-panel-muted"}`}
+                                        >
+                                          <span>{c.label}</span>
+                                          <span className="font-num">{faDigits(c.sold)}/{faDigits(c.capacity)}</span>
+                                        </span>
+                                      ))}
+                                      {classes.length > 2 && (
+                                        <span
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setExpandedActiveId(expanded ? null : f.id);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === "Enter" || e.key === " ") {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              setExpandedActiveId(expanded ? null : f.id);
+                                            }
+                                          }}
+                                          className="text-[10px] font-bold text-accent"
+                                        >
+                                          {expanded ? "کمتر" : `+${faDigits(classes.length - 2)} کلاس دیگر`}
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="font-num text-[10px] text-panel-muted">
+                                      {faDigits(f.sold)}/{faDigits(f.capacity)} ({faDigits(pct)}٪)
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="flex flex-col items-end gap-2">
+                                  <span className="font-num font-bold text-panel-ink">
+                                    {f.basePriceIrr != null ? `${faMoney(f.basePriceIrr)} تومان` : "—"}
+                                  </span>
+                                  {canManageFlights && (
+                                    <span className="flex items-center gap-2">
+                                      <span className={`text-[9px] font-bold ${pubOn ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+                                        {pubOn ? "فعال در سایت" : "در انتظار مجوز"}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        disabled={commercialBusy}
+                                        onClick={(e) => void onToggleSiteVisible(f, e)}
+                                        className={`relative h-5 w-9 rounded-full transition ${pubOn ? "bg-[#16a34a]" : "bg-[#3a4459]"}`}
+                                        aria-label="نمایش در سایت"
+                                      >
+                                        <span
+                                          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${pubOn ? "left-0.5" : "right-0.5"}`}
+                                        />
+                                      </button>
+                                    </span>
+                                  )}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  ) : (
+                    <>
                   <div className="grid grid-cols-[1.7fr_1.1fr_1.4fr_1.5fr_1.2fr_0.9fr] gap-3 border-b border-panel-border px-5 py-2 text-[11px] font-bold text-panel-muted">
                     <span>مسیر</span>
                     <span>شماره پرواز</span>
@@ -645,6 +991,8 @@ export default function FlightsPage() {
                       );
                     })}
                   </ul>
+                    </>
+                  )}
                   {data.active.length === 0 && (
                     <p className="py-6 text-center text-xs text-panel-muted">
                       پروازی ثبت نشده است.
@@ -659,32 +1007,112 @@ export default function FlightsPage() {
                 </div>
               </div>
 
-              {isCommercial && (
-                <div
-                  ref={pricingSectionRef}
-                  id="embedded-pricing"
-                  className="mt-4"
-                >
-                  <PricingPage embedded />
-                </div>
-              )}
             </section>
+          )}
+
+          {subTab === "ops" && isCommercial && data && (
+            <div className="flex flex-col gap-4">
+              <section className="overflow-hidden rounded-xl border border-panel-border bg-panel-surface">
+                <div className="border-b border-panel-border px-[15px] py-[13px]">
+                  <h2 className="m-0 text-[14.5px] font-extrabold text-panel-ink">
+                    تعیین قیمت پرواز و ارسال برای بررسی مدیر عملیات
+                  </h2>
+                  <p className="mt-1 text-[11.5px] leading-6 text-panel-muted">
+                    روی هر پرواز کلیک کنید تا جزئیات، وضعیت و نظر مدیر عملیات را ببینید و در صورت نیاز تاریخ، ساعت، قیمت، تعداد صندلی یا بار مجاز را اصلاح و دوباره برای بررسی ارسال کنید.
+                  </p>
+                </div>
+                <div className="flex flex-col">
+                  {opsPager.pageItems.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => setEditFlightId(row.id)}
+                      className="flex items-center justify-between gap-3 border-b border-[#1a2436] px-[15px] py-3.5 text-right transition hover:bg-[#18223a]"
+                    >
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="text-[13.5px] font-extrabold text-panel-ink">
+                          {routeLabel(row.originCode, row.destCode)}
+                        </span>
+                        <span
+                          className="ltr font-num rounded-[7px] bg-[#18223a] px-[9px] py-[3px] text-[10.5px] font-bold text-panel-muted"
+                          dir="ltr"
+                        >
+                          {row.flightNo}
+                        </span>
+                        {row.approvalStatus === "PENDING_REVISION" ||
+                        row.approvalStatus === "OPERATIONS_REJECTED" ||
+                        row.approvalStatus === "REJECTED" ? (
+                          <span className="rounded-[10px] bg-[rgba(245,158,11,.14)] px-[9px] py-[3px] text-[9.5px] font-extrabold text-[#fbbf24]">
+                            اصلاح‌شده
+                          </span>
+                        ) : null}
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-[14px] px-3 py-[5px] text-[10.5px] font-bold whitespace-nowrap ${
+                          row.approvalStatus != null
+                            ? APPROVAL_STATUS_META[
+                                row.approvalStatus as FlightApprovalStatus
+                              ].className
+                            : "bg-accent/15 text-accent"
+                        }`}
+                      >
+                        {pricingStatusLabel(row)}
+                      </span>
+                    </button>
+                  ))}
+                  {opsFlights.length === 0 && (
+                    <p className="px-[15px] py-[22px] text-center text-[11.5px] text-panel-muted">
+                      پروازی برای قیمت‌گذاری ثبت نشده است.
+                    </p>
+                  )}
+                </div>
+                {opsFlights.length > 0 && (
+                  <div className="border-t border-panel-border px-4 py-3">
+                    <Pagination
+                      page={opsPager.page}
+                      totalPages={opsPager.totalPages}
+                      onChange={opsPager.setPage}
+                      variant="dark"
+                    />
+                  </div>
+                )}
+              </section>
+              <div ref={pricingSectionRef} id="embedded-pricing">
+                <PricingPage embedded />
+              </div>
+            </div>
           )}
 
           {subTab === "history" && isCommercial && data && (
             <section className="rounded-xl border border-panel-border bg-panel-surface" data-testid="active-flight-history">
               <div className="border-b border-panel-border px-5 py-4">
-                <h2 className="text-sm font-bold text-panel-ink">تاریخچه پروازهای در حال انجام</h2>
-                <p className="mt-1 text-[11px] text-panel-muted">نظر مدیران، تغییرات قیمت و رویدادهای پروازهای فعال؛ سوابق پروازهای انجام‌شده در تب مخصوص همان بخش است.</p>
+                <h2 className="text-sm font-bold text-panel-ink">تاریخچه پرواز</h2>
+                <p className="mt-1 text-[11px] text-panel-muted">جستجو بر اساس مسیر یا شماره پرواز؛ شامل پروازهای فعال و انجام‌شده.</p>
+                <div className="relative mt-3 max-w-md">
+                  <input
+                    value={historyQuery}
+                    onChange={(e) => setHistoryQuery(e.target.value)}
+                    placeholder="جستجو بر اساس مسیر یا شماره پرواز…"
+                    className="w-full rounded-lg border border-panel-border bg-panel-canvas px-3 py-2.5 text-xs text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-3 p-4 lg:grid-cols-2">
-                {data.active.filter((row) => row.derivedStatus !== "CANCELLED").map((row) => (
-                  <button key={row.id} type="button" onClick={() => setLifecycleFlight(row)} className="rounded-xl border border-panel-border bg-panel-canvas p-4 text-right transition hover:border-accent/60">
-                    <div className="flex items-start justify-between gap-3"><div><div className="font-bold text-panel-ink">{routeLabel(row.originCode, row.destCode)}</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{row.flightNo}</div></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${STATUS_META[row.derivedStatus].className}`}>{STATUS_META[row.derivedStatus].label}</span></div>
+                {historyFlights.map(({ kind, row }) => (
+                  <button key={`${kind}-${row.id}`} type="button" onClick={() => setLifecycleFlight(row)} className="rounded-xl border border-panel-border bg-panel-canvas p-4 text-right transition hover:border-accent/60">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-bold text-panel-ink">{routeLabel(row.originCode, row.destCode)}</div>
+                        <div className="ltr font-num mt-1 text-[11px] text-panel-muted">{row.flightNo}</div>
+                      </div>
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${kind === "completed" ? "bg-[#34d39924] text-[#34d399]" : STATUS_META[(row as FlightRow).derivedStatus].className}`}>
+                        {kind === "completed" ? "انجام‌شده" : STATUS_META[(row as FlightRow).derivedStatus].label}
+                      </span>
+                    </div>
                     <div className="mt-4 flex items-center justify-between border-t border-panel-border pt-3 text-[11px]"><span className="font-num text-panel-muted">{formatJalaliDateTime(row.departureAt)}</span><span className="font-bold text-accent">مشاهده همه جزئیات ←</span></div>
                   </button>
                 ))}
-                {data.active.filter((row) => row.derivedStatus !== "CANCELLED").length === 0 && <p className="col-span-full py-8 text-center text-xs text-panel-muted">پرواز در حال انجامی وجود ندارد.</p>}
+                {historyFlights.length === 0 && <p className="col-span-full py-8 text-center text-xs text-panel-muted">{historyQuery.trim() ? "پروازی با این مشخصات یافت نشد." : "پروازی برای نمایش تاریخچه وجود ندارد."}</p>}
               </div>
             </section>
           )}
@@ -731,11 +1159,7 @@ export default function FlightsPage() {
                   </h2>
                   <button
                     type="button"
-                    onClick={() =>
-                      setNotice(
-                        "خروجی Excel پروازهای انجام‌شده در حال آماده‌سازی…",
-                      )
-                    }
+                    onClick={exportCompletedFlights}
                     className="rounded-lg border border-[#34d399]/40 bg-[#34d39915] px-3 py-1.5 text-[11px] font-bold text-[#34d399]"
                   >
                     ↓ خروجی Excel
@@ -1051,7 +1475,9 @@ export default function FlightsPage() {
               <section className="rounded-xl border border-panel-border bg-panel-surface">
                 <div className="flex items-center justify-between border-b border-panel-border px-5 py-3">
                   <h2 className="text-sm font-bold text-panel-ink">
-                    پروازهای آینده (برنامه‌ریزی‌شده)
+                    {isCommercial
+                      ? "تعیین پرواز (برنامه‌ریزی‌شده)"
+                      : "پروازهای آینده (برنامه‌ریزی‌شده)"}
                   </h2>
                   <button
                     onClick={() => void onAiAnalysis()}
@@ -1145,15 +1571,7 @@ export default function FlightsPage() {
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setSubTab("active");
-                                      window.setTimeout(() => {
-                                        pricingSectionRef.current?.scrollIntoView(
-                                          {
-                                            behavior: "smooth",
-                                            block: "start",
-                                          },
-                                        );
-                                      }, 0);
+                                      openPricingView();
                                     }}
                                     className="text-[10px] font-bold text-accent underline-offset-2 hover:underline"
                                   >
@@ -1406,6 +1824,181 @@ export default function FlightsPage() {
               {faMoney(detail.totalRevenueIrr)} تومان
             </span>
           </div>
+
+          {isCommercial && (
+            <div className="mt-3 flex flex-col gap-3" data-testid="commercial-flight-detail">
+              <div
+                className={`rounded-xl border p-3 ${detail.siteVisible ?? true ? "border-[#34d39955] bg-[#34d39910]" : "border-[#f59e0b55] bg-[#f59e0b10]"}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-extrabold text-panel-ink">
+                      {detail.siteVisible ?? true
+                        ? "مجوز نمایش و فروش در سایت فعال است"
+                        : "پرواز در سایت مخفی است"}
+                    </div>
+                    <p className="mt-1 text-[10px] text-panel-muted">
+                      تغییر این وضعیت بلافاصله در جستجوی عمومی و رزرو آنلاین اعمال می‌شود.
+                    </p>
+                  </div>
+                  {canManageFlights && (
+                    <button
+                      type="button"
+                      disabled={commercialBusy}
+                      onClick={() => void onToggleSiteVisible(detail)}
+                      className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white ${detail.siteVisible ?? true ? "bg-[#f59e0b]" : "bg-[#34d399]"}`}
+                    >
+                      {detail.siteVisible ?? true ? "مخفی از سایت" : "نمایش در سایت"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(detail.classBreakdown ?? []).length > 0 && (
+                <div className="rounded-xl border border-panel-border p-3">
+                  <h3 className="mb-2 text-xs font-bold text-panel-ink">قیمت سایت به ازای کلاس</h3>
+                  <div className="flex flex-col gap-2">
+                    {(detail.classBreakdown ?? []).map((row) => {
+                      const saved = detail.classSitePrices?.[row.label];
+                      const defaultPrice =
+                        saved ??
+                        (detail.basePriceIrr != null ? detail.basePriceIrr : null);
+                      return (
+                        <div key={row.label} className="grid gap-2 rounded-lg bg-panel-canvas p-2 sm:grid-cols-[1fr_1fr_auto]">
+                          <span className="text-[11px] font-bold text-panel-ink">{row.label}</span>
+                          <input
+                            value={
+                              classPriceDraft[row.label] ??
+                              (defaultPrice != null ? irrToTomanInput(defaultPrice) : "")
+                            }
+                            onChange={(e) =>
+                              setClassPriceDraft((current) => ({
+                                ...current,
+                                [row.label]: e.target.value,
+                              }))
+                            }
+                            inputMode="numeric"
+                            placeholder="قیمت (تومان)"
+                            className="rounded-lg border border-panel-border bg-panel-surface px-2 py-1.5 text-[11px] text-panel-ink outline-none"
+                          />
+                          {canManageFlights && (
+                            <button
+                              type="button"
+                              disabled={commercialBusy}
+                              onClick={() => void onSaveClassSitePrice(row.label)}
+                              className="rounded-lg bg-accent px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50"
+                            >
+                              ذخیره
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {(detail.classBreakdown ?? []).length > 0 && (
+                <div className="rounded-xl border border-panel-border p-3">
+                  <h3 className="mb-2 text-xs font-bold text-panel-ink">آزادسازی صندلی برای آژانس</h3>
+                  <div className="flex flex-col gap-2">
+                    {(detail.classBreakdown ?? []).map((row) => {
+                      const saved = detail.agencyRelease?.[row.label];
+                      const draft = agencyReleaseDraft[row.label];
+                      return (
+                        <div key={`rel-${row.label}`} className="rounded-lg bg-panel-canvas p-2">
+                          <div className="mb-2 flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-panel-ink">{row.label}</span>
+                            {saved?.special ? (
+                              <span className="rounded-full bg-[#f59e0b24] px-2 py-0.5 text-[9px] font-bold text-[#fbbf24]">فوق‌العاده</span>
+                            ) : null}
+                          </div>
+                          {saved ? (
+                            <div className="font-num text-[10px] text-panel-muted">
+                              {faDigits(saved.seats)} صندلی · {faMoney(saved.priceIrr)} تومان
+                              {canManageFlights && (
+                                <button
+                                  type="button"
+                                  disabled={commercialBusy}
+                                  onClick={() => void onToggleAgencyReleaseSpecial(row.label)}
+                                  className="mr-2 text-[10px] font-bold text-accent"
+                                >
+                                  {saved.special ? "حذف فوق‌العاده" : "علامت فوق‌العاده"}
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                              <input
+                                value={draft?.seats ?? ""}
+                                onChange={(e) =>
+                                  setAgencyReleaseDraft((current) => ({
+                                    ...current,
+                                    [row.label]: {
+                                      seats: latinDigits(e.target.value),
+                                      price: current[row.label]?.price ?? "",
+                                    },
+                                  }))
+                                }
+                                inputMode="numeric"
+                                placeholder="تعداد صندلی"
+                                className="rounded-lg border border-panel-border bg-panel-surface px-2 py-1.5 text-[11px] outline-none"
+                              />
+                              <input
+                                value={draft?.price ?? ""}
+                                onChange={(e) =>
+                                  setAgencyReleaseDraft((current) => ({
+                                    ...current,
+                                    [row.label]: {
+                                      seats: current[row.label]?.seats ?? "",
+                                      price: e.target.value,
+                                    },
+                                  }))
+                                }
+                                inputMode="numeric"
+                                placeholder="قیمت آژانس (تومان)"
+                                className="rounded-lg border border-panel-border bg-panel-surface px-2 py-1.5 text-[11px] outline-none"
+                              />
+                              {canManageFlights && (
+                                <button
+                                  type="button"
+                                  disabled={commercialBusy}
+                                  onClick={() => void onSaveAgencyRelease(row.label)}
+                                  className="rounded-lg bg-[#7c3aed] px-3 py-1.5 text-[10px] font-bold text-white disabled:opacity-50"
+                                >
+                                  ثبت
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {(detail.priceHistory ?? []).length > 0 && (
+                <div className="rounded-xl border border-panel-border p-3">
+                  <h3 className="mb-2 text-xs font-bold text-panel-ink">تاریخچه تغییر قیمت</h3>
+                  <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
+                    {(detail.priceHistory ?? []).map((entry) => (
+                      <li key={entry.id} className="rounded-lg bg-panel-canvas p-2 text-[10px]">
+                        <div className="font-num font-bold text-panel-ink">
+                          {entry.previousPriceIrr ? faMoney(entry.previousPriceIrr) : "—"} ← {faMoney(entry.salePriceIrr)} تومان
+                        </div>
+                        <div className="mt-1 text-panel-muted">{entry.reason}</div>
+                        <div className="mt-1 flex justify-between text-[9px] text-panel-muted">
+                          <span>{entry.actorName}</span>
+                          <span className="font-num">{formatJalaliDateTime(entry.createdAt)}</span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {canPublishFareAndControlSeats && canManageFlights && (
             <div className="mt-3 rounded-xl border border-[#7c3aed66] bg-[#7c3aed0c] p-3">

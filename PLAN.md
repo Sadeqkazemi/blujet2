@@ -3509,3 +3509,23 @@ See `CLAUDE.md` → Commands. `docker compose up -d` starts Postgres+Redis;
 - The active admins route uses the backend-connected permission editor and role-safe create flow.
 - Initial manager credentials are generated securely, persisted with forced rotation, and exposed once after creation.
 - VIP remains backed by the real club members/card-request APIs with Senior Manager decision boundaries enforced server-side.
+
+# Commercial panel design refresh — backend (2026-08-18)
+
+Branch `cursor/backend-commercial-overhaul-20260818` (from
+`claude/frontend-overhaul-20260816`). Implements the previously documented
+contracts and retires the production mock adapters.
+
+- [x] `GET /agencies/invoices` aggregate + `VOIDED` enum; OVERDUE stays
+  OVERDUE internally and serializes as UNPAID on the aggregate tabs.
+- [x] Structured `agency_seat_requests` + flight join table; portal POST
+  persists a row; manager GET/PATCH decide; approval creates one
+  `AgencyInvoice`; cartable `sourceId` sync; audit events.
+- [x] `ancillary_services` CRUD + public read; checkout extras overlay
+  mapped travel-cost codes from this table.
+- [x] `panel-nav.config.ts` `ancillary-services` tab; TabGate; mocks
+  unused by production pages.
+- [ ] Follow-up after PR #168 merges: rebase onto `main` and retarget the
+  PR. Pet/wheelchair/custom ancillaries are on `GET /public/ancillary-services`
+  but not in the checkout extras catalog (`TravelExtraCode` remains closed).
+

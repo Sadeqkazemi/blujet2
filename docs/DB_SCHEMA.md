@@ -337,27 +337,6 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   real `pg_dump` invocation. Restore stays a manual RUNBOOK step (see
   `docs/API.md`'s note) — no destructive one-click endpoint.
 
-### IT webservices/API bundle update (2026-08-19)
-
-The new «وب‌سرویس‌ها و API» screen is a management projection over existing
-tables, not a parallel mock-data model:
-
-- `AgencyWebserviceRequest` remains the request/approval source of truth.
-- `AgencyApiKey` remains the only credential record. Its status enum gains
-  `REVOKED` for the bundle's irreversible «لغو کلید» action. The key hash,
-  existing scope, expiry, last-use timestamp and call counter are reused.
-- `AuditLog` remains the event stream for issue, rotate, suspend, activate,
-  revoke and request decisions.
-- No raw key, plaintext secret, fake error-rate or fabricated request row is
-  added. A raw credential exists only in the single issue/rotation response.
-
-The bundle's free-text client creation is deliberately constrained to an
-existing active `AgencyProfile`, preserving tenant ownership and foreign-key
-integrity. Environment/IP/rate-limit controls shown by the prototype are not
-stored as cosmetic fields: the current production partner API has one deployed
-environment and a real Nest throttler limit. Those controls require a separate
-infrastructure policy phase if the product later needs per-key overrides.
-
 ## Phase 9 — Reservation system (seat lock / PNR)
 
 Shared `ReservationSystem` component contract, confirmed from
@@ -2820,36 +2799,6 @@ pricing, seat-lock, executive-approval, or financial state.
 
 ## Commercial inventory state projection (2026-08-13)
 
-## Commercial fare-class sales control (2026-08-19)
-
-Additive columns preserve the existing flight/fare-rule identifiers and avoid a
-second inventory source of truth:
-
-- `flight_instances.publicSaleEnabled boolean NOT NULL DEFAULT true` — an
-  operational gate for public search and booking. The migration default keeps
-  existing published inventory visible; the create-flight service explicitly
-  initializes new rows to `false`. Publication status remains authoritative for
-  approval and is still required.
-- `fare_rules.sitePriceIrr bigint NULL` — optional current public-site price for
-  this class. `NULL` means use `fare_rules.priceIrr`. It is pricing only and does
-  not alter class capacity.
-- `fare_rules.agencySeatsReleased int NOT NULL DEFAULT 0` — current number of
-  unsold seats offered to agencies for this class. This is a bounded commercial
-  offer, not a booking or hard seat lock.
-- `fare_rules.agencyReleasePriceIrr bigint NULL` and
-  `fare_rules.agencySpecialOffer boolean NOT NULL DEFAULT false` — price and
-  presentation flag for the current class offer. A zero release clears the
-  price and special-offer flag.
-- `fare_pricing_proposals.ceoNote text NULL`, `operationsNote text NULL`,
-  `commercialNote text NULL` — role-specific handoff notes. Existing `note`
-  stays for backward compatibility.
-
-Class sold/revenue values are computed from persisted non-cancelled Bookings
-using their purchase-time `fareClassCode`; no counter column is introduced.
-Class price history is read from append-only `audit_logs` entries with category
-`PRICING` and the fare-rule id in metadata. Search-cache invalidation accompanies
-visibility and site-price mutations.
-
 No schema change is required. Commercial active inventory is projected only
 from sellable `flight_instances` (published/approved, or a pending revision
 that retains an approved snapshot). The seat-map projection deliberately keeps
@@ -2858,16 +2807,34 @@ confirmed paid/ticketed passenger seats, active managerial `seat_locks`, and
 company blocks (`seat_locks.classification=FREE`). The public 15-minute hold
 deadline continues to be stored in `bookings.holdExpiresAt`; immutable financial
 sales continue to be stored in `ledger_entries`.
-
-## Commercial travel services (2026-08-19)
-
-No migration is required. The existing `travel_extra_settings` table already
-stores a unique text `code`, Persian `title` and `description`, IRR `price`,
-`billingUnit`, `isActive`, and `availableForPurchase`. The text code supports
-the newly documented fixed `PET` and `WHEELCHAIR` values as well as unique
-`CUSTOM_<identifier>` values for manager-created services. Public visibility is
-derived from the two persisted boolean gates; no duplicate service or pricing
-table is introduced.
 # Senior Manager permission catalog (2026-08)
 
 Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.
+
+# Commercial panel design refresh — schema (2026-08-18)
+
+Migration `1787731200000-CommercialSeatRequestsAncillaries`:
+
+- `agency_invoices.descriptionFa text NULL`
+- `AgencyInvoiceStatus` gains `VOIDED` (OVERDUE is unchanged and is **not**
+  VOIDED). `GET /agencies/invoices?status=UNPAID` matches `UNPAID` and `OVERDUE`.
+- `agency_seat_requests`: `id`, `agencyId` (agency user id, indexed, no FK so
+  the UAT sandbox identity without a profile can still persist a request),
+  `routeId` FK nullable, `aircraftType`, `seats int`, `termMonths smallint`
+  nullable (accepted `1|3|6|12`), `unitPriceIrr bigint`, `payMethod`
+  (`CREDIT|INVOICE`), `status` (`PENDING|PENDING_FINANCE|APPROVED|REJECTED`),
+  `invoiceId` FK nullable, `dueAt` nullable, `decidedById` nullable,
+  `decidedAt` nullable, `createdAt`, `updatedAt`. Indexes on
+  `(agencyId, status)` and `(status, createdAt)`.
+- `agency_seat_request_flights`: `id`, `seatRequestId` FK CASCADE,
+  `flightInstanceId` FK RESTRICT, `createdAt`. Unique
+  `(seatRequestId, flightInstanceId)`.
+- `ancillary_services`: `key` PK (URL-safe), `category` (`SEAT|OTHER`),
+  `titleFa`, `descriptionFa`, `priceIrr bigint`, `enabled`, `isCustom`,
+  `updatedById` nullable, `createdAt`, `updatedAt`. Built-in 3 seat + 8 other
+  rows are inserted by the migration (Persian copy from the design mock).
+  Index `(category, enabled)`.
+
+`POST /agency-portal/seat-requests` writes these tables; `cartable_tasks`
+remain notifications (`sourceType=AGENCY_REQUEST`, `sourceId` = request id).
+Cross-agency invoices still use `agency_invoices` only.

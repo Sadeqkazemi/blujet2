@@ -260,25 +260,6 @@ not implement it faster.
 |---|---|---|
 | GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
 
-### `backend/src/modules/it-manager/` — webservices/API ("وب‌سرویس‌ها و API")
-
-The updated IT panel bundle adds a dedicated operational view over the
-already-existing B2B entities. It does not introduce a second API-key store:
-requests remain `AgencyWebserviceRequest`, credentials remain `AgencyApiKey`,
-and events remain append-only `AuditLog` rows. Every endpoint is
-`IT_MANAGER`-only. Raw keys are returned exactly once after issue/rotation and
-are never persisted or included in list responses.
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/webservices` | One real-data payload for the page: KPI counts, pending/recent requests, API clients, eligible registered agencies, usage counters and API-related audit/security events. Empty database collections produce honest zeros/empty states. |
-| PATCH | `/it/webservices/requests/:id/decide` | `{ approve, stepUpChallengeId?, stepUpCode? }`; approval requires `API_KEY_ROTATE` step-up, reuses the existing request-decision transaction and returns the raw key once. Rejection changes only the request state. |
-| POST | `/it/webservices/clients` | `{ agencyId, scope, stepUpChallengeId, stepUpCode }`; issues a key for an existing active agency through the existing key service. Free-text/fake agencies are not accepted. |
-| PATCH | `/it/webservices/clients/:id` | Suspend/activate/revoke or rotate. Rotation and irreversible revoke require `API_KEY_ROTATE` step-up. `REVOKED` credentials can never be reactivated. |
-
-The production partner endpoints remain `/api/v2/*`; their guard continues to
-enforce status, expiry, agency status and scope on every request.
-
 ### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
 
 Both already exist from Phase 1 — `GET /audit/logs` and `GET /panels/access`
@@ -3630,10 +3611,12 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   occupied seats in DRAFT/HELD/PAID/TICKETED bookings.
 - `POST /agency-portal/seat-requests` (`AGENCY`) accepts
   `{ flightInstanceId, seats, preferredWeekdays?, termMonths? }`, validates the
-  current capacity again, and creates a real cartable task for every active
-  `COMMERCIAL_MANAGER`. It does not directly reserve inventory; the existing
-  commercial commitment workflow remains the only path that activates and
-  locks agency inventory.
+  current capacity again, persists a structured `agency_seat_requests` row
+  (plus `agency_seat_request_flights`), and creates a cartable notification
+  for every active `COMMERCIAL_MANAGER` (`sourceId` = the structured row id).
+  `termMonths` accepts `1 | 3 | 6 | 12`. It does not directly reserve inventory;
+  the existing commercial commitment workflow remains the only path that
+  activates and locks agency inventory.
 - Guest desktop checkout now completes phone/OTP authentication inside the
   results-page modal and resumes the stored flight/cabin/passenger selection.
   Mobile retains its existing login-or-sign-up choice. Desktop passenger,
@@ -3667,76 +3650,72 @@ for a repeated idempotency key.
 
 ## Commercial active-inventory projection (2026-08-13)
 
-## Commercial fare-class sales control (2026-08-19)
-
-The approved Commercial Manager handoff adds a second, explicit sale gate and
-class-level commercial controls without bypassing the existing CEO publication
-workflow. Workflow publication answers whether a flight is approved; the sale
-gate answers whether the approved inventory is currently exposed on the public
-site.
-
-- `PATCH /flights/:instanceId/sales-visibility` — `COMMERCIAL_MANAGER` —
-  `{ enabled: boolean }`. Returns `{ flightInstanceId, publicSaleEnabled,
-  version }`, writes an audit row and invalidates route/date search cache.
-  Enabling requires a sellable workflow state; disabling is always allowed.
-- `GET /flights/:instanceId/commercial-control` — `COMMERCIAL_MANAGER`,
-  `SENIOR_MANAGER` — returns the real per-class projection:
-  `{ flightInstanceId, publicSaleEnabled, fareClasses[] }`. Each class contains
-  `{ ruleId, cabin, classCode, seatsAllocated, soldSeats, remainingSeats,
-  revenueIrr, basePriceIrr, sitePriceIrr, agencySeatsReleased,
-  agencyReleasePriceIrr, agencySpecialOffer, priceHistory[] }`. All IRR values
-  are decimal strings.
-- `PATCH /flights/:instanceId/fare-rules/:ruleId/site-price` —
-  `COMMERCIAL_MANAGER` — `{ priceIrr: string, reason: string }`. Updates the
-  live public price for that fare class, records previous/new values and reason
-  in `audit_logs`, and invalidates search cache. The endpoint never changes an
-  ML suggestion or authorizes a workflow transition.
-- `PUT /flights/:instanceId/fare-rules/:ruleId/agency-release` —
-  `COMMERCIAL_MANAGER` — `{ seats: integer, priceIrr: string,
-  specialOffer?: boolean }`. Upserts the single current agency offer for the
-  class. `seats` must not exceed current unsold class capacity. `seats=0`
-  clears the offer.
-- `PUT /pricing/flights/:flightInstanceId/proposal` keeps its existing fields
-  and additionally accepts `ceoNote?`, `operationsNote?`, `commercialNote?`.
-  The legacy `note?` remains readable/writable for compatibility.
-
-Public search, fare selection and pre-payment re-price resolve a fare-rule price
-as `sitePriceIrr ?? priceIrr` and require `publicSaleEnabled=true` in addition to
-the existing publish status and sale-window checks. Internal staff reservation
-flows are unaffected by this extra public-site gate.
-
 `GET /flights/overview` exposes only commercially sellable instances in its
 `active` and `future` arrays. Every active row also returns `salesHealth` with
 `isWeak`, `occupancyPct`, `hoursToDeparture`, `thresholdPct`, `windowHours`, and
 a Persian reason. This server decision is separate from the persisted advisory
 `aiSuggestion`; the browser must not recompute weak-sale eligibility from its
 own clock.
-
-## Commercial travel services (2026-08-19)
-
-Commercial Managers configure optional passenger services through the existing
-travel-cost endpoints. Fixed service codes are `EXTRA_BAGGAGE`,
-`SPECIAL_MEAL`, `TRAVEL_INSURANCE`, `CIP`, `REFUND_FEE`, `PET`,
-`WHEELCHAIR`, `SEAT_SELECTION`, and the legacy `DATE_CHANGE`. Custom service
-codes use `CUSTOM_<identifier>` where the identifier is 8–64 ASCII letters,
-digits, or hyphens. The display name and description remain server-owned data,
-so clients must render unknown valid custom codes without relying on a local
-enum.
-
-| Method | Path | Role | Notes |
-|---|---|---|---|
-| GET | `/travel-costs` | COMMERCIAL_MANAGER | All fixed and custom services |
-| POST | `/travel-costs` | COMMERCIAL_MANAGER | Create a unique fixed or custom service |
-| PATCH | `/travel-costs/:id` | COMMERCIAL_MANAGER | Update title, price, billing unit, active and purchase flags |
-| DELETE | `/travel-costs/:id` | COMMERCIAL_MANAGER | Remove a service definition |
-| GET | `/public/travel-costs` | public | Active services enabled for purchase |
-
-Money remains an IRR decimal string on the wire. The Commercial UI converts
-the screenshot's تومان values at its boundary. A service is offered publicly
-only when both `isActive` and `availableForPurchase` are true.
-
 # Senior Manager panel completion (2026-08)
 
 - `GET /panels/nav` returns the approved Senior Manager sidebar without `customers`, `reservation`, or `aircraft`.
 - `POST /admins` returns the one-time initial credential in `tempPassword` after step-up verification; the account is persisted with `mustChangePassword=true`.
 - Manager permission payloads additionally accept `dashboard`, `priorities`, `approvals`, and `cartable`; `dashboard` and `cartable` are enforced by the server navigation/access guard.
+
+# Commercial panel design refresh — backend (2026-08-18)
+
+Implemented on `cursor/backend-commercial-overhaul-20260818` (from
+`claude/frontend-overhaul-20260816`). Frontend mock adapters are swapped
+for real `api/agencies.ts` / `api/ancillary-services.ts` calls.
+
+## Cross-agency invoice aggregate (used by: AgenciesListPage "همه فاکتورها")
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Server-side `SELECT` over existing `agency_invoices` (no new table). Optional `?status=UNPAID\|PAID\|VOIDED`. Amounts are decimal strings. |
+
+**OVERDUE vs VOIDED:** `AgencyInvoiceStatus` is `UNPAID | PAID | OVERDUE | VOIDED`.
+OVERDUE is **never** mapped to VOIDED. The UNPAID filter/response includes both
+`UNPAID` and `OVERDUE` (issued / still payable). VOIDED is a new enum value for
+the باطل‌شده tab; existing create/pay/remind flows still write UNPAID/PAID.
+`descriptionFa` is an optional column; when null the aggregate returns `فاکتور آژانس`.
+
+## Manager-side seat-request queue
+
+`POST /agency-portal/seat-requests` now inserts `agency_seat_requests` +
+`agency_seat_request_flights` and keeps the cartable task as a notification
+(`sourceType='AGENCY_REQUEST'`, `sourceId` = the structured row id).
+
+**termMonths:** accepted values are `1 | 3 | 6 | 12` (smallint). The legacy
+portal contract was `3|6|12`; the commercial UI uses `1|3|12`. `6` remains
+valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER` | Structured queue. Money fields are decimal strings. |
+| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` / `PENDING_FINANCE` may be decided; repeats return `409 CONFLICT`. Approval creates exactly one `AgencyInvoice` via the existing invoice service (`descriptionFa` = فاکتور تعهد صندلی چارتری) and links `invoiceId`. Rejection creates no invoice. Cartable tasks for that `sourceId` are closed. Audit records actor, old/new status, and invoice reference. Missing `dueAt` on approve defaults to +7 days. |
+
+## Ancillary services pricing — manager + public
+
+Distinct from `webservice-pricing` (B2B API plans) and complementary to
+`travel_extra_settings` (checkout purchase ids). Mapped built-in OTHER keys
+overlay checkout extras: baggage→EXTRA_BAGGAGE, meal→SPECIAL_MEAL,
+insurance→TRAVEL_INSURANCE, cip→CIP, refund-fee→REFUND_FEE,
+seat-selection→SEAT_SELECTION. Seat-type rows are manager-only. Pet,
+wheelchair, and custom OTHER rows appear on the public ancillary list but
+are not added to the checkout extras catalog (closed `TravelExtraCode` enum).
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ seatServices, otherServices }`. |
+| PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (≥ 0 decimal string). |
+| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`. |
+| POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`. |
+| DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`. |
+| GET | `/public/ancillary-services` | public | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |
+
+## Panel nav
+
+`GET /panels/nav` for `COMMERCIAL_MANAGER` includes
+`{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`.
+

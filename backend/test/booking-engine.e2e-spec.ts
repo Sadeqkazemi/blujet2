@@ -12,6 +12,7 @@ import { Passenger } from '../src/database/entities/passenger.entity';
 import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
 import { Route } from '../src/database/entities/route.entity';
 import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
+import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -199,6 +200,9 @@ describe('Booking engine (e2e)', () => {
     const { accessToken } = await loginAsCustomer(app, '09130000991');
     const repo = dataSource.getRepository(TravelExtraSetting);
     await repo.delete({ code: 'EXTRA_BAGGAGE' });
+    await dataSource
+      .getRepository(AncillaryService)
+      .update({ key: 'baggage' }, { priceIrr: 4_500_000n, enabled: true });
     const extra = await repo.save(
       repo.create({
         code: 'EXTRA_BAGGAGE',
@@ -244,6 +248,9 @@ describe('Booking engine (e2e)', () => {
       .where('b.id = :id', { id: createRes.body.data.id })
       .getOneOrFail();
     expect(stored.extrasSnapshot[0]?.unitPriceIrr).toBe('4500000');
+    await dataSource
+      .getRepository(AncillaryService)
+      .update({ key: 'baggage' }, { priceIrr: 2_000_000n, enabled: true });
   });
 
   it('a booking cannot be paid twice', async () => {

@@ -167,3 +167,54 @@ export interface AgencyMessage {
   body: string;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Cross-agency invoice aggregate + manager seat-request queue
+// (GET /agencies/invoices, GET /agencies/seat-requests, PATCH .../decide).
+// Money fields stay decimal STRINGs to match every other IRR field.
+// ---------------------------------------------------------------------------
+
+export type AggregateInvoiceStatus = 'UNPAID' | 'PAID' | 'VOIDED';
+
+export interface AgencyAggregateInvoiceRow {
+  id: string;
+  invoiceNo: string;
+  agencyId: string;
+  agencyName: string;
+  descriptionFa: string;
+  issuedAt: string;
+  amountIrr: string;
+  status: AggregateInvoiceStatus;
+}
+
+export type AgencySeatRequestStatus = 'PENDING' | 'PENDING_FINANCE' | 'APPROVED' | 'REJECTED';
+export type AgencySeatRequestPayMethod = 'CREDIT' | 'INVOICE';
+
+export interface AgencySeatRequestFlightRow {
+  flightNo: string;
+  date: string;
+  time: string;
+}
+
+export interface AgencySeatRequestRow {
+  id: string;
+  agencyId: string;
+  agencyName: string;
+  managerName: string;
+  phone: string;
+  city: string;
+  licenseNo: string;
+  routeFa: string;
+  seats: number;
+  /** 1|3|12 in the commercial UI; 6 remains valid for the legacy portal contract. */
+  months: 1 | 3 | 6 | 12;
+  aircraftType: string;
+  unitPriceIrr: string;
+  totalIrr: string;
+  payMethod: AgencySeatRequestPayMethod;
+  status: AgencySeatRequestStatus;
+  invoiceNo: string | null;
+  dueAt: string | null;
+  flights: AgencySeatRequestFlightRow[];
+  createdAt: string;
+}

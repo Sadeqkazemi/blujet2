@@ -266,6 +266,12 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M14 5l-4 14" />
     </NavIcon>
   ),
+  'ancillary-services': (
+    <NavIcon>
+      <path d="M5 11V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v5" />
+      <path d="M17 11V9a2 2 0 0 1 2-2 2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7l-3 3v-6a2 2 0 0 1 2-2h11z" />
+    </NavIcon>
+  ),
 };
 
 export function panelNavIcon(key: string): ReactNode {

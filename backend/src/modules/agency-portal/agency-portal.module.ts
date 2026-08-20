@@ -12,6 +12,8 @@ import { User } from '../../database/entities/user.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
 import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
+import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
 import { AgencyPortalController } from './agency-portal.controller';
 import { AgencyPortalService } from './agency-portal.service';
 import { AuditModule } from '../audit/audit.module';
@@ -36,6 +38,8 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
       FlightInstance,
       AgencySeatCommitment,
       CharterCommitment,
+      AgencySeatRequest,
+      AgencySeatRequestFlight,
     ]),
     AuditModule,
     CartableModule,
