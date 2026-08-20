@@ -16,6 +16,18 @@ export interface CommercialPanelSettings {
   agencyRelease?: Record<string, AgencyReleaseClassSettings>;
 }
 
+function stringifyScalar(value: unknown, fallback = ''): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return fallback;
+}
+
 export interface CommercialClassBreakdownRow {
   label: string;
   cabin: CabinClass;
@@ -38,7 +50,7 @@ export function parseCommercialPanelSettings(
     for (const [key, val] of Object.entries(
       obj.classSitePrices as Record<string, unknown>,
     )) {
-      if (val != null) prices[key] = String(val);
+      if (val != null) prices[key] = stringifyScalar(val);
     }
     settings.classSitePrices = prices;
   }
@@ -51,7 +63,7 @@ export function parseCommercialPanelSettings(
       const row = val as Record<string, unknown>;
       release[key] = {
         seats: Number(row.seats ?? 0),
-        priceIrr: String(row.priceIrr ?? '0'),
+        priceIrr: stringifyScalar(row.priceIrr, '0'),
         special: row.special === true,
       };
     }

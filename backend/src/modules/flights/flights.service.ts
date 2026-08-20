@@ -71,6 +71,18 @@ const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 const WEAK_SALES_WINDOW_HOURS = 72;
 const WEAK_SALES_OCCUPANCY_PCT = 60;
 
+function stringifyScalar(value: unknown, fallback = ''): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return fallback;
+}
+
 export function isCommercialInventoryVisible(
   instance: Pick<
     FlightInstance,
@@ -312,8 +324,8 @@ export class FlightsService {
       const meta = (r.metadata ?? {}) as Record<string, unknown>;
       return {
         id: r.id,
-        previousPriceIrr: String(meta.previousPriceIrr ?? ''),
-        salePriceIrr: String(meta.salePriceIrr ?? ''),
+        previousPriceIrr: stringifyScalar(meta.previousPriceIrr),
+        salePriceIrr: stringifyScalar(meta.salePriceIrr),
         reason: r.detail,
         actorName: r.actor?.fullName ?? '—',
         createdAt: r.createdAt.toISOString(),

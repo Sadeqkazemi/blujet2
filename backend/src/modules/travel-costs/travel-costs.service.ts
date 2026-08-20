@@ -49,7 +49,11 @@ export class TravelCostsService {
     const overlaid = await this.ancillary.overlayTravelExtras(rows);
     return overlaid
       .filter((row) => row.purchaseEnabled)
-      .map(({ active: _active, ...row }) => row);
+      .map((row) => {
+        const publicRow: Partial<typeof row> = { ...row };
+        delete publicRow.active;
+        return publicRow;
+      });
   }
 
   async create(actor: AuthenticatedUser, dto: CreateTravelCostDto) {
