@@ -375,6 +375,8 @@ export default function ResultsPage() {
       passengerMix,
       outboundLeg: isReturnLeg ? selectedOutbound ?? undefined : undefined,
     };
+    // Contains public itinerary data and passenger counts only; no PII or payment data.
+    // codeql[js/clear-text-storage-of-sensitive-data]
     sessionStorage.setItem('blujet_checkout_draft', JSON.stringify(draft));
     if (isReturnLeg) {
       sessionStorage.removeItem(ROUNDTRIP_OUTBOUND_KEY);
@@ -402,6 +404,8 @@ export default function ResultsPage() {
         flight,
       };
       setSelectedOutbound(leg);
+      // Contains public itinerary data only; no PII or payment data.
+      // codeql[js/clear-text-storage-of-sensitive-data]
       sessionStorage.setItem(ROUNDTRIP_OUTBOUND_KEY, JSON.stringify(leg));
       setResults(null);
       setExpandedId(null);
