@@ -57,9 +57,7 @@ import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import {
-  ticketedNotificationInput,
-} from '../notifications/customer-notification-copy';
+import { ticketedNotificationInput } from '../notifications/customer-notification-copy';
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
@@ -1312,10 +1310,13 @@ export class BookingService {
     });
 
     if (paid.booking.userId) {
-      const origin = paid.booking.flightInstance?.flight?.route?.originCode ?? '';
+      const origin =
+        paid.booking.flightInstance?.flight?.route?.originCode ?? '';
       const dest = paid.booking.flightInstance?.flight?.route?.destCode ?? '';
       const routeLabel =
-        origin && dest ? `${origin} → ${dest}` : paid.booking.flightInstance?.flight?.flightNo ?? '';
+        origin && dest
+          ? `${origin} → ${dest}`
+          : (paid.booking.flightInstance?.flight?.flightNo ?? '');
       await this.notifications.notify(
         ticketedNotificationInput({
           recipientId: paid.booking.userId,
