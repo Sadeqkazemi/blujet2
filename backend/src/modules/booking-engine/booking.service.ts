@@ -56,6 +56,10 @@ import { PriceLockService } from './price-lock.service';
 import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  ticketedNotificationInput,
+} from '../notifications/customer-notification-copy';
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
@@ -126,6 +130,7 @@ export class BookingService {
     private readonly wallet: WalletService,
     private readonly clubPoints: ClubPointsService,
     private readonly customerReferrals: CustomerReferralsService,
+    private readonly notifications: NotificationsService,
     @Inject(PAYMENT_GATEWAY)
     private readonly gateway: PaymentGateway,
   ) {}
@@ -1305,6 +1310,21 @@ export class BookingService {
         gatewayRefId,
       },
     });
+
+    if (paid.booking.userId) {
+      const origin = paid.booking.flightInstance?.flight?.route?.originCode ?? '';
+      const dest = paid.booking.flightInstance?.flight?.route?.destCode ?? '';
+      const routeLabel =
+        origin && dest ? `${origin} → ${dest}` : paid.booking.flightInstance?.flight?.flightNo ?? '';
+      await this.notifications.notify(
+        ticketedNotificationInput({
+          recipientId: paid.booking.userId,
+          bookingId: paid.booking.id,
+          pnr: paid.booking.pnr,
+          routeLabel: routeLabel || undefined,
+        }),
+      );
+    }
 
     return {
       priceChanged: false as const,
