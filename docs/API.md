@@ -3719,3 +3719,17 @@ are not added to the checkout extras catalog (closed `TravelExtraCode` enum).
 `GET /panels/nav` for `COMMERCIAL_MANAGER` includes
 `{ key: 'ancillary-services', labelFa: 'خدمات', implemented: true }`.
 
+## IT Manager — webservices policy depth (2026-08-20)
+
+Extends `AgencyApiKey` with `capabilities`, `environment`, `flightDomain`,
+`ipWhitelist`, `rateLimitPerMinute`. Partner guard enforces IP whitelist and
+per-key Redis rate limit. Coarse `scope` remains the partner-route gate;
+capabilities drive the IT UI and availability tester.
+
+| Method | Path | Roles | Notes |
+|---|---|---|---|
+| GET | `/it/webservices` | `IT_MANAGER` | Overview includes policy fields; `errorRatePct` is always `null` (no invented rate). |
+| POST | `/it/webservices/clients` | `IT_MANAGER` | Issue key with optional environment/domain/capabilities/IP/rate/expiry. One ACTIVE/SUSPENDED key per agency+environment. |
+| PATCH | `/it/webservices/clients/:id` | `IT_MANAGER` | Status/rotate **or** policy fields (capabilities sync coarse scope). |
+| POST | `/it/webservices/clients/:id/test-availability` | `IT_MANAGER` | `{ flightNo }`. Requires `AVAILABILITY` capability; returns real seatsLeft for next SCHEDULED instance. |
+

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import ReservationPage from './ReservationPage';
 import * as reservationApi from '../../api/reservation';
@@ -14,6 +15,14 @@ import type {
   SeatMap,
 } from '../../types/reservation';
 import type { Role } from '../../types/auth';
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <ReservationPage />
+    </MemoryRouter>,
+  );
+}
 
 const GROUPS: PnrGroup[] = [
   {
@@ -68,6 +77,7 @@ const AGENCIES: AgencyApiAccessRow[] = [
     initials: 'آج',
     keyHint: 'bjk_••••abcd',
     callCount: 12,
+    lastUsedAt: '2026-08-18T10:00:00.000Z',
     status: 'ACTIVE',
   },
 ];
@@ -107,7 +117,7 @@ describe('ReservationPage', () => {
     });
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue([]);
 
-    render(<ReservationPage />);
+    renderPage();
 
     expect(
       await screen.findByText('داده‌ای از وضعیت سرویس‌ها دریافت نشده است.'),
@@ -124,7 +134,7 @@ describe('ReservationPage', () => {
       .spyOn(reservationApi, 'fetchAgencyApiAccess')
       .mockResolvedValue(AGENCIES);
 
-    render(<ReservationPage />);
+    renderPage();
     await userEvent.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
 
     expect(await screen.findByText('آژانس blujet')).toBeInTheDocument();
@@ -173,7 +183,7 @@ describe('ReservationPage', () => {
       ],
     });
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'پروازها' }));
     await user.click(await screen.findByRole('button', { name: /EP-821/ }));
@@ -188,7 +198,7 @@ describe('ReservationPage', () => {
     mockRole('IT_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
 
-    render(<ReservationPage />);
+    renderPage();
     expect(await screen.findByText('سامانه رزرواسیون پرواز')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /داشبورد/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /مدیریت رزروها/ })).toBeInTheDocument();
@@ -222,7 +232,7 @@ describe('ReservationPage', () => {
       },
     ]);
 
-    render(<ReservationPage />);
+    renderPage();
     expect(await screen.findByRole('heading', { name: /سامانه رزرواسیون پرواز/ })).toBeInTheDocument();
 
     const user = userEvent.setup();
@@ -257,7 +267,7 @@ describe('ReservationPage', () => {
       },
     ]);
 
-    render(<ReservationPage />);
+    renderPage();
     expect(await screen.findByRole('heading', { name: /سامانه رزرواسیون پرواز/ })).toBeInTheDocument();
 
     const user = userEvent.setup();
@@ -322,7 +332,7 @@ describe('ReservationPage', () => {
     };
     vi.spyOn(reservationApi, 'fetchSeatMap').mockResolvedValue(seatMap);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'پروازها' }));
     await user.click(await screen.findByRole('button', { name: /EP-821/ }));
@@ -340,7 +350,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
 
@@ -358,7 +368,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     expect(await screen.findByText('آخرین رزروهای ثبت‌شده')).toBeInTheDocument();
@@ -374,7 +384,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
 
@@ -396,7 +406,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     const detailSpy = vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue(DETAIL);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await screen.findByText('آخرین رزروهای ثبت‌شده');
@@ -413,7 +423,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchAgencyApiAccess').mockResolvedValue([]);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
 
@@ -425,7 +435,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchAgencyApiAccess').mockResolvedValue(AGENCIES);
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /دسترسی آژانس‌ها/ }));
 
@@ -469,7 +479,7 @@ describe('ReservationPage', () => {
       ],
     });
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /پروازها/ }));
 
@@ -491,7 +501,7 @@ describe('ReservationPage', () => {
       .spyOn(reservationApi, 'markNoShow')
       .mockResolvedValue({ ...DETAIL, status: 'NO_SHOW' });
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await user.click(await screen.findByRole('button', { name: /BJDEMO1/ }));
@@ -507,7 +517,7 @@ describe('ReservationPage', () => {
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
     vi.spyOn(reservationApi, 'fetchPnrDetail').mockResolvedValue({ ...DETAIL, status: 'CANCELLED' });
 
-    render(<ReservationPage />);
+    renderPage();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /مدیریت رزروها/ }));
     await user.click(await screen.findByRole('button', { name: /BJDEMO1/ }));

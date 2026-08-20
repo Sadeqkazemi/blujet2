@@ -4,6 +4,7 @@ import type { Reflector } from '@nestjs/core';
 import type { Repository } from 'typeorm';
 import type { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AgencyApiKeyStatus, AgencyApiScope } from '../../database/enums';
+import type { RedisService } from '../../redis/redis.service';
 import {
   PartnerApiKeyGuard,
   type PartnerApiRequest,
@@ -29,7 +30,10 @@ describe('PartnerApiKeyGuard', () => {
   const reflector = {
     getAllAndOverride,
   } as unknown as Reflector;
-  const guard = new PartnerApiKeyGuard(repo, reflector);
+  const redis = {
+    incrWithTtl: jest.fn().mockResolvedValue(1),
+  } as unknown as RedisService;
+  const guard = new PartnerApiKeyGuard(repo, reflector, redis);
 
   beforeAll(() => {
     process.env.PII_ENCRYPTION_KEY = 'a'.repeat(64);

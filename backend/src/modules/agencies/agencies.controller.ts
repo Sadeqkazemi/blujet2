@@ -266,6 +266,14 @@ export class AgenciesController {
       dto.scope,
       dto.stepUpChallengeId,
       dto.stepUpCode,
+      {
+        environment: dto.environment,
+        flightDomain: dto.flightDomain,
+        capabilities: dto.capabilities,
+        ipWhitelist: dto.ipWhitelist,
+        rateLimitPerMinute: dto.rateLimitPerMinute,
+        expiresAt: dto.expiresAt,
+      },
     );
     return { success: true, data };
   }

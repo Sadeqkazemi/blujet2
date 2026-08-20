@@ -169,6 +169,16 @@ export interface AuditLogRow {
 
 export type ItApiScope = 'FULL' | 'SEARCH_BOOK' | 'SEARCH_ONLY';
 export type ItApiClientStatus = 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+export type ItApiEnvironment = 'SANDBOX' | 'PRODUCTION';
+export type ItApiFlightDomain = 'ALL' | 'DOMESTIC' | 'INTERNATIONAL';
+export type ItApiCapability =
+  | 'RESERVATION'
+  | 'TICKETING'
+  | 'PRICING'
+  | 'FLIGHT_INFO'
+  | 'REFUND'
+  | 'CHECK_IN'
+  | 'AVAILABILITY';
 
 export interface ItWebserviceRequestRow {
   id: string;
@@ -189,11 +199,17 @@ export interface ItApiClientRow {
   agency: string;
   keyHint: string;
   scope: ItApiScope;
+  capabilities: ItApiCapability[];
+  environment: ItApiEnvironment;
+  flightDomain: ItApiFlightDomain;
+  ipWhitelist: string[];
+  rateLimitPerMinute: number | null;
   status: ItApiClientStatus;
   activatedAt: string;
   expiresAt: string | null;
   lastUsedAt: string | null;
   callCount: number;
+  errorRatePct: number | null;
 }
 
 export interface ItApiEventRow {
@@ -216,7 +232,7 @@ export interface ItWebservicesOverview {
   };
   requests: ItWebserviceRequestRow[];
   clients: ItApiClientRow[];
-  eligibleAgencies: { id: string; name: string }[];
+  eligibleAgencies: { id: string; name: string; licenseNo?: string }[];
   events: ItApiEventRow[];
 }
 
@@ -226,5 +242,23 @@ export interface IssuedItApiKey {
   keyHint: string;
   scope: ItApiScope;
   status: ItApiClientStatus;
+  capabilities?: ItApiCapability[];
+  environment?: ItApiEnvironment;
+  flightDomain?: ItApiFlightDomain;
+  ipWhitelist?: string[];
+  rateLimitPerMinute?: number | null;
+  expiresAt?: string | null;
   rawKey?: string;
+}
+
+export interface ItAvailabilityTestResult {
+  allowed: boolean;
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  capacity: number;
+  seatsSold: number;
+  seatsLeft: number;
 }

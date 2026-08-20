@@ -181,10 +181,19 @@ export function issueItApiClient(
   agencyId: string,
   scope: ItApiScope,
   stepUp: { stepUpChallengeId: string; stepUpCode: string },
+  extras: {
+    environment?: import('../types/it-manager').ItApiEnvironment;
+    flightDomain?: import('../types/it-manager').ItApiFlightDomain;
+    capabilities?: import('../types/it-manager').ItApiCapability[];
+    ipWhitelist?: string[];
+    rateLimitPerMinute?: number | null;
+    expiresAt?: string | null;
+  } = {},
 ) {
   return apiPost<IssuedItApiKey>('/it/webservices/clients', {
     agencyId,
     scope,
+    ...extras,
     ...stepUp,
   });
 }
@@ -196,7 +205,21 @@ export function updateItApiClient(
     regenerate?: boolean;
     stepUpChallengeId?: string;
     stepUpCode?: string;
+    scope?: ItApiScope;
+    capabilities?: import('../types/it-manager').ItApiCapability[];
+    environment?: import('../types/it-manager').ItApiEnvironment;
+    flightDomain?: import('../types/it-manager').ItApiFlightDomain;
+    ipWhitelist?: string[];
+    rateLimitPerMinute?: number | null;
+    expiresAt?: string | null;
   },
 ) {
   return apiPatch<IssuedItApiKey>(`/it/webservices/clients/${id}`, dto);
+}
+
+export function testItApiAvailability(id: string, flightNo: string) {
+  return apiPost<import('../types/it-manager').ItAvailabilityTestResult>(
+    `/it/webservices/clients/${id}/test-availability`,
+    { flightNo },
+  );
 }

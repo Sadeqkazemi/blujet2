@@ -49,11 +49,19 @@ import { TWO_FACTOR_PROVIDER } from '../auth/providers/two-factor-provider.inter
 import type { TwoFactorProvider } from '../auth/providers/two-factor-provider.interface';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { hashAgencyApiKey } from '../../common/agency-api-key';
+import {
+  capabilitiesFromScope,
+  normalizeCapabilities,
+  scopeFromCapabilities,
+} from '../../common/agency-api-capabilities';
 import type {
-  AgencyApiScope,
+  AgencyApiCapability,
+  AgencyApiEnvironment,
   AgencyApiKeyStatus,
+  AgencyApiScope,
   AgencyCreditRequestStatus,
   AgencyDocumentStatus,
+  AgencyFlightDomain,
   AgencyMembershipStatus,
   AgencySeatRequestStatus,
   AgencyWebserviceRequestStatus,
@@ -74,11 +82,17 @@ function generateSixDigitCode(): string {
 }
 
 function apiKeyView(key: AgencyApiKey, rawKey?: string) {
+  const capabilities = normalizeCapabilities(key.capabilities, key.scope);
   return {
     id: key.id,
     agencyId: key.agencyId,
     keyHint: `bjk_••••${key.id.replace(/-/g, '').slice(0, 4)}`,
     scope: key.scope,
+    capabilities,
+    environment: key.environment,
+    flightDomain: key.flightDomain,
+    ipWhitelist: key.ipWhitelist ?? [],
+    rateLimitPerMinute: key.rateLimitPerMinute,
     status: key.status,
     activatedAt: key.activatedAt,
     expiresAt: key.expiresAt,
@@ -1189,6 +1203,14 @@ export class AgenciesService {
     scope: AgencyApiScope,
     stepUpChallengeId: string,
     stepUpCode: string,
+    options: {
+      environment?: AgencyApiEnvironment;
+      flightDomain?: AgencyFlightDomain;
+      capabilities?: AgencyApiCapability[];
+      ipWhitelist?: string[];
+      rateLimitPerMinute?: number | null;
+      expiresAt?: string | null;
+    } = {},
   ) {
     await this.stepUp.verify(
       actor,
@@ -1197,12 +1219,40 @@ export class AgenciesService {
       'API_KEY_ROTATE',
     );
     await this.getProfileOrThrow(id);
+
+    const environment = options.environment ?? 'SANDBOX';
+    const flightDomain = options.flightDomain ?? 'ALL';
+    const capabilities = normalizeCapabilities(options.capabilities, scope);
+    const resolvedScope = options.capabilities?.length
+      ? scopeFromCapabilities(capabilities)
+      : scope;
+
+    const existing = await this.apiKeyRepo.findOne({
+      where: [
+        { agencyId: id, environment, status: 'ACTIVE' },
+        { agencyId: id, environment, status: 'SUSPENDED' },
+      ],
+    });
+    if (existing) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message:
+          'برای این آژانس در این محیط قبلاً کلید فعال وجود دارد؛ ابتدا آن را لغو کنید یا محیط دیگر را انتخاب کنید.',
+      });
+    }
+
     const rawKey = generateApiKeySecret();
     const created = await this.apiKeyRepo.save(
       this.apiKeyRepo.create({
         agencyId: id,
         keyHash: hashAgencyApiKey(rawKey),
-        scope,
+        scope: resolvedScope,
+        capabilities,
+        environment,
+        flightDomain,
+        ipWhitelist: options.ipWhitelist ?? [],
+        rateLimitPerMinute: options.rateLimitPerMinute ?? null,
+        expiresAt: options.expiresAt ? new Date(options.expiresAt) : null,
         status: 'ACTIVE',
       }),
     );
@@ -1212,7 +1262,7 @@ export class AgenciesService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'صدور کلید API آژانس',
-      detail: `کلید API با دامنه ${scope} توسط ${actor.fullName} صادر شد.`,
+      detail: `کلید API با دامنه ${resolvedScope} (${environment}) توسط ${actor.fullName} صادر شد.`,
       entityType: 'AgencyApiKey',
       entityId: created.id,
     });
@@ -1230,6 +1280,13 @@ export class AgenciesService {
       regenerate?: boolean;
       stepUpChallengeId?: string;
       stepUpCode?: string;
+      scope?: AgencyApiScope;
+      capabilities?: AgencyApiCapability[];
+      environment?: AgencyApiEnvironment;
+      flightDomain?: AgencyFlightDomain;
+      ipWhitelist?: string[];
+      rateLimitPerMinute?: number | null;
+      expiresAt?: string | null;
     },
   ) {
     const key = await this.apiKeyRepo.findOneBy({ id: keyId });
@@ -1305,10 +1362,74 @@ export class AgenciesService {
       return apiKeyView(updated);
     }
 
-    throw new BadRequestException({
-      code: ErrorCode.VALIDATION_FAILED,
-      message: 'یکی از status یا regenerate الزامی است.',
+    const policyTouched =
+      dto.capabilities !== undefined ||
+      dto.scope !== undefined ||
+      dto.environment !== undefined ||
+      dto.flightDomain !== undefined ||
+      dto.ipWhitelist !== undefined ||
+      dto.rateLimitPerMinute !== undefined ||
+      dto.expiresAt !== undefined;
+
+    if (!policyTouched) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'حداقل یک فیلد برای به‌روزرسانی الزامی است.',
+      });
+    }
+
+    if (dto.environment && dto.environment !== key.environment) {
+      const clash = await this.apiKeyRepo.findOne({
+        where: [
+          {
+            agencyId: id,
+            environment: dto.environment,
+            status: 'ACTIVE',
+          },
+          {
+            agencyId: id,
+            environment: dto.environment,
+            status: 'SUSPENDED',
+          },
+        ],
+      });
+      if (clash && clash.id !== key.id) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'کلید دیگری برای این آژانس در محیط انتخاب‌شده فعال است.',
+        });
+      }
+      key.environment = dto.environment;
+    }
+
+    if (dto.capabilities) {
+      key.capabilities = normalizeCapabilities(dto.capabilities, key.scope);
+      key.scope = scopeFromCapabilities(key.capabilities);
+    } else if (dto.scope) {
+      key.scope = dto.scope;
+      key.capabilities = capabilitiesFromScope(dto.scope);
+    }
+
+    if (dto.flightDomain) key.flightDomain = dto.flightDomain;
+    if (dto.ipWhitelist !== undefined) key.ipWhitelist = dto.ipWhitelist;
+    if (dto.rateLimitPerMinute !== undefined) {
+      key.rateLimitPerMinute = dto.rateLimitPerMinute;
+    }
+    if (dto.expiresAt !== undefined) {
+      key.expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : null;
+    }
+
+    const updated = await this.apiKeyRepo.save(key);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'AGENCY',
+      action: 'به‌روزرسانی سیاست کلید API آژانس',
+      detail: `سیاست کلید API توسط ${actor.fullName} به‌روزرسانی شد.`,
+      entityType: 'AgencyApiKey',
+      entityId: keyId,
     });
+    return apiKeyView(updated);
   }
 
   // ── Invoices & messaging ─────────────────────────────────────────────

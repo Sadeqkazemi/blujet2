@@ -3,6 +3,7 @@ import type { AgencyApiKey } from '../../database/entities/agency-api-key.entity
 import type { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import type { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
 import type { AuditLog } from '../../database/entities/audit-log.entity';
+import { Role } from '../../database/enums';
 import type { AgenciesService } from '../agencies/agencies.service';
 import { ItWebservicesService } from './it-webservices.service';
 
@@ -52,6 +53,16 @@ describe('ItWebservicesService', () => {
         agency: { user: { fullName: 'آژانس سپهر' } },
         keyHash: 'must-never-leave-the-server',
         scope: 'SEARCH_BOOK',
+        capabilities: [
+          'RESERVATION',
+          'TICKETING',
+          'FLIGHT_INFO',
+          'AVAILABILITY',
+        ],
+        environment: 'SANDBOX',
+        flightDomain: 'ALL',
+        ipWhitelist: [],
+        rateLimitPerMinute: null,
         status: 'ACTIVE',
         activatedAt: new Date('2026-08-19T08:00:00.000Z'),
         expiresAt: null,
@@ -92,6 +103,9 @@ describe('ItWebservicesService', () => {
       keyRepo as unknown as Repository<AgencyApiKey>,
       agencyRepo as unknown as Repository<AgencyProfile>,
       auditRepo as unknown as Repository<AuditLog>,
+      {} as never,
+      {} as never,
+      {} as never,
       agencies as AgenciesService,
     );
 
@@ -130,9 +144,12 @@ describe('ItWebservicesService', () => {
       keyRepo as unknown as Repository<AgencyApiKey>,
       {} as Repository<AgencyProfile>,
       {} as Repository<AuditLog>,
+      {} as never,
+      {} as never,
+      {} as never,
       agencies as unknown as AgenciesService,
     );
-    const actor = { id: 'it-1', role: 'IT_MANAGER', fullName: 'مدیر IT' };
+    const actor = { id: 'it-1', role: Role.IT_MANAGER, fullName: 'مدیر IT' };
 
     await service.updateClient(actor, 'key-1', {
       status: 'REVOKED',

@@ -24,6 +24,7 @@ import { CreateApiKeyDto } from '../agencies/dto/create-api-key.dto';
 import { DecideWebserviceRequestDto } from '../agencies/dto/decide-webservice-request.dto';
 import { UpdateApiKeyDto } from '../agencies/dto/update-api-key.dto';
 import { CreateItApiClientDto } from './dto/create-it-api-client.dto';
+import { TestAvailabilityDto } from './dto/test-availability.dto';
 import { ItWebservicesService } from './it-webservices.service';
 
 @ApiTags('it-manager-webservices')
@@ -75,12 +76,22 @@ export class ItWebservicesController {
         keyDto.scope,
         keyDto.stepUpChallengeId,
         keyDto.stepUpCode,
+        {
+          environment: keyDto.environment,
+          flightDomain: keyDto.flightDomain,
+          capabilities: keyDto.capabilities,
+          ipWhitelist: keyDto.ipWhitelist,
+          rateLimitPerMinute: keyDto.rateLimitPerMinute,
+          expiresAt: keyDto.expiresAt,
+        },
       ),
     };
   }
 
   @Patch('clients/:id')
-  @ApiOperation({ summary: 'تعلیق، فعال‌سازی، لغو یا تعویض کلید API' })
+  @ApiOperation({
+    summary: 'تعلیق، فعال‌سازی، لغو، چرخش یا به‌روزرسانی سیاست کلید API',
+  })
   @ApiResponse({ status: 200, description: 'کلاینت API به‌روزرسانی شد.' })
   @ApiNotFoundResponse({ description: 'کلاینت یافت نشد.' })
   async updateClient(
@@ -91,6 +102,23 @@ export class ItWebservicesController {
     return {
       success: true,
       data: await this.webservices.updateClient(actor, id, dto),
+    };
+  }
+
+  @Post('clients/:id/test-availability')
+  @ApiOperation({
+    summary: 'آزمایشگر استعلام ظرفیت — همان منطق دسترسی AVAILABILITY',
+  })
+  @ApiResponse({ status: 200, description: 'نتیجهٔ استعلام ظرفیت' })
+  @ApiForbiddenResponse({ description: 'Scope کلاینت شامل AVAILABILITY نیست.' })
+  @ApiNotFoundResponse({ description: 'کلاینت یا پرواز یافت نشد.' })
+  async testAvailability(
+    @Param('id') id: string,
+    @Body() dto: TestAvailabilityDto,
+  ) {
+    return {
+      success: true,
+      data: await this.webservices.testAvailability(id, dto.flightNo),
     };
   }
 }

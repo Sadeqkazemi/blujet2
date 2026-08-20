@@ -3,6 +3,7 @@ import {
   decideItWebserviceRequest,
   fetchItWebservices,
   issueItApiClient,
+  testItApiAvailability,
   updateItApiClient,
 } from '../../api/it-manager';
 import Modal from '../../components/Modal';
@@ -11,8 +12,12 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type {
   IssuedItApiKey,
+  ItApiCapability,
   ItApiClientRow,
+  ItApiEnvironment,
+  ItApiFlightDomain,
   ItApiScope,
+  ItAvailabilityTestResult,
   ItWebservicesOverview,
   ItWebserviceRequestRow,
 } from '../../types/it-manager';
@@ -24,6 +29,18 @@ const SCOPE_LABEL: Record<ItApiScope, string> = {
   SEARCH_BOOK: 'جستجو و رزرو',
   SEARCH_ONLY: 'فقط جستجو',
 };
+
+const CAPABILITY_LABEL: Record<ItApiCapability, string> = {
+  RESERVATION: 'رزرو پرواز',
+  TICKETING: 'صدور بلیط',
+  PRICING: 'نرخ‌گذاری',
+  FLIGHT_INFO: 'اطلاعات پرواز',
+  REFUND: 'استرداد بلیط',
+  CHECK_IN: 'چک‌این آنلاین',
+  AVAILABILITY: 'استعلام ظرفیت',
+};
+
+const ALL_CAPABILITIES = Object.keys(CAPABILITY_LABEL) as ItApiCapability[];
 
 function errorMessage(error: unknown): string {
   return error instanceof Error
@@ -75,6 +92,9 @@ export default function WebservicesApiPage() {
   const [scope, setScope] = useState<ItApiScope>('SEARCH_ONLY');
   const [query, setQuery] = useState('');
   const [issuedKey, setIssuedKey] = useState<IssuedItApiKey | null>(null);
+  const [settingsClient, setSettingsClient] = useState<ItApiClientRow | null>(
+    null,
+  );
   const stepUp = useStepUp('API_KEY_ROTATE');
 
   const load = useCallback(async () => {
@@ -290,9 +310,25 @@ export default function WebservicesApiPage() {
           busyId={busyId}
           onQuery={setQuery}
           onAction={changeClient}
+          onSettings={setSettingsClient}
         />
       )}
       {tab === 'events' && <EventsPanel rows={data?.events ?? []} />}
+
+      {settingsClient && (
+        <ClientSettingsModal
+          client={settingsClient}
+          busy={busyId === settingsClient.id}
+          onClose={() => setSettingsClient(null)}
+          onSaved={async () => {
+            setSettingsClient(null);
+            setNotice('سیاست کلاینت ذخیره شد.');
+            await load();
+          }}
+          onError={(message) => setError(message)}
+          setBusyId={setBusyId}
+        />
+      )}
 
       {newClientOpen && (
         <Modal
@@ -446,6 +482,7 @@ function ClientsPanel({
   busyId,
   onQuery,
   onAction,
+  onSettings,
 }: {
   rows: ItApiClientRow[];
   query: string;
@@ -455,6 +492,7 @@ function ClientsPanel({
     row: ItApiClientRow,
     action: 'toggle' | 'rotate' | 'revoke',
   ) => Promise<void>;
+  onSettings: (row: ItApiClientRow) => void;
 }) {
   const calls = rows.reduce((sum, row) => sum + row.callCount, 0);
   return (
@@ -489,6 +527,15 @@ function ClientsPanel({
                   >
                     {row.keyHint}
                   </code>
+                  <div className="mt-1 text-[10px] text-[#8494ac]">
+                    {row.environment === 'PRODUCTION' ? 'Production' : 'Sandbox'}{' '}
+                    ·{' '}
+                    {row.flightDomain === 'DOMESTIC'
+                      ? 'داخلی'
+                      : row.flightDomain === 'INTERNATIONAL'
+                        ? 'بین‌المللی'
+                        : 'همه پروازها'}
+                  </div>
                 </div>
                 <div className="text-xs text-[#c7d2e2]">
                   {SCOPE_LABEL[row.scope]}
@@ -503,8 +550,21 @@ function ClientsPanel({
                     : 'هنوز استفاده نشده'}
                   <br />
                   تعداد درخواست: {faDigits(row.callCount)}
+                  {row.rateLimitPerMinute != null && (
+                    <>
+                      <br />
+                      Rate Limit: {faDigits(row.rateLimitPerMinute)}/دقیقه
+                    </>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSettings(row)}
+                    className="rounded-lg border border-[#33415c] px-2.5 py-1.5 text-[10px] text-[#c7d2e2]"
+                  >
+                    تنظیمات
+                  </button>
                   {row.status !== 'REVOKED' && (
                     <>
                       <button
@@ -540,6 +600,214 @@ function ClientsPanel({
         )}
       </section>
     </div>
+  );
+}
+
+function ClientSettingsModal({
+  client,
+  busy,
+  onClose,
+  onSaved,
+  onError,
+  setBusyId,
+}: {
+  client: ItApiClientRow;
+  busy: boolean;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+  onError: (message: string) => void;
+  setBusyId: (id: string | null) => void;
+}) {
+  const [capabilities, setCapabilities] = useState<ItApiCapability[]>(
+    client.capabilities ?? [],
+  );
+  const [environment, setEnvironment] = useState<ItApiEnvironment>(
+    client.environment,
+  );
+  const [flightDomain, setFlightDomain] = useState<ItApiFlightDomain>(
+    client.flightDomain,
+  );
+  const [ipText, setIpText] = useState(client.ipWhitelist.join('\n'));
+  const [rateLimit, setRateLimit] = useState(
+    client.rateLimitPerMinute != null ? String(client.rateLimitPerMinute) : '',
+  );
+  const [expiresAt, setExpiresAt] = useState(
+    client.expiresAt ? client.expiresAt.slice(0, 10) : '',
+  );
+  const [flightNo, setFlightNo] = useState('');
+  const [testResult, setTestResult] = useState<ItAvailabilityTestResult | null>(
+    null,
+  );
+  const [testing, setTesting] = useState(false);
+
+  async function save() {
+    setBusyId(client.id);
+    try {
+      const ips = ipText
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await updateItApiClient(client.id, {
+        capabilities,
+        environment,
+        flightDomain,
+        ipWhitelist: ips,
+        rateLimitPerMinute: rateLimit.trim() ? Number(rateLimit) : null,
+        expiresAt: expiresAt.trim()
+          ? new Date(`${expiresAt}T23:59:59.000Z`).toISOString()
+          : null,
+      });
+      await onSaved();
+    } catch (err) {
+      onError(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function runTester() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await testItApiAvailability(client.id, flightNo.trim()));
+    } catch (err) {
+      onError(errorMessage(err));
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  return (
+    <Modal title={`تنظیمات — ${client.agency}`} onClose={onClose} variant="dark">
+      <div className="max-h-[70vh] space-y-4 overflow-y-auto pe-1">
+        <div>
+          <div className="mb-2 text-xs font-bold">Scope</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {ALL_CAPABILITIES.map((cap) => {
+              const on = capabilities.includes(cap);
+              return (
+                <label
+                  key={cap}
+                  className="flex items-center gap-2 rounded-lg border border-[#2a3550] bg-[#0d1625] px-3 py-2 text-[11px]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={() =>
+                      setCapabilities((prev) =>
+                        on ? prev.filter((c) => c !== cap) : [...prev, cap],
+                      )
+                    }
+                  />
+                  {CAPABILITY_LABEL[cap]}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs">
+            <span className="mb-1 block font-bold">محیط اجرا</span>
+            <select
+              value={environment}
+              onChange={(e) =>
+                setEnvironment(e.target.value as ItApiEnvironment)
+              }
+              className="h-10 w-full rounded-xl border border-[#2a3550] bg-[#0d1625] px-3 text-xs"
+            >
+              <option value="SANDBOX">Sandbox</option>
+              <option value="PRODUCTION">Production</option>
+            </select>
+          </label>
+          <label className="block text-xs">
+            <span className="mb-1 block font-bold">دامنه پروازی</span>
+            <select
+              value={flightDomain}
+              onChange={(e) =>
+                setFlightDomain(e.target.value as ItApiFlightDomain)
+              }
+              className="h-10 w-full rounded-xl border border-[#2a3550] bg-[#0d1625] px-3 text-xs"
+            >
+              <option value="ALL">همه</option>
+              <option value="DOMESTIC">فقط داخلی</option>
+              <option value="INTERNATIONAL">فقط بین‌المللی</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="block text-xs">
+          <span className="mb-1 block font-bold">IP Whitelist (هر خط یک IP)</span>
+          <textarea
+            value={ipText}
+            onChange={(e) => setIpText(e.target.value)}
+            rows={3}
+            dir="ltr"
+            className="w-full rounded-xl border border-[#2a3550] bg-[#0d1625] p-3 text-left text-xs"
+            placeholder="خالی = بدون محدودیت"
+          />
+        </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs">
+            <span className="mb-1 block font-bold">Rate Limit (در دقیقه)</span>
+            <input
+              value={rateLimit}
+              onChange={(e) => setRateLimit(e.target.value)}
+              inputMode="numeric"
+              dir="ltr"
+              className="h-10 w-full rounded-xl border border-[#2a3550] bg-[#0d1625] px-3 text-left text-xs"
+              placeholder="خالی = فقط سقف سراسری"
+            />
+          </label>
+          <label className="block text-xs">
+            <span className="mb-1 block font-bold">تاریخ انقضای کلید</span>
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className="h-10 w-full rounded-xl border border-[#2a3550] bg-[#0d1625] px-3 text-xs"
+            />
+          </label>
+        </div>
+
+        <div className="rounded-xl border border-[#2a3550] bg-[#0d1625] p-3">
+          <div className="mb-2 text-xs font-bold">آزمایشگر استعلام ظرفیت</div>
+          <div className="flex gap-2">
+            <input
+              value={flightNo}
+              onChange={(e) => setFlightNo(e.target.value)}
+              placeholder="مثلاً EP-821"
+              dir="ltr"
+              className="h-10 flex-1 rounded-xl border border-[#2a3550] bg-[#101827] px-3 text-left text-xs"
+            />
+            <button
+              type="button"
+              disabled={testing || !flightNo.trim()}
+              onClick={() => void runTester()}
+              className="rounded-xl bg-[#334155] px-3 text-[11px] font-bold disabled:opacity-50"
+            >
+              {testing ? '…' : 'تست'}
+            </button>
+          </div>
+          {testResult && (
+            <p className="mt-2 text-[11px] leading-6 text-emerald-300">
+              {testResult.flightNo}: ظرفیت {faDigits(testResult.capacity)} ·
+              باقی‌مانده {faDigits(testResult.seatsLeft)}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void save()}
+          className="h-11 w-full rounded-xl bg-[#3b82f6] text-xs font-extrabold disabled:opacity-50"
+        >
+          {busy ? 'در حال ذخیره…' : 'ذخیره سیاست'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 
