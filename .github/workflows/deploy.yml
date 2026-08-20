@@ -170,6 +170,24 @@ jobs:
               touch "$access_extension_sentinel"
               chmod 600 "$access_extension_sentinel"
             fi
+            # Owner-approved extension v2: active temporary identities move
+            # forward by seven days; an already-expired identity receives a
+            # fresh seven-day window from this execution. A separate sentinel,
+            # confirmation phrase and root-only audit file make this grant
+            # one-time, reviewable and independent from extension v1.
+            access_extension_v2_sentinel=/root/.blujet-uat-temporary-access-extension-v2-complete
+            if [ ! -f "$access_extension_v2_sentinel" ]; then
+              umask 077
+              access_extension_v2_audit=/root/blujet-uat-temporary-access-extension-v2.json
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e NODE_ENV=production \
+                -e TEMP_PANEL_EXTENSION_CONFIRM=EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V2 \
+                backend node dist/database/extend-temporary-panel-access-v2.js --execute \
+                > "$access_extension_v2_audit"
+              chmod 600 "$access_extension_v2_audit"
+              touch "$access_extension_v2_sentinel"
+              chmod 600 "$access_extension_v2_sentinel"
+            fi
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
             # reference/configuration tables are retained by the purge policy.
