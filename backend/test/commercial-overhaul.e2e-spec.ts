@@ -221,6 +221,12 @@ describe('Commercial manager overhaul (e2e)', () => {
       await request(app.getHttpServer())
         .get('/agencies/seat-requests')
         .set('Authorization', auth(finance.accessToken))
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .patch(`/agencies/seat-requests/${requestId}/decide`)
+        .set('Authorization', auth(finance.accessToken))
+        .send({ approve: true, dueAt: '2026-09-01T00:00:00.000Z' })
         .expect(403);
 
       await request(app.getHttpServer())
