@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BeforeInsert,
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -16,6 +17,10 @@ import { User } from './user.entity';
   'userId',
   'nationalIdHash',
 ])
+@Check(
+  'saved_passengers_gender_check',
+  `"gender" IS NULL OR "gender" IN ('male', 'female')`,
+)
 @Entity('saved_passengers')
 export class SavedPassenger {
   @PrimaryColumn({
@@ -59,6 +64,13 @@ export class SavedPassenger {
 
   @Column({ type: 'boolean', default: false })
   isChild!: boolean;
+
+  /** `male` | `female` — matches checkout Gender (empty not stored). */
+  @Column({ type: 'text', nullable: true })
+  gender!: 'male' | 'female' | null;
+
+  @Column({ type: 'date', nullable: true })
+  birthDate!: string | null;
 
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;

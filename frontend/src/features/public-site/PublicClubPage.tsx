@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchClubPoints } from '../../api/publicSite';
+import { fetchClubPoints, joinClub } from '../../api/publicSite';
+import { ApiRequestError } from '../../api/envelope';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatToman } from '../../lib/fa-format';
@@ -168,6 +169,8 @@ export default function PublicClubPage() {
   const t = STR[locale];
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -175,6 +178,29 @@ export default function PublicClubPage() {
       .then(setClub)
       .catch(() => setClub(null));
   }, [loggedIn]);
+
+  async function onJoin() {
+    setJoinBusy(true);
+    setJoinError(null);
+    try {
+      const membership = await joinClub();
+      setClub({
+        isMember: membership.isMember,
+        level: membership.level,
+        balance: membership.balance,
+      });
+    } catch (err) {
+      setJoinError(
+        err instanceof ApiRequestError
+          ? err.message
+          : locale === 'en'
+            ? 'Could not join the club.'
+            : 'عضویت در باشگاه انجام نشد.',
+      );
+    } finally {
+      setJoinBusy(false);
+    }
+  }
 
   const gridCols3 = isMobile ? '1fr' : 'repeat(3,1fr)';
   const gridCols4 = isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)';
@@ -213,13 +239,38 @@ export default function PublicClubPage() {
                 {t.joinFree}
               </Link>
             )}
+            {loggedIn && club && !club.isMember && (
+              <button
+                type="button"
+                data-testid="public-club-join"
+                disabled={joinBusy}
+                onClick={() => void onJoin()}
+                style={{
+                  background: '#fff',
+                  color: '#1668c4',
+                  padding: '11px 24px',
+                  borderRadius: 12,
+                  fontSize: '13.5px',
+                  fontWeight: 800,
+                  border: 'none',
+                  cursor: joinBusy ? 'wait' : 'pointer',
+                  fontFamily: 'inherit',
+                  opacity: joinBusy ? 0.7 : 1,
+                }}
+              >
+                {t.joinFree}
+              </button>
+            )}
             <Link
-              to={loggedIn ? '/manage-booking' : '/signin'}
+              to={loggedIn ? '/account?tab=club' : '/signin'}
               style={{ textDecoration: 'none', background: '#ffffff22', border: '1px solid #ffffff55', color: '#fff', padding: '11px 21px', borderRadius: 12, fontSize: '13.5px', fontWeight: 700 }}
             >
               {t.myAccount}
             </Link>
           </div>
+          {joinError && (
+            <p style={{ marginTop: 14, color: '#ffd0d0', fontSize: 13 }}>{joinError}</p>
+          )}
         </div>
       </section>
 

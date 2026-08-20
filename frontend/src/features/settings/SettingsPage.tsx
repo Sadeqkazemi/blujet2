@@ -110,8 +110,9 @@ const inputClass =
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  /** System-wide company/gateway/refund editors — IT owns this after chair settings tab was removed. */
-  const isSystemEditor = user?.role === 'IT_MANAGER';
+  /** Company/content/gateway editors are not writable for IT (server key scope). */
+  const canEditBrandContent = false;
+  const canEditRefundRules = user?.role === 'IT_MANAGER';
   const isSiteAdmin = user?.role === 'SITE_ADMIN';
   const isIt = user?.role === 'IT_MANAGER';
   const [data, setData] = useState<SettingsResult | null>(null);
@@ -177,10 +178,21 @@ export default function SettingsPage() {
             supportPhone: draft.supportPhone,
             appDownloadLinks: draft.appDownloadLinks,
           }
-        : draft;
+        : isIt
+          ? {
+              maintenance: draft.maintenance,
+              registration: draft.registration,
+              charterSale: draft.charterSale,
+              apiPublic: draft.apiPublic,
+              sandbox: draft.sandbox,
+              socialLinks: draft.socialLinks,
+              appDownloadLinks: draft.appDownloadLinks,
+              supportPhone: draft.supportPhone,
+            }
+          : draft;
       const result = await updateSettings(patch);
 
-      if (isSystemEditor && data && !isSiteAdmin) {
+      if (canEditRefundRules && data && !isSiteAdmin) {
         const changed: { id: string; penaltyPct: number }[] = [];
         for (const rule of data.refundRules) {
           const parsed = parseInt(latinDigits(ruleDraft[rule.id] ?? ''), 10);
@@ -212,7 +224,7 @@ export default function SettingsPage() {
         {isSiteAdmin
           ? 'مدیریت لینک‌های اجتماعی، تماس پشتیبانی و دانلود اپلیکیشن در سایت'
           : isIt
-            ? 'پیکربندی سراسری سایت و برند'
+            ? 'سرویس‌های عملیاتی سایت، شبکه‌های اجتماعی و تماس پشتیبانی'
             : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
       </p>
 
@@ -247,7 +259,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex min-w-[280px] flex-1 flex-col gap-[9px]">
               <div className="flex h-[118px] items-center justify-center rounded-xl border-[1.5px] border-dashed border-[#2a3a55] bg-[#0f1623] px-4 text-center text-[11.5px] text-[#6b7b94]">
-                آپلود لوگوی جدید به‌زودی از همین پنل فعال می‌شود
+                آپلود لوگو از این پنل هنوز فعال نیست — فعلاً برند ثابت blujet نمایش داده می‌شود
               </div>
               <p className="text-[10.5px] leading-[1.7] text-[#6b7b94]">
                 فرمت PNG شفاف یا SVG — حداکثر ۱ مگابایت — نسبت پیشنهادی افقی
@@ -258,7 +270,7 @@ export default function SettingsPage() {
       )}
 
       <div className={`grid grid-cols-1 gap-4 ${isIt ? 'max-w-[760px]' : 'lg:grid-cols-2'}`}>
-        {isSystemEditor && (
+        {canEditBrandContent && (
           <div className={cardClass}>
             <div className="mb-4 text-sm font-bold text-white">اطلاعات شرکت</div>
             <div className="flex flex-col gap-3">
@@ -285,7 +297,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isSystemEditor && (
+        {canEditBrandContent && (
           <div className={cardClass}>
             <div className="mb-1 text-sm font-bold text-white">محتوای سایت</div>
             <p className="mb-4 text-[11px] text-[#6b7b94]">متن صفحات عمومی — بدون نیاز به انتشار نسخهٔ جدید</p>
@@ -316,7 +328,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isSystemEditor && (
+        {canEditBrandContent && (
           <div className={cardClass}>
             <div className="mb-4 text-sm font-bold text-white">درگاه پرداخت</div>
             <div className="flex flex-col divide-y divide-[#1f2a3d]">
@@ -337,7 +349,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isSystemEditor && (
+        {canEditRefundRules && (
           <div className={cardClass}>
             <div className="mb-1 text-sm font-bold text-white">قوانین استرداد</div>
             <p className="mb-4 text-[11px] leading-6 text-[#6b7b94]">
@@ -365,7 +377,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {isSiteAdmin && (
+        {(isSiteAdmin || isIt) && (
           <div className={cardClass}>
             <div className="mb-1 text-sm font-bold text-white">تماس پشتیبانی</div>
             <p className="mb-4 text-[11px] text-[#6b7b94]">شماره تلفن و ایمیل نمایش‌داده‌شده در سایت</p>
@@ -382,23 +394,25 @@ export default function SettingsPage() {
                   className={`font-num ${inputClass}`}
                 />
               </div>
-              <div>
-                <label htmlFor="set-support-email" className={labelClass}>
-                  ایمیل پشتیبانی
-                </label>
-                <input
-                  id="set-support-email"
-                  dir="ltr"
-                  value={strOf('supportEmail')}
-                  onChange={(e) => setKey('supportEmail', e.target.value)}
-                  className={`font-num ${inputClass}`}
-                />
-              </div>
+              {isSiteAdmin && (
+                <div>
+                  <label htmlFor="set-support-email" className={labelClass}>
+                    ایمیل پشتیبانی
+                  </label>
+                  <input
+                    id="set-support-email"
+                    dir="ltr"
+                    value={strOf('supportEmail')}
+                    onChange={(e) => setKey('supportEmail', e.target.value)}
+                    className={`font-num ${inputClass}`}
+                  />
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {isSiteAdmin && (
+        {(isSiteAdmin || isIt) && (
           <div className={cardClass}>
             <div className="mb-1 text-sm font-bold text-white">لینک دانلود اپلیکیشن</div>
             <p className="mb-4 text-[11px] text-[#6b7b94]">دکمه‌های بخش اپلیکیشن در صفحهٔ اصلی</p>

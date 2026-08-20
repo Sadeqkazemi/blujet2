@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { lookupBookingByPnrAndLastName, submitAnonymousRefund } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
@@ -9,11 +10,10 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail } from '../../types/public-site';
 
 // مدیریت رزرو — real PNR + last-name self-service (no login), matching
-// مدیریت رزرو.dc.html's anonymous lookup UX. تغییر صندلی/دانلود بلیط stay
-// disabled this phase (see docs/API.md's Phase 19 for the deferral
-// reasoning); refund uses the same real IBAN-then-submit flow as
-// TicketPage.tsx's authenticated refund form, not a pre-submission
-// per-passenger preview.
+// مدیریت رزرو.dc.html's anonymous lookup UX. تغییر صندلی stays disabled
+// until a public seat-change endpoint exists; دانلود بلیط opens the
+// e-ticket page at /ticket/:pnr. Refund uses the same real IBAN-then-submit
+// flow as TicketPage.tsx's authenticated refund form.
 //
 // Most labels below reuse design-reference-v2/مدیریت رزرو.dc.html's own
 // isEN vocabulary for this exact page (heroTitle, lblPnr, lblLastName,
@@ -178,9 +178,11 @@ const STR: Record<StoredLocale, {
 
 export default function ManageBookingPage() {
   const { locale } = useLocale();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
   const t = STR[locale];
-  const [pnr, setPnr] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [pnr, setPnr] = useState(() => (params.get('pnr') ?? '').toUpperCase());
+  const [lastName, setLastName] = useState(() => params.get('lastName') ?? '');
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [booking, setBooking] = useState<BookingDetail | null>(null);
@@ -189,6 +191,28 @@ export default function ManageBookingPage() {
   const [iban, setIban] = useState('');
   const [refundError, setRefundError] = useState<string | null>(null);
   const [refundResult, setRefundResult] = useState<{ penaltyPct: number; refundableIrr: string; penaltyAmountIrr: string } | null>(null);
+
+  useEffect(() => {
+    const qPnr = (params.get('pnr') ?? '').trim();
+    const qLast = (params.get('lastName') ?? '').trim();
+    if (qPnr) setPnr(qPnr.toUpperCase());
+    if (qLast) setLastName(qLast);
+    if (qPnr.length >= 4 && qLast) {
+      void (async () => {
+        setLoading(true);
+        setLookupError(null);
+        try {
+          const data = await lookupBookingByPnrAndLastName(qPnr, qLast);
+          setBooking(data);
+        } catch (err) {
+          setBooking(null);
+          setLookupError(err instanceof ApiRequestError ? err.message : t.lookupErrorFallback);
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }
+  }, [params, t.lookupErrorFallback]);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
@@ -230,55 +254,57 @@ export default function ManageBookingPage() {
 
   return (
     <PublicPageShell>
-      <section style={{ background: 'linear-gradient(150deg,#0d2640,#124a86)', color: '#fff', padding: '41px 22px 65px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: 30, fontWeight: 900, margin: '0 0 10px', letterSpacing: '-.5px' }}>{t.title}</h1>
-        <p style={{ fontSize: 13, color: '#c9dcf3', margin: 0 }}>{t.subtitle}</p>
+      <section style={{ background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff', padding: '34px 22px 40px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: 27, fontWeight: 900, margin: '0 0 8px' }}>{t.title}</h1>
+        <p style={{ fontSize: 13, color: '#aac4e2', margin: 0 }}>{t.subtitle}</p>
       </section>
 
-      <div style={{ maxWidth: 720, margin: '-34px auto 0', padding: '0 22px 60px', position: 'relative' }}>
-        {/* LOOKUP CARD */}
+      <div style={{ maxWidth: 880, margin: '32px auto 56px', padding: '0 26px', position: 'relative' }}>
+        {/* LOOKUP CARD — stacked full-width CTA matching مدیریت رزرو.dc.html */}
         <form
           onSubmit={lookup}
-          style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 18, boxShadow: '0 24px 54px -28px rgba(13,38,102,.35)', padding: 20, display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}
+          style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, boxShadow: '0 18px 50px -28px rgba(13,38,102,.5)', padding: 21 }}
         >
-          <div style={{ flex: '1 1 160px' }}>
-            <label htmlFor="mb-pnr" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-              {t.pnrLabel}
-            </label>
-            <input
-              id="mb-pnr"
-              data-testid="mb-pnr"
-              dir="ltr"
-              value={pnr}
-              onChange={(e) => setPnr(e.target.value)}
-              placeholder={t.pnrPlaceholder}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none', textTransform: 'uppercase' }}
-            />
-          </div>
-          <div style={{ flex: '1 1 160px' }}>
-            <label htmlFor="mb-lastname" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-              {t.lastNameLabel}
-            </label>
-            <input
-              id="mb-lastname"
-              data-testid="mb-lastname"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder={t.lastNamePlaceholder}
-              style={{ width: '100%', boxSizing: 'border-box', padding: '11px 13px', border: '1.5px solid #e3e9f1', borderRadius: 11, fontFamily: 'inherit', fontSize: 13.5, outline: 'none' }}
-            />
+          <div style={{ display: 'flex', gap: 13, flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 220px' }}>
+              <label htmlFor="mb-pnr" style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#8a96a6', marginBottom: 8 }}>
+                {t.pnrLabel}
+              </label>
+              <input
+                id="mb-pnr"
+                data-testid="mb-pnr"
+                dir="ltr"
+                value={pnr}
+                onChange={(e) => setPnr(e.target.value)}
+                placeholder={t.pnrPlaceholder}
+                style={{ width: '100%', boxSizing: 'border-box', height: 52, padding: '0 12px', border: '1.5px solid #e2e7ee', borderRadius: 12, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, outline: 'none', textTransform: 'uppercase', background: '#fafbfd' }}
+              />
+            </div>
+            <div style={{ flex: '1 1 220px' }}>
+              <label htmlFor="mb-lastname" style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#8a96a6', marginBottom: 8 }}>
+                {t.lastNameLabel}
+              </label>
+              <input
+                id="mb-lastname"
+                data-testid="mb-lastname"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder={t.lastNamePlaceholder}
+                style={{ width: '100%', boxSizing: 'border-box', height: 52, padding: '0 12px', border: '1.5px solid #e2e7ee', borderRadius: 12, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, outline: 'none', background: '#fafbfd' }}
+              />
+            </div>
           </div>
           <button
             type="submit"
             data-testid="mb-lookup"
             disabled={loading}
-            style={{ flex: 'none', border: 'none', borderRadius: 11, background: '#1668c4', color: '#fff', padding: '12px 26px', fontSize: 13.5, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: loading ? 0.7 : 1 }}
+            style={{ marginTop: 20, width: '100%', height: 54, border: 'none', borderRadius: 13, background: '#1668c4', color: '#fff', fontSize: 14, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: loading ? 0.7 : 1, boxShadow: '0 14px 30px -14px rgba(22,104,196,.6)' }}
           >
             {loading ? t.lookingUpBtn : t.lookupBtn}
           </button>
-          <div style={{ flexBasis: '100%', fontSize: 11, color: '#8a96a6' }}>{t.emailSmsNote}</div>
+          <div style={{ marginTop: 16, fontSize: 11.5, color: '#9aa4b2', textAlign: 'center' }}>{t.emailSmsNote}</div>
           {lookupError && (
-            <div data-testid="mb-lookup-error" style={{ flexBasis: '100%', borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d' }}>
+            <div data-testid="mb-lookup-error" style={{ marginTop: 12, borderRadius: 10, background: '#fef2f2', padding: 10, fontSize: 12, color: '#e5484d', textAlign: 'center' }}>
               {lookupError}
             </div>
           )}
@@ -375,11 +401,23 @@ export default function ManageBookingPage() {
                 </button>
                 <button
                   type="button"
-                  disabled
-                  title={t.soonTooltip}
-                  style={{ marginRight: 'auto', border: 'none', background: '#e3e9f1', color: '#8a96a6', padding: '10px 20px', borderRadius: 11, fontSize: 12.5, fontWeight: 800, cursor: 'not-allowed', fontFamily: 'inherit' }}
+                  data-testid="mb-download-ticket"
+                  disabled={booking.status !== 'TICKETED'}
+                  onClick={() => navigate(`/ticket/${booking.pnr}`)}
+                  style={{
+                    marginRight: 'auto',
+                    border: 'none',
+                    background: booking.status === 'TICKETED' ? '#1668c4' : '#e3e9f1',
+                    color: booking.status === 'TICKETED' ? '#fff' : '#8a96a6',
+                    padding: '10px 20px',
+                    borderRadius: 11,
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    cursor: booking.status === 'TICKETED' ? 'pointer' : 'not-allowed',
+                    fontFamily: 'inherit',
+                  }}
                 >
-                  {t.downloadTicketBtn} <span style={{ fontSize: 10 }}>{t.soonSuffix}</span>
+                  {t.downloadTicketBtn}
                 </button>
               </div>
             </div>

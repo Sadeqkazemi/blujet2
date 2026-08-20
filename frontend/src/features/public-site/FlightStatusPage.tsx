@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { fetchAirports } from '../../api/publicSite';
@@ -177,12 +177,13 @@ function todayIso() {
 
 export default function FlightStatusPage() {
   const { locale } = useLocale();
+  const [params] = useSearchParams();
   const t = STR[locale];
   const [mode, setMode] = useState<'flightNo' | 'route'>('flightNo');
-  const [flightNo, setFlightNo] = useState('');
+  const [flightNo, setFlightNo] = useState(() => params.get('flightNo') ?? '');
   const [origin, setOrigin] = useState('');
   const [dest, setDest] = useState('');
-  const [dateIso, setDateIso] = useState<string | null>(todayIso());
+  const [dateIso, setDateIso] = useState<string | null>(() => params.get('date') ?? todayIso());
   const [airports, setAirports] = useState<Airport[]>([]);
   const [result, setResult] = useState<FlightStatusResult | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -195,6 +196,37 @@ export default function FlightStatusPage() {
       .then(setAirports)
       .catch(() => setAirports([]));
   }, []);
+
+  useEffect(() => {
+    const qFlight = (params.get('flightNo') ?? '').trim();
+    const qDate = params.get('date');
+    if (qFlight) setFlightNo(qFlight);
+    if (qDate) setDateIso(qDate);
+    if (!qFlight || !qDate) return;
+    let cancelled = false;
+    setSearching(true);
+    setError(null);
+    setNotFound(false);
+    setResult(null);
+    lookupFlightStatus({ flightNo: qFlight, date: qDate.slice(0, 10) })
+      .then((data) => {
+        if (!cancelled) setResult(data);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err instanceof ApiRequestError && err.code === 'NOT_FOUND') {
+          setNotFound(true);
+        } else {
+          setError(err instanceof ApiRequestError ? err.message : t.errorFallback);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSearching(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [params, t.errorFallback]);
 
   async function search(e: React.FormEvent) {
     e.preventDefault();

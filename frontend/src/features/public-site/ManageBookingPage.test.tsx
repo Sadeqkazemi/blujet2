@@ -117,7 +117,7 @@ describe('ManageBookingPage', () => {
     expect(submit).toHaveBeenCalledWith('BJ4X2K', 'رضایی', 'IR820170000000332211009900');
   });
 
-  it('disables تغییر صندلی and دانلود بلیط as not-yet-built', async () => {
+  it('keeps change seat disabled but enables download ticket for ticketed bookings', async () => {
     vi.spyOn(publicSiteApi, 'lookupBookingByPnrAndLastName').mockResolvedValue(BOOKING);
     renderPage();
 
@@ -127,7 +127,7 @@ describe('ManageBookingPage', () => {
     await screen.findByTestId('mb-pnr-show');
 
     expect(screen.getByRole('button', { name: /تغییر صندلی/ })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /دانلود بلیط/ })).toBeDisabled();
+    expect(screen.getByTestId('mb-download-ticket')).toBeEnabled();
   });
 
   it('renders translated heading, labels, and result in English', async () => {

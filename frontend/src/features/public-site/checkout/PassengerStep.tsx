@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { normalizeIranMobile } from '../../../lib/fa-format';
 import { localeDigits } from '../../../lib/locale-format';
@@ -10,7 +11,11 @@ import {
   savedOptionToPassengerPatch,
   type CheckoutSavedPaxOption,
 } from './checkout-saved-pax';
-import { emptyPassenger, type PassengerFormDraft } from './checkout-types';
+import {
+  emptyPassenger,
+  passengerTypeOrdinal,
+  type PassengerFormDraft,
+} from './checkout-types';
 
 const inputCls =
   'h-[46px] w-full rounded-[10px] border-[1.5px] border-[#e2e7ee] bg-white px-3.5 text-sm outline-none focus:border-[#1668c4]';
@@ -139,36 +144,33 @@ export default function PassengerStep({
   passengers,
   onChange,
   savedPassengers,
+  savedPassengersEnabled = true,
   departureAt,
+  lockPassengerCount = false,
 }: {
   locale: StoredLocale;
   passengers: PassengerFormDraft[];
   onChange: (next: PassengerFormDraft[]) => void;
   savedPassengers: SavedPassenger[];
+  savedPassengersEnabled?: boolean;
   departureAt?: string;
+  /** When true, count comes from search mix — hide add/remove. */
+  lockPassengerCount?: boolean;
 }) {
   const t = CHECKOUT_COPY[locale];
+  const isMobile = useIsMobile();
+  const paxNameCols = isMobile ? '1fr' : '1fr 1.6fr 0.7fr';
+  const dobGridCols = isMobile ? '1fr' : '1fr 1fr';
   const departureDate = departureAt ? dayjs(departureAt) : dayjs();
   const adultLatestBirthYear =
     locale === 'fa'
       ? Number(departureDate.calendar('jalali').format('YYYY')) - 12
       : departureDate.year() - 12;
   const passengerLabel = (passenger: PassengerFormDraft, index: number) => {
-    if (passenger.passengerType === 'CHILD') {
-      return locale === 'en'
-        ? `Child ${index + 1}`
-        : locale === 'ar'
-          ? `طفل ${index + 1}`
-          : `کودک ${index + 1}`;
-    }
-    if (passenger.passengerType === 'INFANT') {
-      return locale === 'en'
-        ? `Infant ${index + 1}`
-        : locale === 'ar'
-          ? `رضيع ${index + 1}`
-          : `نوزاد ${index + 1}`;
-    }
-    return t.adultLabel(index + 1);
+    const ordinal = passengerTypeOrdinal(passengers, index);
+    if (passenger.passengerType === 'CHILD') return t.childLabel(ordinal);
+    if (passenger.passengerType === 'INFANT') return t.infantLabel(ordinal);
+    return t.adultLabel(ordinal);
   };
   const [openSavedFor, setOpenSavedFor] = useState<number | null>(null);
   const savedOptions = useMemo(
@@ -235,15 +237,24 @@ export default function PassengerStep({
               </button>
               <button
                 type="button"
-                onClick={() => setOpenSavedFor(openSavedFor === i ? null : i)}
-                className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#1668c4]"
+                disabled={!savedPassengersEnabled}
+                title={savedPassengersEnabled ? undefined : t.savedSignInHint}
+                onClick={() => {
+                  if (!savedPassengersEnabled) return;
+                  setOpenSavedFor(openSavedFor === i ? null : i);
+                }}
+                className={`flex items-center gap-1.5 text-[11.5px] font-bold ${
+                  savedPassengersEnabled
+                    ? 'cursor-pointer text-[#1668c4]'
+                    : 'cursor-not-allowed text-[#c3cad4]'
+                }`}
                 data-testid={`checkout-from-saved-${i}`}
                 aria-expanded={openSavedFor === i}
               >
                 <UserIcon />
                 {t.fromSaved}
               </button>
-              {passengers.length > 1 && (
+              {!lockPassengerCount && passengers.length > 1 && (
                 <button
                   type="button"
                   onClick={() => onChange(passengers.filter((_, j) => j !== i))}
@@ -298,7 +309,11 @@ export default function PassengerStep({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-[11px] sm:grid-cols-3">
+          <div
+            className="grid gap-[11px]"
+            data-testid={`checkout-pax-name-grid-${i}`}
+            style={{ gridTemplateColumns: paxNameCols }}
+          >
             <input
               data-testid={`checkout-pax-first-${i}`}
               dir="ltr"
@@ -336,7 +351,11 @@ export default function PassengerStep({
           </div>
 
           {p.docType === 'NATIONAL_ID' ? (
-            <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
+            <div
+              className="mt-3.5 grid gap-[11px]"
+              data-testid={`checkout-pax-doc-grid-${i}`}
+              style={{ gridTemplateColumns: dobGridCols }}
+            >
               <div>
                 <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
                   {t.nationalId}
@@ -374,7 +393,11 @@ export default function PassengerStep({
               </div>
             </div>
           ) : (
-            <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
+            <div
+              className="mt-3.5 grid gap-[11px]"
+              data-testid={`checkout-pax-doc-grid-${i}`}
+              style={{ gridTemplateColumns: dobGridCols }}
+            >
               <div>
                 <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
                   {t.passportNo}
@@ -419,15 +442,17 @@ export default function PassengerStep({
         </div>
       ))}
 
-      <button
-        type="button"
-        onClick={() => onChange([...passengers, emptyPassenger('', 'ADULT')])}
-        data-testid="checkout-add-pax"
-        className="inline-flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] border-[#1668c4] px-[18px] py-[11px] text-[12.5px] font-bold text-[#1668c4]"
-      >
-        <span className="text-base leading-none">+</span>
-        {t.addPax}
-      </button>
+      {!lockPassengerCount && (
+        <button
+          type="button"
+          onClick={() => onChange([...passengers, emptyPassenger('', 'ADULT')])}
+          data-testid="checkout-add-pax"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-[11px] border-[1.5px] border-[#1668c4] px-[18px] py-[11px] text-[12.5px] font-bold text-[#1668c4]"
+        >
+          <span className="text-base leading-none">+</span>
+          {t.addPax}
+        </button>
+      )}
     </section>
   );
 }

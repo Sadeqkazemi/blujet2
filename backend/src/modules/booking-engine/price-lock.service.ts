@@ -16,6 +16,7 @@ import { pctOfIrr, roundIrrTo } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CabinClass } from '../../database/enums';
 import { assertSellableForSale } from '../flights/definition-sellability';
+import { WalletService } from './wallet.service';
 
 const LOCK_TTL_MS = 72 * 60 * 60 * 1000;
 /** Flat, NestJS-computed fee — CLAUDE.md: "fee/risk suggested by the ML
@@ -33,6 +34,7 @@ export class PriceLockService {
     private readonly flightInstanceRepo: Repository<FlightInstance>,
     @InjectRepository(ClubMember)
     private readonly clubMemberRepo: Repository<ClubMember>,
+    private readonly wallet: WalletService,
   ) {}
 
   async create(
@@ -86,16 +88,20 @@ export class PriceLockService {
     );
     const feeIrr = roundIrrTo(pctOfIrr(priceIrr, LOCK_FEE_PCT), 10_000n);
 
-    return this.priceLockRepo.save(
-      this.priceLockRepo.create({
-        userId: user.id,
-        flightInstanceId: dto.flightInstanceId,
-        cabin: dto.cabin,
-        lockedPriceIrr: priceIrr,
-        feeIrr,
-        expiresAt: new Date(Date.now() + LOCK_TTL_MS),
-      }),
-    );
+    return this.priceLockRepo.manager.transaction(async (tx) => {
+      await this.wallet.charge(tx, user.id, feeIrr, null);
+      return tx.save(
+        tx.create(PriceLock, {
+          userId: user.id,
+          flightInstanceId: dto.flightInstanceId,
+          cabin: dto.cabin,
+          lockedPriceIrr: priceIrr,
+          feeIrr,
+          feeCharged: true,
+          expiresAt: new Date(Date.now() + LOCK_TTL_MS),
+        }),
+      );
+    });
   }
 
   async listMine(user: AuthenticatedUser) {
@@ -140,8 +146,13 @@ export class PriceLockService {
         message: 'این قفل قیمت دیگر فعال نیست.',
       });
     }
-    lock.status = 'CANCELLED';
-    return this.priceLockRepo.save(lock);
+    return this.priceLockRepo.manager.transaction(async (tx) => {
+      if (lock.feeCharged && lock.feeIrr > 0n) {
+        await this.wallet.credit(tx, user.id, lock.feeIrr, null);
+      }
+      lock.status = 'CANCELLED';
+      return tx.save(lock);
+    });
   }
 
   /** Finds an active, non-expired, not-yet-consumed lock for this exact

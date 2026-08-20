@@ -151,7 +151,8 @@ migrations doesn't require renaming.
 - `AircraftSeatMap` — business + optional comfort + economy row/col bands; COMFORT cannot be sold without comfort rows.
 - `FarePricingProposal.status` — PENDING|REGISTERED|REJECTED; `competitorPriceIrr` nullable.
 - `Booking { id, pnr unique, flightInstanceId→FlightInstance, channel: DIRECT|AGENCY|VIP|MANAGERIAL, agencyId→User?, status: DRAFT|HELD|PAID|TICKETED|CANCELLED|EXPIRED|REFUNDED, priceIrr Int, taxIrr, chargeSnapshot jsonb?, createdAt }` — full state machine per CLAUDE.md; Phase 1 dashboards only read `PAID`/`TICKETED` rows.
-- `Passenger { id, bookingId→Booking, fullName, nationalId(encrypted), mobile(encrypted) }`
+- `Passenger { id, bookingId→Booking, fullName, nationalId(encrypted),
+  passportNo(encrypted), gender (`male`|`female`), mobile(encrypted) }`
 - `LedgerEntry { id, bookingId→Booking?, agencyId→AgencyProfile?, type: SALE|REFUND|SETTLEMENT|COMMISSION, signedAmountIrr Int, occurredAt, createdBy→User? }` — double-entry, immutable, append-only; refunds/settlements are new rows, never edits. `agencyId` (added in Phase 3) is set on agency-channel `SALE` rows (mirroring `booking.agencyId`) and on every `SETTLEMENT` row, since a settlement (invoice payment or a direct "ثبت تسویه") isn't necessarily tied to one `Booking` — this lets `AgencyCreditLine.usedIrr` derive from a single `agencyId` filter instead of a join through `Booking` that `SETTLEMENT` rows wouldn't have anyway.
 
 Sales-chart/KPI endpoints (`GET /reporting/sales`, etc., Phase 1 API) query
@@ -1701,10 +1702,13 @@ originally-proposed scope.
 
 ## Phase 34 — کیف پول + قفل قیمت هوشمند: retroactive docs + frontend closure
 
-No schema change. `WalletEntry` and `PriceLock` already existed (an
-earlier phase's merge, never given its own docs/DB_SCHEMA.md section —
-retroactively documented here). Two additive, non-breaking response-shape
-changes, both query/serialization only:
+`WalletEntry` and `PriceLock` already existed (an earlier phase's merge,
+never given its own docs/DB_SCHEMA.md section — retroactively documented
+here). Migration `1788163200000-PriceLockFeeCharged` adds
+`PriceLock.feeCharged boolean NOT NULL DEFAULT false`. The flag records
+whether the lock fee was actually debited from the wallet, so cancellation
+refunds only a previously charged fee. The remaining changes are additive,
+non-breaking response-shape changes:
 
 - `PriceLockService.listMine()` now joins `FlightInstance → Flight →
   Route` and includes `flight: { flightNo, originCode, destCode,
@@ -1716,8 +1720,8 @@ changes, both query/serialization only:
   relation snapshot — see docs/API.md's Phase 34 section for the exact
   bug found and fixed).
 
-See `docs/features/wallet-price-lock.md` for the full frontend-closure
-reasoning, including the deliberately-undecided fee-charging gap.
+See `docs/features/wallet-price-lock.md` for the full frontend-closure and
+wallet debit/refund behavior.
 
 ## Phase 38 — تغییر نوع هواپیما: frontend closure
 
@@ -1834,6 +1838,8 @@ model SavedPassenger {
   user           User     @relation("SavedPassengerOwner", ...)
   fullName       String
   latinName      String
+  gender         String?  // male | female
+  birthDate      DateTime? @db.Date
   nationalIdEnc  String?
   nationalIdHash String?
   passportNoEnc  String?
@@ -1848,9 +1854,11 @@ model SavedPassenger {
 }
 ```
 
-Migration: `20260731130000_saved_passengers`. PII columns follow the same
-AES-256-GCM + HMAC hash pattern as `ClubMember`/`Passenger`. Application
-cap: 20 rows per user; duplicate national ID per user rejected in service.
+Migration: `1787990400000-SavedPassengerGenderBirthDate` (adds `gender` +
+`birthDate`). PII columns follow the same AES-256-GCM + HMAC hash pattern as
+`ClubMember`/`Passenger`. Application cap: 20 rows per user; duplicate
+national ID per user rejected in service. Checkout autofill uses gender +
+birthDate so selecting a saved passenger can complete the passenger form.
 
 ## پنل کاربر — حساب‌های بانکی (`SavedBankAccount`)
 
@@ -2773,6 +2781,11 @@ than relying on any cascade.
 - `taxIrr bigint NOT NULL`
 
 `seatCode` remains nullable and is null only for a lap infant. Availability and commitment checks count occupied seats, while receipts and extras may count all travellers according to their billing unit.
+
+Migration `1788076800000-PassengerGenderPassport` also stores checkout
+`gender` (`male`|`female`) and encrypted `passportNoEnc` on the passenger
+row.
+
 ## Manager panel permission restrictions
 
 - `users.panelPermissions jsonb NULL` stores an optional array of coarse manager-panel permission keys.

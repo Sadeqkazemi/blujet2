@@ -74,14 +74,6 @@ export const ACCOUNT_NAV_ITEMS: AccountNavItem[] = [
     showInMobileMenu: false,
   },
   {
-    key: 'saved',
-    group: 'account',
-    label: { fa: 'نشان‌شده‌ها', en: 'Saved', ar: 'المحفوظة' },
-    showInSidebar: true,
-    showInMobileSidebar: false,
-    showInMobileMenu: true,
-  },
-  {
     key: 'price-locks',
     group: 'account',
     label: { fa: 'قفل قیمت', en: 'Price Lock', ar: 'قفل السعر' },

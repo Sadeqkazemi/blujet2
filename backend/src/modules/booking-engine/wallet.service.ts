@@ -43,14 +43,17 @@ export class WalletService {
           'شارژ کیف پول تا اتصال و تأیید درگاه پرداخت واقعی غیرفعال است.',
       });
     }
-    await this.walletRepo.save(
+    const entry = await this.walletRepo.save(
       this.walletRepo.create({
         userId,
         type: 'TOPUP',
         signedAmountIrr: amountIrr,
       }),
     );
-    return this.getBalance(userId);
+    return {
+      balanceIrr: await this.getBalance(userId),
+      entryId: entry.id,
+    };
   }
 
   /** Debits the wallet inside an existing transaction — throws if the
@@ -59,7 +62,7 @@ export class WalletService {
     manager: EntityManager,
     userId: string,
     amountIrr: Irr,
-    bookingId: string,
+    bookingId: string | null,
   ) {
     const balance = await this.sumBalance(manager, userId);
     if (balance < amountIrr) {
@@ -73,6 +76,23 @@ export class WalletService {
         userId,
         type: 'PURCHASE',
         signedAmountIrr: negateIrr(amountIrr),
+        bookingId,
+      }),
+    );
+  }
+
+  /** Credits the wallet (e.g. refunding a previously charged price-lock fee). */
+  async credit(
+    manager: EntityManager,
+    userId: string,
+    amountIrr: Irr,
+    bookingId: string | null = null,
+  ) {
+    await manager.save(
+      manager.create(WalletEntry, {
+        userId,
+        type: 'TOPUP',
+        signedAmountIrr: amountIrr,
         bookingId,
       }),
     );

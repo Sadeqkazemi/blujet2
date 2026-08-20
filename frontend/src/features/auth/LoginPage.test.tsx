@@ -96,6 +96,13 @@ describe('LoginPage', () => {
     expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
   });
 
+  it('links the airline logo on the visual panel to the public home page', () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue(baseAuth);
+    renderLoginPage();
+
+    expect(screen.getByTestId('staff-login-home-logo')).toHaveAttribute('href', '/');
+  });
+
   it('keeps ordinary staff on the 2FA journey', async () => {
     const requestLogin = vi.fn().mockResolvedValue({
       loginMode: 'TWO_FACTOR' as const,

@@ -100,6 +100,7 @@ export interface BookingPassengerView {
   occupiesSeat: boolean;
   fareIrr: string;
   taxIrr: string;
+  gender?: 'male' | 'female' | null;
 }
 
 export interface BookingDetail {
@@ -170,6 +171,8 @@ export interface SavedPassenger {
   id: string;
   fullName: string;
   latinName: string;
+  gender: 'male' | 'female' | null;
+  birthDate: string | null;
   nationalId: string | null;
   passportNo: string | null;
   mobile: string | null;

@@ -9,7 +9,20 @@ import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import { ApiRequestError } from '../../api/envelope';
-import type { PriceLock, SearchFlightResult } from '../../types/public-site';
+import type { PriceLock, SearchFlightResult, SeatMapResult } from '../../types/public-site';
+
+const SEATMAP: SeatMapResult = {
+  flightInstanceId: 'fi-1',
+  seats: [
+    { seatCode: '12A', row: 12, cabin: 'ECONOMY', status: 'FREE' },
+    { seatCode: '12B', row: 12, cabin: 'ECONOMY', status: 'FREE' },
+  ],
+};
+
+async function confirmDesktopBuyModal() {
+  await screen.findByTestId('results-buy-modal');
+  await userEvent.click(screen.getByTestId('results-buy-continue'));
+}
 
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({
@@ -93,6 +106,12 @@ function mockSearchApis() {
       isCenter: false,
     },
   ]);
+  vi.spyOn(publicSiteApi, 'fetchSeatMap').mockResolvedValue(SEATMAP);
+  vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({
+    isMember: false,
+    level: null,
+    balance: 0,
+  });
 }
 
 function renderPage(
@@ -121,6 +140,7 @@ function renderPage(
       <Routes>
         <Route path="/results" element={<ResultsPage />} />
         <Route path="/signin" element={<div>صفحه ورود</div>} />
+        <Route path="/checkout/new" element={<div data-testid="checkout-page">checkout</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -253,7 +273,34 @@ describe('ResultsPage', () => {
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
   });
 
+  it('shows passenger mix and cabin from the search URL in the summary', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=2&children=1&infants=1&cabin=ECONOMY',
+    );
+    expect(
+      await screen.findByTestId('results-pax-cabin-summary'),
+    ).toHaveTextContent('۴ مسافر · اکونومی');
+  });
+
+  it('scales flight card price by the passenger mix from the URL', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    // 380_000_000 IRR adult unit → 38_000_000 تومان × 2 adults = 76_000_000
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=2&children=0&infants=0',
+    );
+    await screen.findByTestId('result-card');
+    expect(screen.getAllByText(/۷۶٬۰۰۰٬۰۰۰/).length).toBeGreaterThan(0);
+  });
+
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
+    mockLocale('fa');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
@@ -266,9 +313,33 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('edit-search-origin')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-dest')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-date')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-search-pax')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('edit-search-date'));
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
+  });
+
+  it('applies passenger mix from edit search into the results summary', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&adults=1&children=0&infants=0',
+    );
+    await screen.findByTestId('result-card');
+    expect(screen.getByTestId('results-pax-cabin-summary')).toHaveTextContent(
+      '۱ مسافر · اکونومی',
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
+    await userEvent.click(screen.getByTestId('edit-search-pax-adults-inc'));
+    await userEvent.click(screen.getByTestId('edit-search-pax-children-inc'));
+    await userEvent.click(screen.getByRole('button', { name: 'جستجوی پرواز' }));
+
+    expect(
+      await screen.findByTestId('results-pax-cabin-summary'),
+    ).toHaveTextContent('۳ مسافر · اکونومی');
   });
 
   it('calls advisory API and shows buy recommendation', async () => {
@@ -294,7 +365,7 @@ describe('ResultsPage', () => {
     );
   });
 
-  it('opens the login prompt before checkout when a guest buys a ticket and lets them close it', async () => {
+  it('navigates guests to checkout without a seat modal on results', async () => {
     mockLocale('fa');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
@@ -304,18 +375,13 @@ describe('ResultsPage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'برای ادامه وارد شوید' });
-    expect(dialog).toHaveTextContent('ورود با شماره موبایل');
-    expect(dialog).toHaveTextContent('برای ادامه رزرو، شماره موبایل خود را تأیید کنید.');
-    expect(screen.getByTestId('desktop-guest-otp-modal')).toBeInTheDocument();
-    expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
+    expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
+    expect(screen.queryByTestId('results-buy-modal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desktop-guest-otp-modal')).not.toBeInTheDocument();
     expect(sessionStorage.getItem('blujet_checkout_draft')).toContain('fi-1');
-
-    await userEvent.click(screen.getByRole('button', { name: 'بستن پنجره ورود' }));
-    expect(screen.queryByRole('dialog', { name: 'برای ادامه وارد شوید' })).not.toBeInTheDocument();
   });
 
-  it('keeps the existing login-or-signup choice on mobile results', async () => {
+  it('navigates mobile guests straight to checkout when buying a ticket', async () => {
     mockLocale('fa');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
@@ -327,12 +393,10 @@ describe('ResultsPage', () => {
     await screen.findByTestId('result-card');
     await userEvent.click(screen.getByTestId('mobile-expand-flight'));
 
-    const buy = screen.getByRole('button', { name: /خرید بلیط/ });
-    await userEvent.click(buy);
+    await userEvent.click(screen.getByRole('button', { name: /خرید بلیط/ }));
 
+    expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
     expect(screen.queryByTestId('desktop-guest-otp-modal')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ورود' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'ثبت‌نام' })).toBeInTheDocument();
   });
 
   it('flips the route airplane in Persian RTL results', async () => {
@@ -574,11 +638,12 @@ describe('ResultsPage', () => {
       expect(screen.getByTestId('cabin-selector')).toBeInTheDocument();
       await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
       await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
+      await confirmDesktopBuyModal();
 
       expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
     });
 
-    it('shows the desktop phone and OTP login before checkout for a guest', async () => {
+    it('navigates guests to checkout without a seat modal or OTP on results', async () => {
       mockLocale('fa');
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
@@ -590,8 +655,9 @@ describe('ResultsPage', () => {
       await expandFirstCard();
       await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
 
-      expect(await screen.findByTestId('desktop-guest-otp-modal')).toBeInTheDocument();
-      expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
+      expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
+      expect(screen.queryByTestId('results-buy-modal')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('desktop-guest-otp-modal')).not.toBeInTheDocument();
     });
 
     it('calls createPriceLock with cabin COMFORT when COMFORT is selected', async () => {

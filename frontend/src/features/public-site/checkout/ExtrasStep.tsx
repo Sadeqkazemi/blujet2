@@ -1,10 +1,16 @@
 import { useState, type ReactNode } from 'react';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { localeMoney } from '../../../lib/fa-format';
 import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
 import { CHECKOUT_COPY } from './checkout-copy';
-import { extraTitle, extraTotalIrr, type ExtraServiceState } from './checkout-types';
+import {
+  extraDescription,
+  extraTitle,
+  extraTotalIrr,
+  type ExtraServiceState,
+} from './checkout-types';
 import Md80SeatMap from './Md80SeatMap';
 import {
   buildMd80Seats,
@@ -213,6 +219,7 @@ export default function ExtrasStep({
   aircraftType: string;
 }) {
   const t = CHECKOUT_COPY[locale];
+  const isMobile = useIsMobile();
   const [seatOpen, setSeatOpen] = useState(true);
   const aircraft = aircraftType.trim() || 'MD-80';
   const rawSeats = seats ?? [];
@@ -246,10 +253,14 @@ export default function ExtrasStep({
       </div>
       <p className="mb-[15px] mt-0 text-[11.5px] text-[#9aa4b2]">{t.pickServices}</p>
 
-      <div className="mb-4 grid grid-cols-1 gap-2.5 md:grid-cols-2">
+      <div
+        className="mb-4 grid gap-2.5"
+        data-testid="checkout-extras-grid"
+        style={{ gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr' }}
+      >
         {extras.map((sv) => {
           const title = extraTitle(sv, locale);
-          const description = locale === 'fa' ? sv.descriptionFa : null;
+          const description = extraDescription(sv, locale);
           return (
             <div
               key={sv.id}
@@ -316,7 +327,7 @@ export default function ExtrasStep({
         })}
         {extras.length === 0 && (
           <p className="col-span-full rounded-[13px] border border-dashed border-[#d7dee8] px-4 py-6 text-center text-xs text-[#8a96a6]">
-            در حال حاضر هزینه یا خدمت جانبی فعالی ثبت نشده است.
+            {t.noExtrasAvailable}
           </p>
         )}
       </div>

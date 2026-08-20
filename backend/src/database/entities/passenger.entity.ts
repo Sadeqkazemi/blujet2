@@ -19,6 +19,10 @@ export type PassengerType = 'ADULT' | 'CHILD' | 'INFANT';
   'passengers_passengerType_check',
   `"passengerType" IN ('ADULT','CHILD','INFANT')`,
 )
+@Check(
+  'passengers_gender_check',
+  `"gender" IS NULL OR "gender" IN ('male', 'female')`,
+)
 @Entity('passengers')
 export class Passenger {
   @PrimaryColumn({ type: 'text', primaryKeyConstraintName: 'passengers_pkey' })
@@ -50,6 +54,13 @@ export class Passenger {
 
   @Column({ type: 'text', nullable: true })
   nationalIdHash!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  passportNoEnc!: string | null;
+
+  /** `male` | `female` — matches checkout Gender. */
+  @Column({ type: 'text', nullable: true })
+  gender!: 'male' | 'female' | null;
 
   @Column({ type: 'text', nullable: true })
   seatCode!: string | null;

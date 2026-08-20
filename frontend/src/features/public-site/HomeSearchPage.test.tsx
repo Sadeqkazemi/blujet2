@@ -547,8 +547,14 @@ describe('HomeSearchPage — responsive layout (frozen)', () => {
 
     const serviceButtons = services.querySelectorAll('button');
     expect(serviceButtons.length).toBe(4);
-    expect(serviceButtons[0]).toHaveStyle({ flex: '0 0 calc(50% - 6.5px)' });
+    expect(serviceButtons[0]).toHaveStyle({
+      width: 'calc((100% - 10px) / 2)',
+      minWidth: 'calc((100% - 10px) / 2)',
+    });
 
+    const dests = screen.getByTestId('home-popular-destinations');
+    expect(dests).toHaveClass('hscroll');
+    expect(dests).toHaveStyle({ display: 'flex', overflowX: 'auto', minWidth: '0px' });
     expect(screen.getByText('مقصدهای محبوب')).toBeInTheDocument();
     expect(screen.getByTestId('popular-dest-DXB')).toBeInTheDocument();
     expect(screen.queryByText('با رسیدن به حد امتیاز، کارت عضویت بگیر')).not.toBeInTheDocument();

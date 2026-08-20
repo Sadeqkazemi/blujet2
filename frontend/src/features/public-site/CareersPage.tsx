@@ -8,10 +8,25 @@ import { localeDigits } from '../../lib/locale-format';
 import type { JobSummary, JobType } from '../../types/careers';
 import { jobPostingImageUrl } from './site-content-shared';
 
-const JOB_TYPE_META: Record<JobType, { label: string; color: string; bg: string }> = {
-  FULL_TIME: { label: 'تمام‌وقت', color: '#34d399', bg: 'rgba(16,185,129,.14)' },
-  REMOTE: { label: 'دورکاری', color: '#60a5fa', bg: 'rgba(59,130,246,.14)' },
-  PART_TIME: { label: 'پاره‌وقت', color: '#f59e0b', bg: 'rgba(245,158,11,.14)' },
+const JOB_TYPE_META: Record<
+  StoredLocale,
+  Record<JobType, { label: string; color: string; bg: string }>
+> = {
+  fa: {
+    FULL_TIME: { label: 'تمام‌وقت', color: '#34d399', bg: 'rgba(16,185,129,.14)' },
+    REMOTE: { label: 'دورکاری', color: '#60a5fa', bg: 'rgba(59,130,246,.14)' },
+    PART_TIME: { label: 'پاره‌وقت', color: '#f59e0b', bg: 'rgba(245,158,11,.14)' },
+  },
+  en: {
+    FULL_TIME: { label: 'Full-time', color: '#34d399', bg: 'rgba(16,185,129,.14)' },
+    REMOTE: { label: 'Remote', color: '#60a5fa', bg: 'rgba(59,130,246,.14)' },
+    PART_TIME: { label: 'Part-time', color: '#f59e0b', bg: 'rgba(245,158,11,.14)' },
+  },
+  ar: {
+    FULL_TIME: { label: 'دوام كامل', color: '#34d399', bg: 'rgba(16,185,129,.14)' },
+    REMOTE: { label: 'عن بُعد', color: '#60a5fa', bg: 'rgba(59,130,246,.14)' },
+    PART_TIME: { label: 'دوام جزئي', color: '#f59e0b', bg: 'rgba(245,158,11,.14)' },
+  },
 };
 
 const STR: Record<
@@ -230,7 +245,7 @@ export default function CareersPage() {
             </div>
             <div className="careers-jobs-grid">
               {jobs.map((j) => {
-                const meta = JOB_TYPE_META[j.type];
+                const meta = JOB_TYPE_META[locale][j.type];
                 const img = jobPostingImageUrl(j.imageUrl, j.imageFileId);
                 return (
                   <Link key={j.id} to={`/careers/${j.id}/apply`} data-testid="job-card" className="careers-job-card">

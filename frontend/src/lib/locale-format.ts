@@ -14,6 +14,19 @@ export function localeDigits(value: string | number, locale: StoredLocale): stri
   return String(value);
 }
 
+/** Split an ISO birth date into day/month/year strings for passenger forms. */
+export function isoDateToFormParts(
+  iso: string,
+  locale: StoredLocale,
+): { birthDay: string; birthMonth: string; birthYear: string } {
+  const d = dayjs(iso).calendar(calendarForLocale(locale));
+  return {
+    birthDay: String(d.date()),
+    birthMonth: String(d.month() + 1),
+    birthYear: String(d.year()),
+  };
+}
+
 export function formatLocaleDate(
   value: string | number | Date,
   locale: StoredLocale,

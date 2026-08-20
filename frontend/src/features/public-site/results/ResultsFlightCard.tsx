@@ -18,7 +18,6 @@ import {
   formatDuration,
   formatFlightClock,
   flightDurationMinutes,
-  priceBreakdown,
   primaryCabin,
   stopLabel,
 } from './results-utils';
@@ -39,6 +38,8 @@ type Props = {
   saveBusyKey: string | null;
   showGoldLock: boolean;
   passengerMix: PassengerMix;
+  preferredCabin?: CabinClass;
+  buyLabel?: string;
   onToggle: () => void;
   onBuy: (cabin: CabinClass) => void;
   onLock: (cabin: CabinClass) => void;
@@ -61,20 +62,28 @@ export default function ResultsFlightCard({
   saveBusyKey,
   showGoldLock,
   passengerMix,
+  preferredCabin,
+  buyLabel,
   onToggle,
   onBuy,
   onLock,
   onSave,
 }: Props) {
-  const defaultCabin = primaryCabin(flight);
+  const defaultCabin =
+    (preferredCabin
+      ? flight.cabins.find((c) => c.cabin === preferredCabin)
+      : undefined) ?? primaryCabin(flight);
   const [selectedCabinClass, setSelectedCabinClass] = useState<CabinClass>(
-    defaultCabin?.cabin ?? 'ECONOMY',
+    defaultCabin?.cabin ?? preferredCabin ?? 'ECONOMY',
   );
 
   useEffect(() => {
-    const next = primaryCabin(flight);
+    const preferred = preferredCabin
+      ? flight.cabins.find((c) => c.cabin === preferredCabin)
+      : undefined;
+    const next = preferred ?? primaryCabin(flight);
     if (next) setSelectedCabinClass(next.cabin);
-  }, [flight]);
+  }, [flight, preferredCabin]);
 
   const cabin =
     flight.cabins.find((c) => c.cabin === selectedCabinClass) ?? defaultCabin;
@@ -92,7 +101,6 @@ export default function ResultsFlightCard({
   );
   const stops = stopLabel(Boolean(flight.connection), locale);
   const priceIrr = passengerTotalIrr(cabin.priceIrr, passengerMix);
-  const { baseIrr, taxIrr } = priceBreakdown(priceIrr);
   const seatDemand = seatCountForMix(passengerMix);
   const canBook = cabin.seatsLeft >= seatDemand;
   const lowSeats = cabin.seatsLeft > 0 && cabin.seatsLeft <= 3;
@@ -578,9 +586,11 @@ export default function ResultsFlightCard({
             <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 12 }}>
               {copy.adultPaxLabel} × {passengerMix.adults}
               {passengerMix.children
-                ? ` · کودک × ${passengerMix.children}`
+                ? ` · ${copy.childPaxLabel} × ${passengerMix.children}`
                 : ''}
-              {passengerMix.infants ? ` · نوزاد × ${passengerMix.infants}` : ''}
+              {passengerMix.infants
+                ? ` · ${copy.infantPaxLabel} × ${passengerMix.infants}`
+                : ''}
             </div>
             <div
               style={{
@@ -593,13 +603,7 @@ export default function ResultsFlightCard({
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: '#6b7787' }}>{copy.basePriceLabel}</span>
                 <span style={{ fontWeight: 600, color: '#16202e' }}>
-                  {localeMoney(baseIrr.toString(), locale)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6b7787' }}>{copy.taxesFeesLabel}</span>
-                <span style={{ fontWeight: 600, color: '#16202e' }}>
-                  {localeMoney(taxIrr.toString(), locale)}
+                  {localeMoney(priceIrr.toString(), locale)}
                 </span>
               </div>
             </div>
@@ -656,7 +660,7 @@ export default function ResultsFlightCard({
                 opacity: canBook ? 1 : 0.5,
               }}
             >
-              {copy.buyTicketLabel}
+              {buyLabel ?? copy.buyTicketLabel}
             </button>
             {showGoldLock && (
               <button
