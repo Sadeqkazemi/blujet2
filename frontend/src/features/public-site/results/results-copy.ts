@@ -62,6 +62,15 @@ export type ResultsCopy = {
   comfortLabel: string;
   priceDetailsLabel: string;
   adultPaxLabel: string;
+  childPaxLabel: string;
+  infantPaxLabel: string;
+  selectReturnLabel: string;
+  selectOutboundActionLabel: string;
+  buyModalTitle: string;
+  buyModalContinue: string;
+  buyModalSkipSeats: string;
+  seatSelectionHint: string;
+  yourSelectionLabel: string;
   basePriceLabel: string;
   taxesFeesLabel: string;
   totalLabel: string;
@@ -163,6 +172,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     comfortLabel: 'کامفورت',
     priceDetailsLabel: 'جزئیات قیمت',
     adultPaxLabel: 'مسافر بزرگسال (۱)',
+    childPaxLabel: 'کودک',
+    infantPaxLabel: 'نوزاد',
+    selectReturnLabel: 'انتخاب پرواز برگشت',
+    selectOutboundActionLabel: 'انتخاب پرواز رفت',
+    buyModalTitle: 'انتخاب صندلی',
+    buyModalContinue: 'ادامه به تکمیل خرید',
+    buyModalSkipSeats: 'ادامه بدون انتخاب صندلی',
+    seatSelectionHint: 'انتخاب صندلی اختیاری است؛ می‌توانید بعداً در مرحله خدمات جانبی هم صندلی انتخاب کنید.',
+    yourSelectionLabel: 'انتخاب شما',
     basePriceLabel: 'قیمت پایه',
     taxesFeesLabel: 'مالیات و عوارض',
     totalLabel: 'مجموع',
@@ -262,6 +280,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     comfortLabel: 'Comfort',
     priceDetailsLabel: 'Price details',
     adultPaxLabel: 'Adult passenger (1)',
+    childPaxLabel: 'Child',
+    infantPaxLabel: 'Infant',
+    selectReturnLabel: 'Select return flight',
+    selectOutboundActionLabel: 'Select outbound flight',
+    buyModalTitle: 'Seat selection',
+    buyModalContinue: 'Continue to checkout',
+    buyModalSkipSeats: 'Continue without seats',
+    seatSelectionHint: 'Seat selection is optional; you can also pick seats later during checkout extras.',
+    yourSelectionLabel: 'Your selection',
     basePriceLabel: 'Base price',
     taxesFeesLabel: 'Taxes & fees',
     totalLabel: 'Total',
@@ -361,6 +388,15 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     comfortLabel: 'كومفورت',
     priceDetailsLabel: 'تفاصيل السعر',
     adultPaxLabel: 'مسافر بالغ (١)',
+    childPaxLabel: 'طفل',
+    infantPaxLabel: 'رضيع',
+    selectReturnLabel: 'اختر رحلة العودة',
+    selectOutboundActionLabel: 'اختر رحلة الذهاب',
+    buyModalTitle: 'اختيار المقعد',
+    buyModalContinue: 'المتابعة إلى إتمام الشراء',
+    buyModalSkipSeats: 'المتابعة دون اختيار مقعد',
+    seatSelectionHint: 'اختيار المقعد اختياري؛ يمكنك أيضاً اختيار المقاعد لاحقاً في خطوة الخدمات الإضافية.',
+    yourSelectionLabel: 'اختيارك',
     basePriceLabel: 'السعر الأساسي',
     taxesFeesLabel: 'الضرائب والرسوم',
     totalLabel: 'المجموع',

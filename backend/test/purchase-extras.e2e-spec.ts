@@ -164,6 +164,24 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
     );
   }
 
+  async function fundWallet(accessToken: string, amountIrr = 200_000_000) {
+    const res = await request(app.getHttpServer())
+      .post('/my/wallet/topup')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ amountIrr });
+    expect(res.status).toBeLessThan(300);
+  }
+
+  async function lockAsGold(phone: string, daysAhead: number) {
+    const { accessToken, userId } = await loginAsCustomer(app, phone);
+    expect(accessToken).toBeTruthy();
+    expect(userId).toBeTruthy();
+    await linkGoldMember(userId!);
+    await fundWallet(accessToken!);
+    const instance = await freshInstance(daysAhead);
+    return { accessToken: accessToken!, userId: userId!, instance };
+  }
+
   // ── Promo codes ─────────────────────────────────────────────────────
 
   it('applies a PERCENT promo code at payment and posts the discounted amount to the ledger', async () => {
@@ -355,9 +373,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   });
 
   it('lets a gold member lock a price, then books at that price even after the market price moves', async () => {
-    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(9));
-    await linkGoldMember(userId!);
-    const instance = await freshInstance(44);
+    const { accessToken, instance } = await lockAsGold(phoneFor(9), 44);
 
     const lockRes = await request(app.getHttpServer())
       .post('/my/price-locks')
@@ -416,9 +432,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   });
 
   it('rejects a second active price lock for the same flight+cabin', async () => {
-    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(10));
-    await linkGoldMember(userId!);
-    const instance = await freshInstance(45);
+    const { accessToken, instance } = await lockAsGold(phoneFor(10), 45);
 
     const first = await request(app.getHttpServer())
       .post('/my/price-locks')
@@ -434,9 +448,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   });
 
   it('lets a member cancel an active lock', async () => {
-    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(11));
-    await linkGoldMember(userId!);
-    const instance = await freshInstance(46);
+    const { accessToken, instance } = await lockAsGold(phoneFor(11), 46);
 
     const created = await request(app.getHttpServer())
       .post('/my/price-locks')
@@ -451,9 +463,7 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   });
 
   it('GET /my/price-locks includes the locked flight route/number/departure, not just raw ids', async () => {
-    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(12));
-    await linkGoldMember(userId!);
-    const instance = await freshInstance(47);
+    const { accessToken, instance } = await lockAsGold(phoneFor(12), 47);
 
     await request(app.getHttpServer())
       .post('/my/price-locks')
@@ -474,9 +484,10 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
   });
 
   it('a booking created against an active lock is flagged isPriceLocked; an ordinary booking is not', async () => {
-    const { accessToken, userId } = await loginAsCustomer(app, phoneFor(13));
-    await linkGoldMember(userId!);
-    const lockedInstance = await freshInstance(48);
+    const { accessToken, instance: lockedInstance } = await lockAsGold(
+      phoneFor(13),
+      48,
+    );
 
     await request(app.getHttpServer())
       .post('/my/price-locks')

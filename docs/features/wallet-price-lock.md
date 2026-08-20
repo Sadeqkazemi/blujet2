@@ -81,22 +81,13 @@ already existed and was already e2e-tested (`backend/test/purchase-extras
     expiry on success, or the backend's own Persian error message
     (e.g. an already-active lock for that flight+cabin) on failure.
 
-## ⚑ Known, deliberately un-decided gap: the lock fee is never charged
+## Price-lock fee charging (updated 2026-08-20)
 
-`PriceLockService.create()` computes and stores `feeIrr` (flat 3% of the
-live cabin price, per the existing documented formula), but **no code
-path anywhere debits a wallet, calls the payment gateway, or writes a
-ledger entry for it** — this was true before this phase and remains true
-after it. This phase's UI displays `feeIrr` as a plain data field (labeled
-"کارمزد") without asserting whether it is or isn't charged, rather than
-inventing a charging mechanism unilaterally: CLAUDE.md's Financial Rules
-require every balance change to go through the double-entry ledger and
-forbid ad-hoc money handling, and deciding *how* to charge a lock fee
-(from the wallet only? gateway redirect? what happens on cancel — full
-refund, partial, none?) is a real product decision, not a UI-wiring task.
-Flagged here explicitly rather than silently left implicit, matching the
-project's established "documented, not silently dropped" convention (see
-e.g. Phase 27's `fn_invoices` note, Phase 31's `sc_manage`/sessions note).
+`PriceLockService.create()` computes `feeIrr` (flat 3% of the live cabin
+price) and **debits the member wallet** inside the same transaction
+(`WalletEntry` type `PURCHASE`, `bookingId=null`, `feeCharged=true`).
+Cancel refunds the fee via `TOPUP` when `feeCharged` is true. Insufficient
+wallet balance returns 409.
 
 ## Acceptance checklist
 

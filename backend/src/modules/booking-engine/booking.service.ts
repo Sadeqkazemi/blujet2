@@ -56,6 +56,9 @@ import { PriceLockService } from './price-lock.service';
 import { WalletService } from './wallet.service';
 import { ClubPointsService } from './club-points.service';
 import { CustomerReferralsService } from '../customer-referrals/customer-referrals.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ticketedNotificationInput } from '../notifications/customer-notification-copy';
+import { assertNationalIdSeatLimitForFlight } from './national-id-seat-limit';
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { CreateBookingDto } from './dto/create-booking.dto';
@@ -126,6 +129,7 @@ export class BookingService {
     private readonly wallet: WalletService,
     private readonly clubPoints: ClubPointsService,
     private readonly customerReferrals: CustomerReferralsService,
+    private readonly notifications: NotificationsService,
     @Inject(PAYMENT_GATEWAY)
     private readonly gateway: PaymentGateway,
   ) {}
@@ -218,6 +222,7 @@ export class BookingService {
         occupiesSeat: p.occupiesSeat,
         fareIrr: p.fareIrr,
         taxIrr: p.taxIrr,
+        gender: p.gender,
       })),
     };
   }
@@ -447,6 +452,8 @@ export class BookingService {
         .where('fi.id = :id', { id: instance.id })
         .getOne();
 
+      await assertNationalIdSeatLimitForFlight(tx, instance.id, dto.passengers);
+
       const taken = await this.search.takenSeatCodes(instance.id);
       const conflict = requestedCodes.find((c) => taken.has(c));
       if (conflict) {
@@ -543,8 +550,12 @@ export class BookingService {
           occupiesSeat: row.occupiesSeat,
           fareIrr: row.fareIrr,
           taxIrr: row.taxIrr,
+          gender: p.gender ?? null,
           nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
           nationalIdHash: nationalId ? hashPii(nationalId) : null,
+          passportNoEnc: p.passportNo?.trim()
+            ? encryptPii(p.passportNo.trim().toUpperCase())
+            : null,
           mobileEnc: p.mobile ? encryptPii(p.mobile) : null,
         });
       });
@@ -832,6 +843,13 @@ export class BookingService {
           .setLock('pessimistic_write')
           .where('fi.id = :id', { id: instance.id })
           .getOneOrFail();
+
+        await assertNationalIdSeatLimitForFlight(
+          tx,
+          instance.id,
+          dto.passengers,
+        );
+
         const lockedAllotment = await tx.findOne(AgencyAllotment, {
           where: { id: allotmentId, agencyId: actor.id },
           lock: { mode: 'pessimistic_write' },
@@ -952,8 +970,12 @@ export class BookingService {
               occupiesSeat,
               fareIrr,
               taxIrr,
+              gender: passenger.gender ?? null,
               nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
               nationalIdHash: nationalId ? hashPii(nationalId) : null,
+              passportNoEnc: passenger.passportNo?.trim()
+                ? encryptPii(passenger.passportNo.trim().toUpperCase())
+                : null,
               mobileEnc: passenger.mobile ? encryptPii(passenger.mobile) : null,
             });
           }),
@@ -1305,6 +1327,24 @@ export class BookingService {
         gatewayRefId,
       },
     });
+
+    if (paid.booking.userId) {
+      const origin =
+        paid.booking.flightInstance?.flight?.route?.originCode ?? '';
+      const dest = paid.booking.flightInstance?.flight?.route?.destCode ?? '';
+      const routeLabel =
+        origin && dest
+          ? `${origin} → ${dest}`
+          : (paid.booking.flightInstance?.flight?.flightNo ?? '');
+      await this.notifications.notify(
+        ticketedNotificationInput({
+          recipientId: paid.booking.userId,
+          bookingId: paid.booking.id,
+          pnr: paid.booking.pnr,
+          routeLabel: routeLabel || undefined,
+        }),
+      );
+    }
 
     return {
       priceChanged: false as const,

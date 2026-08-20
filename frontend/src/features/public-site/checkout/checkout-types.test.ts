@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildPassengersFromMix,
   passengerTotalIrr,
+  passengerTypeOrdinal,
   seatCountForMix,
   validatePassengerAges,
 } from './checkout-types';
@@ -76,5 +78,23 @@ describe('passenger pricing helpers', () => {
 
   it('does not allocate a seat to a lap infant', () => {
     expect(seatCountForMix({ adults: 2, children: 1, infants: 2 })).toBe(3);
+  });
+
+  it('builds one form card per search mix slot with per-type ordinals', () => {
+    const passengers = buildPassengersFromMix({
+      adults: 2,
+      children: 1,
+      infants: 1,
+    });
+    expect(passengers.map((p) => p.passengerType)).toEqual([
+      'ADULT',
+      'ADULT',
+      'CHILD',
+      'INFANT',
+    ]);
+    expect(passengerTypeOrdinal(passengers, 0)).toBe(1);
+    expect(passengerTypeOrdinal(passengers, 1)).toBe(2);
+    expect(passengerTypeOrdinal(passengers, 2)).toBe(1);
+    expect(passengerTypeOrdinal(passengers, 3)).toBe(1);
   });
 });

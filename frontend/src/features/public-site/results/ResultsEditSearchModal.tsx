@@ -11,8 +11,13 @@ import {
   localeMonthYear,
   localeWeekdays,
 } from '../../../lib/locale-format';
-import type { Airport } from '../../../types/public-site';
+import type { Airport, CabinClass } from '../../../types/public-site';
+import {
+  normalizePassengerMix,
+  type PassengerMix,
+} from '../checkout/checkout-types';
 import type { ResultsCopy } from './results-copy';
+import { parseCabinParam } from './results-utils';
 
 type Props = {
   open: boolean;
@@ -21,8 +26,18 @@ type Props = {
   origin: string;
   dest: string;
   date: string;
+  returnDate?: string;
+  passengerMix: PassengerMix;
+  cabin: CabinClass;
   onClose: () => void;
-  onApply: (origin: string, dest: string, date: string) => void;
+  onApply: (
+    origin: string,
+    dest: string,
+    date: string,
+    returnDate: string | undefined,
+    passengerMix: PassengerMix,
+    cabin: CabinClass,
+  ) => void;
 };
 
 type CalCell = { label: string; iso: string | null; disabled: boolean; selected: boolean };
@@ -232,6 +247,9 @@ export default function ResultsEditSearchModal({
   origin,
   dest,
   date,
+  returnDate = '',
+  passengerMix,
+  cabin,
   onClose,
   onApply,
 }: Props) {
@@ -241,8 +259,10 @@ export default function ResultsEditSearchModal({
   const [draftDest, setDraftDest] = useState(dest);
   const [draftDate, setDraftDate] = useState(date);
   const [draftReturnDate, setDraftReturnDate] = useState('');
-  const [draftPax, setDraftPax] = useState('1');
-  const [draftClass, setDraftClass] = useState('ECONOMY');
+  const [draftAdults, setDraftAdults] = useState(passengerMix.adults);
+  const [draftChildren, setDraftChildren] = useState(passengerMix.children);
+  const [draftInfants, setDraftInfants] = useState(passengerMix.infants);
+  const [draftClass, setDraftClass] = useState<CabinClass>(cabin);
   const [calOpen, setCalOpen] = useState(false);
   const [calTarget, setCalTarget] = useState<'departure' | 'return'>('departure');
   const [applying, setApplying] = useState(false);
@@ -252,15 +272,32 @@ export default function ResultsEditSearchModal({
 
   useEffect(() => {
     if (!open) return;
+    const mix = normalizePassengerMix(passengerMix);
     setDraftOrigin(origin);
     setDraftDest(dest);
     setDraftDate(date);
-    setTripType('oneway');
+    setDraftReturnDate(returnDate);
+    setDraftAdults(mix.adults);
+    setDraftChildren(mix.children);
+    setDraftInfants(mix.infants);
+    setDraftClass(cabin);
+    setTripType(returnDate ? 'round' : 'oneway');
     setCalOpen(false);
     setApplying(false);
     setViewMonth(dayjs(`${date}T12:00:00Z`).calendar(calendarForLocale(locale)));
     fetchAirports().then(setAirports).catch(() => setAirports([]));
-  }, [open, origin, dest, date, locale]);
+  }, [
+    open,
+    origin,
+    dest,
+    date,
+    returnDate,
+    passengerMix.adults,
+    passengerMix.children,
+    passengerMix.infants,
+    cabin,
+    locale,
+  ]);
 
   const weekdays = localeWeekdays[locale];
   const calTitle = localeMonthYear(viewMonth, locale);
@@ -268,22 +305,57 @@ export default function ResultsEditSearchModal({
   const calCells = buildCalendarCells(viewMonth, selectedIso, locale);
   const calTargetLabel = calTarget === 'departure' ? copy.departureDateLabel : copy.returnDateLabel;
 
-  const paxOptions = useMemo(
-    () =>
-      [1, 2, 3, 4, 5].map((n) => ({
-        value: String(n),
-        label: localeDigits(n, locale),
-      })),
-    [locale],
-  );
-
   const classOptions = useMemo(
     () => [
-      { value: 'ECONOMY', label: copy.economyLabel },
-      { value: 'COMFORT', label: copy.comfortLabel },
-      { value: 'BUSINESS', label: locale === 'en' ? 'Business' : locale === 'ar' ? 'رجال الأعمال' : 'بیزنس' },
+      { value: 'ECONOMY' as const, label: copy.economyLabel },
+      { value: 'COMFORT' as const, label: copy.comfortLabel },
+      {
+        value: 'BUSINESS' as const,
+        label:
+          locale === 'en'
+            ? 'Business'
+            : locale === 'ar'
+              ? 'رجال الأعمال'
+              : 'بیزنس',
+      },
     ],
     [copy.comfortLabel, copy.economyLabel, locale],
+  );
+
+  const paxRows = useMemo(
+    () => [
+      {
+        key: 'adults',
+        label:
+          locale === 'en' ? 'Adults' : locale === 'ar' ? 'بالغون' : 'بزرگسال',
+        val: draftAdults,
+        dec: () =>
+          setDraftAdults((n) => {
+            const next = Math.max(1, n - 1);
+            setDraftInfants((inf) => Math.min(inf, next));
+            return next;
+          }),
+        inc: () => setDraftAdults((n) => n + 1),
+      },
+      {
+        key: 'children',
+        label:
+          locale === 'en' ? 'Children' : locale === 'ar' ? 'أطفال' : 'کودک',
+        val: draftChildren,
+        dec: () => setDraftChildren((n) => Math.max(0, n - 1)),
+        inc: () => setDraftChildren((n) => n + 1),
+      },
+      {
+        key: 'infants',
+        label:
+          locale === 'en' ? 'Infants' : locale === 'ar' ? 'رضّع' : 'نوزاد',
+        val: draftInfants,
+        dec: () => setDraftInfants((n) => Math.max(0, n - 1)),
+        inc: () =>
+          setDraftInfants((n) => Math.min(draftAdults, n + 1)),
+      },
+    ],
+    [draftAdults, draftChildren, draftInfants, locale],
   );
 
   function openCalendar(target: 'departure' | 'return') {
@@ -296,7 +368,19 @@ export default function ResultsEditSearchModal({
   function handleApply() {
     if (draftOrigin === draftDest || applying) return;
     setApplying(true);
-    onApply(draftOrigin, draftDest, draftDate);
+    const mix = normalizePassengerMix({
+      adults: draftAdults,
+      children: draftChildren,
+      infants: draftInfants,
+    });
+    onApply(
+      draftOrigin,
+      draftDest,
+      draftDate,
+      tripType === 'round' && draftReturnDate ? draftReturnDate : undefined,
+      mix,
+      parseCabinParam(draftClass),
+    );
   }
 
   if (!open) return null;
@@ -491,39 +575,93 @@ export default function ResultsEditSearchModal({
               </div>
             )}
 
-            <div style={{ flex: 1, minWidth: 140 }}>
+            <div style={{ flex: 1.4, minWidth: 200 }} data-testid="edit-search-pax">
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.paxCountLabel}</div>
-              <select
-                value={draftPax}
-                onChange={(e) => setDraftPax(e.target.value)}
+              <div
                 style={{
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  height: 50,
                   border: '1.5px solid #e2e7ee',
                   borderRadius: 11,
                   background: '#fafbfd',
-                  padding: '0 10px',
-                  fontFamily: 'inherit',
-                  fontSize: 13.5,
-                  color: '#16202e',
-                  outline: 'none',
-                  cursor: 'pointer',
+                  padding: '8px 10px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
                 }}
               >
-                {paxOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
+                {paxRows.map((row) => (
+                  <div
+                    key={row.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>
+                      {row.label}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        type="button"
+                        data-testid={`edit-search-pax-${row.key}-dec`}
+                        onClick={row.dec}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          border: '1px solid #d7e0ec',
+                          background: '#fff',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontWeight: 800,
+                          color: '#1668c4',
+                        }}
+                      >
+                        −
+                      </button>
+                      <span
+                        data-testid={`edit-search-pax-${row.key}-val`}
+                        style={{
+                          minWidth: 18,
+                          textAlign: 'center',
+                          fontWeight: 800,
+                          color: '#0d2640',
+                          fontSize: 13.5,
+                        }}
+                      >
+                        {localeDigits(row.val, locale)}
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`edit-search-pax-${row.key}-inc`}
+                        onClick={row.inc}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          border: '1px solid #d7e0ec',
+                          background: '#fff',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontWeight: 800,
+                          color: '#1668c4',
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
 
             <div style={{ flex: 1, minWidth: 140 }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.flightClassLabel}</div>
               <select
+                data-testid="edit-search-cabin"
                 value={draftClass}
-                onChange={(e) => setDraftClass(e.target.value)}
+                onChange={(e) => setDraftClass(parseCabinParam(e.target.value))}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
@@ -645,6 +783,7 @@ export default function ResultsEditSearchModal({
 
           <button
             type="button"
+            data-testid="edit-search-apply"
             disabled={applying || draftOrigin === draftDest}
             onClick={handleApply}
             style={{

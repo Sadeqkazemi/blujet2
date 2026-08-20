@@ -24,6 +24,14 @@ export class MyClubController {
     return { success: true, data };
   }
 
+  @Post('join')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'عضویت رایگان مشتری در باشگاه (سطح نقره‌ای)' })
+  async join(@CurrentUser() actor: AuthenticatedUser) {
+    const data = await this.club.joinMine(actor.id);
+    return { success: true, data };
+  }
+
   @Post('card-request')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'ثبت درخواست صدور کارت عضویت باشگاه' })

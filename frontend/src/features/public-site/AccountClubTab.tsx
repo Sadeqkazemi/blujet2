@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { submitClubCardRequest } from '../../api/publicSite';
+import { joinClub, submitClubCardRequest } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -258,16 +258,57 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
   const { locale } = useLocale();
   const t = CLUB_STR[locale];
   const [requestBusy, setRequestBusy] = useState(false);
+  const [joinBusy, setJoinBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  async function onJoinClub() {
+    setJoinBusy(true);
+    setJoinError(null);
+    try {
+      const next = await joinClub();
+      onMembershipChange(next);
+    } catch (err) {
+      setJoinError(
+        err instanceof ApiRequestError
+          ? err.message
+          : locale === 'en'
+            ? 'Could not join the club.'
+            : 'عضویت در باشگاه انجام نشد.',
+      );
+    } finally {
+      setJoinBusy(false);
+    }
+  }
 
   if (!membership?.isMember) {
     return (
       <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 18, padding: '40px 26px', textAlign: 'center' }}>
         <p style={{ fontSize: 13, color: '#6b7787', marginBottom: 14 }}>{t.notMemberText}</p>
-        <Link to="/club" style={{ background: '#1668c4', color: '#fff', padding: '10px 24px', borderRadius: 11, fontSize: 12.5, fontWeight: 800, textDecoration: 'none' }}>
+        {joinError && (
+          <p style={{ fontSize: 12.5, color: '#c0392b', marginBottom: 12 }}>{joinError}</p>
+        )}
+        <button
+          type="button"
+          data-testid="account-club-join"
+          disabled={joinBusy}
+          onClick={() => void onJoinClub()}
+          style={{
+            background: '#1668c4',
+            color: '#fff',
+            padding: '10px 24px',
+            borderRadius: 11,
+            fontSize: 12.5,
+            fontWeight: 800,
+            border: 'none',
+            cursor: joinBusy ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            opacity: joinBusy ? 0.7 : 1,
+          }}
+        >
           {t.joinFreeBtn}
-        </Link>
+        </button>
       </div>
     );
   }

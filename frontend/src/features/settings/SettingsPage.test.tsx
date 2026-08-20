@@ -64,23 +64,33 @@ function mockRole(role: Role) {
 }
 
 describe('SettingsPage', () => {
-  it('IT_MANAGER sees company/gateways/refund-rules and saving persists a toggle', async () => {
+  it('IT_MANAGER sees operational toggles (not company/gateways) and saving persists a toggle', async () => {
     mockRole('IT_MANAGER');
     vi.spyOn(adminsApi, 'fetchSettings').mockResolvedValue(DATA);
     const updateSpy = vi.spyOn(adminsApi, 'updateSettings').mockResolvedValue(DATA);
 
     render(<SettingsPage />);
-    expect(await screen.findByText('اطلاعات شرکت')).toBeInTheDocument();
+    expect(await screen.findByText('تنظیمات کلی سامانه')).toBeInTheDocument();
+    expect(screen.queryByText('اطلاعات شرکت')).not.toBeInTheDocument();
+    expect(screen.queryByText('درگاه پرداخت')).not.toBeInTheDocument();
     expect(screen.getByText('قوانین استرداد')).toBeInTheDocument();
-    expect(screen.getByText('تنظیمات کلی سامانه')).toBeInTheDocument();
+    expect(screen.getByText('تماس پشتیبانی')).toBeInTheDocument();
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('switch', { name: 'حالت تعمیر و نگهداری' }));
     await user.click(screen.getByRole('button', { name: 'ذخیره تنظیمات' }));
 
     await waitFor(() =>
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ maintenance: true })),
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          maintenance: true,
+          socialLinks: expect.any(Array),
+          supportPhone: expect.any(String),
+        }),
+      ),
     );
+    expect(updateSpy.mock.calls[0]?.[0]).not.toHaveProperty('companyName');
+    expect(updateSpy.mock.calls[0]?.[0]).not.toHaveProperty('gatewayMellat');
   });
 
   it('IT_MANAGER can save an enabled social link', async () => {

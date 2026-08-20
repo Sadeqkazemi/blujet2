@@ -20,6 +20,7 @@ import {
   encryptPii,
   hashPii,
   tryDecryptPii,
+  decryptPii,
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
@@ -550,6 +551,76 @@ export class ClubService {
       .where('e."clubMemberId" = :memberId', { memberId })
       .getRawOne<{ sum: string | null }>();
     return row?.sum ? Number(row.sum) : 0;
+  }
+
+  /** Customer self-service: join the loyalty club (links User → ClubMember). */
+  async joinMine(userId: string) {
+    const existing = await this.clubMemberRepo.findOne({ where: { userId } });
+    if (existing) {
+      return this.getMyMembership(userId);
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کاربر یافت نشد.',
+      });
+    }
+    if (!user.nationalIdEnc) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message:
+          'برای عضویت در باشگاه، ابتدا کد ملی را در پروفایل خود تکمیل کنید.',
+      });
+    }
+    const nationalId = normalizeNationalId(decryptPii(user.nationalIdEnc));
+    if (!isValidIranianNationalId(nationalId)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'کد ملی پروفایل معتبر نیست.',
+      });
+    }
+    const byNid = await this.clubMemberRepo.findOne({
+      where: { nationalIdHash: hashPii(nationalId) },
+    });
+    if (byNid) {
+      if (byNid.userId && byNid.userId !== userId) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'عضویت باشگاه با این کد ملی قبلاً به حساب دیگری وصل است.',
+        });
+      }
+      byNid.userId = userId;
+      await this.clubMemberRepo.save(byNid);
+      return this.getMyMembership(userId);
+    }
+
+    const email =
+      user.email?.trim() ||
+      (user.phone ? `${user.phone.replace(/\D/g, '')}@users.blujet.local` : '');
+    if (!email) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message:
+          'برای عضویت در باشگاه، ابتدا ایمیل یا شماره موبایل را در پروفایل تکمیل کنید.',
+      });
+    }
+
+    await this.clubMemberRepo.save(
+      this.clubMemberRepo.create({
+        userId,
+        fullName: user.fullName,
+        email,
+        birthDate: user.birthDate ?? null,
+        nationalIdEnc: encryptPii(nationalId),
+        nationalIdHash: hashPii(nationalId),
+        level: ClubTier.SILVER,
+        points: 0,
+      }),
+    );
+
+    return this.getMyMembership(userId);
   }
 
   /** Customer self-service: full club membership view for the user panel. */

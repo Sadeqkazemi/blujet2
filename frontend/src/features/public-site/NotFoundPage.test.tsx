@@ -6,12 +6,15 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
 
+import * as useIsMobileModule from '../../hooks/useIsMobile';
+
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
 }
 
 beforeEach(() => {
   vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
+  vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'unauthenticated',
     user: null,
@@ -42,7 +45,7 @@ describe('NotFoundPage', () => {
     expect(screen.getByText('جستجوی پرواز')).toHaveAttribute('href', '/');
     expect(screen.getByText('۴۰۴')).toBeInTheDocument();
     // Homepage header/footer shell
-    expect(screen.getByText('خدمات')).toBeInTheDocument();
+    expect(screen.getByTestId('public-services-menu-toggle')).toHaveTextContent('خدمات');
   });
 
   it('renders translated heading and links in English', () => {

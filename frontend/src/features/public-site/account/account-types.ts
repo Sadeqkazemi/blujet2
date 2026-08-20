@@ -5,7 +5,6 @@ export type TabKey =
   | 'wallet'
   | 'loans'
   | 'club'
-  | 'saved'
   | 'price-locks'
   | 'passengers'
   | 'refunds'

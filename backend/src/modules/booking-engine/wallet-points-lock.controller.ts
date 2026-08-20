@@ -18,6 +18,8 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { NotificationsService } from '../notifications/notifications.service';
+import { walletTopupNotificationInput } from '../notifications/customer-notification-copy';
 
 @ApiTags('purchase-extras')
 @Controller()
@@ -28,6 +30,7 @@ export class WalletPointsLockController {
     private readonly wallet: WalletService,
     private readonly points: ClubPointsService,
     private readonly priceLocks: PriceLockService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get('my/wallet')
@@ -48,7 +51,17 @@ export class WalletPointsLockController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: TopupWalletDto,
   ) {
-    const balanceIrr = await this.wallet.topup(user.id, dto.amountIrr);
+    const { balanceIrr, entryId } = await this.wallet.topup(
+      user.id,
+      dto.amountIrr,
+    );
+    await this.notifications.notify(
+      walletTopupNotificationInput({
+        recipientId: user.id,
+        amountIrr: String(dto.amountIrr),
+        entryId,
+      }),
+    );
     return { success: true, data: { balanceIrr } };
   }
 

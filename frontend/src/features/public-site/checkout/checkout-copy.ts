@@ -1,4 +1,6 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
+import { localeDigits } from '../../../lib/locale-format';
+import type { PassengerMix } from './checkout-types';
 
 export const CHECKOUT_COPY: Record<
   StoredLocale,
@@ -17,7 +19,7 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: string;
     description: string;
     amountToman: string;
-    ticketPrice: (count: number) => string;
+    ticketPrice: (mix: PassengerMix) => string;
     taxesFees: string;
     total: string;
     securePayment: string;
@@ -29,7 +31,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: string;
     backStep: string;
     completePaxError: string;
+    nidSeatLimitError: string;
     adultLabel: (n: number) => string;
+    childLabel: (n: number) => string;
+    infantLabel: (n: number) => string;
     nationalId: string;
     passport: string;
     scanDocument: string;
@@ -46,6 +51,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: string;
     selectSaved: string;
     savedEmpty: string;
+    savedSignInHint: string;
     addPax: string;
     remove: string;
     passenger: string;
@@ -61,7 +67,12 @@ export const CHECKOUT_COPY: Record<
     ofLabel: string;
     selectedExtras: string;
     nameChangeWarning: string;
+    editPaxFromReview: string;
+    editPaxPopupTitle: string;
+    savePaxEdits: string;
+    cancelBtn: string;
     noneSelected: string;
+    noExtrasAvailable: string;
     toman: string;
     extras: Record<'baggage' | 'meal' | 'insurance' | 'cip', { title: string; desc: string }>;
     months: string[];
@@ -83,7 +94,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'جزئیات پرداخت',
     description: 'شرح',
     amountToman: 'مبلغ (تومان)',
-    ticketPrice: (n) => `قیمت بلیط (بزرگسال × ${n})`,
+    ticketPrice: (mix) =>
+      `قیمت بلیط (${[
+        mix.adults > 0 ? `بزرگسال × ${localeDigits(mix.adults, 'fa')}` : null,
+        mix.children > 0 ? `کودک × ${localeDigits(mix.children, 'fa')}` : null,
+        mix.infants > 0 ? `نوزاد × ${localeDigits(mix.infants, 'fa')}` : null,
+      ]
+        .filter(Boolean)
+        .join('، ')})`,
     taxesFees: 'مالیات و عوارض',
     total: 'جمع کل',
     securePayment: 'پرداخت امن و رمزگذاری‌شده',
@@ -95,7 +113,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'ادامه به پرداخت',
     backStep: 'بازگشت به مرحله قبل',
     completePaxError: 'لطفاً اطلاعات همه مسافران را کامل کنید.',
+    nidSeatLimitError: 'با یک کد ملی حداکثر ۲ صندلی قابل خرید است.',
     adultLabel: (n) => `${n}. بزرگسال`,
+    childLabel: (n) => `${n}. کودک`,
+    infantLabel: (n) => `${n}. نوزاد`,
     nationalId: 'کد ملی',
     passport: 'گذرنامه',
     scanDocument: 'اسکن مدرک',
@@ -112,6 +133,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'از مسافران ذخیره‌شده',
     selectSaved: 'انتخاب از مسافران ذخیره‌شده:',
     savedEmpty: 'هنوز مسافری در حساب شما ذخیره نشده است.',
+    savedSignInHint: 'برای استفاده از مسافران ذخیره‌شده وارد حساب شوید',
     addPax: 'مسافر جدید',
     remove: 'حذف',
     passenger: 'مسافر',
@@ -129,7 +151,12 @@ export const CHECKOUT_COPY: Record<
     selectedExtras: 'خدمات جانبی انتخابی',
     nameChangeWarning:
       'پس از پرداخت، امکان تغییر نام مسافران وجود ندارد. لطفاً املای نام را با دقت بررسی کنید.',
+    editPaxFromReview: 'ویرایش مسافران',
+    editPaxPopupTitle: 'ویرایش اطلاعات مسافران',
+    savePaxEdits: 'ذخیره تغییرات',
+    cancelBtn: 'انصراف',
     noneSelected: 'انتخاب نشده',
+    noExtrasAvailable: 'در حال حاضر هزینه یا خدمت جانبی فعالی ثبت نشده است.',
     toman: 'تومان',
     extras: {
       baggage: { title: 'بار اضافه (۱۰ کیلوگرم)', desc: 'علاوه بر مجاز ۲۰ کیلوگرمی' },
@@ -157,7 +184,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'Payment details',
     description: 'Description',
     amountToman: 'Amount (Toman)',
-    ticketPrice: (n) => `Ticket price (adult × ${n})`,
+    ticketPrice: (mix) =>
+      `Ticket price (${[
+        mix.adults > 0 ? `adult × ${mix.adults}` : null,
+        mix.children > 0 ? `child × ${mix.children}` : null,
+        mix.infants > 0 ? `infant × ${mix.infants}` : null,
+      ]
+        .filter(Boolean)
+        .join(', ')})`,
     taxesFees: 'Taxes & fees',
     total: 'Total',
     securePayment: 'Secure encrypted payment',
@@ -169,7 +203,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'Continue to payment',
     backStep: 'Back to previous step',
     completePaxError: 'Please complete all passenger information.',
+    nidSeatLimitError: 'A national ID may occupy at most 2 seats.',
     adultLabel: (n) => `${n}. Adult`,
+    childLabel: (n) => `${n}. Child`,
+    infantLabel: (n) => `${n}. Infant`,
     nationalId: 'National ID',
     passport: 'Passport',
     scanDocument: 'Scan document',
@@ -186,6 +223,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'From saved passengers',
     selectSaved: 'Select from saved passengers:',
     savedEmpty: 'You have no saved passengers yet.',
+    savedSignInHint: 'Sign in to use saved passengers',
     addPax: 'New passenger',
     remove: 'Remove',
     passenger: 'Passenger',
@@ -203,7 +241,12 @@ export const CHECKOUT_COPY: Record<
     selectedExtras: 'Selected extras',
     nameChangeWarning:
       'Passenger names cannot be changed after payment. Please verify spelling carefully.',
+    editPaxFromReview: 'Edit passengers',
+    editPaxPopupTitle: 'Edit passenger details',
+    savePaxEdits: 'Save changes',
+    cancelBtn: 'Cancel',
     noneSelected: 'Not selected',
+    noExtrasAvailable: 'No optional travel services are available right now.',
     toman: 'Toman',
     extras: {
       baggage: { title: 'Extra baggage (10 kg)', desc: 'On top of the 20 kg allowance' },
@@ -231,7 +274,14 @@ export const CHECKOUT_COPY: Record<
     paymentDetails: 'تفاصيل الدفع',
     description: 'الوصف',
     amountToman: 'المبلغ (تومان)',
-    ticketPrice: (n) => `سعر التذكرة (بالغ × ${n})`,
+    ticketPrice: (mix) =>
+      `سعر التذكرة (${[
+        mix.adults > 0 ? `بالغ × ${localeDigits(mix.adults, 'ar')}` : null,
+        mix.children > 0 ? `طفل × ${localeDigits(mix.children, 'ar')}` : null,
+        mix.infants > 0 ? `رضيع × ${localeDigits(mix.infants, 'ar')}` : null,
+      ]
+        .filter(Boolean)
+        .join('، ')})`,
     taxesFees: 'الضرائب والرسوم',
     total: 'الإجمالي',
     securePayment: 'دفع آمن ومشفر',
@@ -243,7 +293,10 @@ export const CHECKOUT_COPY: Record<
     nextPay: 'المتابعة إلى الدفع',
     backStep: 'العودة للخطوة السابقة',
     completePaxError: 'يرجى إكمال بيانات جميع المسافرين.',
+    nidSeatLimitError: 'لا يجوز لرقم وطني واحد حجز أكثر من مقعدين.',
     adultLabel: (n) => `${n}. بالغ`,
+    childLabel: (n) => `${n}. طفل`,
+    infantLabel: (n) => `${n}. رضيع`,
     nationalId: 'بطاقة الهوية',
     passport: 'جواز السفر',
     scanDocument: 'مسح المستند',
@@ -260,6 +313,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'من المسافرين المحفوظين',
     selectSaved: 'اختر من المسافرين المحفوظين:',
     savedEmpty: 'لا يوجد مسافرون محفوظون في حسابك بعد.',
+    savedSignInHint: 'سجّل الدخول لاستخدام المسافرين المحفوظين',
     addPax: 'مسافر جديد',
     remove: 'حذف',
     passenger: 'مسافر',
@@ -276,7 +330,12 @@ export const CHECKOUT_COPY: Record<
     ofLabel: 'من',
     selectedExtras: 'الخدمات الإضافية المختارة',
     nameChangeWarning: 'لا يمكن تغيير أسماء المسافرين بعد الدفع. يرجى التحقق من الإملاء.',
+    editPaxFromReview: 'تعديل المسافرين',
+    editPaxPopupTitle: 'تعديل بيانات المسافرين',
+    savePaxEdits: 'حفظ التغييرات',
+    cancelBtn: 'إلغاء',
     noneSelected: 'لم يتم الاختيار',
+    noExtrasAvailable: 'لا توجد خدمات سفر إضافية متاحة حالياً.',
     toman: 'تومان',
     extras: {
       baggage: { title: 'أمتعة إضافية (10 كجم)', desc: 'إضافة إلى الحد المسموح 20 كجم' },
@@ -290,3 +349,44 @@ export const CHECKOUT_COPY: Record<
     ],
   },
 };
+
+const AGE_ERROR_COPY: Record<
+  StoredLocale,
+  Record<
+    'INFANT_AGE_INVALID' | 'CHILD_AGE_INVALID' | 'TOO_MANY_LAP_INFANTS' | 'ADULT_AGE_REQUIRED',
+    string
+  >
+> = {
+  fa: {
+    INFANT_AGE_INVALID:
+      'این مسافر در تاریخ پرواز زیر ۲ سال نیست و امکان تهیه بلیط نوزاد برای او وجود ندارد.',
+    CHILD_AGE_INVALID:
+      'بلیط کودک یا نوزاد صندلی‌دار فقط برای مسافر کمتر از ۱۲ سال در تاریخ پرواز قابل استفاده است.',
+    TOO_MANY_LAP_INFANTS: 'هر مسافر بزرگسال فقط می‌تواند یک نوزاد بدون صندلی همراه داشته باشد.',
+    ADULT_AGE_REQUIRED: 'مسافر ۱۲ ساله یا بزرگ‌تر باید با نرخ بزرگسال ثبت شود.',
+  },
+  en: {
+    INFANT_AGE_INVALID:
+      'This passenger is not under 2 on the flight date and cannot use an infant ticket.',
+    CHILD_AGE_INVALID:
+      'A child ticket (including a seated infant) is only valid before age 12 on the flight date.',
+    TOO_MANY_LAP_INFANTS: 'Each adult may accompany only one lap infant.',
+    ADULT_AGE_REQUIRED: 'Passengers aged 12 or older must use an adult ticket.',
+  },
+  ar: {
+    INFANT_AGE_INVALID:
+      'هذا المسافر ليس دون سن ٢ في تاريخ الرحلة ولا يمكنه استخدام تذكرة رضيع.',
+    CHILD_AGE_INVALID:
+      'تذكرة الطفل (بما في ذلك الرضيع بمقعد) صالحة فقط قبل سن ١٢ في تاريخ الرحلة.',
+    TOO_MANY_LAP_INFANTS: 'يمكن لكل بالغ مرافقة رضيع واحد فقط بدون مقعد.',
+    ADULT_AGE_REQUIRED: 'يجب على المسافرين aged ١٢ أو أكثر استخدام تذكرة بالغ.',
+  },
+};
+
+export function passengerAgeErrorMessage(
+  code: string,
+  locale: StoredLocale,
+): string | null {
+  const key = code as keyof (typeof AGE_ERROR_COPY)['fa'];
+  return AGE_ERROR_COPY[locale][key] ?? AGE_ERROR_COPY.fa[key] ?? null;
+}

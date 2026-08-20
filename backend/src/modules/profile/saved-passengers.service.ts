@@ -38,6 +38,8 @@ export class SavedPassengersService {
       id: row.id,
       fullName: row.fullName,
       latinName: row.latinName,
+      gender: row.gender,
+      birthDate: row.birthDate,
       nationalId: row.nationalIdEnc ? decryptPii(row.nationalIdEnc) : null,
       passportNo: row.passportNoEnc ? decryptPii(row.passportNoEnc) : null,
       mobile: row.mobileEnc ? decryptPii(row.mobileEnc) : null,
@@ -45,6 +47,17 @@ export class SavedPassengersService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  private normalizeBirthDate(input: string): string {
+    const day = input.trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تاریخ تولد نامعتبر است.',
+      });
+    }
+    return day;
   }
 
   private assertHasIdDoc(
@@ -125,6 +138,8 @@ export class SavedPassengersService {
         userId: user.id,
         fullName: dto.fullName.trim(),
         latinName: dto.latinName.trim().toUpperCase(),
+        gender: dto.gender,
+        birthDate: this.normalizeBirthDate(dto.birthDate),
         nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
         nationalIdHash: nationalId ? hashPii(nationalId) : null,
         passportNoEnc: passportNo ? encryptPii(passportNo) : null,
@@ -172,6 +187,10 @@ export class SavedPassengersService {
           : {}),
         ...(dto.latinName !== undefined
           ? { latinName: dto.latinName.trim().toUpperCase() }
+          : {}),
+        ...(dto.gender !== undefined ? { gender: dto.gender } : {}),
+        ...(dto.birthDate !== undefined
+          ? { birthDate: this.normalizeBirthDate(dto.birthDate) }
           : {}),
         ...(dto.nationalId !== undefined
           ? {

@@ -42,8 +42,16 @@ export default function ItDashboardPage() {
     {
       label: 'سرویس فعال',
       value: `${faDigits(data.kpis.servicesUp)}/${faDigits(data.kpis.servicesTotal)}`,
-      trend: 'پایدار',
-      trendClass: 'text-[#34d399]',
+      trend:
+        data.kpis.servicesTotal > 0 && data.kpis.servicesUp === data.kpis.servicesTotal
+          ? 'همه سالم'
+          : data.kpis.servicesUp < data.kpis.servicesTotal
+            ? 'نیازمند بررسی'
+            : '—',
+      trendClass:
+        data.kpis.servicesTotal > 0 && data.kpis.servicesUp === data.kpis.servicesTotal
+          ? 'text-[#34d399]'
+          : 'text-[#f59e0b]',
       cta: 'مدیریت ←',
       iconBg: 'rgba(59,130,246,.16)',
       iconColor: '#3b82f6',
@@ -59,8 +67,9 @@ export default function ItDashboardPage() {
     {
       label: 'آپ‌تایم ۳۰ روز',
       value: faPercent(data.kpis.uptime30dPct),
-      trend: '+۰٫۰۲',
-      trendClass: 'text-[#34d399]',
+      trend: data.kpis.uptime30dPct >= 99.5 ? 'پایدار' : 'زیر هدف',
+      trendClass:
+        data.kpis.uptime30dPct >= 99.5 ? 'text-[#34d399]' : 'text-[#f59e0b]',
       cta: 'لاگ‌ها ←',
       iconBg: 'rgba(16,185,129,.16)',
       iconColor: '#34d399',
@@ -75,8 +84,9 @@ export default function ItDashboardPage() {
     {
       label: 'کاربر فعال سامانه',
       value: faDigits(data.kpis.activeSessions),
-      trend: '+۳',
-      trendClass: 'text-[#34d399]',
+      trend: data.kpis.activeSessions > 0 ? 'نشست جاری' : 'بدون نشست',
+      trendClass:
+        data.kpis.activeSessions > 0 ? 'text-[#34d399]' : 'text-[#6b7b94]',
       cta: 'کاربران ←',
       iconBg: 'rgba(147,51,234,.16)',
       iconColor: '#a855f7',

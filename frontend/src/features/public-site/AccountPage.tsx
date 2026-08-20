@@ -12,7 +12,6 @@ import {
   fetchMyProfile,
   fetchMySessions,
   fetchPrivacyExport,
-  fetchSavedFlights,
   fetchSavedPassengers,
   createSavedPassenger,
   updateSavedPassenger,
@@ -27,7 +26,6 @@ import {
   submitIdentityVerification,
   revokeMySession,
   fetchWallet,
-  removeSavedFlight,
   requestEmailVerify,
   topupWallet,
   updateMyProfile,
@@ -37,15 +35,15 @@ import { ApiRequestError } from '../../api/envelope';
 import { fetchMySupportTickets } from '../../api/support-tickets';
 import { changeOwnPassword, setPassword } from '../../api/auth';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
+import { tomanAmountInWords } from '../../lib/amount-in-words';
 import { localeDigits } from '../../lib/locale-format';
-import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
+import { formatLocaleDate, formatLocaleDateTime, parseLocaleDateToIso } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
-import AccountSavedFlightsTab from './AccountSavedFlightsTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
 import AccountReferralTab from './AccountReferralTab';
@@ -86,6 +84,35 @@ const STATUS_LABEL: Record<string, StatusEntry> = {
   EXPIRED: { label: { fa: 'منقضی شده', en: 'Expired', ar: 'منتهي الصلاحية' }, bg: '#fbf0ef', color: '#d64545' },
   REFUNDED: { label: { fa: 'مسترد شده', en: 'Refunded', ar: 'تم الاسترداد' }, bg: '#f1f4f8', color: '#8a96a6' },
 };
+
+/** HELD bookings keep a 15-minute pay window (CLAUDE.md / holdExpiresAt). */
+function holdSecondsLeft(holdExpiresAt: string | null): number {
+  if (!holdExpiresAt) return 0;
+  return Math.max(0, Math.floor((new Date(holdExpiresAt).getTime() - Date.now()) / 1000));
+}
+
+function isHoldPayable(booking: BookingDetail): boolean {
+  return booking.status === 'HELD' && holdSecondsLeft(booking.holdExpiresAt) > 0;
+}
+
+/** E-ticket image/boarding pass is only for issued tickets — never unpaid holds. */
+function canViewETicket(booking: BookingDetail): boolean {
+  return booking.status === 'TICKETED';
+}
+
+function displayTripStatus(booking: BookingDetail): string {
+  if (booking.status === 'HELD' && holdSecondsLeft(booking.holdExpiresAt) <= 0) {
+    return 'EXPIRED';
+  }
+  return booking.status;
+}
+
+function formatHoldClock(secs: number, locale: StoredLocale): string {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  const raw = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return localeDigits(raw, locale);
+}
 
 const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
   OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
@@ -151,6 +178,8 @@ const STR: Record<StoredLocale, {
   pnrLabel: string;
   priceLockedBadge: string;
   viewTicketLink: string;
+  continuePaymentLink: string;
+  holdRemainingLabel: (clock: string) => string;
   // wallet
   walletBalanceHeading: string;
   topupAmountLabel: string;
@@ -244,6 +273,8 @@ const STR: Record<StoredLocale, {
     pnrLabel: 'کد رزرو',
     priceLockedBadge: '🔒 قیمت قفل‌شده',
     viewTicketLink: 'مشاهده بلیط',
+    continuePaymentLink: 'ادامه پرداخت',
+    holdRemainingLabel: (clock) => `مهلت پرداخت ${clock}`,
     walletBalanceHeading: 'موجودی کیف پول',
     topupAmountLabel: 'مبلغ شارژ (تومان)',
     topupPlaceholder: 'مثلاً ۵۰۰۰۰۰',
@@ -330,6 +361,8 @@ const STR: Record<StoredLocale, {
     pnrLabel: 'PNR',
     priceLockedBadge: '🔒 Price Locked',
     viewTicketLink: 'View Ticket',
+    continuePaymentLink: 'Continue payment',
+    holdRemainingLabel: (clock) => `Pay within ${clock}`,
     walletBalanceHeading: 'Wallet Balance',
     topupAmountLabel: 'Top-Up Amount (Toman)',
     topupPlaceholder: 'e.g. 500000',
@@ -416,6 +449,8 @@ const STR: Record<StoredLocale, {
     pnrLabel: 'رمز الحجز',
     priceLockedBadge: '🔒 السعر مقفل',
     viewTicketLink: 'عرض التذكرة',
+    continuePaymentLink: 'متابعة الدفع',
+    holdRemainingLabel: (clock) => `مهلة الدفع ${clock}`,
     walletBalanceHeading: 'رصيد المحفظة',
     topupAmountLabel: 'مبلغ الشحن (تومان)',
     topupPlaceholder: 'مثلاً ٥٠٠٠٠٠',
@@ -470,6 +505,7 @@ export default function AccountPage() {
   const urlTab = searchParams.get('tab');
   const [tab, setTab] = useState<TabKey>(() => (isAccountTabKey(urlTab) ? urlTab : 'trips'));
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
+  const [, setHoldTick] = useState(0);
   const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
   const [clubMembership, setClubMembership] = useState<ClubMembershipView | null>(null);
@@ -477,8 +513,6 @@ export default function AccountPage() {
   const [topupBusy, setTopupBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [priceLocks, setPriceLocks] = useState<PriceLock[] | null>(null);
-  const [savedFlights, setSavedFlights] = useState<SavedFlight[] | null>(null);
-  const [savedBusyId, setSavedBusyId] = useState<string | null>(null);
   const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[] | null>(null);
   const [passengerBusyId, setPassengerBusyId] = useState<string | null>(null);
   const [passengerFormBusy, setPassengerFormBusy] = useState(false);
@@ -562,7 +596,6 @@ export default function AccountPage() {
     fetchClubPoints().then(setClub).catch(() => setClub(null));
     fetchClubMembership().then(setClubMembership).catch(() => setClubMembership(null));
     fetchMyPriceLocks().then(setPriceLocks).catch(() => setPriceLocks([]));
-    fetchSavedFlights().then(setSavedFlights).catch(() => setSavedFlights([]));
     fetchSavedPassengers().then(setSavedPassengers).catch(() => setSavedPassengers([]));
     fetchMySessions().then(setSessions).catch(() => setSessions([]));
     fetchBankAccounts().then(setBankAccounts).catch(() => setBankAccounts([]));
@@ -586,6 +619,13 @@ export default function AccountPage() {
         setTicketsError(STR.fa.ticketsLoadError);
       });
   }, [status]);
+
+  useEffect(() => {
+    const hasOpenHold = bookings?.some((b) => isHoldPayable(b));
+    if (!hasOpenHold) return;
+    const id = window.setInterval(() => setHoldTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [bookings]);
 
   async function onSaveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -686,18 +726,6 @@ export default function AccountPage() {
       setError(err instanceof ApiRequestError ? err.message : t.topupErrorFallback);
     } finally {
       setTopupBusy(false);
-    }
-  }
-
-  async function onRemoveSaved(id: string) {
-    setSavedBusyId(id);
-    try {
-      await removeSavedFlight(id);
-      setSavedFlights((prev) => (prev ? prev.filter((f) => f.id !== id) : prev));
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
-    } finally {
-      setSavedBusyId(null);
     }
   }
 
@@ -840,9 +868,25 @@ export default function AccountPage() {
     setPassengerFormError(null);
     setPassengerFormBusy(true);
     try {
+      if (!form.gender) {
+        setPassengerFormError(locale === 'en' ? 'Gender is required.' : 'انتخاب جنسیت الزامی است.');
+        throw new Error('gender');
+      }
+      const birthDate = parseLocaleDateToIso(
+        `${form.birthYear}/${form.birthMonth}/${form.birthDay}`,
+        locale,
+      )?.slice(0, 10);
+      if (!birthDate) {
+        setPassengerFormError(
+          locale === 'en' ? 'Invalid date of birth.' : 'تاریخ تولد نامعتبر است.',
+        );
+        throw new Error('birthDate');
+      }
       const dto = {
         fullName: form.fullName.trim(),
         latinName: form.latinName.trim(),
+        gender: form.gender,
+        birthDate,
         nationalId: form.nationalId.trim() || undefined,
         passportNo: form.passportNo.trim() || undefined,
         mobile: form.mobile.trim() || undefined,
@@ -859,6 +903,9 @@ export default function AccountPage() {
       }
       setPassengerFormKey((k) => k + 1);
     } catch (err) {
+      if (err instanceof Error && (err.message === 'gender' || err.message === 'birthDate')) {
+        throw err;
+      }
       setPassengerFormError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
       throw err;
     } finally {
@@ -1015,9 +1062,12 @@ export default function AccountPage() {
               </div>
             )}
             {bookings?.map((b) => {
-              const st = STATUS_LABEL[b.status] ?? { label: { fa: b.status, en: b.status, ar: b.status }, bg: '#f1f4f8', color: '#5a6678' };
+              const statusKey = displayTripStatus(b);
+              const st = STATUS_LABEL[statusKey] ?? { label: { fa: statusKey, en: statusKey, ar: statusKey }, bg: '#f1f4f8', color: '#5a6678' };
+              const payable = isHoldPayable(b);
+              const holdSecs = payable ? holdSecondsLeft(b.holdExpiresAt) : 0;
               return (
-                <div key={b.id} data-testid="account-trip" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div key={b.id} data-testid="account-trip" data-status={statusKey} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
                       {b.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {b.destCode}
@@ -1025,17 +1075,48 @@ export default function AccountPage() {
                     <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
                       {b.flightNo} · {formatLocaleDateTime(b.departureAt, locale)} · {t.pnrLabel} <span dir="ltr">{b.pnr}</span>
                     </div>
+                    {payable && (
+                      <div
+                        data-testid="trip-hold-remaining"
+                        style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: '#9a7d22' }}
+                      >
+                        {t.holdRemainingLabel(formatHoldClock(holdSecs, locale))}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                      width: isMobile ? '100%' : undefined,
+                    }}
+                  >
                     {b.isPriceLocked && (
                       <span data-testid="trip-price-locked-badge" style={{ fontSize: 10.5, fontWeight: 800, background: '#fff7e6', color: '#9a7d22', padding: '5px 12px', borderRadius: 14 }}>
                         {t.priceLockedBadge}
                       </span>
                     )}
                     <span style={{ fontSize: 10.5, fontWeight: 800, background: st.bg, color: st.color, padding: '5px 12px', borderRadius: 14 }}>{st.label[locale]}</span>
-                    <Link to={b.pnr ? `/ticket/${b.pnr}` : '#'} style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                      {t.viewTicketLink}
-                    </Link>
+                    {canViewETicket(b) && (
+                      <Link
+                        to={`/ticket/${b.pnr}`}
+                        data-testid="trip-view-ticket"
+                        style={{ fontSize: 11.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}
+                      >
+                        {t.viewTicketLink}
+                      </Link>
+                    )}
+                    {payable && (
+                      <Link
+                        to={`/payment/${b.id}`}
+                        data-testid="trip-continue-payment"
+                        style={{ fontSize: 11.5, color: '#fff', fontWeight: 800, textDecoration: 'none', background: '#1668c4', padding: '7px 12px', borderRadius: 10 }}
+                      >
+                        {t.continuePaymentLink}
+                      </Link>
+                    )}
                   </div>
                 </div>
               );
@@ -1062,6 +1143,14 @@ export default function AccountPage() {
                   placeholder={t.topupPlaceholder}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
                 />
+                {tomanAmountInWords(topupAmount, locale) && (
+                  <div
+                    data-testid="wallet-topup-amount-words"
+                    style={{ marginTop: 7, fontSize: 11.5, color: '#8a96a6', fontWeight: 600, lineHeight: 1.6 }}
+                  >
+                    {tomanAmountInWords(topupAmount, locale)}
+                  </div>
+                )}
               </div>
               <button
                 type="submit"
@@ -1087,18 +1176,6 @@ export default function AccountPage() {
                 setClubMembership(m);
                 setClub({ isMember: m.isMember, level: m.level, balance: m.balance });
               }}
-            />
-          )
-        )}
-
-        {tab === 'saved' && (
-          savedFlights === null ? (
-            <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>
-          ) : (
-            <AccountSavedFlightsTab
-              flights={savedFlights}
-              busyId={savedBusyId}
-              onRemove={(id) => void onRemoveSaved(id)}
             />
           )
         )}

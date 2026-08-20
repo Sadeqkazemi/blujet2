@@ -82,12 +82,34 @@ body {
   }
 }
 
-/* Horizontal scroll without visible scrollbar (design bundle .hscroll) */
+/* Horizontal scroll strips (home services / destinations / routes).
+   Must stay width-constrained (`min-width: 0`) so the track scrolls
+   instead of growing the page and getting clipped by the viewport. */
 .hscroll {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  cursor: grab;
+}
+
+.hscroll:active {
+  cursor: grabbing;
 }
 
 .hscroll::-webkit-scrollbar {
   display: none;
+}
+
+.hscroll > * {
+  flex: none;
+  touch-action: pan-x;
 }

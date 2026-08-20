@@ -27,6 +27,7 @@ describe('Identity admin review (e2e)', () => {
       '09180000202',
       '09180000203',
       '09180000204',
+      '09180000205',
     ]);
   });
 
@@ -103,6 +104,26 @@ describe('Identity admin review (e2e)', () => {
       .patch(`/identity-verifications/${rowId}/approve`)
       .set('Authorization', `Bearer ${admin.accessToken}`);
     expect(again.status).toBe(409);
+  });
+
+  it('keeps the admin queue available when legacy PII cannot be decrypted', async () => {
+    const { rowId, userId } = await submitAsCustomer('09180000205');
+    await dataSource
+      .getRepository(User)
+      .update(
+        { id: userId },
+        { nationalIdEnc: 'legacy-ciphertext-from-another-key' },
+      );
+    const admin = await loginAs(app, 'site.admin');
+
+    const list = await request(app.getHttpServer())
+      .get('/identity-verifications')
+      .set('Authorization', `Bearer ${admin.accessToken}`);
+
+    expect(list.status).toBe(200);
+    const mine = list.body.data.find((r: { id: string }) => r.id === rowId);
+    expect(mine).toBeDefined();
+    expect(mine.nationalId).toBeNull();
   });
 
   it('reject requires a reason, surfaces it to the customer, and re-submit works', async () => {

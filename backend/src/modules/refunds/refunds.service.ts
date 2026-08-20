@@ -14,6 +14,9 @@ import { Passenger } from '../../database/entities/passenger.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { refundSubmittedNotificationInput } from '../notifications/customer-notification-copy';
+import { refundPaidNotificationInput } from '../notifications/customer-notification-copy';
 import { ErrorCode } from '../../common/errors';
 import { decryptPii, encryptPii } from '../../common/pii-crypto';
 import { matchesLastName } from '../../common/passenger-name.util';
@@ -80,6 +83,7 @@ export class RefundsService {
     private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     private readonly stepUp: StepUpService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** RefundRequest has a recursive JsonValue `history` column, which makes
@@ -325,6 +329,16 @@ export class RefundsService {
       },
     });
 
+    if (request.booking?.userId) {
+      await this.notifications.notify(
+        refundPaidNotificationInput({
+          recipientId: request.booking.userId,
+          refundId: id,
+          pnr: request.booking.pnr,
+        }),
+      );
+    }
+
     return toListRow(updated);
   }
 
@@ -536,6 +550,14 @@ export class RefundsService {
       entityId: request.id,
     });
 
+    await this.notifications.notify(
+      refundSubmittedNotificationInput({
+        recipientId: actor.id,
+        refundId: request.id,
+        pnr: request.booking.pnr,
+      }),
+    );
+
     return toCustomerRow(request);
   }
 
@@ -593,6 +615,15 @@ export class RefundsService {
           }),
         );
         saved.booking = booking;
+        if (booking.userId) {
+          await this.notifications.notify(
+            refundSubmittedNotificationInput({
+              recipientId: booking.userId,
+              refundId: saved.id,
+              pnr: booking.pnr,
+            }),
+          );
+        }
         return toCustomerRow(saved);
       } catch (err) {
         if (isUniqueViolation(err, 'refund_requests_trackingCode_key')) {

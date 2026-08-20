@@ -40,9 +40,10 @@ import { MySavedFlightsController } from './my-saved-flights.controller';
 import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
+import { AiModule } from '../ai/ai.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AncillaryServicesModule } from '../ancillary-services/ancillary-services.module';
-import { AiModule } from '../ai/ai.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import {
   PAYMENT_GATEWAY,
   SandboxPaymentGateway,
@@ -83,6 +84,7 @@ import {
     CustomerReferralsModule,
     AncillaryServicesModule,
     AiModule,
+    NotificationsModule,
   ],
   controllers: [
     SearchController,

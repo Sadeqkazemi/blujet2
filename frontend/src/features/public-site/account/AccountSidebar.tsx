@@ -6,6 +6,25 @@ import type { TabKey } from './account-types';
 import { sidebarAccountNavItems } from './account-nav-items';
 import ConfirmActionDialog from '../../../components/ConfirmActionDialog';
 
+function looksLikePhone(value: string): boolean {
+  const digits = value.replace(/[^\d+]/g, '');
+  return /^\+?\d{10,15}$/.test(digits);
+}
+
+function formatPhoneDisplay(value: string): string {
+  const digits = value.replace(/[^\d]/g, '');
+  if (digits.length === 11 && digits.startsWith('09')) {
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.length === 12 && digits.startsWith('98')) {
+    return `0${digits.slice(2, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+  }
+  if (digits.length === 13 && digits.startsWith('989')) {
+    return `0${digits.slice(2, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+  }
+  return value;
+}
+
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
   SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
   GOLD: { fa: 'عضو طلایی باشگاه', en: 'Gold Club Member', ar: 'عضو ذهبية النادي' },
@@ -109,11 +128,6 @@ const NAV_ICONS: Record<TabKey, React.ReactNode> = {
       <circle cx="12" cy="3.6" r="1.1" fill="currentColor" stroke="none" />
     </svg>
   ),
-  saved: (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
-    </svg>
-  ),
   'price-locks': (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="5" y="11" width="14" height="10" rx="2" />
@@ -164,11 +178,13 @@ function NavButton({
   label,
   active,
   onSelect,
+  isRTL,
 }: {
   tabKey: TabKey;
   label: string;
   active: boolean;
   onSelect: () => void;
+  isRTL: boolean;
 }) {
   return (
     <button
@@ -198,7 +214,7 @@ function NavButton({
       <span
         style={{
           position: 'absolute',
-          right: -1,
+          ...(isRTL ? { right: -1 } : { left: -1 }),
           top: '50%',
           transform: 'translateY(-50%)',
           width: 3,
@@ -245,9 +261,13 @@ export default function AccountSidebar({
 }: Props) {
   const { locale } = useLocale();
   const t = STR[locale];
+  const isRTL = locale !== 'en';
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const displayName = user?.fullName ?? t.defaultUserName;
+  const phoneAsName = displayName ? looksLikePhone(displayName) : false;
+  const headingName = phoneAsName ? t.defaultUserName : displayName;
+  const phoneLine = phoneAsName ? formatPhoneDisplay(displayName) : null;
   const membershipBadge =
     club?.isMember && club.level
       ? (TIER_LABEL[club.level]?.[locale] ?? club.level)
@@ -276,9 +296,9 @@ export default function AccountSidebar({
         border: '1px solid #e9eef4',
         borderRadius: 18,
         maxHeight: isMobile ? 'none' : 'calc(100vh - 106px)',
-        overflowX: 'hidden',
-        overflowY: isMobile ? 'hidden' : 'auto',
-        overscrollBehavior: 'contain',
+        overflow: isMobile ? 'hidden' : 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
         boxShadow: '0 20px 44px -32px rgba(13,38,102,.55)',
       }}
     >
@@ -287,6 +307,7 @@ export default function AccountSidebar({
           padding: '16px 15px 15px',
           background: 'linear-gradient(150deg,#123a62 0%,#0c243d 100%)',
           color: '#fff',
+          flex: 'none',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -309,7 +330,21 @@ export default function AccountSidebar({
             </svg>
           </div>
           <div style={{ minWidth: 0, lineHeight: 1.4 }}>
-            <div style={{ fontSize: 15.5, fontWeight: 800 }}>{displayName}</div>
+            <div style={{ fontSize: 15.5, fontWeight: 800 }}>{headingName}</div>
+            {phoneLine && (
+              <div
+                dir="ltr"
+                style={{
+                  marginTop: 4,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: '#c5d6eb',
+                  letterSpacing: 0.2,
+                }}
+              >
+                {phoneLine}
+              </div>
+            )}
             <div
               style={{
                 display: 'inline-flex',
@@ -368,7 +403,15 @@ export default function AccountSidebar({
           </button>
         </div>
       </div>
-      <div style={{ padding: 9 }}>
+      <div
+        style={{
+          padding: 9,
+          overflowY: isMobile ? 'hidden' : 'auto',
+          overscrollBehavior: 'contain',
+          flex: 1,
+          minHeight: 0,
+        }}
+      >
         {sidebarNav.map((item, index) => (
           <div key={item.key}>
             {index > 0 && sidebarNav[index - 1]?.group !== item.group && (
@@ -379,6 +422,7 @@ export default function AccountSidebar({
               label={item.label[locale]}
               active={tab === item.key}
               onSelect={() => onTabChange(item.key)}
+              isRTL={isRTL}
             />
           </div>
         ))}

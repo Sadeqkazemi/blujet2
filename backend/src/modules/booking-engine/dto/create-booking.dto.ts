@@ -31,6 +31,24 @@ export class BookingPassengerDto {
   @IsString()
   nationalId?: string;
 
+  @ApiProperty({
+    example: 'A1234567',
+    required: false,
+    description: 'Passport number when travelling on passport',
+  })
+  @IsOptional()
+  @IsString()
+  passportNo?: string;
+
+  @ApiProperty({
+    enum: ['male', 'female'],
+    required: false,
+    example: 'male',
+  })
+  @IsOptional()
+  @IsIn(['male', 'female'])
+  gender?: 'male' | 'female';
+
   @ApiProperty({ example: '09121234567', required: false })
   @IsOptional()
   @IsString()
