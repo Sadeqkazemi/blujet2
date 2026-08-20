@@ -2838,3 +2838,14 @@ Migration `1787731200000-CommercialSeatRequestsAncillaries`:
 `POST /agency-portal/seat-requests` writes these tables; `cartable_tasks`
 remain notifications (`sourceType=AGENCY_REQUEST`, `sourceId` = request id).
 Cross-agency invoices still use `agency_invoices` only.
+
+## Site-admin rules persistence (2026-08-20)
+
+No new table or migration is required. The seven ordered categories are stored
+as one JSONB value in the existing `system_settings` row whose key is
+`siteRules`. Its value has the shape
+`{ categories: [{ id, title, text }] }`; the API requires the fixed ids
+`purchase`, `refund`, `change`, `baggage`, `club`, `privacy`, and `pets`
+exactly once. `updatedById` and `updatedAt` continue to provide setting-level
+provenance, while `audit_logs` records each save. Public reads expose this
+value only through the allowlisted rules projection.

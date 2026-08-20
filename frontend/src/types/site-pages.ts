@@ -8,6 +8,23 @@ export type SiteContentFieldKey =
 
 export type PublicSiteContent = Record<SiteContentFieldKey, string>;
 
+export type SiteRuleId =
+  | 'purchase'
+  | 'refund'
+  | 'change'
+  | 'baggage'
+  | 'club'
+  | 'privacy'
+  | 'pets';
+
+export type SiteRuleCategory = {
+  id: SiteRuleId;
+  title: string;
+  text: string;
+};
+
+export type SiteRules = { categories: SiteRuleCategory[] };
+
 export type SitePageRow = {
   id: string;
   nameFa: string;

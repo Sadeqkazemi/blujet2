@@ -54,6 +54,64 @@ type LocaleContentBase =
 
 export type PublicContentLocale = 'fa' | 'en' | 'ar';
 
+export const SITE_RULE_IDS = [
+  'purchase',
+  'refund',
+  'change',
+  'baggage',
+  'club',
+  'privacy',
+  'pets',
+] as const;
+
+export type SiteRuleCategory = {
+  id: (typeof SITE_RULE_IDS)[number];
+  title: string;
+  text: string;
+};
+
+export type SiteRules = { categories: SiteRuleCategory[] };
+
+export const DEFAULT_SITE_RULES: SiteRules = {
+  categories: [
+    {
+      id: 'purchase',
+      title: 'خرید و صدور بلیط',
+      text: '۱. قیمت نمایش‌داده‌شده شامل مالیات و عوارض است و هزینهٔ پنهانی وجود ندارد.\n۲. پس از پرداخت موفق، بلیط الکترونیکی بلافاصله صادر و به ایمیل و شمارهٔ موبایل شما ارسال می‌شود.\n۳. مسئولیت صحت اطلاعات هویتی مسافران (نام، نام خانوادگی و کد ملی/گذرنامه) بر عهدهٔ خریدار است.',
+    },
+    {
+      id: 'refund',
+      title: 'استرداد و کنسلی',
+      text: '۱. میزان جریمهٔ استرداد بر اساس نوع نرخ بلیط و سیاست ایرلاین تعیین می‌شود.\n۲. درخواست استرداد از بخش «مدیریت رزرو» قابل ثبت و مبلغ قابل بازگشت پیش از تأیید نمایش داده می‌شود.\n۳. بازگشت وجه حداکثر ظرف ۷۲ ساعت کاری به حساب پرداخت‌کننده انجام می‌شود.',
+    },
+    {
+      id: 'change',
+      title: 'تغییر تاریخ و مشخصات',
+      text: '۱. تغییر تاریخ پرواز تا ۴ ساعت پیش از پرواز و بر اساس موجودی صندلی امکان‌پذیر است.\n۲. اصلاح مشخصات هویتی مسافر (نام، نام خانوادگی، کد ملی) تنها یک‌بار و پیش از صدور بلیط مجاز است.\n۳. تغییر تاریخ مشمول مابه‌التفاوت نرخ و کارمزد تغییر بر اساس سیاست ایرلاین است.',
+    },
+    {
+      id: 'baggage',
+      title: 'بار و چک‌این',
+      text: '۱. بار مجاز همراه بر اساس کلاس پروازی و مسیر پرواز تعیین و در زمان رزرو نمایش داده می‌شود.\n۲. اضافه‌بار در فرودگاه بر اساس تعرفهٔ ایرلاین محاسبه و دریافت می‌شود.\n۳. حضور در کانتر چک‌این حداقل ۹۰ دقیقه پیش از پرواز داخلی و ۱۸۰ دقیقه پیش از پرواز خارجی الزامی است.',
+    },
+    {
+      id: 'club',
+      title: 'باشگاه مشتریان',
+      text: '۱. عضویت در باشگاه مشتریان رایگان است و با هر خرید بلیط امتیاز محاسبه می‌شود.\n۲. سطح عضویت (نقره‌ای، طلایی، پلاتینیوم) بر اساس مجموع امتیاز سالانه تعیین می‌شود.\n۳. امتیازهای باشگاه قابل استفاده برای تخفیف در خرید بلیط‌های بعدی هستند و تاریخ انقضا دارند.',
+    },
+    {
+      id: 'privacy',
+      title: 'حریم خصوصی و امنیت',
+      text: '۱. اطلاعات شخصی مسافران صرفاً برای صدور بلیط و ارائهٔ خدمات پروازی استفاده می‌شود.\n۲. اطلاعات پرداخت از طریق درگاه بانکی رمزنگاری‌شده پردازش و در سرورهای blujet ذخیره نمی‌شود.\n۳. اطلاعات کاربران بدون رضایت صریح در اختیار اشخاص ثالث قرار نمی‌گیرد، مگر بر اساس الزام قانونی.',
+    },
+    {
+      id: 'pets',
+      title: 'قوانین حمل حیوان خانگی',
+      text: '۱. حیوانات خانگی کوچک (سگ و گربه) تا وزن ۸ کیلوگرم همراه با قفس مجاز، در کابین مسافر پذیرفته می‌شوند.\n۲. حیوانات با وزن بیشتر باید در محفظه بار هواپیما و در قفس استاندارد IATA حمل شوند.\n۳. ارائه‌ی کارت واکسیناسیون معتبر و گواهی سلامت دامپزشکی الزامی است.\n۴. هزینه‌ی حمل حیوان خانگی جداگانه محاسبه و در زمان رزرو دریافت می‌شود.\n۵. حمل حیوانات وحشی، خطرناک یا نژادهای ممنوعه طبق مقررات پروازی مجاز نیست.\n۶. ظرفیت حمل حیوان خانگی در هر پرواز محدود است و بر اساس اولویت رزرو تخصیص می‌یابد.',
+    },
+  ],
+};
+
 /** Every storable key with its server-side default. Unknown keys are
  * rejected — the settings table never becomes a free-form dumping ground. */
 export const SETTING_DEFAULTS: Record<string, unknown> = {
@@ -91,6 +149,7 @@ export const SETTING_DEFAULTS: Record<string, unknown> = {
   contactAddress_ar: 'طهران، إيران',
   contactOfficeHours_ar: 'السبت–الخميس ٨:٠٠–٢٠:٠٠ — مغلق يوم الجمعة',
   termsText_ar: 'الشروط والأحكام لاستخدام خدمات blujet.',
+  siteRules: DEFAULT_SITE_RULES,
   // IT Manager / SITE_ADMIN settings tab — footer social links.
   socialLinks: DEFAULT_SOCIAL_LINKS,
   // SITE_ADMIN settings tab — app download buttons on the home page.
@@ -244,6 +303,103 @@ export class SettingsService {
     });
 
     return this.getAll();
+  }
+
+  private parseSiteRules(value: unknown): SiteRules {
+    if (!value || typeof value !== 'object' || !('categories' in value)) {
+      return DEFAULT_SITE_RULES;
+    }
+    const categories = (value as { categories?: unknown }).categories;
+    if (
+      !Array.isArray(categories) ||
+      categories.length !== SITE_RULE_IDS.length
+    ) {
+      return DEFAULT_SITE_RULES;
+    }
+    const byId = new Map<string, SiteRuleCategory>();
+    for (const item of categories) {
+      if (!item || typeof item !== 'object') return DEFAULT_SITE_RULES;
+      const candidate = item as Record<string, unknown>;
+      if (
+        !SITE_RULE_IDS.includes(candidate.id as SiteRuleCategory['id']) ||
+        typeof candidate.title !== 'string' ||
+        typeof candidate.text !== 'string' ||
+        !candidate.title.trim() ||
+        !candidate.text.trim() ||
+        byId.has(candidate.id as string)
+      ) {
+        return DEFAULT_SITE_RULES;
+      }
+      byId.set(candidate.id as string, {
+        id: candidate.id as SiteRuleCategory['id'],
+        title: candidate.title.trim(),
+        text: candidate.text.trim(),
+      });
+    }
+    if (byId.size !== SITE_RULE_IDS.length) return DEFAULT_SITE_RULES;
+    return {
+      categories: SITE_RULE_IDS.map((id) => byId.get(id)!),
+    };
+  }
+
+  async getSiteRules(): Promise<SiteRules> {
+    const stored = await this.settingRepo.findOne({
+      where: { key: 'siteRules' },
+    });
+    return this.parseSiteRules(stored?.value ?? DEFAULT_SITE_RULES);
+  }
+
+  async updateSiteRules(
+    actor: AuthenticatedUser,
+    input: { categories: Array<{ id: string; title: string; text: string }> },
+  ): Promise<SiteRules> {
+    const submittedIds = input.categories.map((item) => item.id);
+    if (
+      input.categories.length !== SITE_RULE_IDS.length ||
+      new Set(submittedIds).size !== SITE_RULE_IDS.length ||
+      SITE_RULE_IDS.some((id) => !submittedIds.includes(id))
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'هر هفت دستهٔ قوانین باید دقیقاً یک‌بار ارسال شوند.',
+      });
+    }
+    const normalized: SiteRules = {
+      categories: SITE_RULE_IDS.map((id) => {
+        const item = input.categories.find((candidate) => candidate.id === id)!;
+        return { id, title: item.title.trim(), text: item.text.trim() };
+      }),
+    };
+    if (normalized.categories.some((item) => !item.title || !item.text)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'عنوان و متن هیچ دسته‌ای نمی‌تواند خالی باشد.',
+      });
+    }
+
+    const existing = await this.settingRepo.findOne({
+      where: { key: 'siteRules' },
+    });
+    const row = existing ?? this.settingRepo.create({ key: 'siteRules' });
+    row.value = normalized;
+    row.updatedById = actor.id;
+    row.updatedAt = new Date();
+    await this.settingRepo.save(row);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'تغییر قوانین سایت',
+      detail: `هفت دستهٔ قوانین سایت توسط ${actor.fullName} به‌روزرسانی شد.`,
+      entityType: 'SystemSetting',
+      entityId: 'siteRules',
+    });
+    return normalized;
+  }
+
+  async getPublicSiteRules(locale: PublicContentLocale = 'fa') {
+    if (locale !== 'fa') return { categories: [] as SiteRuleCategory[] };
+    return this.getSiteRules();
   }
 
   /** ⚑ Writes the REAL Phase 7 refund engine rows — the settings screen and

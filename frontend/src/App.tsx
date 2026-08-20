@@ -88,6 +88,7 @@ import BlogAdminPage from './features/blog/BlogAdminPage';
 import MediaAdminPage from './features/site-content/MediaAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 import AdminLoansPage from './features/loans/AdminLoansPage';
+import SiteRulesPage from './features/site-content/SiteRulesPage';
 import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
 
 export default function App() {
@@ -109,6 +110,7 @@ export default function App() {
           <Route path="/club" element={<PublicClubPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/travel-info" element={<TravelInfoPage />} />
+          <Route path="/terms" element={<TravelInfoPage />} />
           <Route path="/signin" element={<CustomerLoginPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/manage-booking" element={<ManageBookingPage />} />
@@ -220,6 +222,9 @@ export default function App() {
               </Route>
               <Route path="jobapps" element={<TabGate tabKey="jobapps" />}>
                 <Route index element={<CareersAdminPage />} />
+              </Route>
+              <Route path="rules" element={<TabGate tabKey="rules" />}>
+                <Route index element={<SiteRulesPage />} />
               </Route>
               <Route path="blog" element={<TabGate tabKey="blog" />}>
                 <Route index element={<BlogAdminPage />} />

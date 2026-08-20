@@ -6,6 +6,7 @@ import * as loansApi from '../../api/loans';
 
 const ROW = {
   id: 'loan-1', userId: 'user-1', requestedAmountIrr: '50000000', bankStatus: 'UNDER_REVIEW' as const,
+  customer: { id: 'user-1', fullName: 'نگار رضایی', phone: '09121234567' },
   displayStatus: 'under_review' as const, bankReferenceId: 'BANK-55',
   createdAt: '2026-08-10T08:00:00.000Z', updatedAt: '2026-08-10T08:00:00.000Z',
   lastSyncedAt: '2026-08-10T09:00:00.000Z', statusSummary: { source: 'bank' },
@@ -22,8 +23,9 @@ describe('AdminLoansPage', () => {
     render(<AdminLoansPage />);
 
     expect(await screen.findByText('در حال بررسی بانک')).toBeInTheDocument();
+    expect(screen.getByText('نگار رضایی')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /تأیید|رد/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'جزئیات' }));
+    await userEvent.click(screen.getByRole('button', { name: 'مشاهده وضعیت ←' }));
     expect(await screen.findByText('BANK-55')).toBeInTheDocument();
     expect(detailSpy).toHaveBeenCalledWith('loan-1');
   });

@@ -22,7 +22,7 @@ import {
 } from '../src/modules/loans/bank-loan.http.adapter';
 import type { BankLoanProvider } from '../src/modules/loans/bank-loan.types';
 import { bankScopedIdempotencyKey } from '../src/modules/loans/loan-idempotency';
-import { loginAsCustomer } from './helpers/login.helper';
+import { loginAs, loginAsCustomer } from './helpers/login.helper';
 
 class FakeBank implements BankLoanProvider {
   created = 0;
@@ -170,6 +170,35 @@ describe('Bank loans adapter (e2e)', () => {
       where: { eventId: payload.eventId },
     });
     expect(events).toBe(1);
+  });
+
+  it('site-admin list/detail include the related real customer identity and remain read-only', async () => {
+    const phone = '09138880031';
+    const customer = await loginAsCustomer(app, phone);
+    const key = `loan-admin-view-${Date.now()}`;
+    const created = await request(app.getHttpServer())
+      .post('/me/loan-applications')
+      .set('Authorization', `Bearer ${customer.accessToken}`)
+      .send({ requestedAmountIrr: '540000000', idempotencyKey: key });
+    expect(created.status).toBe(201);
+
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const list = await request(app.getHttpServer())
+      .get('/admin/loan-applications?page=1&pageSize=100')
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`);
+    expect(list.status).toBe(200);
+    const row = list.body.data.items.find(
+      (item: { id: string }) => item.id === created.body.data.id,
+    );
+    expect(row.customer.id).toBe(customer.userId);
+    expect(row.customer.phone).toBe('+989138880031');
+    expect(row.customer.fullName).toBeTruthy();
+
+    const detail = await request(app.getHttpServer())
+      .get(`/admin/loan-applications/${created.body.data.id}`)
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.data.customer.id).toBe(customer.userId);
   });
 
   it('PENDING and REJECTED never credit the wallet', async () => {

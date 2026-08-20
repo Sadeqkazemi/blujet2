@@ -290,6 +290,7 @@ describe('Panels (e2e)', () => {
       'media',
       'blog',
       'jobapps',
+      'rules',
     ]);
     // Product request (2026-08): KYC and system settings stay outside the SITE_ADMIN sidebar.
     expect(keys).not.toContain('kyc');

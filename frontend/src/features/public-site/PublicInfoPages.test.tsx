@@ -54,6 +54,7 @@ beforeEach(() => {
     phone: '021-44694471',
     email: 'info@blujet.com',
   });
+  vi.spyOn(settingsApi, 'fetchPublicSiteRules').mockResolvedValue({ categories: [] });
 });
 
 function renderWithRouter(node: React.ReactNode) {
@@ -270,5 +271,16 @@ describe('TravelInfoPage', () => {
     expect(screen.getAllByText('الشروط والأحكام').length).toBeGreaterThan(0);
     expect(screen.getAllByText('الشراء وإصدار التذكرة').length).toBe(2);
     expect(screen.getByText(/الأمتعة المجانية المسموح بها ٢٠ كجم/)).toBeInTheDocument();
+  });
+
+  it('renders published Persian rules from the site-admin API', async () => {
+    vi.mocked(settingsApi.fetchPublicSiteRules).mockResolvedValue({
+      categories: [
+        { id: 'pets', title: 'قوانین تازه حیوانات', text: 'خط اول\nخط دوم' },
+      ],
+    });
+    renderWithRouter(<TravelInfoPage />);
+    expect((await screen.findAllByText('قوانین تازه حیوانات')).length).toBe(2);
+    expect(screen.getByText('خط دوم')).toBeInTheDocument();
   });
 });

@@ -83,6 +83,13 @@ export class LoansService {
     return {
       ...base,
       userId: row.userId,
+      customer: row.user
+        ? {
+            id: row.user.id,
+            fullName: row.user.fullName,
+            phone: row.user.phone,
+          }
+        : null,
       statusSummary: row.statusSummary,
       walletCreditReference: row.walletCreditReference,
     };
@@ -494,6 +501,7 @@ export class LoansService {
 
   async listAdmin(page = 1, pageSize = 20) {
     const [rows, total] = await this.loanRepo.findAndCount({
+      relations: { user: true },
       order: { createdAt: 'DESC' },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -507,7 +515,10 @@ export class LoansService {
   }
 
   async getAdmin(id: string) {
-    const row = await this.loanRepo.findOne({ where: { id } });
+    const row = await this.loanRepo.findOne({
+      where: { id },
+      relations: { user: true },
+    });
     if (!row) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
