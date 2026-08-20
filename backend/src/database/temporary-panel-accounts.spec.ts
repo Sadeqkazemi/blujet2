@@ -6,6 +6,7 @@ import {
   TEMPORARY_PANEL_EXTENSION_MS,
   TEMPORARY_PANEL_INITIAL_ACCESS_MS,
   createTemporaryPanelExpiry,
+  createTemporaryPanelV2ExtensionExpiry,
   generateTemporaryPanelPassword,
   getTemporaryPanelAccessState,
 } from './temporary-panel-accounts';
@@ -62,7 +63,7 @@ describe('temporary panel accounts', () => {
     ).toBe(true);
   });
 
-  it('starts at seven days and permits only one controlled seven-day extension', () => {
+  it('starts at seven days and accepts only owner-controlled deadlines within the UAT ceiling', () => {
     const createdAt = new Date('2026-08-05T00:00:00.000Z');
     const deadline = createTemporaryPanelExpiry(createdAt);
     expect(deadline.getTime() - createdAt.getTime()).toBe(
@@ -98,6 +99,33 @@ describe('temporary panel accounts', () => {
         ),
       }),
     ).toBe('INVALID');
+  });
+
+  it('extends active v2 access by seven days and expired access from execution time', () => {
+    const createdAt = new Date('2026-08-05T00:00:00.000Z');
+    const now = new Date('2026-08-20T00:00:00.000Z');
+    const activeDeadline = new Date('2026-08-23T00:00:00.000Z');
+    expect(
+      createTemporaryPanelV2ExtensionExpiry(createdAt, activeDeadline, now),
+    ).toEqual(new Date('2026-08-30T00:00:00.000Z'));
+
+    const expiredDeadline = new Date('2026-08-19T00:00:00.000Z');
+    expect(
+      createTemporaryPanelV2ExtensionExpiry(createdAt, expiredDeadline, now),
+    ).toEqual(new Date('2026-08-27T00:00:00.000Z'));
+  });
+
+  it('caps a v2 extension at the owner-approved absolute ceiling', () => {
+    const createdAt = new Date('2026-08-05T00:00:00.000Z');
+    const previousDeadline = new Date('2026-09-01T00:00:00.000Z');
+    const deadline = createTemporaryPanelV2ExtensionExpiry(
+      createdAt,
+      previousDeadline,
+      new Date('2026-08-20T00:00:00.000Z'),
+    );
+    expect(deadline.getTime()).toBe(
+      createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS,
+    );
   });
 
   it('never treats ordinary or 2FA-enabled staff as password-only accounts', () => {

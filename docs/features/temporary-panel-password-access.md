@@ -219,7 +219,10 @@ Acceptance:
   temporary accounts, clears their password hashes, and revokes their sessions
   without deleting referenced business/audit history —
   `temporary-panel-accounts.spec.ts`.
-- [ ] The exception starts with seven days and supports one owner-approved
-  seven-day extension, with a hard maximum of 14 days from creation. It can be
-  removed earlier when Kavenegar is operational —
+- [ ] The exception starts with seven days. Owner-approved extension v1 adds
+  seven days to the original deadline; owner-approved extension v2 adds seven
+  days to an active deadline or grants seven days from execution after expiry.
+  Separate confirmation phrases, audit files and root sentinels make both
+  grants one-time, with a v2 safety ceiling of 28 days from creation. Access can
+  be removed earlier when Kavenegar is operational —
   `temporary-panel-accounts.spec.ts`.

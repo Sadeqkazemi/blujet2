@@ -4,10 +4,12 @@ import type { Role } from './enums';
 
 export const TEMPORARY_PANEL_INITIAL_ACCESS_MS = 7 * 24 * 60 * 60 * 1000;
 export const TEMPORARY_PANEL_EXTENSION_MS = 7 * 24 * 60 * 60 * 1000;
-/** Owner-approved UAT ceiling: the original seven-day window plus at most one
- * controlled seven-day extension. Ordinary accounts never use this path. */
+/** Owner-approved UAT ceiling after extension v2. This is deliberately wider
+ * than the requested deadline so accounts created on different rollout dates
+ * can all receive the same controlled seven-day continuation. Ordinary
+ * accounts never use this path. */
 export const TEMPORARY_PANEL_ACCESS_MAX_MS =
-  TEMPORARY_PANEL_INITIAL_ACCESS_MS + TEMPORARY_PANEL_EXTENSION_MS;
+  TEMPORARY_PANEL_INITIAL_ACCESS_MS + 3 * TEMPORARY_PANEL_EXTENSION_MS;
 export const TEMPORARY_PANEL_USERNAME_PREFIX = 'uat.';
 export const TEMPORARY_PANEL_PASSWORD_LENGTH = 16;
 const TEMPORARY_PANEL_PASSWORD_ALPHABET =
@@ -125,6 +127,27 @@ export function getTemporaryPanelAccessState(
 
 export function createTemporaryPanelExpiry(now = new Date()): Date {
   return new Date(now.getTime() + TEMPORARY_PANEL_INITIAL_ACCESS_MS);
+}
+
+/** Extension v2 adds seven days to an active deadline. If the account has
+ * already expired, it grants a fresh seven-day window from execution time.
+ * The absolute ceiling keeps malformed/manual deadlines fail-closed. */
+export function createTemporaryPanelV2ExtensionExpiry(
+  createdAt: Date,
+  previousExpiresAt: Date,
+  now = new Date(),
+): Date {
+  const extensionBase =
+    previousExpiresAt.getTime() > now.getTime() ? previousExpiresAt : now;
+  const requestedDeadline = new Date(
+    extensionBase.getTime() + TEMPORARY_PANEL_EXTENSION_MS,
+  );
+  const absoluteCeiling = new Date(
+    createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS,
+  );
+  return requestedDeadline < absoluteCeiling
+    ? requestedDeadline
+    : absoluteCeiling;
 }
 
 export interface UatSandboxAgencyCandidate extends TemporaryPanelAccessUser {
