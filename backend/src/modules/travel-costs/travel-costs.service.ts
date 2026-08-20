@@ -9,6 +9,7 @@ import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AuditService } from '../audit/audit.service';
+import { AncillaryServicesService } from '../ancillary-services/ancillary-services.service';
 import type {
   CreateTravelCostDto,
   UpdateTravelCostDto,
@@ -20,14 +21,15 @@ export class TravelCostsService {
     @InjectRepository(TravelExtraSetting)
     private readonly repo: Repository<TravelExtraSetting>,
     private readonly audit: AuditService,
+    private readonly ancillary: AncillaryServicesService,
   ) {}
 
   listManager() {
     return this.repo.find({ order: { sortOrder: 'ASC', createdAt: 'ASC' } });
   }
 
-  listPublic() {
-    return this.repo.find({
+  async listPublic() {
+    const rows = await this.repo.find({
       where: { active: true },
       order: { sortOrder: 'ASC', createdAt: 'ASC' },
       select: {
@@ -40,9 +42,18 @@ export class TravelCostsService {
         billingUnit: true,
         priceIrr: true,
         purchaseEnabled: true,
+        active: true,
         sortOrder: true,
       },
     });
+    const overlaid = await this.ancillary.overlayTravelExtras(rows);
+    return overlaid
+      .filter((row) => row.purchaseEnabled)
+      .map((row) => {
+        const publicRow: Partial<typeof row> = { ...row };
+        delete publicRow.active;
+        return publicRow;
+      });
   }
 
   async create(actor: AuthenticatedUser, dto: CreateTravelCostDto) {

@@ -88,8 +88,13 @@ export class RequestAgencySeatsDto {
   @IsIn([0, 1, 2, 3, 4, 5, 6], { each: true })
   preferredWeekdays?: number[];
 
-  @ApiPropertyOptional({ enum: [3, 6, 12], example: 3 })
+  @ApiPropertyOptional({
+    enum: [1, 3, 6, 12],
+    example: 3,
+    description:
+      'مدت به ماه. قرارداد قدیمی 3|6|12 است؛ UI جدید 1|3|12. هر چهار مقدار پذیرفته و به صورت smallint ذخیره می‌شود.',
+  })
   @IsOptional()
-  @IsIn([3, 6, 12])
-  termMonths?: 3 | 6 | 12;
+  @IsIn([1, 3, 6, 12])
+  termMonths?: 1 | 3 | 6 | 12;
 }

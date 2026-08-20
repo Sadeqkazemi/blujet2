@@ -20,9 +20,7 @@ describe("ScheduleTemplatesTab", () => {
 
     render(<ScheduleTemplatesTab />);
 
-    expect(
-      await screen.findByText("هنوز مسیر پروازی تعریف نشده است."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('هنوز مسیر پروازی فعالی تعریف نشده است.')).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
     ).toBeInTheDocument();

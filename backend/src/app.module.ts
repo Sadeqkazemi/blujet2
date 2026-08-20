@@ -62,6 +62,7 @@ import { CustomerReferralsModule } from './modules/customer-referrals/customer-r
 import { WebservicePricingModule } from './modules/webservice-pricing/webservice-pricing.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { TravelCostsModule } from './modules/travel-costs/travel-costs.module';
+import { AncillaryServicesModule } from './modules/ancillary-services/ancillary-services.module';
 import { LoansModule } from './modules/loans/loans.module';
 import { PartnerApiModule } from './modules/partner-api/partner-api.module';
 import { FinanceReportsModule } from './modules/finance-reports/finance-reports.module';
@@ -182,6 +183,7 @@ import { FinancialIntegrationsModule } from './modules/financial-integrations/fi
     WebservicePricingModule,
     CustomersModule,
     TravelCostsModule,
+    AncillaryServicesModule,
     LoansModule,
     PartnerApiModule,
     FinanceReportsModule,

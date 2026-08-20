@@ -3,6 +3,7 @@ import type {
   AircraftTypeOption,
   AirportEntry,
   AllotmentRow,
+  CommercialFlightControl,
   CreateFareRulePayload,
   CreateFlightDefinitionPayload,
   FareRuleRow,
@@ -15,7 +16,6 @@ import type {
   FlightWorkflowHistory,
   UpdateFareRulePayload,
   UpdateFlightDefinitionPayload,
-  CommercialFlightControl,
 } from "../types/flights";
 
 export function fetchFlightsOverview() {
@@ -97,6 +97,53 @@ export function updateFlightDefinition(
 
 export function fetchFlightDetail(id: string) {
   return apiGet<FlightDetail>(`/flights/${id}`);
+}
+
+export function patchCommercialPanelSettings(
+  instanceId: string,
+  payload: {
+    siteVisible?: boolean;
+    classSitePrices?: Record<string, string>;
+    agencyRelease?: Record<
+      string,
+      { seats?: number; priceIrr?: string; special?: boolean }
+    >;
+  },
+) {
+  return apiPatch<import("../types/flights").FlightCommercialFields>(
+    `/flights/${instanceId}/commercial-settings`,
+    payload,
+  );
+}
+
+export function fetchCommercialFlightControl(instanceId: string) {
+  return apiGet<CommercialFlightControl>(`/flights/${instanceId}/commercial-control`);
+}
+
+export function updateFlightSalesVisibility(instanceId: string, enabled: boolean) {
+  return apiPatch<{ flightInstanceId: string; publicSaleEnabled: boolean; version: number }>(
+    `/flights/${instanceId}/sales-visibility`,
+    { enabled },
+  );
+}
+
+export function updateFareClassSitePrice(
+  instanceId: string,
+  ruleId: string,
+  payload: { priceIrr: string; reason: string },
+) {
+  return apiPatch<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}/site-price`, payload);
+}
+
+export function upsertAgencyFareRelease(
+  instanceId: string,
+  ruleId: string,
+  payload: { seats: number; priceIrr: string; specialOffer?: boolean },
+) {
+  return apiRequest<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}/agency-release`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
 }
 
 export function planFlight(
@@ -208,48 +255,6 @@ export function updateFareRule(
 export function deleteFareRule(instanceId: string, ruleId: string) {
   return apiDelete<{ success: boolean }>(
     `/flights/${instanceId}/fare-rules/${ruleId}`,
-  );
-}
-
-export function fetchCommercialFlightControl(instanceId: string) {
-  return apiGet<CommercialFlightControl>(
-    `/flights/${instanceId}/commercial-control`,
-  );
-}
-
-export function updateFlightSalesVisibility(
-  instanceId: string,
-  enabled: boolean,
-) {
-  return apiPatch<{
-    flightInstanceId: string;
-    publicSaleEnabled: boolean;
-    version: number;
-  }>(
-    `/flights/${instanceId}/sales-visibility`,
-    { enabled },
-  );
-}
-
-export function updateFareClassSitePrice(
-  instanceId: string,
-  ruleId: string,
-  payload: { priceIrr: string; reason: string },
-) {
-  return apiPatch<FareRuleRow>(
-    `/flights/${instanceId}/fare-rules/${ruleId}/site-price`,
-    payload,
-  );
-}
-
-export function upsertAgencyFareRelease(
-  instanceId: string,
-  ruleId: string,
-  payload: { seats: number; priceIrr: string; specialOffer?: boolean },
-) {
-  return apiRequest<FareRuleRow>(
-    `/flights/${instanceId}/fare-rules/${ruleId}/agency-release`,
-    { method: "PUT", body: JSON.stringify(payload) },
   );
 }
 

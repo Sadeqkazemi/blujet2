@@ -22,6 +22,7 @@ import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
+import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -51,6 +52,14 @@ import {
   type CabinClass,
 } from '../../database/enums';
 import { isSellableDefinitionStatus } from './definition-sellability';
+import {
+  buildClassBreakdown,
+  commercialRowExtras,
+  mergeCommercialPanelSettings,
+  parseCommercialPanelSettings,
+  resolveSiteVisible,
+  type CommercialPanelSettings,
+} from './commercial-panel-settings';
 
 /** SCHEDULED instances departing beyond this window belong to the
  * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
@@ -61,6 +70,18 @@ const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
 const WEAK_SALES_WINDOW_HOURS = 72;
 const WEAK_SALES_OCCUPANCY_PCT = 60;
+
+function stringifyScalar(value: unknown, fallback = ''): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'bigint' ||
+    typeof value === 'boolean'
+  ) {
+    return String(value);
+  }
+  return fallback;
+}
 
 export function isCommercialInventoryVisible(
   instance: Pick<
@@ -143,6 +164,10 @@ export class FlightsService {
     private readonly seatLockRepo: Repository<SeatLock>,
     @InjectRepository(FarePricingProposal)
     private readonly proposalRepo: Repository<FarePricingProposal>,
+    @InjectRepository(FlightScheduleTemplate)
+    private readonly scheduleTemplateRepo: Repository<FlightScheduleTemplate>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepo: Repository<AuditLog>,
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
@@ -163,6 +188,149 @@ export class FlightsService {
       .groupBy('b.flightInstanceId')
       .getRawMany<{ flightInstanceId: string; count: string }>();
     return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
+  }
+
+  private async soldByInstanceAndCabin(
+    instanceIds: string[],
+  ): Promise<Map<string, Map<CabinClass, number>>> {
+    const result = new Map<string, Map<CabinClass, number>>();
+    if (instanceIds.length === 0) return result;
+    const rows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.flightInstanceId', 'flightInstanceId')
+      .addSelect('b.cabin', 'cabin')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.flightInstanceId IN (:...ids)', { ids: instanceIds })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .groupBy('b.flightInstanceId')
+      .addGroupBy('b.cabin')
+      .getRawMany<{
+        flightInstanceId: string;
+        cabin: CabinClass;
+        count: string;
+      }>();
+    for (const row of rows) {
+      const byCabin = result.get(row.flightInstanceId) ?? new Map();
+      byCabin.set(row.cabin, Number(row.count));
+      result.set(row.flightInstanceId, byCabin);
+    }
+    return result;
+  }
+
+  private async fareRulesByInstances(
+    instanceIds: string[],
+  ): Promise<Map<string, FareRule[]>> {
+    const map = new Map<string, FareRule[]>();
+    if (instanceIds.length === 0) return map;
+    const rules = await this.fareRuleRepo.find({
+      where: { flightInstanceId: In(instanceIds) },
+      order: { cabin: 'ASC', priceIrr: 'ASC' },
+    });
+    for (const rule of rules) {
+      const list = map.get(rule.flightInstanceId) ?? [];
+      list.push(rule);
+      map.set(rule.flightInstanceId, list);
+    }
+    return map;
+  }
+
+  private async lockedSeatsByInstance(
+    instanceIds: string[],
+  ): Promise<Map<string, number>> {
+    if (instanceIds.length === 0) return new Map();
+    const rows = await this.seatLockRepo
+      .createQueryBuilder('sl')
+      .select('sl.flightInstanceId', 'flightInstanceId')
+      .addSelect('COUNT(*)', 'count')
+      .where('sl.flightInstanceId IN (:...ids)', { ids: instanceIds })
+      .andWhere('sl.releasedAt IS NULL')
+      .groupBy('sl.flightInstanceId')
+      .getRawMany<{ flightInstanceId: string; count: string }>();
+    return new Map(rows.map((r) => [r.flightInstanceId, Number(r.count)]));
+  }
+
+  private async routeAgencyPriceByTemplate(
+    templateIds: string[],
+  ): Promise<Map<string, string>> {
+    if (templateIds.length === 0) return new Map();
+    const templates = await this.scheduleTemplateRepo.find({
+      where: { id: In(templateIds) },
+      select: ['id', 'agencyPriceIrr'],
+    });
+    return new Map(
+      templates.map((t) => [t.id, String(t.agencyPriceIrr ?? '0')]),
+    );
+  }
+
+  private buildCommercialExtras(
+    instance: FlightInstance,
+    sold: number,
+    soldByCabin: Map<CabinClass, number>,
+    fareRules: FareRule[],
+    lockedSeats: number,
+    routeAgencyPriceIrr: string | null,
+  ) {
+    const settings = parseCommercialPanelSettings(instance.commercialPanelSettings);
+    const classBreakdown = buildClassBreakdown({
+      capacity: instance.capacity,
+      cabinCapacities: instance.cabinCapacities,
+      soldTotal: sold,
+      soldByCabin,
+      fareRules: fareRules.map((r) => ({
+        cabin: r.cabin,
+        classCode: r.classCode,
+        seatsAllocated: r.seatsAllocated,
+      })),
+    });
+    return commercialRowExtras({
+      settings,
+      classBreakdown,
+      lockedSeats,
+      routeAgencyPriceIrr,
+    });
+  }
+
+  private async priceChangeHistory(flightInstanceId: string) {
+    const proposal = await this.proposalRepo.findOne({
+      where: { flightInstanceId },
+      select: ['id'],
+    });
+    const qb = this.auditLogRepo
+      .createQueryBuilder('a')
+      .leftJoin('a.actor', 'actor')
+      .addSelect(['actor.id', 'actor.fullName'])
+      .where('a.action = :action', {
+        action: 'تغییر قیمت فروش پرواز منتشرشده',
+      })
+      .orderBy('a.createdAt', 'DESC')
+      .take(20);
+    if (proposal) {
+      qb.andWhere(
+        '(a.entityId = :proposalId OR a.metadata ->> :metaKey = :instanceId)',
+        {
+          proposalId: proposal.id,
+          metaKey: 'flightInstanceId',
+          instanceId: flightInstanceId,
+        },
+      );
+    } else {
+      qb.andWhere('a.metadata ->> :metaKey = :instanceId', {
+        metaKey: 'flightInstanceId',
+        instanceId: flightInstanceId,
+      });
+    }
+    const rows = await qb.getMany();
+    return rows.map((r) => {
+      const meta = (r.metadata ?? {}) as Record<string, unknown>;
+      return {
+        id: r.id,
+        previousPriceIrr: stringifyScalar(meta.previousPriceIrr),
+        salePriceIrr: stringifyScalar(meta.salePriceIrr),
+        reason: r.detail,
+        actorName: r.actor?.fullName ?? '—',
+        createdAt: r.createdAt.toISOString(),
+      };
+    });
   }
 
   /** ⚑ Derived status per docs — the mocks' hardcoded strings mapped to
@@ -223,8 +391,33 @@ export class FlightsService {
         (sold.get(i.id) ?? 0) === 0,
     );
 
+    const activeIds = activeRows.map((i) => i.id);
+    const [soldByCabin, fareRulesMap, lockedMap] = await Promise.all([
+      this.soldByInstanceAndCabin(activeIds),
+      this.fareRulesByInstances(activeIds),
+      this.lockedSeatsByInstance(activeIds),
+    ]);
+    const templateIds = [
+      ...new Set(
+        activeRows
+          .map((i) => i.scheduleTemplateId)
+          .filter((id): id is string => id != null),
+      ),
+    ];
+    const templatePrices = await this.routeAgencyPriceByTemplate(templateIds);
+
     const active = activeRows.map((i) => {
       const s = sold.get(i.id) ?? 0;
+      const commercial = this.buildCommercialExtras(
+        i,
+        s,
+        soldByCabin.get(i.id) ?? new Map(),
+        fareRulesMap.get(i.id) ?? [],
+        lockedMap.get(i.id) ?? 0,
+        i.scheduleTemplateId
+          ? (templatePrices.get(i.scheduleTemplateId) ?? null)
+          : null,
+      );
       return {
         ...this.baseRow(i, s),
         derivedStatus: this.derivedStatus(i.status, s, i.capacity),
@@ -238,6 +431,7 @@ export class FlightsService {
             : commercialSalesHealth(i.departureAt, s, i.capacity),
         aiSuggestion: i.aiSuggestion as unknown as PersistedAiSuggestion | null,
         competitorPriceIrr: i.competitorPriceIrr,
+        ...commercial,
       };
     });
 
@@ -623,6 +817,44 @@ export class FlightsService {
       };
     });
     const sold = channels.reduce((a, c) => a + c.seats, 0);
+    const soldByCabinRows = await this.bookingRepo
+      .createQueryBuilder('b')
+      .select('b.cabin', 'cabin')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.flightInstanceId = :id', { id })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .groupBy('b.cabin')
+      .getRawMany<{ cabin: CabinClass; count: string }>();
+    const soldByCabin = new Map<CabinClass, number>();
+    for (const row of soldByCabinRows) {
+      soldByCabin.set(row.cabin, Number(row.count));
+    }
+    const fareRules = await this.fareRuleRepo.find({
+      where: { flightInstanceId: id },
+      order: { cabin: 'ASC', priceIrr: 'ASC' },
+    });
+    const lockedSeats = await this.seatLockRepo.count({
+      where: { flightInstanceId: id, releasedAt: IsNull() },
+    });
+    let routeAgencyPriceIrr: string | null = null;
+    if (instance.scheduleTemplateId) {
+      const template = await this.scheduleTemplateRepo.findOne({
+        where: { id: instance.scheduleTemplateId },
+        select: ['agencyPriceIrr'],
+      });
+      routeAgencyPriceIrr = template
+        ? String(template.agencyPriceIrr ?? '0')
+        : null;
+    }
+    const commercial = this.buildCommercialExtras(
+      instance,
+      sold,
+      soldByCabin,
+      fareRules,
+      lockedSeats,
+      routeAgencyPriceIrr,
+    );
+    const priceHistory = await this.priceChangeHistory(id);
     return {
       ...this.baseRow(instance, sold),
       derivedStatus: this.derivedStatus(
@@ -642,6 +874,8 @@ export class FlightsService {
       aircraftType: resolveAircraftType(instance),
       aiSuggestion:
         instance.aiSuggestion as unknown as PersistedAiSuggestion | null,
+      ...commercial,
+      priceHistory,
     };
   }
 
@@ -1863,5 +2097,75 @@ export class FlightsService {
     });
 
     return { success: true };
+  }
+
+  async patchCommercialPanelSettings(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    dto: Partial<CommercialPanelSettings>,
+  ) {
+    const instance = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .where('fi.id = :id', { id: instanceId })
+      .getOne();
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یافت نشد.',
+      });
+    }
+    const previous = parseCommercialPanelSettings(
+      instance.commercialPanelSettings,
+    );
+    const merged = mergeCommercialPanelSettings(
+      instance.commercialPanelSettings,
+      dto,
+    );
+    instance.commercialPanelSettings = merged as unknown as typeof instance.commercialPanelSettings;
+    instance.version += 1;
+    await this.instanceRepo.save(instance);
+
+    if (previous.siteVisible !== merged.siteVisible) {
+      const visible = resolveSiteVisible(merged);
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'PRICING',
+        action: visible
+          ? 'فعال‌سازی نمایش پرواز در سایت'
+          : 'مخفی‌سازی پرواز از سایت',
+        detail: `پرواز ${instance.flight.flightNo} (${instance.flight.route.originCode}←${instance.flight.route.destCode}) توسط ${actor.fullName}.`,
+        entityType: 'FlightInstance',
+        entityId: instance.id,
+        metadata: { siteVisible: visible },
+      });
+      await this.redis.del(
+        `search:flights:${instance.flight.route.originCode.toUpperCase()}:${instance.flight.route.destCode.toUpperCase()}:${instance.departureAt.toISOString().slice(0, 10)}`,
+      );
+    }
+
+    const sold = await this.soldByInstance([instance.id]);
+    const soldByCabin = await this.soldByInstanceAndCabin([instance.id]);
+    const fareRules = await this.fareRuleRepo.find({
+      where: { flightInstanceId: instance.id },
+    });
+    const lockedSeats = await this.lockedSeatsByInstance([instance.id]);
+    let routeAgencyPriceIrr: string | null = null;
+    if (instance.scheduleTemplateId) {
+      const prices = await this.routeAgencyPriceByTemplate([
+        instance.scheduleTemplateId,
+      ]);
+      routeAgencyPriceIrr = prices.get(instance.scheduleTemplateId) ?? null;
+    }
+    return this.buildCommercialExtras(
+      instance,
+      sold.get(instance.id) ?? 0,
+      soldByCabin.get(instance.id) ?? new Map(),
+      fareRules,
+      lockedSeats.get(instance.id) ?? 0,
+      routeAgencyPriceIrr,
+    );
   }
 }

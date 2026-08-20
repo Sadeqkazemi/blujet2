@@ -9,8 +9,10 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
+import { Airport } from '../../database/entities/airport.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { AgencyRequestOtp } from '../../database/entities/agency-request-otp.entity';
 import { AgencyMembershipRequest } from '../../database/entities/agency-membership-request.entity';
@@ -53,8 +55,11 @@ import type {
   AgencyCreditRequestStatus,
   AgencyDocumentStatus,
   AgencyMembershipStatus,
+  AgencySeatRequestStatus,
   AgencyWebserviceRequestStatus,
+  AggregateInvoiceStatus,
 } from '../../database/enums';
+import { toWireAggregateInvoiceStatus } from './agency-invoice-aggregate';
 
 function generateApiKeySecret(): string {
   return `bjk_${crypto.randomBytes(32).toString('base64url')}`;
@@ -125,6 +130,10 @@ export class AgenciesService {
     private readonly auditLogRepo: Repository<AuditLog>,
     @InjectRepository(RefreshToken)
     private readonly refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(AgencySeatRequest)
+    private readonly seatRequestRepo: Repository<AgencySeatRequest>,
+    @InjectRepository(Airport)
+    private readonly airportRepo: Repository<Airport>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly notifications: NotificationsService,
@@ -1312,32 +1321,214 @@ export class AgenciesService {
     });
   }
 
-  async issueInvoice(
+  /**
+   * Cross-agency invoice aggregate for the Commercial Manager «همه فاکتورها»
+   * view. OVERDUE is preserved in the DB and never mapped to VOIDED; the
+   * UNPAID tab includes both UNPAID and OVERDUE (issued / still payable).
+   */
+  async listAggregateInvoices(status?: AggregateInvoiceStatus) {
+    const qb = this.invoiceRepo
+      .createQueryBuilder('i')
+      .innerJoinAndSelect('i.agency', 'agency')
+      .innerJoinAndSelect('agency.user', 'user')
+      .orderBy('i.issuedAt', 'DESC');
+    if (status === 'PAID') {
+      qb.andWhere('i.status = :status', { status: 'PAID' });
+    } else if (status === 'VOIDED') {
+      qb.andWhere('i.status = :status', { status: 'VOIDED' });
+    } else if (status === 'UNPAID') {
+      qb.andWhere('i.status IN (:...statuses)', {
+        statuses: ['UNPAID', 'OVERDUE'],
+      });
+    }
+    const rows = await qb.getMany();
+    return rows.map((row) => this.toAggregateInvoiceRow(row));
+  }
+
+  async listSeatRequests() {
+    const rows = await this.seatRequestRepo.find({
+      relations: {
+        invoice: true,
+        route: true,
+        flights: { flightInstance: { flight: true } },
+      },
+      order: { createdAt: 'DESC' },
+    });
+    const agencyIds = [...new Set(rows.map((row) => row.agencyId))];
+    const [profiles, users, airports] = await Promise.all([
+      agencyIds.length
+        ? this.profileRepo.find({
+            where: { userId: In(agencyIds) },
+            relations: { user: true },
+          })
+        : Promise.resolve([]),
+      agencyIds.length
+        ? this.userRepo.find({ where: { id: In(agencyIds) } })
+        : Promise.resolve([]),
+      this.airportRepo.find(),
+    ]);
+    const profileById = new Map(profiles.map((p) => [p.userId, p]));
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
+    return rows.map((row) =>
+      this.toSeatRequestRow(row, profileById, userById, cityByCode),
+    );
+  }
+
+  async decideSeatRequest(
     actor: AuthenticatedUser,
     id: string,
-    dto: { amountIrr: Irr; dueAt: string },
+    dto: { approve: boolean; dueAt?: string },
   ) {
-    await this.getProfileOrThrow(id);
-    const created = await this.invoiceRepo.save(
-      this.invoiceRepo.create({
-        agencyId: id,
-        invoiceNo: generateInvoiceNo(),
-        issuedById: actor.id,
-        dueAt: new Date(dto.dueAt),
-        amountIrr: dto.amountIrr,
-        status: 'UNPAID',
-      }),
+    const existing = await this.seatRequestRepo.findOne({
+      where: { id },
+      relations: { invoice: true },
+    });
+    if (!existing) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'درخواست صندلی یافت نشد.',
+      });
+    }
+
+    const result = await this.seatRequestRepo.manager.transaction(
+      async (tx) => {
+        const locked = await tx
+          .createQueryBuilder(AgencySeatRequest, 'r')
+          .setLock('pessimistic_write')
+          .where('r.id = :id', { id })
+          .getOne();
+        if (!locked) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'درخواست صندلی یافت نشد.',
+          });
+        }
+        const pending: AgencySeatRequestStatus[] = [
+          'PENDING',
+          'PENDING_FINANCE',
+        ];
+        if (!pending.includes(locked.status)) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'این درخواست قبلاً بررسی شده است.',
+          });
+        }
+
+        const oldStatus = locked.status;
+        if (!dto.approve) {
+          locked.status = 'REJECTED';
+          locked.decidedById = actor.id;
+          locked.decidedAt = new Date();
+          await tx.save(locked);
+          await this.cartable.resolveOpenBySource(
+            'AGENCY_REQUEST',
+            locked.id,
+            'REJECTED',
+            `رد درخواست صندلی توسط ${actor.fullName}`,
+            tx,
+          );
+          return { row: locked, invoice: null, oldStatus };
+        }
+
+        const dueAt = this.parseDueAt(dto.dueAt);
+        const totalIrr = locked.unitPriceIrr * BigInt(locked.seats);
+        const invoice = await this.issueInvoice(
+          actor,
+          locked.agencyId,
+          {
+            amountIrr: totalIrr,
+            dueAt: dueAt.toISOString(),
+            descriptionFa: 'فاکتور تعهد صندلی چارتری',
+          },
+          tx,
+        );
+        locked.status = 'APPROVED';
+        locked.invoiceId = invoice.id;
+        locked.dueAt = dueAt;
+        locked.decidedById = actor.id;
+        locked.decidedAt = new Date();
+        await tx.save(locked);
+        await this.cartable.resolveOpenBySource(
+          'AGENCY_REQUEST',
+          locked.id,
+          'APPROVED',
+          `تأیید درخواست صندلی و صدور فاکتور ${invoice.invoiceNo}`,
+          tx,
+        );
+        return { row: locked, invoice, oldStatus };
+      },
     );
 
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'AGENCY',
-      action: 'صدور فاکتور آژانس',
-      detail: `فاکتور ${created.invoiceNo} به مبلغ ${dto.amountIrr} ریال توسط ${actor.fullName} صادر شد.`,
-      entityType: 'AgencyInvoice',
-      entityId: created.id,
+      action: dto.approve
+        ? 'تأیید درخواست خرید صندلی آژانس'
+        : 'رد درخواست خرید صندلی آژانس',
+      detail: `وضعیت درخواست صندلی از ${result.oldStatus} به ${result.row.status} توسط ${actor.fullName} تغییر کرد.${result.invoice ? ` فاکتور ${result.invoice.invoiceNo}.` : ''}`,
+      entityType: 'AgencySeatRequest',
+      entityId: result.row.id,
+      metadata: {
+        oldStatus: result.oldStatus,
+        newStatus: result.row.status,
+        invoiceId: result.invoice?.id ?? null,
+        invoiceNo: result.invoice?.invoiceNo ?? null,
+      },
     });
+    if (result.invoice) {
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'AGENCY',
+        action: 'صدور فاکتور از درخواست صندلی',
+        detail: `فاکتور ${result.invoice.invoiceNo} از روی درخواست صندلی صادر شد.`,
+        entityType: 'AgencyInvoice',
+        entityId: result.invoice.id,
+        metadata: { seatRequestId: result.row.id },
+      });
+    }
+
+    return {
+      id: result.row.id,
+      status: result.row.status as 'APPROVED' | 'REJECTED',
+    };
+  }
+
+  async issueInvoice(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: { amountIrr: Irr; dueAt: string; descriptionFa?: string },
+    manager?: EntityManager,
+  ) {
+    await this.getProfileOrThrow(id);
+    const invoiceRepo = manager
+      ? manager.getRepository(AgencyInvoice)
+      : this.invoiceRepo;
+    const created = await invoiceRepo.save(
+      invoiceRepo.create({
+        agencyId: id,
+        invoiceNo: generateInvoiceNo(),
+        issuedById: actor.id,
+        dueAt: new Date(dto.dueAt),
+        amountIrr: dto.amountIrr,
+        descriptionFa: dto.descriptionFa ?? null,
+        status: 'UNPAID',
+      }),
+    );
+
+    if (!manager) {
+      await this.audit.record({
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'AGENCY',
+        action: 'صدور فاکتور آژانس',
+        detail: `فاکتور ${created.invoiceNo} به مبلغ ${dto.amountIrr} ریال توسط ${actor.fullName} صادر شد.`,
+        entityType: 'AgencyInvoice',
+        entityId: created.id,
+      });
+    }
 
     return created;
   }
@@ -1750,5 +1941,83 @@ export class AgenciesService {
         file: { fileName: true, sizeBytes: true, mimeType: true },
       },
     });
+  }
+
+  private toAggregateInvoiceRow(
+    row: AgencyInvoice & { agency?: { user?: { fullName: string } } },
+  ) {
+    const status = toWireAggregateInvoiceStatus(row.status);
+    return {
+      id: row.id,
+      invoiceNo: row.invoiceNo,
+      agencyId: row.agencyId,
+      agencyName: row.agency?.user?.fullName ?? '',
+      descriptionFa: row.descriptionFa?.trim() || 'فاکتور آژانس',
+      issuedAt: row.issuedAt.toISOString(),
+      amountIrr: row.amountIrr.toString(),
+      status,
+    };
+  }
+
+  private toSeatRequestRow(
+    row: AgencySeatRequest,
+    profileById: Map<string, AgencyProfile>,
+    userById: Map<string, User>,
+    cityByCode: Map<string, string>,
+  ) {
+    const profile = profileById.get(row.agencyId);
+    const user = userById.get(row.agencyId);
+    const origin = row.route?.originCode;
+    const dest = row.route?.destCode;
+    const originFa = origin ? (cityByCode.get(origin) ?? origin) : '';
+    const destFa = dest ? (cityByCode.get(dest) ?? dest) : '';
+    const routeFa =
+      originFa && destFa
+        ? `${originFa} - ${destFa}`
+        : origin && dest
+          ? `${origin} - ${dest}`
+          : '—';
+    const months = (row.termMonths ?? 1) as 1 | 3 | 6 | 12;
+    return {
+      id: row.id,
+      agencyId: row.agencyId,
+      agencyName: profile?.user.fullName ?? user?.fullName ?? '',
+      managerName: profile?.managerName ?? user?.fullName ?? '',
+      phone: profile?.phone ?? user?.phone ?? '',
+      city: profile?.city ?? '',
+      licenseNo: profile?.licenseNo ?? '',
+      routeFa,
+      seats: row.seats,
+      months,
+      aircraftType: row.aircraftType,
+      unitPriceIrr: row.unitPriceIrr.toString(),
+      totalIrr: (row.unitPriceIrr * BigInt(row.seats)).toString(),
+      payMethod: row.payMethod,
+      status: row.status,
+      invoiceNo: row.invoice?.invoiceNo ?? null,
+      dueAt: row.dueAt?.toISOString() ?? null,
+      flights: (row.flights ?? []).map((flight) => {
+        const departure = flight.flightInstance?.departureAt;
+        return {
+          flightNo: flight.flightInstance?.flight.flightNo ?? '',
+          date: departure ? departure.toISOString().slice(0, 10) : '',
+          time: departure ? departure.toISOString().slice(11, 16) : '',
+        };
+      }),
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  private parseDueAt(raw?: string) {
+    const dueAt = raw
+      ? new Date(raw)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(dueAt.getTime())) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'تاریخ مهلت پرداخت نامعتبر است.',
+      });
+    }
+    return dueAt;
   }
 }

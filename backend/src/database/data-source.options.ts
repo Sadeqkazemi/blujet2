@@ -1,6 +1,8 @@
 import type { DataSourceOptions } from 'typeorm';
 import { AgencyAllotment } from './entities/agency-allotment.entity';
 import { AgencySeatCommitment } from './entities/agency-seat-commitment.entity';
+import { AgencySeatRequest } from './entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from './entities/agency-seat-request-flight.entity';
 import { AgencyApiKey } from './entities/agency-api-key.entity';
 import { AgencyCreditLine } from './entities/agency-credit-line.entity';
 import { AgencyCreditRequest } from './entities/agency-credit-request.entity';
@@ -17,6 +19,7 @@ import { AircraftDefinition } from './entities/aircraft-definition.entity';
 import { AircraftSeat } from './entities/aircraft-seat.entity';
 import { AircraftSeatMap } from './entities/aircraft-seat-map.entity';
 import { Airport } from './entities/airport.entity';
+import { AncillaryService } from './entities/ancillary-service.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { BackupRecord } from './entities/backup-record.entity';
 import { BlogPost } from './entities/blog-post.entity';
@@ -108,6 +111,8 @@ export const dataSourceOptions: DataSourceOptions = {
   entities: [
     AgencyAllotment,
     AgencySeatCommitment,
+    AgencySeatRequest,
+    AgencySeatRequestFlight,
     AgencyApiKey,
     AgencyCreditLine,
     AgencyCreditRequest,
@@ -124,6 +129,7 @@ export const dataSourceOptions: DataSourceOptions = {
     AircraftSeat,
     AircraftSeatMap,
     Airport,
+    AncillaryService,
     AuditLog,
     BackupRecord,
     BlogPost,

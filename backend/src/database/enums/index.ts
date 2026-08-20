@@ -256,9 +256,49 @@ export const AgencyInvoiceStatus = {
   UNPAID: 'UNPAID',
   PAID: 'PAID',
   OVERDUE: 'OVERDUE',
+  VOIDED: 'VOIDED',
 } as const;
 export type AgencyInvoiceStatus =
   (typeof AgencyInvoiceStatus)[keyof typeof AgencyInvoiceStatus];
+
+/** Manager aggregate invoice tabs. OVERDUE is never mapped to VOIDED;
+ * it serializes as UNPAID (issued / still payable). */
+export const AggregateInvoiceStatus = {
+  UNPAID: 'UNPAID',
+  PAID: 'PAID',
+  VOIDED: 'VOIDED',
+} as const;
+export type AggregateInvoiceStatus =
+  (typeof AggregateInvoiceStatus)[keyof typeof AggregateInvoiceStatus];
+
+export const AgencySeatRequestStatus = {
+  PENDING: 'PENDING',
+  PENDING_FINANCE: 'PENDING_FINANCE',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+export type AgencySeatRequestStatus =
+  (typeof AgencySeatRequestStatus)[keyof typeof AgencySeatRequestStatus];
+
+export const AgencySeatRequestPayMethod = {
+  CREDIT: 'CREDIT',
+  INVOICE: 'INVOICE',
+} as const;
+export type AgencySeatRequestPayMethod =
+  (typeof AgencySeatRequestPayMethod)[keyof typeof AgencySeatRequestPayMethod];
+
+/** Accepted `termMonths` values: union of the legacy agency-portal contract
+ * (3|6|12) and the commercial UI (1|3|12). Persisted as smallint. */
+export const AGENCY_SEAT_REQUEST_TERM_MONTHS = [1, 3, 6, 12] as const;
+export type AgencySeatRequestTermMonths =
+  (typeof AGENCY_SEAT_REQUEST_TERM_MONTHS)[number];
+
+export const AncillaryServiceCategory = {
+  SEAT: 'SEAT',
+  OTHER: 'OTHER',
+} as const;
+export type AncillaryServiceCategory =
+  (typeof AncillaryServiceCategory)[keyof typeof AncillaryServiceCategory];
 
 export const AgencyCreditRequestStatus = {
   PENDING: 'PENDING',

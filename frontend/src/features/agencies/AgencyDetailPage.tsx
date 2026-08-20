@@ -27,6 +27,8 @@ import { faDigits, faMoney, parseTomanToRial } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '../../lib/jalali';
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
+import JalaliDatePicker from '../../components/JalaliDatePicker';
+import { fetchAggregateSeatRequests } from '../../api/agencies';
 import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
@@ -35,10 +37,18 @@ import type {
   AgencyDocument,
   AgencyInvoice,
   AgencyMessage,
+  AgencySeatRequestRow,
 } from '../../types/agencies';
 import type { AgencyCreditRequest, AgencyWebserviceRequest } from '../../types/agency-portal';
 
-type CommercialTab = 'overview' | 'finance' | 'messages';
+type CommercialTab = 'overview' | 'finance' | 'messages' | 'history';
+
+const SEAT_REQUEST_HISTORY_STATUS_LABEL: Record<AgencySeatRequestRow['status'], { label: string; color: string; bg: string }> = {
+  PENDING: { label: 'در انتظار بررسی', color: '#f59e0b', bg: 'rgba(245,158,11,.14)' },
+  PENDING_FINANCE: { label: 'در انتظار مالی', color: '#a78bfa', bg: 'rgba(167,139,250,.14)' },
+  APPROVED: { label: 'تأیید شده', color: '#34d399', bg: 'rgba(52,211,153,.14)' },
+  REJECTED: { label: 'رد شده', color: '#f87171', bg: 'rgba(248,113,113,.14)' },
+};
 
 const API_SCOPE_OPTIONS: { value: AgencyApiScope; label: string }[] = [
   { value: 'FULL', label: 'کامل (جستجو + رزرو + صدور)' },
@@ -121,6 +131,28 @@ export default function AgencyDetailPage() {
   const [creditRequests, setCreditRequests] = useState<AgencyCreditRequest[]>([]);
   const [webserviceRequests, setWebserviceRequests] = useState<AgencyWebserviceRequest[]>([]);
   const [requestError, setRequestError] = useState<string | null>(null);
+
+  // History tab (design: HISTORY TAB). Payment history reuses the real
+  // extras.transactions ledger data. Seat-request history uses
+  // GET /agencies/seat-requests filtered by this agency.
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [historyDate, setHistoryDate] = useState<string | null>(null);
+  const [seatRequestHistory, setSeatRequestHistory] = useState<AgencySeatRequestRow[]>([]);
+
+  useEffect(() => {
+    if (role !== 'COMMERCIAL_MANAGER') return;
+    let cancelled = false;
+    fetchAggregateSeatRequests()
+      .then((rows) => {
+        if (!cancelled) setSeatRequestHistory(rows.filter((r) => r.agencyId === agencyId));
+      })
+      .catch(() => {
+        if (!cancelled) setSeatRequestHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [role, agencyId]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -1017,6 +1049,96 @@ export default function AgencyDetailPage() {
     </SectionCard>
   );
 
+  const filteredHistoryTransactions = (extras?.transactions ?? []).filter((t) => {
+    const q = historyQuery.trim();
+    if (q && !t.titleFa.includes(q) && !(t.ref ?? '').includes(q)) return false;
+    if (historyDate && !t.occurredAt.startsWith(historyDate.slice(0, 10))) return false;
+    return true;
+  });
+
+  const filteredSeatRequestHistory = seatRequestHistory.filter((r) => {
+    const q = historyQuery.trim();
+    if (q && !r.routeFa.includes(q)) return false;
+    if (historyDate && !r.createdAt.startsWith(historyDate.slice(0, 10))) return false;
+    return true;
+  });
+
+  const historyContent = (
+    <div className="flex flex-col gap-[15px]">
+      <div className="flex flex-wrap gap-[9px]">
+        <input
+          value={historyQuery}
+          onChange={(e) => setHistoryQuery(e.target.value)}
+          placeholder="جستجو در سابقه بر اساس مسیر یا شماره…"
+          className="h-11 min-w-[220px] flex-1 rounded-[11px] border border-panel-border-2 bg-panel-canvas px-3.5 text-xs text-panel-ink outline-none transition focus:border-accent"
+        />
+        <div className="h-11 overflow-hidden rounded-[11px] border border-panel-border-2 bg-panel-surface-2">
+          <JalaliDatePicker label="تاریخ" value={historyDate} onChange={setHistoryDate} theme="dark" compact placeholder="انتخاب تاریخ" />
+        </div>
+        {historyDate && (
+          <button onClick={() => setHistoryDate(null)} className="px-1 text-[11px] font-bold text-accent">
+            پاک‌کردن تاریخ
+          </button>
+        )}
+      </div>
+
+      <SectionCard
+        title="سابقهٔ درخواست‌های خرید صندلی"
+        action={<span className="rounded-xl bg-panel-canvas px-2 py-0.5 text-[10.5px] font-bold text-panel-muted">{faDigits(filteredSeatRequestHistory.length)}</span>}
+      >
+        {filteredSeatRequestHistory.length === 0 ? (
+          <p className="py-4 text-center text-xs text-panel-muted">درخواستی یافت نشد.</p>
+        ) : (
+          <div className="flex flex-col">
+            {filteredSeatRequestHistory.map((r) => {
+              const st = SEAT_REQUEST_HISTORY_STATUS_LABEL[r.status];
+              return (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2.5 border-b border-panel-border/60 py-2.5 last:border-b-0">
+                  <div>
+                    <div className="text-xs font-extrabold text-panel-ink">{r.routeFa}</div>
+                    <div className="mt-0.5 text-[10.5px] text-panel-muted">
+                      {faDigits(r.seats)} صندلی · {faDigits(r.months)} ماهه · {faMoney(r.totalIrr)} تومان
+                    </div>
+                  </div>
+                  <span className="rounded-2xl px-2.5 py-1 text-[10px] font-bold" style={{ color: st.color, background: st.bg }}>
+                    {st.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard
+        title="تاریخچهٔ پرداخت"
+        action={<span className="rounded-xl bg-panel-canvas px-2 py-0.5 text-[10.5px] font-bold text-panel-muted">{faDigits(filteredHistoryTransactions.length)}</span>}
+      >
+        {filteredHistoryTransactions.length === 0 ? (
+          <p className="py-4 text-center text-xs text-panel-muted">پرداختی یافت نشد.</p>
+        ) : (
+          <div className="flex flex-col">
+            {filteredHistoryTransactions.map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-3 border-b border-panel-border/60 py-2.5 last:border-b-0">
+                <div>
+                  <div className="text-xs font-bold text-panel-ink">{t.titleFa}</div>
+                  <div className="mt-0.5 text-[10.5px] text-panel-muted">
+                    {formatJalaliDateTime(t.occurredAt)}
+                    {t.ref ? ` · PNR ${t.ref}` : ''}
+                  </div>
+                </div>
+                <span className={`font-num text-xs font-extrabold ${t.signedAmountIrr >= 0 ? 'text-[#34d399]' : 'text-danger'}`}>
+                  {t.signedAmountIrr >= 0 ? '+' : ''}
+                  {faMoney(Math.abs(t.signedAmountIrr))} تومان
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+    </div>
+  );
+
   const overviewContent = (
     <div className="space-y-4">
       {statsRow}
@@ -1080,6 +1202,7 @@ export default function AgencyDetailPage() {
                 { key: 'overview', label: 'نمای کلی' },
                 { key: 'finance', label: 'مالی' },
                 { key: 'messages', label: 'مکاتبه‌ها' },
+                { key: 'history', label: 'سابقه' },
               ] as { key: CommercialTab; label: string }[]
             ).map((t) => (
               <button
@@ -1116,6 +1239,7 @@ export default function AgencyDetailPage() {
             </div>
           )}
           {tab === 'messages' && messagesSection}
+          {tab === 'history' && historyContent}
         </>
       ) : (
         overviewContent

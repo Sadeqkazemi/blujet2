@@ -70,11 +70,27 @@ export default function ScheduleTemplatesTab() {
   const [busy, setBusy] = useState(false);
   const [deactivateRow, setDeactivateRow] =
     useState<ScheduleTemplateRow | null>(null);
+  const [routeTab, setRouteTab] = useState<"active" | "history">("active");
+  const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
+  const [routePreviews, setRoutePreviews] = useState<
+    Record<string, ScheduleTemplatePreview>
+  >({});
+  const [previewBusyId, setPreviewBusyId] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAircraft = aircraft.find(
     (row) => row.id === form.aircraftDefinitionId,
   );
+
+  const activeRoutes = useMemo(
+    () => (items ?? []).filter((row) => row.status === "ACTIVE"),
+    [items],
+  );
+  const historyRoutes = useMemo(
+    () => (items ?? []).filter((row) => row.status === "DEACTIVATED"),
+    [items],
+  );
+  const visibleRoutes = routeTab === "active" ? activeRoutes : historyRoutes;
 
   const load = useCallback(async () => {
     const result = await fetchScheduleTemplates();
@@ -218,6 +234,47 @@ export default function ScheduleTemplatesTab() {
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  function weekdayLabels(days: number[]) {
+    return days
+      .map((day) => WEEKDAYS.find(([value]) => value === day)?.[1])
+      .filter(Boolean)
+      .join("، ");
+  }
+
+  async function toggleRouteExpand(row: ScheduleTemplateRow) {
+    if (expandedRouteId === row.id) {
+      setExpandedRouteId(null);
+      return;
+    }
+    setExpandedRouteId(row.id);
+    if (routePreviews[row.id]) return;
+    setPreviewBusyId(row.id);
+    setError(null);
+    try {
+      const previewPayload: ScheduleTemplatePayload = {
+        originAirportId: row.originAirportId,
+        destinationAirportId: row.destinationAirportId,
+        flightNoBase: row.flightNoBase,
+        aircraftDefinitionId: row.aircraftDefinitionId,
+        departureTime: row.departureTime,
+        durationMinutes: row.durationMinutes,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        weekdays: row.weekdays,
+        agencyPriceIrr: row.agencyPriceIrr,
+        legalCeilingIrr: row.legalCeilingIrr,
+      };
+      const result = await previewScheduleTemplate(previewPayload);
+      setRoutePreviews((current) => ({ ...current, [row.id]: result }));
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "دریافت تاریخ‌های پرواز انجام نشد.",
+      );
+    } finally {
+      setPreviewBusyId(null);
     }
   }
 
@@ -492,20 +549,43 @@ export default function ScheduleTemplatesTab() {
         </form>
       </section>
       <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
-        <h2 className="mb-4 text-sm font-black text-panel-ink">
-          مسیرهای پروازی تعریف‌شده
-        </h2>
+        <div className="mb-4 flex gap-2 rounded-xl border border-panel-border bg-panel-canvas p-1">
+          <button
+            type="button"
+            onClick={() => setRouteTab("active")}
+            className={`flex-1 rounded-lg px-3 py-2 text-center text-xs font-bold transition ${
+              routeTab === "active"
+                ? "bg-accent text-white"
+                : "text-panel-muted hover:text-panel-ink"
+            }`}
+          >
+            مسیرهای پروازی فعال ({faDigits(activeRoutes.length)})
+          </button>
+          <button
+            type="button"
+            onClick={() => setRouteTab("history")}
+            className={`flex-1 rounded-lg px-3 py-2 text-center text-xs font-bold transition ${
+              routeTab === "history"
+                ? "bg-accent text-white"
+                : "text-panel-muted hover:text-panel-ink"
+            }`}
+          >
+            تاریخچه پرواز ({faDigits(historyRoutes.length)})
+          </button>
+        </div>
         {items === null ? (
           <p className="py-6 text-center text-xs text-panel-muted">
             در حال بارگذاری…
           </p>
-        ) : items.length === 0 ? (
+        ) : visibleRoutes.length === 0 ? (
           <p className="py-6 text-center text-xs text-panel-muted">
-            هنوز مسیر پروازی تعریف نشده است.
+            {routeTab === "history"
+              ? "هنوز هیچ مسیر پروازی به پایان نرسیده است."
+              : "هنوز مسیر پروازی فعالی تعریف نشده است."}
           </p>
         ) : (
           <div className="flex flex-col gap-3">
-            {items.map((row) => (
+            {visibleRoutes.map((row) => (
               <article
                 key={row.id}
                 className="rounded-xl border border-panel-border bg-panel-surface-2 p-4"
@@ -528,15 +608,55 @@ export default function ScheduleTemplatesTab() {
                     {row.status === "ACTIVE" ? "فعال" : "غیرفعال"}
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-panel-muted">
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-panel-muted">
                   <span>
                     {formatJalaliDate(row.startDate)} تا{" "}
                     {formatJalaliDate(row.endDate)}
                   </span>
-                  <span>{faDigits(row.weekdays.length)} روز در هفته</span>
+                  <span>{weekdayLabels(row.weekdays)}</span>
                   <span>{faDigits(row.capacity)} صندلی</span>
-                  <span>{faMoney(row.agencyPriceIrr)} تومان</span>
+                  <span className="rounded-md bg-[#8b5cf624] px-2 py-0.5 font-bold text-[#a78bfa]">
+                    وب‌سرویس: {faMoney(row.agencyPriceIrr)} تومان
+                  </span>
+                  {row.instanceCount != null && (
+                    <span className="rounded-md bg-panel-canvas px-2 py-0.5">
+                      {faDigits(row.instanceCount)} پرواز ثبت‌شده
+                    </span>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void toggleRouteExpand(row)}
+                  className="mt-3 text-xs font-bold text-accent"
+                >
+                  {expandedRouteId === row.id
+                    ? "بستن تاریخ‌های پرواز"
+                    : previewBusyId === row.id
+                      ? "در حال بارگذاری…"
+                      : "مشاهده تاریخ‌های پرواز"}
+                </button>
+                {expandedRouteId === row.id && routePreviews[row.id] && (
+                  <div className="mt-3 rounded-lg border border-panel-border bg-panel-canvas p-3">
+                    <div className="mb-2 text-[11px] font-bold text-panel-ink">
+                      {faDigits(routePreviews[row.id].occurrenceCount)} پرواز در این بازه
+                    </div>
+                    <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto">
+                      {routePreviews[row.id].dates.slice(0, 24).map((dateRow) => (
+                        <span
+                          key={dateRow.departureAt}
+                          className="rounded-md bg-panel-surface px-2 py-1 font-num text-[10px] text-panel-muted"
+                        >
+                          {formatJalaliDate(dateRow.localDate)}
+                        </span>
+                      ))}
+                      {routePreviews[row.id].dates.length > 24 && (
+                        <span className="text-[10px] text-panel-muted">
+                          +{faDigits(routePreviews[row.id].dates.length - 24)} تاریخ دیگر
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {row.status === "ACTIVE" && (
                   <button
                     type="button"

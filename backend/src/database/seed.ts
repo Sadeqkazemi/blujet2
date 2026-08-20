@@ -57,6 +57,8 @@ import {
 import { AgencyApiKey } from './entities/agency-api-key.entity';
 import { AgencyCreditLine } from './entities/agency-credit-line.entity';
 import { AgencyInvoice } from './entities/agency-invoice.entity';
+import { AncillaryService } from './entities/ancillary-service.entity';
+import { TravelExtraSetting } from './entities/travel-extra-setting.entity';
 import { AgencyMembershipRequest } from './entities/agency-membership-request.entity';
 import { AgencyMessage } from './entities/agency-message.entity';
 import { AgencyProfile } from './entities/agency-profile.entity';
@@ -104,6 +106,7 @@ import { SurveyQuestion } from './entities/survey-question.entity';
 import { SurveySettings } from './entities/survey-settings.entity';
 import { User } from './entities/user.entity';
 import type { JsonValue } from './json-types';
+import { ANCILLARY_BUILT_IN_SERVICES } from '../modules/ancillary-services/ancillary-services.catalog';
 
 const dataSource = new DataSource(dataSourceOptions);
 
@@ -228,6 +231,8 @@ async function main() {
   const agencyCreditLineRepo = dataSource.getRepository(AgencyCreditLine);
   const agencyApiKeyRepo = dataSource.getRepository(AgencyApiKey);
   const agencyInvoiceRepo = dataSource.getRepository(AgencyInvoice);
+  const ancillaryRepo = dataSource.getRepository(AncillaryService);
+  const travelExtraRepo = dataSource.getRepository(TravelExtraSetting);
   const agencyMessageRepo = dataSource.getRepository(AgencyMessage);
   const agencyMembershipRequestRepo = dataSource.getRepository(
     AgencyMembershipRequest,
@@ -643,6 +648,38 @@ async function main() {
       status: AgencyInvoiceStatus.OVERDUE,
     },
   );
+
+  for (const seed of ANCILLARY_BUILT_IN_SERVICES) {
+    await upsertBy(
+      ancillaryRepo,
+      { key: seed.key },
+      {
+        key: seed.key,
+        category: seed.category,
+        titleFa: seed.titleFa,
+        descriptionFa: seed.descriptionFa,
+        priceIrr: seed.priceIrr,
+        enabled: seed.enabled,
+        isCustom: false,
+      },
+    );
+    if (seed.travelExtra) {
+      await upsertBy(
+        travelExtraRepo,
+        { code: seed.travelExtra.code },
+        {
+          code: seed.travelExtra.code,
+          titleFa: seed.titleFa,
+          descriptionFa: seed.descriptionFa,
+          billingUnit: seed.travelExtra.billingUnit,
+          priceIrr: seed.priceIrr,
+          active: seed.enabled,
+          purchaseEnabled: seed.enabled,
+          sortOrder: 0,
+        },
+      );
+    }
+  }
 
   for (const m of [
     {

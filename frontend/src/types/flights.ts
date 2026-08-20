@@ -54,6 +54,68 @@ export interface FlightDefinitionSnapshot {
   chargeRules: ChargeRule[];
 }
 
+export interface CommercialClassBreakdownRow {
+  label: string;
+  cabin: CabinKind;
+  classCode?: string;
+  capacity: number;
+  sold: number;
+}
+
+export interface AgencyReleaseClassSettings {
+  seats: number;
+  priceIrr: string;
+  special?: boolean;
+}
+
+export interface FlightPriceHistoryRow {
+  id: string;
+  previousPriceIrr: string;
+  salePriceIrr: string;
+  reason: string;
+  actorName: string;
+  createdAt: string;
+}
+
+export interface FlightCommercialFields {
+  siteVisible: boolean;
+  classBreakdown: CommercialClassBreakdownRow[];
+  agencyReleaseSeats: number;
+  lockedSeats: number;
+  routeAgencyPriceIrr: string | null;
+  classSitePrices: Record<string, string>;
+  agencyRelease: Record<string, AgencyReleaseClassSettings>;
+}
+
+export interface FareClassPriceHistory {
+  previousPriceIrr: string;
+  newPriceIrr: string;
+  reason: string;
+  changedAt: string;
+}
+
+export interface CommercialFareClassControl {
+  ruleId: string;
+  cabin: CabinKind;
+  classCode: string;
+  seatsAllocated: number;
+  soldSeats: number;
+  remainingSeats: number;
+  revenueIrr: string;
+  basePriceIrr: string;
+  sitePriceIrr: string | null;
+  agencySeatsReleased: number;
+  agencyReleasePriceIrr: string | null;
+  agencySpecialOffer: boolean;
+  priceHistory: FareClassPriceHistory[];
+}
+
+export interface CommercialFlightControl {
+  flightInstanceId: string;
+  publicSaleEnabled: boolean;
+  fareClasses: CommercialFareClassControl[];
+}
+
 export interface FlightRow {
   id: string;
   flightNo: string;
@@ -66,7 +128,6 @@ export interface FlightRow {
   // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON
   // on the backend — a JS number can't safely hold IRR amounts above 2^53).
   basePriceIrr: string | null;
-  publicSaleEnabled?: boolean;
   derivedStatus: DerivedFlightStatus;
   durationMinutes?: number;
   cabinCapacities?: CabinCapacity[];
@@ -88,6 +149,14 @@ export interface FlightRow {
     windowHours: number;
     reasonFa: string;
   };
+  siteVisible?: boolean;
+  publicSaleEnabled?: boolean;
+  classBreakdown?: CommercialClassBreakdownRow[];
+  agencyReleaseSeats?: number;
+  lockedSeats?: number;
+  routeAgencyPriceIrr?: string | null;
+  classSitePrices?: Record<string, string>;
+  agencyRelease?: Record<string, AgencyReleaseClassSettings>;
 }
 
 export interface FlightAiSuggestion {
@@ -158,6 +227,7 @@ export interface FlightDetail extends FlightRow {
   totalRevenueIrr: string;
   occupancyPct: number;
   aircraftType: string;
+  priceHistory?: FlightPriceHistoryRow[];
 }
 
 export interface AircraftTypeOption {
@@ -210,35 +280,6 @@ export interface FareRuleRow {
   validFrom: string | null;
   validUntil: string | null;
   allowedChannels: ("SYSTEM" | "CHARTER" | "AGENCY")[];
-}
-
-export interface FareClassPriceHistory {
-  previousPriceIrr: string;
-  newPriceIrr: string;
-  reason: string;
-  changedAt: string;
-}
-
-export interface CommercialFareClassControl {
-  ruleId: string;
-  cabin: CabinKind;
-  classCode: string;
-  seatsAllocated: number;
-  soldSeats: number;
-  remainingSeats: number;
-  revenueIrr: string;
-  basePriceIrr: string;
-  sitePriceIrr: string | null;
-  agencySeatsReleased: number;
-  agencyReleasePriceIrr: string | null;
-  agencySpecialOffer: boolean;
-  priceHistory: FareClassPriceHistory[];
-}
-
-export interface CommercialFlightControl {
-  flightInstanceId: string;
-  publicSaleEnabled: boolean;
-  fareClasses: CommercialFareClassControl[];
 }
 
 export interface CreateFareRulePayload {
