@@ -29,6 +29,9 @@ import { AgenciesModule } from '../agencies/agencies.module';
 import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
 import { ItWebservicesController } from './it-webservices.controller';
 import { ItWebservicesService } from './it-webservices.service';
 
@@ -49,6 +52,9 @@ import { ItWebservicesService } from './it-webservices.service';
       AgencyApiKey,
       AgencyProfile,
       AgencyWebserviceRequest,
+      FlightInstance,
+      Passenger,
+      AircraftSeatMap,
     ]),
     AuditModule,
     NotificationsModule,

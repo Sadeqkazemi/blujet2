@@ -148,7 +148,8 @@ export interface AgencyApiAccessRow {
   initials: string;
   keyHint: string;
   callCount: number;
-  status: 'ACTIVE' | 'SUSPENDED';
+  lastUsedAt: string | null;
+  status: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
 }
 
 export type ReservationFlightStatusKey = 'SELLING' | 'NEAR_FULL' | 'FULL';

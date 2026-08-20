@@ -46,6 +46,22 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Atomic increment with TTL on first write. Returns null when Redis is
+   * unavailable so callers can degrade (e.g. skip per-key rate limits).
+   */
+  async incrWithTtl(key: string, ttlSeconds: number): Promise<number | null> {
+    try {
+      const count = await this.client.incr(key);
+      if (count === 1) {
+        await this.client.expire(key, ttlSeconds);
+      }
+      return count;
+    } catch {
+      return null;
+    }
+  }
+
   async onModuleDestroy() {
     await this.client.quit().catch(() => undefined);
   }

@@ -32,6 +32,10 @@ views. Existing production booking, agency and partner-API rules still apply.
 - [x] Raw issued/rotated keys are shown once in a copyable modal.
 - [x] Client list supports agency search and shows scope, status, last use and
       real accumulated call count without inventing an error rate.
+- [x] Client policy fields: capabilities, environment, flightDomain, IP
+      whitelist, rate limit, expiry — editable from IT settings modal; partner
+      guard enforces IP + per-key rate limit.
+- [x] Availability tester endpoint mirrors the AVAILABILITY capability gate.
 
 ### Verification mapping
 

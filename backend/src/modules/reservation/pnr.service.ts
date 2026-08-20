@@ -167,6 +167,9 @@ export class PnrService {
         { q: `%${query.q}%` },
       );
     }
+    if (query.status) {
+      qb.andWhere('b.status = :status', { status: query.status });
+    }
     const bookings = await qb.getMany();
 
     const bookingIds = bookings.map((b) => b.id);
@@ -956,6 +959,7 @@ export class PnrService {
         // Raw key is never stored — only an opaque hint from the key id.
         keyHint: `bjk_••••${k.id.replace(/-/g, '').slice(0, 4)}`,
         callCount: k.callCount,
+        lastUsedAt: k.lastUsedAt,
         status: k.status,
       };
     });

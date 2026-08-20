@@ -40,9 +40,12 @@ export function releaseLock(lockId: string) {
   return apiPatch<SeatLockView>(`/reservation/seatmap/locks/${lockId}/release`);
 }
 
-export function fetchPnrList(q?: string) {
-  const qs = q ? `?q=${encodeURIComponent(q)}` : '';
-  return apiGet<PnrGroup[]>(`/reservation/pnr${qs}`);
+export function fetchPnrList(q?: string, status?: string) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (status) params.set('status', status);
+  const qs = params.toString();
+  return apiGet<PnrGroup[]>(`/reservation/pnr${qs ? `?${qs}` : ''}`);
 }
 
 export function fetchPnrDetail(pnr: string) {
