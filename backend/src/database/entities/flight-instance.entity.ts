@@ -112,6 +112,10 @@ export class FlightInstance {
   @Column({ type: 'bigint', nullable: true, transformer: bigintTransformer })
   competitorPriceIrr!: bigint | null;
 
+  /** Commercial manager panel: site visibility, per-class site prices, agency releases. */
+  @Column({ type: 'jsonb', nullable: true })
+  commercialPanelSettings!: JsonValue | null;
+
   /**
    * Per-cabin capacities: [{ cabin, seats }]. COMFORT is independent of ECONOMY.
    * Null on legacy rows (pre-definition migration).

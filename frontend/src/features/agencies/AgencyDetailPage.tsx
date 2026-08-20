@@ -28,7 +28,7 @@ import { formatJalaliDate, formatJalaliDateTime, parseJalaliDateToIso } from '..
 import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
-import { fetchAggregateSeatRequests } from '../../api/agencies-mock';
+import { fetchAggregateSeatRequests } from '../../api/agencies';
 import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
@@ -133,8 +133,8 @@ export default function AgencyDetailPage() {
   const [requestError, setRequestError] = useState<string | null>(null);
 
   // History tab (design: HISTORY TAB). Payment history reuses the real
-  // extras.transactions ledger data (see below). Seat-request history has
-  // no backend source yet — temp mock, see api/agencies-mock.ts.
+  // extras.transactions ledger data. Seat-request history uses
+  // GET /agencies/seat-requests filtered by this agency.
   const [historyQuery, setHistoryQuery] = useState('');
   const [historyDate, setHistoryDate] = useState<string | null>(null);
   const [seatRequestHistory, setSeatRequestHistory] = useState<AgencySeatRequestRow[]>([]);

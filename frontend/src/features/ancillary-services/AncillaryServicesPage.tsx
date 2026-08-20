@@ -10,7 +10,7 @@ import {
   setSeatServicePrice,
   toggleOtherService,
   toggleSeatService,
-} from '../../api/ancillary-services-mock';
+} from '../../api/ancillary-services';
 import { faDigits, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import type { AncillaryServiceRow, SeatServiceRow } from '../../types/ancillary-services';
 
@@ -111,10 +111,7 @@ function ServiceRow({
 }
 
 /**
- * Design: SERVICES (per-service pricing) — «خدمات». Entirely TEMP MOCK,
- * no backend module exists for ancillary services pricing yet (see
- * api/ancillary-services-mock.ts / docs/API.md). Nav entry is also
- * temporary — see PanelShell.tsx's ANCILLARY_SERVICES_TEMP_NAV comment.
+ * Design: SERVICES (per-service pricing) — «خدمات».
  */
 export default function AncillaryServicesPage() {
   const { user } = useAuth();
@@ -181,9 +178,8 @@ export default function AncillaryServicesPage() {
     flash('خدمت جدید ثبت شد ✓');
   }
 
-  // This route isn't nav-gated server-side yet (see PanelShell.tsx's
-  // ANCILLARY_SERVICES_TEMP_NAV comment) — enforce the role client-side
-  // until the real GET /panels/nav entry lands.
+  // This route is TabGate-wrapped; keep a client-side role check so a
+  // direct render in tests still shows the coming-soon placeholder.
   if (user?.role !== 'COMMERCIAL_MANAGER') return <ComingSoonPage />;
 
   return (
@@ -191,15 +187,6 @@ export default function AncillaryServicesPage() {
       <div>
         <h1 className="m-0 text-[20.5px] font-black text-white">خدمات جانبی پروازی</h1>
         <p className="mt-1 text-[11.5px] text-[#6b7b94]">قیمت‌گذاری صندلی و سایر خدمات جانبی قابل ارائه به مسافران</p>
-      </div>
-
-      <div className="flex items-center gap-2 rounded-xl border border-[rgba(59,130,246,.25)] bg-[rgba(59,130,246,.08)] px-3 py-[11px] text-[11.5px] text-[#9fb0c7]">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" className="flex-none">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M12 8v5M12 16h.01" />
-        </svg>
-        این صفحه به بک‌اند واقعی متصل نیست و صرفاً برای بازبینی طرح UI است؛ تغییرات فقط در همین مرورگر ذخیره
-        می‌شود.
       </div>
 
       {notice && <p className="rounded-xl bg-[rgba(52,211,153,.12)] p-3 text-xs font-bold text-[#34d399]">{notice}</p>}

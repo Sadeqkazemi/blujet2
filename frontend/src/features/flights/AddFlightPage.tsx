@@ -239,7 +239,9 @@ export default function AddFlightPage({
   const [compToman, setCompToman] = useState("");
   const [proposedToman, setProposedToman] = useState("");
   const [legalToman, setLegalToman] = useState("");
-  const [note, setNote] = useState("");
+  const [noteCeo, setNoteCeo] = useState("");
+  const [noteOps, setNoteOps] = useState("");
+  const [noteCommercial, setNoteCommercial] = useState("");
   const [ai, setAi] = useState<AiSuggestion | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
@@ -679,6 +681,14 @@ export default function AddFlightPage({
       competitorPriceIrr: compIrr ?? undefined,
     };
 
+    const composedNote = [
+      noteCeo.trim() ? `[مدیر عامل] ${noteCeo.trim()}` : "",
+      noteOps.trim() ? `[عملیات] ${noteOps.trim()}` : "",
+      noteCommercial.trim() ? `[بازرگانی] ${noteCommercial.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     setSaving(true);
     try {
       if (isEdit && flightId) {
@@ -687,7 +697,7 @@ export default function AddFlightPage({
         await upsertProposal(flightId, {
           proposedPriceIrr: proposedIrr,
           legalRateIrr: legalIrr ?? undefined,
-          note: note.trim() || undefined,
+          note: composedNote || undefined,
         });
         await submitFlightToOperations(flightId, updated.version);
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
@@ -724,7 +734,7 @@ export default function AddFlightPage({
       await upsertProposal(created.id, {
         proposedPriceIrr: proposedIrr,
         legalRateIrr: legalIrr ?? undefined,
-        note: note.trim() || undefined,
+        note: composedNote || undefined,
       });
       await submitFlightToOperations(created.id, created.version);
 
@@ -1498,14 +1508,44 @@ export default function AddFlightPage({
                 />
               </div>
               <div className="mt-[13px]">
-                <label className={labelClass} htmlFor="af-note">
-                  یادداشت برای گردش تأیید (اختیاری)
+                <label className={labelClass} htmlFor="af-note-ceo">
+                  یادداشت برای مدیر عامل (اختیاری)
                 </label>
                 <textarea
-                  id="af-note"
+                  id="af-note-ceo"
                   placeholder="توضیح دلیل قیمت پیشنهادی…"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  value={noteCeo}
+                  onChange={(e) => setNoteCeo(e.target.value)}
+                  className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                />
+              </div>
+              <div className="mt-[13px]">
+                <label
+                  className={`${labelClass} text-[#f59e0b]`}
+                  htmlFor="af-note-ops"
+                >
+                  یادداشت برای مدیر عملیات (اختیاری)
+                </label>
+                <textarea
+                  id="af-note-ops"
+                  placeholder="توضیح نکات عملیاتی این پرواز…"
+                  value={noteOps}
+                  onChange={(e) => setNoteOps(e.target.value)}
+                  className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
+                />
+              </div>
+              <div className="mt-[13px]">
+                <label
+                  className={`${labelClass} text-[#34d399]`}
+                  htmlFor="af-note-commercial"
+                >
+                  یادداشت برای مدیر بازرگانی (اختیاری)
+                </label>
+                <textarea
+                  id="af-note-commercial"
+                  placeholder="توضیح داخلی برای پیگیری تیم بازرگانی…"
+                  value={noteCommercial}
+                  onChange={(e) => setNoteCommercial(e.target.value)}
                   className="min-h-[66px] w-full resize-y rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 py-2.5 text-[12.5px] leading-[1.8] text-[#e7ecf3] outline-none"
                 />
               </div>

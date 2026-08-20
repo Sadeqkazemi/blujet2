@@ -154,14 +154,6 @@ export default function PanelShell() {
     if (!user?.isSuperAdmin && user?.role === 'SITE_ADMIN') {
       items = items.filter((item) => !SITE_ADMIN_SIDEBAR_DENYLIST.has(item.key));
     }
-    // TEMP: «خدمات» (ancillary services pricing) has no real GET /panels/nav
-    // entry yet — the page is frontend-only and mock-backed (see
-    // AncillaryServicesPage.tsx), so it can't be wired into
-    // backend/panel-nav.config.ts in this frontend-only branch. Appended
-    // client-side, COMMERCIAL_MANAGER only, until that backend key lands.
-    if (user?.role === 'COMMERCIAL_MANAGER' && !items.some((item) => item.key === 'ancillary-services')) {
-      items = [...items, { key: 'ancillary-services', labelFa: 'خدمات', implemented: true }];
-    }
     return items;
   }, [nav, user?.role, user?.isSuperAdmin]);
 

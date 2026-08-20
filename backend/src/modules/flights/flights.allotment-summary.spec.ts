@@ -38,6 +38,8 @@ describe('FlightsService allotmentSummary', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
     jest.spyOn(service, 'listAllotments').mockResolvedValue([
       {

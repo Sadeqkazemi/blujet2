@@ -54,6 +54,39 @@ export interface FlightDefinitionSnapshot {
   chargeRules: ChargeRule[];
 }
 
+export interface CommercialClassBreakdownRow {
+  label: string;
+  cabin: CabinKind;
+  classCode?: string;
+  capacity: number;
+  sold: number;
+}
+
+export interface AgencyReleaseClassSettings {
+  seats: number;
+  priceIrr: string;
+  special?: boolean;
+}
+
+export interface FlightPriceHistoryRow {
+  id: string;
+  previousPriceIrr: string;
+  salePriceIrr: string;
+  reason: string;
+  actorName: string;
+  createdAt: string;
+}
+
+export interface FlightCommercialFields {
+  siteVisible: boolean;
+  classBreakdown: CommercialClassBreakdownRow[];
+  agencyReleaseSeats: number;
+  lockedSeats: number;
+  routeAgencyPriceIrr: string | null;
+  classSitePrices: Record<string, string>;
+  agencyRelease: Record<string, AgencyReleaseClassSettings>;
+}
+
 export interface FlightRow {
   id: string;
   flightNo: string;
@@ -87,6 +120,13 @@ export interface FlightRow {
     windowHours: number;
     reasonFa: string;
   };
+  siteVisible?: boolean;
+  classBreakdown?: CommercialClassBreakdownRow[];
+  agencyReleaseSeats?: number;
+  lockedSeats?: number;
+  routeAgencyPriceIrr?: string | null;
+  classSitePrices?: Record<string, string>;
+  agencyRelease?: Record<string, AgencyReleaseClassSettings>;
 }
 
 export interface FlightAiSuggestion {
@@ -157,6 +197,7 @@ export interface FlightDetail extends FlightRow {
   totalRevenueIrr: string;
   occupancyPct: number;
   aircraftType: string;
+  priceHistory?: FlightPriceHistoryRow[];
 }
 
 export interface AircraftTypeOption {

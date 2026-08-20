@@ -113,6 +113,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },
     { key: 'clubrules', labelFa: 'قوانین باشگاه مشتریان', implemented: true },
     { key: 'webservice', labelFa: 'وب سرویس', implemented: true },
+    { key: 'ancillary-services', labelFa: 'خدمات', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
   ],

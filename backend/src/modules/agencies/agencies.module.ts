@@ -6,6 +6,9 @@ import { AgencyRequestOtp } from '../../database/entities/agency-request-otp.ent
 import { AgencyMembershipRequest } from '../../database/entities/agency-membership-request.entity';
 import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AgencyInvoice } from '../../database/entities/agency-invoice.entity';
+import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
+import { Airport } from '../../database/entities/airport.entity';
 import { AgencyMessage } from '../../database/entities/agency-message.entity';
 import { AgencyCreditRequest } from '../../database/entities/agency-credit-request.entity';
 import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
@@ -35,6 +38,9 @@ import { SmsModule } from '../sms/sms.module';
       AgencyMembershipRequest,
       AgencyApiKey,
       AgencyInvoice,
+      AgencySeatRequest,
+      AgencySeatRequestFlight,
+      Airport,
       AgencyMessage,
       AgencyCreditRequest,
       AgencyWebserviceRequest,

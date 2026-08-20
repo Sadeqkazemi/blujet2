@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
+import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
 
@@ -17,6 +18,9 @@ describe('Travel costs (e2e)', () => {
   });
 
   afterEach(async () => {
+    await dataSource
+      .getRepository(AncillaryService)
+      .update({ key: 'baggage' }, { priceIrr: 2_000_000n, enabled: true });
     await app.close();
   });
 
@@ -57,6 +61,11 @@ describe('Travel costs (e2e)', () => {
       .expect(201);
 
     const id = createRes.body.data.id as string;
+    await request(app.getHttpServer())
+      .patch('/ancillary-services/baggage/price')
+      .set(auth)
+      .send({ priceIrr: '4500000' })
+      .expect(200);
     await request(app.getHttpServer())
       .get('/public/travel-costs')
       .expect(200)

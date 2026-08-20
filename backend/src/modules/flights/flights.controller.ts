@@ -47,6 +47,7 @@ import {
   ResolveScheduleTemplateQueryDto,
   ScheduleTemplatePreviewDto,
 } from './dto/schedule-template.dto';
+import { PatchCommercialPanelSettingsDto } from './dto/commercial-panel-settings.dto';
 import { ScheduleTemplateService } from './schedule-template.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -809,6 +810,41 @@ export class FlightsController {
   })
   async detail(@Param('instanceId') instanceId: string) {
     const data = await this.flights.detail(instanceId);
+    return { success: true, data };
+  }
+
+  @Patch(':instanceId/commercial-settings')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'تنظیمات پنل بازرگانی: نمایش در سایت، قیمت کلاس‌ها، آزادسازی آژانس',
+  })
+  async patchCommercialSettings(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId') instanceId: string,
+    @Body() dto: PatchCommercialPanelSettingsDto,
+  ) {
+    const data = await this.flights.patchCommercialPanelSettings(
+      actor,
+      instanceId,
+      {
+        siteVisible: dto.siteVisible,
+        classSitePrices: dto.classSitePrices,
+        agencyRelease: dto.agencyRelease
+          ? Object.fromEntries(
+              Object.entries(dto.agencyRelease).map(([label, row]) => [
+                label,
+                {
+                  seats: row.seats ?? 0,
+                  priceIrr: row.priceIrr ?? '0',
+                  special: row.special,
+                },
+              ]),
+            )
+          : undefined,
+      },
+    );
     return { success: true, data };
   }
 

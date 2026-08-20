@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { searchPassengers } from '../../api/reporting';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { faDigits, faMoney } from '../../lib/fa-format';
+import { downloadCsv } from '../../lib/download-csv';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { PassengerReportHit } from '../../types/reporting';
 
@@ -16,20 +17,59 @@ const STATUS_LABEL: Record<string, string> = {
   REFUNDED: 'مستردشده',
 };
 
+const QUICK_NAMES_KEY = 'blujet_pax_report_quick_names';
+const MAX_QUICK_NAMES = 8;
+
+function readQuickNames(): string[] {
+  try {
+    const raw = sessionStorage.getItem(QUICK_NAMES_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((n): n is string => typeof n === 'string' && n.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function rememberQuickNames(names: string[]) {
+  const prev = readQuickNames();
+  const merged = [...names, ...prev.filter((n) => !names.includes(n))].slice(0, MAX_QUICK_NAMES);
+  sessionStorage.setItem(QUICK_NAMES_KEY, JSON.stringify(merged));
+  return merged;
+}
+
 export default function PassengerReportsPage() {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<PassengerReportHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [quickNames, setQuickNames] = useState<string[]>([]);
   const hitsPager = usePagination(hits ?? []);
 
-  async function onSearch(e: FormEvent) {
-    e.preventDefault();
-    if (query.trim().length < 2) return;
+  useEffect(() => {
+    setQuickNames(readQuickNames());
+  }, []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const t = window.setTimeout(() => setNotice(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [notice]);
+
+  async function runSearch(q: string) {
+    const trimmed = q.trim();
+    if (trimmed.length < 2) return;
     setSearching(true);
     setError(null);
     try {
-      setHits(await searchPassengers(query.trim()));
+      const next = await searchPassengers(trimmed);
+      setHits(next);
+      if (next.length > 0) {
+        const names = Array.from(new Set(next.map((h) => h.fullName.trim()).filter(Boolean)));
+        setQuickNames(rememberQuickNames(names));
+      }
     } catch {
       setError('خطا در جستجوی مسافر.');
     } finally {
@@ -37,16 +77,105 @@ export default function PassengerReportsPage() {
     }
   }
 
+  async function onSearch(e: FormEvent) {
+    e.preventDefault();
+    await runSearch(query);
+  }
+
+  function onQuickName(name: string) {
+    setQuery(name);
+    void runSearch(name);
+  }
+
+  function exportPassengerExcel() {
+    if (!hits || hits.length === 0) {
+      setNotice('ابتدا جستجو کنید تا نتیجه‌ای برای خروجی وجود داشته باشد.');
+      return;
+    }
+    downloadCsv(
+      'passenger-report.csv',
+      ['نام', 'کد ملی', 'PNR', 'وضعیت', 'پرواز', 'مسیر', 'تاریخ', 'صندلی', 'مبلغ'],
+      hits.map((h) => [
+        h.fullName,
+        h.maskedNationalId ?? '',
+        h.pnr,
+        STATUS_LABEL[h.status] ?? h.status,
+        h.flightNo,
+        `${h.originCode} → ${h.destCode}`,
+        formatJalaliDate(h.departureAt),
+        h.seatCode ?? '',
+        faMoney(h.priceIrr),
+      ]),
+    );
+    setNotice('خروجی Excel دانلود شد ✓');
+  }
+
+  function exportPassengerPdf() {
+    if (!hits || hits.length === 0) {
+      setNotice('ابتدا جستجو کنید تا نتیجه‌ای برای خروجی وجود داشته باشد.');
+      return;
+    }
+    const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/><title>گزارش مسافران</title>
+      <style>body{font-family:Tahoma,sans-serif;padding:24px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;font-size:12px}th{background:#f3f4f6}</style></head><body>
+      <h1>گزارش مسافران</h1><table><thead><tr><th>نام</th><th>PNR</th><th>پرواز</th><th>مسیر</th><th>تاریخ</th><th>مبلغ</th></tr></thead><tbody>
+      ${hits.map((h) => `<tr><td>${h.fullName}</td><td>${h.pnr}</td><td>${h.flightNo}</td><td>${h.originCode} → ${h.destCode}</td><td>${formatJalaliDate(h.departureAt)}</td><td>${faMoney(h.priceIrr)}</td></tr>`).join('')}
+      </tbody></table></body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) {
+      setNotice('مرورگر اجازه باز کردن پنجره چاپ را نداد.');
+      return;
+    }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+    setNotice('پنجره چاپ PDF باز شد ✓');
+  }
+
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <h1 className="mb-1 text-[20.5px] font-black text-white">گزارش مسافران</h1>
       <p className="mb-6 text-sm text-[#6b7b94]">جستجوی مسافر و مشاهده‌ی جزئیات بلیط</p>
 
-      <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5">
-        <div className="mb-1 text-[14.5px] font-extrabold text-white">جستجوی مسافر</div>
-        <p className="mb-4 text-[11.5px] text-[#6b7b94]">
-          نام و نام خانوادگی مسافر (یا کد ملی) را وارد کنید تا جزئیات بلیط، پرواز و تاریخ نمایش داده شود.
+      {notice && (
+        <p role="status" className="mb-4 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3.5 py-2.5 text-xs text-[#9fb0c7]">
+          {notice}
         </p>
+      )}
+
+      <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5">
+        <div className="mb-4 flex items-start justify-between gap-2.5">
+          <div>
+            <div className="mb-1 text-[14.5px] font-extrabold text-white">جستجوی مسافر</div>
+            <p className="text-[11.5px] text-[#6b7b94]">
+              نام و نام خانوادگی مسافر (یا کد ملی) را وارد کنید تا جزئیات بلیط، پرواز و تاریخ نمایش داده شود.
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-[7px]">
+            <button
+              type="button"
+              onClick={exportPassengerExcel}
+              className="flex items-center gap-[5px] rounded-[9px] border border-[rgba(16,185,129,.4)] bg-[rgba(16,185,129,.1)] px-[11px] py-[7px] text-[11px] font-bold text-[#34d399]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 3v12M8 11l4 4 4-4M5 21h14" />
+              </svg>
+              Excel
+            </button>
+            <button
+              type="button"
+              onClick={exportPassengerPdf}
+              className="flex items-center gap-[5px] rounded-[9px] border border-[rgba(248,113,113,.4)] bg-[rgba(248,113,113,.1)] px-[11px] py-[7px] text-[11px] font-bold text-[#f87171]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+              </svg>
+              PDF
+            </button>
+          </div>
+        </div>
+
         <form onSubmit={onSearch} className="flex max-w-xl gap-2">
           <input
             value={query}
@@ -62,6 +191,22 @@ export default function PassengerReportsPage() {
             {searching ? 'در حال جستجو…' : 'جستجو'}
           </button>
         </form>
+
+        {quickNames.length > 0 && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-[7px]">
+            <span className="text-[11px] text-[#6b7b94]">جستجوی سریع:</span>
+            {quickNames.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => onQuickName(name)}
+                className="rounded-[14px] border border-[#28344c] bg-[#18223a] px-2.5 py-1 text-[11px] text-[#9fb0c7] hover:text-white"
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="mt-4 text-xs text-[#f87171]">

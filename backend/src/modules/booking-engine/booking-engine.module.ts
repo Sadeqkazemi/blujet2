@@ -41,6 +41,7 @@ import { PrivacyController } from './privacy.controller';
 import { PrivacyService } from './privacy.service';
 import { AuditModule } from '../audit/audit.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
+import { AncillaryServicesModule } from '../ancillary-services/ancillary-services.module';
 import { AiModule } from '../ai/ai.module';
 import {
   PAYMENT_GATEWAY,
@@ -80,6 +81,7 @@ import {
     ]),
     AuditModule,
     CustomerReferralsModule,
+    AncillaryServicesModule,
     AiModule,
   ],
   controllers: [

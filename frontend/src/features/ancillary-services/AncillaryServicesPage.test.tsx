@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import AncillaryServicesPage from './AncillaryServicesPage';
-import * as mockApi from '../../api/ancillary-services-mock';
+import * as mockApi from '../../api/ancillary-services';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AncillaryServiceRow, SeatServiceRow } from '../../types/ancillary-services';
@@ -55,7 +55,7 @@ describe('AncillaryServicesPage', () => {
     expect(screen.queryByText('قیمت انواع صندلی')).not.toBeInTheDocument();
   });
 
-  it('saving a price calls the mock adapter and shows a confirmation toast', async () => {
+  it('saving a price calls the adapter and shows a confirmation toast', async () => {
     mockRole('COMMERCIAL_MANAGER');
     vi.spyOn(mockApi, 'fetchSeatServices').mockResolvedValue(SEAT_SERVICES);
     vi.spyOn(mockApi, 'fetchOtherServices').mockResolvedValue(OTHER_SERVICES);

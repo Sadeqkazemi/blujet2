@@ -3,7 +3,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import AgenciesListPage from './AgenciesListPage';
 import * as agenciesApi from '../../api/agencies';
-import * as agenciesMockApi from '../../api/agencies-mock';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { AgencyListResult, AgencyMembershipRequest } from '../../types/agencies';
@@ -15,8 +14,8 @@ import type { Role } from '../../types/auth';
  * network call and mask the real assertions. */
 function mockCommercialExtras() {
   vi.spyOn(agenciesApi, 'fetchAllWebserviceRequests').mockResolvedValue([]);
-  vi.spyOn(agenciesMockApi, 'fetchAggregateSeatRequests').mockResolvedValue([]);
-  vi.spyOn(agenciesMockApi, 'fetchAggregateInvoices').mockResolvedValue([]);
+  vi.spyOn(agenciesApi, 'fetchAggregateSeatRequests').mockResolvedValue([]);
+  vi.spyOn(agenciesApi, 'fetchAggregateInvoices').mockResolvedValue([]);
 }
 
 // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON on
@@ -179,8 +178,8 @@ describe('AgenciesListPage', () => {
     vi.spyOn(agenciesApi, 'fetchAgencies').mockResolvedValue(LIST);
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue(REQUESTS);
     vi.spyOn(agenciesApi, 'fetchAllWebserviceRequests').mockResolvedValue([]);
-    vi.spyOn(agenciesMockApi, 'fetchAggregateInvoices').mockResolvedValue([]);
-    vi.spyOn(agenciesMockApi, 'fetchAggregateSeatRequests').mockResolvedValue([
+    vi.spyOn(agenciesApi, 'fetchAggregateInvoices').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAggregateSeatRequests').mockResolvedValue([
       {
         id: 'sr1',
         agencyId: 'a1',
@@ -238,8 +237,8 @@ describe('AgenciesListPage', () => {
     mockRole('COMMERCIAL_MANAGER');
     vi.spyOn(agenciesApi, 'fetchAgencies').mockResolvedValue(LIST);
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue(REQUESTS);
-    vi.spyOn(agenciesMockApi, 'fetchAggregateSeatRequests').mockResolvedValue([]);
-    vi.spyOn(agenciesMockApi, 'fetchAggregateInvoices').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAggregateSeatRequests').mockResolvedValue([]);
+    vi.spyOn(agenciesApi, 'fetchAggregateInvoices').mockResolvedValue([]);
     const wsRow: AgencyWebserviceQueueRow = {
       id: 'ws1',
       agencyId: 'a1',

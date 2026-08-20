@@ -98,6 +98,23 @@ export function fetchFlightDetail(id: string) {
   return apiGet<FlightDetail>(`/flights/${id}`);
 }
 
+export function patchCommercialPanelSettings(
+  instanceId: string,
+  payload: {
+    siteVisible?: boolean;
+    classSitePrices?: Record<string, string>;
+    agencyRelease?: Record<
+      string,
+      { seats?: number; priceIrr?: string; special?: boolean }
+    >;
+  },
+) {
+  return apiPatch<import("../types/flights").FlightCommercialFields>(
+    `/flights/${instanceId}/commercial-settings`,
+    payload,
+  );
+}
+
 export function planFlight(
   id: string,
   payload: {

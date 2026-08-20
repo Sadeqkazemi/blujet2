@@ -1,24 +1,6 @@
 /**
- * TEMP/DEV ONLY — MOCK ADAPTER. No backend endpoint exists for these two
- * reads yet. Local/design-review use only; never imported by production
- * data paths outside the two agencies pages that need it while the real
- * backend is pending.
- *
- * `docs/API.md` documents the intended real contract this file stands in
- * for ("Phase — Commercial agency cross-view aggregates"):
- *   - GET /agencies/invoices              (cross-agency invoice aggregate)
- *   - GET /agencies/seat-requests         (manager-side seat-request queue)
- *   - PATCH /agencies/seat-requests/:id/decide
- *
- * This module is isolated on purpose: it is never imported by anything
- * outside the two agencies pages that need it, and every function mirrors
- * the exact signature/shape a real `api/agencies.ts` addition would have —
- * swapping it out later is a one-line import change, not a rewrite.
- *
- * To keep this honest per CLAUDE.md's "no fabricated business data" rule,
- * every row below is anchored to a REAL agency fetched from `GET /agencies`
- * — only the request-specific fields (seats/price/status/dates), which have
- * no backend source at all yet, are synthesized.
+ * TEMP/DEV ONLY — fixture adapter. Production pages import `api/agencies.ts`.
+ * Kept for isolated unit tests and as a copy of the original mock seed data.
  */
 import { fetchAgencies } from './agencies';
 import type {

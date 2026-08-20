@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PassengerReportsPage from './PassengerReportsPage';
 import * as reportingApi from '../../api/reporting';
 import type { PassengerReportHit } from '../../types/reporting';
@@ -20,6 +20,10 @@ const HIT: PassengerReportHit = {
 };
 
 describe('PassengerReportsPage', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
   it('searches and shows the ticket detail card with a masked national ID', async () => {
     const searchSpy = vi.spyOn(reportingApi, 'searchPassengers').mockResolvedValue([HIT]);
 
@@ -49,8 +53,40 @@ describe('PassengerReportsPage', () => {
   it('does not expose demo passenger suggestions before a real search', () => {
     render(<PassengerReportsPage />);
 
+    expect(screen.queryByText('جستجوی سریع:')).not.toBeInTheDocument();
     expect(screen.queryByText('نگار رضایی')).not.toBeInTheDocument();
     expect(screen.queryByText('رضا کریمی')).not.toBeInTheDocument();
     expect(screen.queryByText('سارا محمدی')).not.toBeInTheDocument();
+  });
+
+  it('shows Excel/PDF stub toasts matching the design', async () => {
+    vi.spyOn(reportingApi, 'searchPassengers').mockResolvedValue([HIT]);
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+
+    render(<PassengerReportsPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('نام مسافر یا کد ملی'), 'نگار');
+    await user.click(screen.getByRole('button', { name: 'جستجو' }));
+    await screen.findAllByText('نگار رضایی');
+
+    await user.click(screen.getByRole('button', { name: /Excel/i }));
+    expect(createObjectURL).toHaveBeenCalled();
+    expect(await screen.findByRole('status')).toHaveTextContent('خروجی Excel دانلود شد ✓');
+  });
+
+  it('adds quick-search chips from successful search hits only', async () => {
+    const searchSpy = vi.spyOn(reportingApi, 'searchPassengers').mockResolvedValue([HIT]);
+
+    render(<PassengerReportsPage />);
+    const user = userEvent.setup();
+    await user.type(screen.getByPlaceholderText('نام مسافر یا کد ملی'), 'نگار');
+    await user.click(screen.getByRole('button', { name: 'جستجو' }));
+
+    expect(await screen.findByText('جستجوی سریع:')).toBeInTheDocument();
+    const chip = screen.getByRole('button', { name: 'نگار رضایی' });
+    await user.click(chip);
+    expect(searchSpy).toHaveBeenLastCalledWith('نگار رضایی');
   });
 });
