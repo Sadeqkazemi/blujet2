@@ -459,6 +459,12 @@ export default function PaymentPage() {
         setPriceChange(result);
         return;
       }
+      const pendingReturn = sessionStorage.getItem('blujet_pending_return_payment');
+      if (pendingReturn) {
+        sessionStorage.removeItem('blujet_pending_return_payment');
+        navigate(`/payment/${pendingReturn}`);
+        return;
+      }
       navigate(`/ticket/${result.booking.pnr}`);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.payError);

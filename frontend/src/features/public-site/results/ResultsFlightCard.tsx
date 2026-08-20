@@ -39,6 +39,7 @@ type Props = {
   saveBusyKey: string | null;
   showGoldLock: boolean;
   passengerMix: PassengerMix;
+  buyLabel?: string;
   onToggle: () => void;
   onBuy: (cabin: CabinClass) => void;
   onLock: (cabin: CabinClass) => void;
@@ -61,6 +62,7 @@ export default function ResultsFlightCard({
   saveBusyKey,
   showGoldLock,
   passengerMix,
+  buyLabel,
   onToggle,
   onBuy,
   onLock,
@@ -578,9 +580,11 @@ export default function ResultsFlightCard({
             <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 12 }}>
               {copy.adultPaxLabel} × {passengerMix.adults}
               {passengerMix.children
-                ? ` · کودک × ${passengerMix.children}`
+                ? ` · ${copy.childPaxLabel} × ${passengerMix.children}`
                 : ''}
-              {passengerMix.infants ? ` · نوزاد × ${passengerMix.infants}` : ''}
+              {passengerMix.infants
+                ? ` · ${copy.infantPaxLabel} × ${passengerMix.infants}`
+                : ''}
             </div>
             <div
               style={{
@@ -656,7 +660,7 @@ export default function ResultsFlightCard({
                 opacity: canBook ? 1 : 0.5,
               }}
             >
-              {copy.buyTicketLabel}
+              {buyLabel ?? copy.buyTicketLabel}
             </button>
             {showGoldLock && (
               <button

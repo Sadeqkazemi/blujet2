@@ -17,6 +17,10 @@ const STR: Record<
   {
     loading: string;
     notFound: string;
+    unpaidTitle: string;
+    unpaidMsg: string;
+    expiredTitle: string;
+    expiredMsg: string;
     title: string;
     ticketIssued: string;
     origin: string;
@@ -31,6 +35,11 @@ const STR: Record<
   fa: {
     loading: 'در حال بارگذاری…',
     notFound: 'بلیط یافت نشد.',
+    unpaidTitle: 'بلیط هنوز صادر نشده است',
+    unpaidMsg:
+      'تا تکمیل پرداخت نمی‌توانید تصویر بلیط را ببینید. برای رزروهای در انتظار پرداخت حداکثر ۱۵ دقیقه فرصت دارید.',
+    expiredTitle: 'مهلت پرداخت به پایان رسید',
+    expiredMsg: 'این رزرو منقضی شده و صندلی آزاد شده است. لطفاً دوباره جستجو و خرید کنید.',
     title: 'بلیط الکترونیکی',
     ticketIssued: 'کارت پرواز · صادر شده',
     origin: 'مبدأ',
@@ -44,6 +53,11 @@ const STR: Record<
   en: {
     loading: 'Loading…',
     notFound: 'Ticket not found.',
+    unpaidTitle: 'Ticket not issued yet',
+    unpaidMsg:
+      'You cannot view the ticket image until payment is complete. Unpaid holds are valid for 15 minutes.',
+    expiredTitle: 'Payment window expired',
+    expiredMsg: 'This reservation expired and the seat was released. Please search and book again.',
     title: 'E-ticket',
     ticketIssued: 'Boarding pass · issued',
     origin: 'Origin',
@@ -57,6 +71,11 @@ const STR: Record<
   ar: {
     loading: 'جارٍ التحميل…',
     notFound: 'لم تُعثر على التذكرة.',
+    unpaidTitle: 'لم تُصدر التذكرة بعد',
+    unpaidMsg:
+      'لا يمكنك عرض صورة التذكرة قبل إتمام الدفع. الحجوزات غير المدفوعة صالحة لمدة ١٥ دقيقة.',
+    expiredTitle: 'انتهت مهلة الدفع',
+    expiredMsg: 'انتهت صلاحية هذا الحجز وتم تحرير المقعد. يرجى البحث والحجز مجددًا.',
     title: 'التذكرة الإلكترونية',
     ticketIssued: 'بطاقة الصعود · صادرة',
     origin: 'المبدأ',
@@ -103,10 +122,39 @@ export default function TicketPage() {
     );
   }
 
-  const statusLabel =
-    booking.status === 'TICKETED'
-      ? t.ticketIssued
-      : booking.status;
+  const holdExpired =
+    booking.status === 'EXPIRED' ||
+    (booking.status === 'HELD' &&
+      booking.holdExpiresAt !== null &&
+      new Date(booking.holdExpiresAt).getTime() <= Date.now());
+  const unpaid =
+    booking.status === 'HELD' ||
+    booking.status === 'DRAFT' ||
+    booking.status === 'PAID';
+
+  if (holdExpired) {
+    return (
+      <PublicPageShell>
+        <div className="mx-auto max-w-[520px] p-8 text-center">
+          <h1 className="mb-3 text-lg font-extrabold text-[#0d2640]">{t.expiredTitle}</h1>
+          <p className="text-sm leading-7 text-[#6b7787]">{t.expiredMsg}</p>
+        </div>
+      </PublicPageShell>
+    );
+  }
+
+  if (unpaid || booking.status !== 'TICKETED') {
+    return (
+      <PublicPageShell>
+        <div className="mx-auto max-w-[520px] p-8 text-center" data-testid="ticket-unpaid-block">
+          <h1 className="mb-3 text-lg font-extrabold text-[#0d2640]">{t.unpaidTitle}</h1>
+          <p className="text-sm leading-7 text-[#6b7787]">{t.unpaidMsg}</p>
+        </div>
+      </PublicPageShell>
+    );
+  }
+
+  const statusLabel = t.ticketIssued;
 
   return (
     <PublicPageShell>

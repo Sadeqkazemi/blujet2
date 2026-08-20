@@ -272,6 +272,44 @@ describe('AccountPage', () => {
     renderPage();
     expect(await screen.findByTestId('account-trip')).toBeInTheDocument();
     expect(screen.getByText('BJ-100', { exact: false })).toBeInTheDocument();
+    expect(screen.getByTestId('trip-view-ticket')).toHaveAttribute('href', '/ticket/BJ4X2K');
+  });
+
+  it('hides view-ticket for unpaid holds and offers continue-payment within 15 minutes', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([
+      {
+        ...BOOKING,
+        id: 'b-held',
+        pnr: 'BJHOLD1',
+        status: 'HELD',
+        holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      },
+    ]);
+    renderPage('/account?tab=trips');
+    expect(await screen.findByTestId('account-trip')).toHaveAttribute('data-status', 'HELD');
+    expect(screen.queryByTestId('trip-view-ticket')).not.toBeInTheDocument();
+    expect(screen.getByTestId('trip-continue-payment')).toHaveAttribute('href', '/payment/b-held');
+    expect(screen.getByTestId('trip-hold-remaining')).toBeInTheDocument();
+  });
+
+  it('shows expired status without ticket or payment links when hold TTL elapsed', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([
+      {
+        ...BOOKING,
+        id: 'b-exp',
+        pnr: 'BJEXP01',
+        status: 'EXPIRED',
+        holdExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+      },
+    ]);
+    renderPage('/account?tab=trips');
+    const row = await screen.findByTestId('account-trip');
+    expect(row).toHaveAttribute('data-status', 'EXPIRED');
+    expect(row).toHaveTextContent('منقضی شده');
+    expect(screen.queryByTestId('trip-view-ticket')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('trip-continue-payment')).not.toBeInTheDocument();
   });
 
   it('switches to the wallet tab and shows the real balance', async () => {
@@ -513,12 +551,12 @@ describe('AccountPage', () => {
     expect(await screen.findByTestId('trip-price-locked-badge')).toBeInTheDocument();
   });
 
-  it('switches to the saved tab and lists bookmarked flights with book action', async () => {
+  it('redirects the removed saved tab to trips', async () => {
     mockAuth('authenticated');
     renderPage('/account?tab=saved');
-    expect(await screen.findByTestId('account-saved-flights')).toBeInTheDocument();
-    expect(screen.getByText('تهران ← مشهد')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'رزرو' })).toBeInTheDocument();
+    expect(await screen.findByTestId('account-sidebar')).toBeInTheDocument();
+    expect(screen.queryByTestId('account-saved-flights')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('account-tab-saved')).not.toBeInTheDocument();
   });
 
   it('switches to the price-locks tab and lists a real lock with its route, price, fee, and cancel action', async () => {
@@ -554,6 +592,7 @@ describe('AccountPage', () => {
     renderPage('/account?tab=wallet');
 
     await userEvent.type(screen.getByTestId('wallet-topup-amount'), '۵۰۰٬۰۰۰');
+    expect(screen.getByTestId('wallet-topup-amount-words')).toHaveTextContent('پانصد هزار تومان');
     await userEvent.click(screen.getByTestId('wallet-topup-submit'));
 
     await vi.waitFor(() => expect(topup).toHaveBeenCalledWith(5_000_000));
@@ -588,7 +627,7 @@ describe('AccountPage', () => {
     renderPage('/account?tab=profile');
     expect(screen.getByTestId('account-sidebar')).toHaveStyle({
       maxHeight: 'calc(100vh - 106px)',
-      overflowY: 'auto',
+      overflow: 'hidden',
     });
     for (const tabKey of [
       'profile',
@@ -596,8 +635,8 @@ describe('AccountPage', () => {
       'trips',
       'refunds',
       'wallet',
+      'loans',
       'club',
-      'saved',
       'price-locks',
       'passengers',
       'tickets',
@@ -608,6 +647,7 @@ describe('AccountPage', () => {
     ]) {
       expect(screen.getByTestId(`account-tab-${tabKey}`)).toBeInTheDocument();
     }
+    expect(screen.queryByTestId('account-tab-saved')).not.toBeInTheDocument();
   });
 
   it('shows the requested compact navigation in the mobile sidebar and opens its tabs', async () => {
@@ -615,7 +655,7 @@ describe('AccountPage', () => {
     mockAuth('authenticated');
     renderPage('/account?tab=profile');
 
-    expect(screen.getByTestId('account-sidebar')).toHaveStyle({ overflowY: 'hidden' });
+    expect(screen.getByTestId('account-sidebar')).toHaveStyle({ overflow: 'hidden' });
 
     for (const tabKey of ['profile', 'account-info', 'trips', 'refunds', 'wallet', 'club']) {
       expect(screen.getByTestId(`account-tab-${tabKey}`)).toBeInTheDocument();

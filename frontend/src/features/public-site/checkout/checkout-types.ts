@@ -35,6 +35,13 @@ export interface CheckoutDraft {
   selectedSeats: string[];
   flight: FlightSnapshot;
   passengerMix: PassengerMix;
+  /** Outbound leg when the user booked a round-trip return flight. */
+  outboundLeg?: {
+    flightInstanceId: string;
+    cabin: CabinClass;
+    selectedSeats: string[];
+    flight: FlightSnapshot;
+  };
 }
 
 export type DocType = 'NATIONAL_ID' | 'PASSPORT';
@@ -169,6 +176,15 @@ export function extraTitle(
   if (locale === 'en') return extra.titleEn || extra.titleFa;
   if (locale === 'ar') return extra.titleAr || extra.titleFa;
   return extra.titleFa;
+}
+
+/** Public travel-cost API exposes `descriptionFa` only; fall back for en/ar. */
+export function extraDescription(
+  extra: ExtraServiceState,
+  locale: 'fa' | 'en' | 'ar',
+): string | null {
+  if (!extra.descriptionFa) return null;
+  return extra.descriptionFa;
 }
 
 export function extraTotalIrr(

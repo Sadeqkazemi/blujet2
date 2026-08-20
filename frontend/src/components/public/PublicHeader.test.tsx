@@ -1,16 +1,69 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import PublicHeader from './PublicHeader';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUser, mockAuthUserLocale } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as publicSiteApi from '../../api/publicSite';
+import * as notificationsApi from '../../api/notifications';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
+}
+
+function mockCustomerNotifications(
+  rows: Array<{
+    id: string;
+    title: string;
+    body?: string;
+    category?: 'SYSTEM' | 'MESSAGE' | 'REQUEST' | 'APPROVAL' | 'CARTABLE';
+    entityType?: string | null;
+  }> = [],
+) {
+  vi.spyOn(notificationsApi, 'fetchNotificationsUnreadCount').mockResolvedValue({
+    total: rows.length,
+    CARTABLE: 0,
+    MESSAGE: 0,
+    REQUEST: 0,
+    APPROVAL: 0,
+    SYSTEM: rows.length,
+  });
+  vi.spyOn(notificationsApi, 'fetchNotifications').mockResolvedValue(
+    rows.map((r) => ({
+      id: r.id,
+      recipientId: 'u1',
+      category: r.category ?? 'SYSTEM',
+      action: 'INFO',
+      title: r.title,
+      body: r.body ?? '',
+      entityType: r.entityType ?? null,
+      entityId: null,
+      dedupeKey: null,
+      readAt: null,
+      createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    })),
+  );
+  vi.spyOn(notificationsApi, 'markNotificationRead').mockResolvedValue({
+    id: rows[0]?.id ?? 'n1',
+    recipientId: 'u1',
+    category: 'SYSTEM',
+    action: 'INFO',
+    title: rows[0]?.title ?? '',
+    body: '',
+    entityType: null,
+    entityId: null,
+    dedupeKey: null,
+    readAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+  vi.spyOn(notificationsApi, 'markAllNotificationsRead').mockResolvedValue({ updated: rows.length });
 }
 
 function renderHeader(initialPath = '/') {
@@ -24,6 +77,7 @@ function renderHeader(initialPath = '/') {
 describe('PublicHeader — logged-in user', () => {
   it('requires confirmation before signing a customer out', async () => {
     mockLocale();
+    mockCustomerNotifications();
     const signOut = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -34,6 +88,18 @@ describe('PublicHeader — logged-in user', () => {
       signOut,
     });
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی',
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
+      completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
+    });
 
     renderHeader();
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
@@ -45,8 +111,16 @@ describe('PublicHeader — logged-in user', () => {
     expect(signOut).toHaveBeenCalledOnce();
   });
 
-  it('opens the notification dropdown with sample notifications', async () => {
+  it('loads real notifications and marks one as read when opened', async () => {
     mockLocale();
+    mockCustomerNotifications([
+      {
+        id: 'notif-1',
+        title: 'یادآوری سفر',
+        body: 'پرواز تهران → دبی شما فرداست.',
+        entityType: 'BOOKING',
+      },
+    ]);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
       user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
@@ -56,16 +130,34 @@ describe('PublicHeader — logged-in user', () => {
       signOut: vi.fn(),
     });
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی',
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
+      completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
+    });
 
     renderHeader();
+    expect(await screen.findByTestId('public-notif-badge')).toHaveTextContent('۱');
     await userEvent.click(screen.getByTestId('public-notif-toggle'));
-    expect(screen.getByText('اعلان‌ها')).toBeInTheDocument();
+    expect(screen.getByTestId('public-notif-dropdown')).toBeInTheDocument();
     expect(screen.getByText('یادآوری سفر')).toBeInTheDocument();
-    expect(screen.getByText('جدید')).toBeInTheDocument();
+    expect(screen.getByTestId('public-notif-new-badge')).toHaveTextContent('۱');
+    await userEvent.click(screen.getByTestId('public-notif-item-notif-1'));
+    await waitFor(() => {
+      expect(notificationsApi.markNotificationRead).toHaveBeenCalledWith('notif-1');
+    });
   });
 
-  it('shows the points balance and profile/trips links in the user menu', async () => {
+  it('shows the wallet balance and profile/trips links in the user menu', async () => {
     mockLocale();
+    mockCustomerNotifications();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
       user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
@@ -75,17 +167,31 @@ describe('PublicHeader — logged-in user', () => {
       signOut: vi.fn(),
     });
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '24500000' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی',
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
+      completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
+    });
 
     renderHeader();
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
-    expect(await screen.findByText('۱۲۴۵۰')).toBeInTheDocument();
+    expect(await screen.findByTestId('public-user-wallet-balance')).toHaveTextContent('۲٬۴۵۰٬۰۰۰');
+    expect(screen.getByText('موجودی کل کیف پول')).toBeInTheDocument();
     expect(screen.getByText('مشاهده پروفایل')).toHaveAttribute('href', '/account');
     expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/manage-booking');
-    expect(screen.getByText('استرداد')).toHaveAttribute('href', '/manage-booking');
+    expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/manage-booking');
   });
 
-  it('shows English notifications and latin points when locale is en', async () => {
+  it('shows English notifications and wallet balance when locale is en', async () => {
     mockLocale('en');
+    mockCustomerNotifications([{ id: 'n-en', title: 'Trip reminder', body: 'Check-in is open.' }]);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
       user: mockAuthUserLocale('EN', { id: 'u1', fullName: 'Negar Rezaei', role: 'USER' }),
@@ -95,13 +201,74 @@ describe('PublicHeader — logged-in user', () => {
       signOut: vi.fn(),
     });
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '24500000' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'Negar Rezaei',
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
+      completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
+    });
 
     renderHeader();
     expect(screen.getByText('Flights')).toBeInTheDocument();
+    expect(await screen.findByTestId('public-notif-badge')).toHaveTextContent('1');
+    await userEvent.click(screen.getByTestId('public-notif-toggle'));
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.getByText('Trip reminder')).toBeInTheDocument();
     expect(screen.queryByText('Log in / Sign up')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
-    expect(await screen.findByText('12450')).toBeInTheDocument();
+    expect(await screen.findByTestId('public-user-wallet-balance')).toHaveTextContent('2,450,000');
     expect(screen.getByText('View Profile')).toHaveAttribute('href', '/account');
+  });
+
+  it('shows the mobile notification bell and empty state in fa/en/ar', async () => {
+    for (const locale of ['fa', 'en', 'ar'] as const) {
+      vi.restoreAllMocks();
+      mockLocale(locale);
+      mockCustomerNotifications();
+      vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+      vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+        status: 'authenticated',
+        user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+        requestLogin: vi.fn(),
+        confirmTwoFactor: vi.fn(),
+        agencyLogin: vi.fn(),
+        signOut: vi.fn(),
+      });
+      vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+      vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
+      vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+        fullName: 'نگار رضایی',
+        nationalId: null,
+        birthDate: null,
+        passportNo: null,
+        email: null,
+        emailVerifiedAt: null,
+        completionPct: 100,
+        profileIncomplete: false,
+        missingProfileFields: [],
+      });
+
+      const { unmount } = renderHeader();
+      expect(screen.getByTestId('public-notif-toggle-mobile')).toBeInTheDocument();
+      expect(screen.queryByTestId('public-notif-badge-mobile')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByTestId('public-notif-toggle-mobile'));
+      expect(await screen.findByTestId('public-notif-dropdown-mobile')).toBeInTheDocument();
+      expect(screen.getByTestId('public-notif-empty')).toBeInTheDocument();
+      const emptyText =
+        locale === 'en'
+          ? 'No new notifications.'
+          : locale === 'ar'
+            ? 'لا توجد إشعارات جديدة.'
+            : 'اعلان جدیدی ندارید.';
+      expect(screen.getByTestId('public-notif-empty')).toHaveTextContent(emptyText);
+      unmount();
+    }
   });
 
   it('highlights Flights nav on the results route', () => {
@@ -155,6 +322,7 @@ describe('PublicHeader — logged-in user', () => {
 
   it('shows account panel links in the mobile hamburger menu when logged in', async () => {
     mockLocale();
+    mockCustomerNotifications();
     vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -165,15 +333,17 @@ describe('PublicHeader — logged-in user', () => {
       signOut: vi.fn(),
     });
     vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
     vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
       fullName: 'نگار رضایی',
-      phone: '09121234567',
-      email: null,
-      emailVerified: false,
       nationalId: null,
       birthDate: null,
       passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
       completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
     });
 
     renderHeader();
@@ -186,5 +356,32 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.getByText('اطلاعات حساب')).toBeInTheDocument();
     expect(screen.getAllByText('سفرها و مدیریت رزرو').length).toBeGreaterThan(0);
     expect(screen.getByTestId('public-mobile-account-security')).toHaveAttribute('href', '/account?tab=security');
+    expect(screen.queryByTestId('public-mobile-account-saved')).not.toBeInTheDocument();
+  });
+
+  it('keeps the mobile services menu collapsed until toggled', async () => {
+    mockLocale();
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'unauthenticated',
+      user: null,
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-mobile-menu-toggle'));
+
+    expect(screen.getByTestId('public-mobile-services-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('public-mobile-services-panel')).not.toBeInTheDocument();
+    expect(screen.queryByText('انتخاب صندلی')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('public-mobile-services-toggle'));
+    expect(screen.getByTestId('public-mobile-services-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('public-mobile-services-panel')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /انتخاب صندلی/ })).toHaveAttribute('href', '/services/seat-selection');
+    expect(screen.getByRole('link', { name: /اضافه بار/ })).toHaveAttribute('href', '/services/extra-baggage');
   });
 });

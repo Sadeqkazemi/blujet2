@@ -61,4 +61,28 @@ describe('TicketPage', () => {
     expect(await screen.findByText('E-ticket')).toBeInTheDocument();
     expect(screen.queryByText('Request ticket refund')).not.toBeInTheDocument();
   });
+
+  it('blocks the boarding-pass view for unpaid HELD bookings', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue({
+      ...TICKETED,
+      status: 'HELD',
+      holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+    });
+    renderPage();
+
+    expect(await screen.findByTestId('ticket-unpaid-block')).toBeInTheDocument();
+    expect(screen.queryByTestId('ticket-barcode')).not.toBeInTheDocument();
+  });
+
+  it('shows expiry message when the 15-minute hold has elapsed', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue({
+      ...TICKETED,
+      status: 'EXPIRED',
+      holdExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    renderPage();
+
+    expect(await screen.findByText('مهلت پرداخت به پایان رسید')).toBeInTheDocument();
+    expect(screen.queryByTestId('ticket-barcode')).not.toBeInTheDocument();
+  });
 });

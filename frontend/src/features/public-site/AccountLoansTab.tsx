@@ -6,6 +6,7 @@ import {
 } from '../../api/loans';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { localeMoney, parseTomanToRialString } from '../../lib/fa-format';
+import { tomanAmountInWords } from '../../lib/amount-in-words';
 import { formatLocaleDateTime } from '../../lib/locale-format';
 import type { LoanApplication, LoanDisplayStatus } from '../../types/loans';
 
@@ -112,11 +113,20 @@ export default function AccountLoansTab() {
           <label className="flex-1 text-xs font-bold text-[#3f546b]">
             {t.amount}
             <input
+              data-testid="loan-amount-input"
               inputMode="numeric"
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               className="mt-2 h-12 w-full rounded-xl border border-[#dce5f1] px-4 font-num outline-none focus:border-[#1668c4]"
             />
+            {tomanAmountInWords(amount, locale) && (
+              <div
+                data-testid="loan-amount-words"
+                className="mt-2 text-[11.5px] font-semibold leading-6 text-[#8a96a6]"
+              >
+                {tomanAmountInWords(amount, locale)}
+              </div>
+            )}
           </label>
           <button disabled={busy} className="h-12 rounded-xl bg-[#1668c4] px-6 text-xs font-black text-white disabled:opacity-60">
             {busy ? '…' : t.submit}

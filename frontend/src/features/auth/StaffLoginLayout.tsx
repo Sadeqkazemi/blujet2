@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
 const FEATURES = [
   {
@@ -53,7 +54,12 @@ export function StaffLoginLayout({ children }: { children: ReactNode }) {
         <img src="/signin-aircraft.png" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50" />
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(175deg,rgba(11,21,38,.35),rgba(11,21,38,.82)_55%,#0b1526_100%)]" />
         <div className="relative flex h-full flex-col justify-between px-12 py-11">
-          <div className="flex items-center gap-2.5">
+          <Link
+            to="/"
+            data-testid="staff-login-home-logo"
+            className="flex items-center gap-2.5 no-underline transition hover:opacity-90"
+            aria-label="بازگشت به صفحه اصلی blujet"
+          >
             <div className="flex h-[42px] w-[42px] items-center justify-center rounded-xl bg-gradient-to-br from-accent to-navy-2 text-[19px] text-white shadow-lg">
               ✈
             </div>
@@ -61,7 +67,7 @@ export function StaffLoginLayout({ children }: { children: ReactNode }) {
               <div className="text-[19px] leading-none font-black text-white">blujet</div>
               <div className="mt-0.5 text-[10.5px] text-[#93a5c2]">سامانهٔ مدیریت داخلی</div>
             </div>
-          </div>
+          </Link>
 
           <div className="max-w-[460px]">
             <h1 className="mb-4 text-[32px] leading-relaxed font-black text-white">

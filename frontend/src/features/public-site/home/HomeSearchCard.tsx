@@ -733,6 +733,7 @@ export default function HomeSearchCard({
   const [pnr, setPnr] = useState('');
   const [lastName, setLastName] = useState('');
   const [flightNo, setFlightNo] = useState('');
+  const [statusDateIso, setStatusDateIso] = useState<string | null>(null);
 
   const showReturn = tripType === 'round' || isMobile;
   const returnInteractive = tripType === 'round';
@@ -746,6 +747,19 @@ export default function HomeSearchCard({
       }
     : {};
   const fieldBoxBg = isMobile ? '#fff' : 'transparent';
+  const auxFieldBoxStyle: React.CSSProperties = {
+    flex: 1,
+    background: fieldBoxBg,
+    borderRadius: 12,
+    padding: '13px 15px',
+    boxShadow: '0 8px 20px -12px rgba(0,0,0,.3)',
+  };
+  const auxFieldLabelStyle: React.CSSProperties = {
+    fontSize: 11,
+    color: '#9aa4b2',
+    fontWeight: 600,
+    marginBottom: 3,
+  };
   const searchBtnRadius = isMobile
     ? '13px'
     : isRTL
@@ -1668,31 +1682,13 @@ export default function HomeSearchCard({
                   gap: 11,
                 }}
               >
-                <div
-                  style={{
-                    flex: 1,
-                    background: fieldBoxBg,
-                    borderRadius: 12,
-                    padding: '13px 15px',
-                    boxShadow: isMobile
-                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
-                      : 'none',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: '#9aa4b2',
-                      fontWeight: 600,
-                      marginBottom: 3,
-                    }}
-                  >
-                    {t.lblBookingCode}
-                  </div>
+                <div style={auxFieldBoxStyle}>
+                  <div style={auxFieldLabelStyle}>{t.lblBookingCode}</div>
                   <input
                     value={pnr}
                     onChange={(ev) => setPnr(ev.target.value)}
                     placeholder={t.phBookingCode}
+                    dir="ltr"
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
@@ -1703,30 +1699,12 @@ export default function HomeSearchCard({
                       fontWeight: 700,
                       color: '#16202e',
                       background: 'transparent',
+                      textAlign: isRTL ? 'right' : 'left',
                     }}
                   />
                 </div>
-                <div
-                  style={{
-                    flex: 1,
-                    background: fieldBoxBg,
-                    borderRadius: 12,
-                    padding: '13px 15px',
-                    boxShadow: isMobile
-                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
-                      : 'none',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: '#9aa4b2',
-                      fontWeight: 600,
-                      marginBottom: 3,
-                    }}
-                  >
-                    {t.lblLastName}
-                  </div>
+                <div style={auxFieldBoxStyle}>
+                  <div style={auxFieldLabelStyle}>{t.lblLastName}</div>
                   <input
                     value={lastName}
                     onChange={(ev) => setLastName(ev.target.value)}
@@ -1747,11 +1725,13 @@ export default function HomeSearchCard({
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  navigate(
-                    `/manage-booking${pnr ? `?pnr=${encodeURIComponent(pnr)}` : ''}`,
-                  )
-                }
+                onClick={() => {
+                  const q = new URLSearchParams();
+                  if (pnr.trim()) q.set('pnr', pnr.trim());
+                  if (lastName.trim()) q.set('lastName', lastName.trim());
+                  const qs = q.toString();
+                  navigate(`/manage-booking${qs ? `?${qs}` : ''}`);
+                }}
                 style={{
                   marginTop: 14,
                   width: '100%',
@@ -1794,31 +1774,13 @@ export default function HomeSearchCard({
                   gap: 11,
                 }}
               >
-                <div
-                  style={{
-                    flex: 1,
-                    background: fieldBoxBg,
-                    borderRadius: 12,
-                    padding: '13px 15px',
-                    boxShadow: isMobile
-                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
-                      : 'none',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: '#9aa4b2',
-                      fontWeight: 600,
-                      marginBottom: 3,
-                    }}
-                  >
-                    {t.lblFlightNo}
-                  </div>
+                <div style={auxFieldBoxStyle}>
+                  <div style={auxFieldLabelStyle}>{t.lblFlightNo}</div>
                   <input
                     value={flightNo}
                     onChange={(ev) => setFlightNo(ev.target.value)}
                     placeholder={t.phFlightNo}
+                    dir="ltr"
                     style={{
                       width: '100%',
                       boxSizing: 'border-box',
@@ -1829,49 +1791,33 @@ export default function HomeSearchCard({
                       fontWeight: 700,
                       color: '#16202e',
                       background: 'transparent',
+                      textAlign: isRTL ? 'right' : 'left',
                     }}
                   />
                 </div>
-                <div
-                  style={{
-                    flex: 1,
-                    background: fieldBoxBg,
-                    borderRadius: 12,
-                    padding: '13px 15px',
-                    boxShadow: isMobile
-                      ? '0 8px 20px -12px rgba(0,0,0,.3)'
-                      : 'none',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: '#9aa4b2',
-                      fontWeight: 600,
-                      marginBottom: 3,
-                    }}
-                  >
-                    {t.lblFlightDate}
-                  </div>
-                  <input
+                <div style={auxFieldBoxStyle}>
+                  <div style={auxFieldLabelStyle}>{t.lblFlightDate}</div>
+                  <JalaliDatePicker
+                    locale={locale}
+                    label=""
+                    value={statusDateIso}
+                    onChange={setStatusDateIso}
+                    testId="home-status-date"
                     placeholder={t.phFlightDate}
-                    style={{
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      border: 'none',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      fontSize: 14,
-                      fontWeight: 700,
-                      color: '#16202e',
-                      background: 'transparent',
-                    }}
+                    isRTL={isRTL}
+                    embedded
                   />
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => navigate('/flight-status')}
+                onClick={() => {
+                  const q = new URLSearchParams();
+                  if (flightNo.trim()) q.set('flightNo', flightNo.trim());
+                  if (statusDateIso) q.set('date', statusDateIso.slice(0, 10));
+                  const qs = q.toString();
+                  navigate(`/flight-status${qs ? `?${qs}` : ''}`);
+                }}
                 style={{
                   marginTop: 14,
                   width: '100%',

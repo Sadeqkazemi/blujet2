@@ -46,6 +46,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: string;
     selectSaved: string;
     savedEmpty: string;
+    savedSignInHint: string;
     addPax: string;
     remove: string;
     passenger: string;
@@ -61,7 +62,12 @@ export const CHECKOUT_COPY: Record<
     ofLabel: string;
     selectedExtras: string;
     nameChangeWarning: string;
+    editPaxFromReview: string;
+    editPaxPopupTitle: string;
+    savePaxEdits: string;
+    cancelBtn: string;
     noneSelected: string;
+    noExtrasAvailable: string;
     toman: string;
     extras: Record<'baggage' | 'meal' | 'insurance' | 'cip', { title: string; desc: string }>;
     months: string[];
@@ -112,6 +118,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'از مسافران ذخیره‌شده',
     selectSaved: 'انتخاب از مسافران ذخیره‌شده:',
     savedEmpty: 'هنوز مسافری در حساب شما ذخیره نشده است.',
+    savedSignInHint: 'برای استفاده از مسافران ذخیره‌شده وارد حساب شوید',
     addPax: 'مسافر جدید',
     remove: 'حذف',
     passenger: 'مسافر',
@@ -129,7 +136,12 @@ export const CHECKOUT_COPY: Record<
     selectedExtras: 'خدمات جانبی انتخابی',
     nameChangeWarning:
       'پس از پرداخت، امکان تغییر نام مسافران وجود ندارد. لطفاً املای نام را با دقت بررسی کنید.',
+    editPaxFromReview: 'ویرایش مسافران',
+    editPaxPopupTitle: 'ویرایش اطلاعات مسافران',
+    savePaxEdits: 'ذخیره تغییرات',
+    cancelBtn: 'انصراف',
     noneSelected: 'انتخاب نشده',
+    noExtrasAvailable: 'در حال حاضر هزینه یا خدمت جانبی فعالی ثبت نشده است.',
     toman: 'تومان',
     extras: {
       baggage: { title: 'بار اضافه (۱۰ کیلوگرم)', desc: 'علاوه بر مجاز ۲۰ کیلوگرمی' },
@@ -186,6 +198,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'From saved passengers',
     selectSaved: 'Select from saved passengers:',
     savedEmpty: 'You have no saved passengers yet.',
+    savedSignInHint: 'Sign in to use saved passengers',
     addPax: 'New passenger',
     remove: 'Remove',
     passenger: 'Passenger',
@@ -203,7 +216,12 @@ export const CHECKOUT_COPY: Record<
     selectedExtras: 'Selected extras',
     nameChangeWarning:
       'Passenger names cannot be changed after payment. Please verify spelling carefully.',
+    editPaxFromReview: 'Edit passengers',
+    editPaxPopupTitle: 'Edit passenger details',
+    savePaxEdits: 'Save changes',
+    cancelBtn: 'Cancel',
     noneSelected: 'Not selected',
+    noExtrasAvailable: 'No optional travel services are available right now.',
     toman: 'Toman',
     extras: {
       baggage: { title: 'Extra baggage (10 kg)', desc: 'On top of the 20 kg allowance' },
@@ -260,6 +278,7 @@ export const CHECKOUT_COPY: Record<
     fromSaved: 'من المسافرين المحفوظين',
     selectSaved: 'اختر من المسافرين المحفوظين:',
     savedEmpty: 'لا يوجد مسافرون محفوظون في حسابك بعد.',
+    savedSignInHint: 'سجّل الدخول لاستخدام المسافرين المحفوظين',
     addPax: 'مسافر جديد',
     remove: 'حذف',
     passenger: 'مسافر',
@@ -276,7 +295,12 @@ export const CHECKOUT_COPY: Record<
     ofLabel: 'من',
     selectedExtras: 'الخدمات الإضافية المختارة',
     nameChangeWarning: 'لا يمكن تغيير أسماء المسافرين بعد الدفع. يرجى التحقق من الإملاء.',
+    editPaxFromReview: 'تعديل المسافرين',
+    editPaxPopupTitle: 'تعديل بيانات المسافرين',
+    savePaxEdits: 'حفظ التغييرات',
+    cancelBtn: 'إلغاء',
     noneSelected: 'لم يتم الاختيار',
+    noExtrasAvailable: 'لا توجد خدمات سفر إضافية متاحة حالياً.',
     toman: 'تومان',
     extras: {
       baggage: { title: 'أمتعة إضافية (10 كجم)', desc: 'إضافة إلى الحد المسموح 20 كجم' },
@@ -290,3 +314,44 @@ export const CHECKOUT_COPY: Record<
     ],
   },
 };
+
+const AGE_ERROR_COPY: Record<
+  StoredLocale,
+  Record<
+    'INFANT_AGE_INVALID' | 'CHILD_AGE_INVALID' | 'TOO_MANY_LAP_INFANTS' | 'ADULT_AGE_REQUIRED',
+    string
+  >
+> = {
+  fa: {
+    INFANT_AGE_INVALID:
+      'این مسافر در تاریخ پرواز زیر ۲ سال نیست و امکان تهیه بلیط نوزاد برای او وجود ندارد.',
+    CHILD_AGE_INVALID:
+      'بلیط کودک یا نوزاد صندلی‌دار فقط برای مسافر کمتر از ۱۲ سال در تاریخ پرواز قابل استفاده است.',
+    TOO_MANY_LAP_INFANTS: 'هر مسافر بزرگسال فقط می‌تواند یک نوزاد بدون صندلی همراه داشته باشد.',
+    ADULT_AGE_REQUIRED: 'مسافر ۱۲ ساله یا بزرگ‌تر باید با نرخ بزرگسال ثبت شود.',
+  },
+  en: {
+    INFANT_AGE_INVALID:
+      'This passenger is not under 2 on the flight date and cannot use an infant ticket.',
+    CHILD_AGE_INVALID:
+      'A child ticket (including a seated infant) is only valid before age 12 on the flight date.',
+    TOO_MANY_LAP_INFANTS: 'Each adult may accompany only one lap infant.',
+    ADULT_AGE_REQUIRED: 'Passengers aged 12 or older must use an adult ticket.',
+  },
+  ar: {
+    INFANT_AGE_INVALID:
+      'هذا المسافر ليس دون سن ٢ في تاريخ الرحلة ولا يمكنه استخدام تذكرة رضيع.',
+    CHILD_AGE_INVALID:
+      'تذكرة الطفل (بما في ذلك الرضيع بمقعد) صالحة فقط قبل سن ١٢ في تاريخ الرحلة.',
+    TOO_MANY_LAP_INFANTS: 'يمكن لكل بالغ مرافقة رضيع واحد فقط بدون مقعد.',
+    ADULT_AGE_REQUIRED: 'يجب على المسافرين aged ١٢ أو أكثر استخدام تذكرة بالغ.',
+  },
+};
+
+export function passengerAgeErrorMessage(
+  code: string,
+  locale: StoredLocale,
+): string | null {
+  const key = code as keyof (typeof AGE_ERROR_COPY)['fa'];
+  return AGE_ERROR_COPY[locale][key] ?? AGE_ERROR_COPY.fa[key] ?? null;
+}

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { normalizeIranMobile } from '../../../lib/fa-format';
 import { localeDigits } from '../../../lib/locale-format';
@@ -139,15 +140,20 @@ export default function PassengerStep({
   passengers,
   onChange,
   savedPassengers,
+  savedPassengersEnabled = true,
   departureAt,
 }: {
   locale: StoredLocale;
   passengers: PassengerFormDraft[];
   onChange: (next: PassengerFormDraft[]) => void;
   savedPassengers: SavedPassenger[];
+  savedPassengersEnabled?: boolean;
   departureAt?: string;
 }) {
   const t = CHECKOUT_COPY[locale];
+  const isMobile = useIsMobile();
+  const paxNameCols = isMobile ? '1fr' : '1fr 1.6fr 0.7fr';
+  const dobGridCols = isMobile ? '1fr' : '1fr 1fr';
   const departureDate = departureAt ? dayjs(departureAt) : dayjs();
   const adultLatestBirthYear =
     locale === 'fa'
@@ -235,8 +241,17 @@ export default function PassengerStep({
               </button>
               <button
                 type="button"
-                onClick={() => setOpenSavedFor(openSavedFor === i ? null : i)}
-                className="flex items-center gap-1.5 text-[11.5px] font-bold text-[#1668c4]"
+                disabled={!savedPassengersEnabled}
+                title={savedPassengersEnabled ? undefined : t.savedSignInHint}
+                onClick={() => {
+                  if (!savedPassengersEnabled) return;
+                  setOpenSavedFor(openSavedFor === i ? null : i);
+                }}
+                className={`flex items-center gap-1.5 text-[11.5px] font-bold ${
+                  savedPassengersEnabled
+                    ? 'cursor-pointer text-[#1668c4]'
+                    : 'cursor-not-allowed text-[#c3cad4]'
+                }`}
                 data-testid={`checkout-from-saved-${i}`}
                 aria-expanded={openSavedFor === i}
               >
@@ -298,7 +313,11 @@ export default function PassengerStep({
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-[11px] sm:grid-cols-3">
+          <div
+            className="grid gap-[11px]"
+            data-testid={`checkout-pax-name-grid-${i}`}
+            style={{ gridTemplateColumns: paxNameCols }}
+          >
             <input
               data-testid={`checkout-pax-first-${i}`}
               dir="ltr"
@@ -336,7 +355,11 @@ export default function PassengerStep({
           </div>
 
           {p.docType === 'NATIONAL_ID' ? (
-            <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
+            <div
+              className="mt-3.5 grid gap-[11px]"
+              data-testid={`checkout-pax-doc-grid-${i}`}
+              style={{ gridTemplateColumns: dobGridCols }}
+            >
               <div>
                 <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
                   {t.nationalId}
@@ -374,7 +397,11 @@ export default function PassengerStep({
               </div>
             </div>
           ) : (
-            <div className="mt-3.5 grid grid-cols-1 gap-[11px] sm:grid-cols-2">
+            <div
+              className="mt-3.5 grid gap-[11px]"
+              data-testid={`checkout-pax-doc-grid-${i}`}
+              style={{ gridTemplateColumns: dobGridCols }}
+            >
               <div>
                 <div className="mb-1.5 text-[10.5px] font-semibold text-[#8a96a6]">
                   {t.passportNo}

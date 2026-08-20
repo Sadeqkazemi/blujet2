@@ -21,8 +21,14 @@ type Props = {
   origin: string;
   dest: string;
   date: string;
+  returnDate?: string;
   onClose: () => void;
-  onApply: (origin: string, dest: string, date: string) => void;
+  onApply: (
+    origin: string,
+    dest: string,
+    date: string,
+    returnDate?: string,
+  ) => void;
 };
 
 type CalCell = { label: string; iso: string | null; disabled: boolean; selected: boolean };
@@ -232,6 +238,7 @@ export default function ResultsEditSearchModal({
   origin,
   dest,
   date,
+  returnDate = '',
   onClose,
   onApply,
 }: Props) {
@@ -255,12 +262,13 @@ export default function ResultsEditSearchModal({
     setDraftOrigin(origin);
     setDraftDest(dest);
     setDraftDate(date);
-    setTripType('oneway');
+    setDraftReturnDate(returnDate);
+    setTripType(returnDate ? 'round' : 'oneway');
     setCalOpen(false);
     setApplying(false);
     setViewMonth(dayjs(`${date}T12:00:00Z`).calendar(calendarForLocale(locale)));
     fetchAirports().then(setAirports).catch(() => setAirports([]));
-  }, [open, origin, dest, date, locale]);
+  }, [open, origin, dest, date, returnDate, locale]);
 
   const weekdays = localeWeekdays[locale];
   const calTitle = localeMonthYear(viewMonth, locale);
@@ -296,7 +304,12 @@ export default function ResultsEditSearchModal({
   function handleApply() {
     if (draftOrigin === draftDest || applying) return;
     setApplying(true);
-    onApply(draftOrigin, draftDest, draftDate);
+    onApply(
+      draftOrigin,
+      draftDest,
+      draftDate,
+      tripType === 'round' && draftReturnDate ? draftReturnDate : undefined,
+    );
   }
 
   if (!open) return null;

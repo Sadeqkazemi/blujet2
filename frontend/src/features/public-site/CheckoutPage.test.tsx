@@ -160,35 +160,46 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-saved-chip-saved-1')).toHaveTextContent('سارا احمدی');
   });
 
-  it('blocks passenger information immediately for guests and returns to results on cancel', async () => {
+  it('shows passenger form for guests and opens OTP after confirm', async () => {
     mockAuth('unauthenticated');
+    const user = userEvent.setup();
     render(
       <MemoryRouter
         initialEntries={[
-          '/results',
           {
             pathname: '/checkout/new',
             search: '?flightInstanceId=fi-1&cabin=ECONOMY',
             state: FLIGHT_STATE,
           },
         ]}
-        initialIndex={1}
       >
         <Routes>
           <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
-          <Route path="/results" element={<div data-testid="results-page">نتایج پرواز</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
+    expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
+    expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-from-saved-0')).toBeDisabled();
+
+    await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
+    await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
+    await user.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
+    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[1]!, '1');
+    await user.selectOptions(selects[2]!, '1');
+    await user.selectOptions(selects[3]!, '1370');
+
+    await user.click(screen.getByTestId('checkout-next'));
     expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
     expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
-    expect(screen.getByTestId('checkout-auth-gate-placeholder')).toBeInTheDocument();
-    expect(screen.queryByTestId('checkout-pax-step')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('checkout-extras-step')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId('checkout-login-close'));
-    expect(await screen.findByTestId('results-page')).toBeInTheDocument();
+    await user.click(screen.getByTestId('checkout-login-close'));
+    expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {
@@ -218,6 +229,56 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-next')).toHaveTextContent('تأیید و ادامه');
     expect(screen.getByTestId('checkout-mobile-sticky')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-next-mobile')).toHaveTextContent('تأیید و ادامه');
+    expect(screen.getByTestId('checkout-pax-name-grid-0')).toHaveStyle({
+      gridTemplateColumns: '1fr',
+    });
+    expect(screen.getByTestId('checkout-pax-doc-grid-0')).toHaveStyle({
+      gridTemplateColumns: '1fr',
+    });
+  });
+
+  it('mobile extras and review steps use single-column service/review grids', async () => {
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
+    mockAuth();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY&origin=THR&dest=MHD',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
+    await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
+    await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
+    await user.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
+    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[1]!, '1');
+    await user.selectOptions(selects[2]!, '1');
+    await user.selectOptions(selects[3]!, '1370');
+
+    await user.click(screen.getByTestId('checkout-next-mobile'));
+    expect(await screen.findByTestId('checkout-extras-step')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-extras-grid')).toHaveStyle({
+      gridTemplateColumns: '1fr',
+    });
+
+    await user.click(screen.getByTestId('checkout-next-mobile'));
+    expect(await screen.findByTestId('checkout-review-step')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-review-extras-grid')).toHaveStyle({
+      gridTemplateColumns: '1fr',
+    });
+    expect(screen.getByTestId('checkout-edit-pax-from-review')).toBeInTheDocument();
   });
 
   it('keeps origin/destination from sessionStorage after auth remount', async () => {

@@ -24,11 +24,12 @@ import type {
   SearchAdvisoryResult,
   SearchFlightResult,
 } from '../../types/public-site';
+import type { CheckoutDraft, FlightSnapshot } from './checkout/checkout-types';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import ResultsAiRadar from './results/ResultsAiRadar';
-import ResultsGuestAuthModal from './results/ResultsGuestAuthModal';
+import ResultsBuyModal from './results/ResultsBuyModal';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
@@ -44,6 +45,10 @@ import {
 } from '../../lib/search-cache';
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
+const ROUNDTRIP_OUTBOUND_KEY = 'blujet_roundtrip_outbound';
+
+type OutboundLeg = NonNullable<CheckoutDraft['outboundLeg']>;
+type BuyModalState = { flight: SearchFlightResult; cabin: CabinClass };
 
 type RealLockResult =
   | { kind: 'success'; lock: PriceLock }
@@ -81,6 +86,7 @@ export default function ResultsPage() {
   const origin = params.get('origin') ?? '';
   const dest = params.get('dest') ?? '';
   const date = params.get('date') ?? '';
+  const returnDate = params.get('returnDate') ?? '';
   const passengerMix = {
     adults: Math.max(1, Number(params.get('adults') || 1)),
     children: Math.max(0, Number(params.get('children') || 0)),
@@ -105,7 +111,27 @@ export default function ResultsPage() {
   >('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
   const [aiVisible, setAiVisible] = useState(true);
-  const [pendingCheckoutPath, setPendingCheckoutPath] = useState<string | null>(null);
+  const [buyModal, setBuyModal] = useState<BuyModalState | null>(null);
+  const [selectedOutbound, setSelectedOutbound] = useState<OutboundLeg | null>(null);
+
+  useEffect(() => {
+    if (!returnDate) {
+      setSelectedOutbound(null);
+      sessionStorage.removeItem(ROUNDTRIP_OUTBOUND_KEY);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(ROUNDTRIP_OUTBOUND_KEY);
+      setSelectedOutbound(raw ? (JSON.parse(raw) as OutboundLeg) : null);
+    } catch {
+      setSelectedOutbound(null);
+    }
+  }, [returnDate, origin, dest, date]);
+
+  const isReturnLeg = Boolean(returnDate && selectedOutbound);
+  const searchOrigin = isReturnLeg ? dest : origin;
+  const searchDest = isReturnLeg ? origin : dest;
+  const searchDate = isReturnLeg ? returnDate : date;
 
   const [club, setClub] = useState<{
     isMember: boolean;
@@ -143,7 +169,7 @@ export default function ResultsPage() {
   }, [status]);
 
   useEffect(() => {
-    if (!origin || !dest || !date) return;
+    if (!searchOrigin || !searchDest || !searchDate) return;
     let cancelled = false;
     setResults(null);
     setSearchError(null);
@@ -155,7 +181,7 @@ export default function ResultsPage() {
       if (!cancelled) setResults((prev) => (prev === null ? [] : prev));
     }, 12_000);
 
-    searchFlights(origin, dest, date)
+    searchFlights(searchOrigin, searchDest, searchDate)
       .then((found) => {
         if (!cancelled) setResults(filterSellableSearchFlights(found));
       })
@@ -173,7 +199,7 @@ export default function ResultsPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [origin, dest, date, copy.searchError, searchNonce]);
+  }, [searchOrigin, searchDest, searchDate, copy.searchError, searchNonce]);
 
   useEffect(
     () => onSearchResultsInvalidate(() => setSearchNonce((n) => n + 1)),
@@ -287,14 +313,93 @@ export default function ResultsPage() {
     nextOrigin: string,
     nextDest: string,
     nextDate: string,
+    nextReturnDate?: string,
   ) {
     if (nextOrigin === nextDest) return;
     const next = new URLSearchParams(params);
     next.set('origin', nextOrigin);
     next.set('dest', nextDest);
     next.set('date', nextDate);
+    if (nextReturnDate) next.set('returnDate', nextReturnDate);
+    else next.delete('returnDate');
+    setSelectedOutbound(null);
+    sessionStorage.removeItem(ROUNDTRIP_OUTBOUND_KEY);
     setParams(next);
     setEditOpen(false);
+  }
+
+  function buildFlightSnapshot(
+    r: SearchFlightResult,
+    cabin: CabinClass,
+  ): FlightSnapshot {
+    const cabinOpt = r.cabins.find((x) => x.cabin === cabin);
+    return {
+      flightInstanceId: r.flightInstanceId,
+      flightNo: r.flightNo,
+      originCode: r.originCode,
+      destCode: r.destCode,
+      departureAt: r.departureAt,
+      arrivalAt: r.arrivalAt,
+      aircraftType: r.aircraftType,
+      priceIrr: cabinOpt?.priceIrr ?? '0',
+    };
+  }
+
+  function proceedToCheckout(
+    r: SearchFlightResult,
+    c: CabinClass,
+    selectedSeats: string[] = [],
+  ) {
+    const flight = buildFlightSnapshot(r, c);
+    const draft: CheckoutDraft = {
+      flightInstanceId: flight.flightInstanceId,
+      cabin: c,
+      selectedSeats,
+      flight,
+      passengerMix,
+      outboundLeg: isReturnLeg ? selectedOutbound ?? undefined : undefined,
+    };
+    sessionStorage.setItem('blujet_checkout_draft', JSON.stringify(draft));
+    if (isReturnLeg) {
+      sessionStorage.removeItem(ROUNDTRIP_OUTBOUND_KEY);
+    }
+    const q = new URLSearchParams({
+      flightInstanceId: r.flightInstanceId,
+      cabin: c,
+      origin: r.originCode,
+      dest: r.destCode,
+      adults: String(passengerMix.adults),
+      children: String(passengerMix.children),
+      infants: String(passengerMix.infants),
+    });
+    const checkoutPath = `/checkout/new?${q.toString()}`;
+    navigate(checkoutPath, { state: { cabin: c, flight } });
+  }
+
+  function handleBuy(r: SearchFlightResult, c: CabinClass) {
+    if (returnDate && !isReturnLeg) {
+      const flight = buildFlightSnapshot(r, c);
+      const leg: OutboundLeg = {
+        flightInstanceId: flight.flightInstanceId,
+        cabin: c,
+        selectedSeats: [],
+        flight,
+      };
+      setSelectedOutbound(leg);
+      sessionStorage.setItem(ROUNDTRIP_OUTBOUND_KEY, JSON.stringify(leg));
+      setResults(null);
+      setExpandedId(null);
+      return;
+    }
+    // Design (نتایج پرواز → تکمیل خرید): buy always goes to passenger form.
+    // Seat map is checkout extras — never before pax, and never for guests
+    // as a results-page gate. Logged-in desktop users may still open the
+    // optional seat modal; guests go straight to checkout.
+    if (!isMobile && status === 'authenticated') {
+      setBuyModal({ flight: r, cabin: c });
+      return;
+    }
+    proceedToCheckout(r, c);
   }
 
   function clearFilters() {
@@ -350,7 +455,9 @@ export default function ResultsPage() {
     );
   }
 
-  const dateLabel = formatLocaleDate(`${date}T12:00:00Z`, locale);
+  const dateLabel = formatLocaleDate(`${searchDate}T12:00:00Z`, locale);
+  const routeOrigin = isReturnLeg ? dest : origin;
+  const routeDest = isReturnLeg ? origin : dest;
 
   return (
     <PublicPageShell>
@@ -445,7 +552,7 @@ export default function ResultsPage() {
                     margin: '0 0 6px',
                   }}
                 >
-                  {copy.selectDepartureLabel}
+                  {isReturnLeg ? copy.selectReturnLabel : copy.selectDepartureLabel}
                 </h2>
                 {isMobile && (
                   <button
@@ -481,11 +588,11 @@ export default function ResultsPage() {
                 }}
               >
                 <span style={{ color: '#0d2640', fontWeight: 800 }}>
-                  {cityLabel(origin)}
+                  {cityLabel(routeOrigin)}
                 </span>
                 <span style={{ color: '#1668c4' }}>{copy.routeArrow}</span>
                 <span style={{ color: '#0d2640', fontWeight: 800 }}>
-                  {cityLabel(dest)}
+                  {cityLabel(routeDest)}
                 </span>
                 <span
                   style={{
@@ -868,50 +975,17 @@ export default function ResultsPage() {
                   club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''),
                 )}
                 passengerMix={passengerMix}
+                buyLabel={
+                  returnDate && !isReturnLeg
+                    ? copy.selectOutboundActionLabel
+                    : undefined
+                }
                 onToggle={() =>
                   setExpandedId((id) =>
                     id === r.flightInstanceId ? null : r.flightInstanceId,
                   )
                 }
-                onBuy={(c) => {
-                  const cabinOpt = r.cabins.find((x) => x.cabin === c);
-                  const flight = {
-                    flightInstanceId: r.flightInstanceId,
-                    flightNo: r.flightNo,
-                    originCode: r.originCode,
-                    destCode: r.destCode,
-                    departureAt: r.departureAt,
-                    arrivalAt: r.arrivalAt,
-                    aircraftType: r.aircraftType,
-                    priceIrr: cabinOpt?.priceIrr ?? '0',
-                  };
-                  // Persist before navigate so OTP/login remounts keep route cities.
-                  sessionStorage.setItem(
-                    'blujet_checkout_draft',
-                    JSON.stringify({
-                      flightInstanceId: flight.flightInstanceId,
-                      cabin: c,
-                      selectedSeats: [],
-                      flight,
-                      passengerMix,
-                    }),
-                  );
-                  const q = new URLSearchParams({
-                    flightInstanceId: r.flightInstanceId,
-                    cabin: c,
-                    origin: r.originCode,
-                    dest: r.destCode,
-                    adults: String(passengerMix.adults),
-                    children: String(passengerMix.children),
-                    infants: String(passengerMix.infants),
-                  });
-                  const checkoutPath = `/checkout/new?${q.toString()}`;
-                  if (status !== 'authenticated') {
-                    setPendingCheckoutPath(checkoutPath);
-                    return;
-                  }
-                  navigate(checkoutPath, { state: { cabin: c, flight } });
-                }}
+                onBuy={(c) => handleBuy(r, c)}
                 onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
                 onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
               />
@@ -1008,25 +1082,6 @@ export default function ResultsPage() {
         />
       </div>
 
-      <ResultsGuestAuthModal
-        locale={locale}
-        open={pendingCheckoutPath !== null}
-        desktopOtp={!isMobile}
-        onClose={() => setPendingCheckoutPath(null)}
-        onAuthenticated={() => {
-          if (!pendingCheckoutPath) return;
-          navigate(pendingCheckoutPath);
-        }}
-        onLogin={() => {
-          if (!pendingCheckoutPath) return;
-          navigate('/signin', { state: { from: pendingCheckoutPath } });
-        }}
-        onSignup={() => {
-          if (!pendingCheckoutPath) return;
-          navigate('/signin?mode=signup', { state: { from: pendingCheckoutPath } });
-        }}
-      />
-
       <ResultsEditSearchModal
         open={editOpen}
         locale={locale}
@@ -1034,9 +1089,28 @@ export default function ResultsPage() {
         origin={origin}
         dest={dest}
         date={date}
+        returnDate={returnDate}
         onClose={() => setEditOpen(false)}
         onApply={applyEditSearch}
       />
+
+      {buyModal && (
+        <ResultsBuyModal
+          open
+          locale={locale}
+          copy={copy}
+          flight={buyModal.flight}
+          cabin={buyModal.cabin}
+          passengerMix={passengerMix}
+          cityName={cityName}
+          onClose={() => setBuyModal(null)}
+          onContinue={(selectedSeats) => {
+            const { flight, cabin } = buyModal;
+            setBuyModal(null);
+            proceedToCheckout(flight, cabin, selectedSeats);
+          }}
+        />
+      )}
 
       {realLockResult && (
         <div

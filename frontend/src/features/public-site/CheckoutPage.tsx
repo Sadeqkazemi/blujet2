@@ -27,7 +27,7 @@ import type {
 } from '../../types/public-site';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import FlowStepper from '../../components/public/FlowStepper';
-import { CHECKOUT_COPY } from './checkout/checkout-copy';
+import { CHECKOUT_COPY, passengerAgeErrorMessage } from './checkout/checkout-copy';
 import {
   clearCheckoutDraft,
   loadCheckoutDraft,
@@ -39,6 +39,7 @@ import FlightSummaryCard from './checkout/FlightSummaryCard';
 import PassengerStep from './checkout/PassengerStep';
 import PricingSidebar from './checkout/PricingSidebar';
 import ReviewStep from './checkout/ReviewStep';
+import ReviewPassengerEditModal from './checkout/ReviewPassengerEditModal';
 import OtpLoginInline from './OtpLoginInline';
 import {
   emptyPassenger,
@@ -99,14 +100,7 @@ export default function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
-
-  // Passenger information is private checkout data. A customer may search and
-  // choose a flight anonymously, but the wizard itself always starts behind
-  // the OTP gate and remains inaccessible until authentication succeeds.
-  useEffect(() => {
-    if (!isWizard || status === 'loading') return;
-    setLoginOpen(status !== 'authenticated');
-  }, [isWizard, status]);
+  const [editPaxOpen, setEditPaxOpen] = useState(false);
 
   // Load held booking (legacy /payment-bound path)
   useEffect(() => {
@@ -180,6 +174,7 @@ export default function CheckoutPage() {
         selectedSeats: fromStorage?.selectedSeats ?? [],
         flight: mergeFlight(stateFlight),
         passengerMix,
+        outboundLeg: fromStorage?.outboundLeg,
       };
       setDraft(d);
       saveCheckoutDraft(d);
@@ -392,22 +387,7 @@ export default function CheckoutPage() {
     }));
     const code = validatePassengerAges(manifest, draft.flight.departureAt);
     if (!code) return null;
-    if (locale === 'en') {
-      if (code === 'INFANT_AGE_INVALID')
-        return 'This passenger is not under 2 on the flight date and cannot use an infant ticket.';
-      if (code === 'CHILD_AGE_INVALID')
-        return 'A child ticket (including a seated infant) is only valid before age 12 on the flight date.';
-      if (code === 'TOO_MANY_LAP_INFANTS')
-        return 'Each adult may accompany only one lap infant.';
-      return 'Passengers aged 12 or older must use an adult ticket.';
-    }
-    if (code === 'INFANT_AGE_INVALID')
-      return 'این مسافر در تاریخ پرواز زیر ۲ سال نیست و امکان تهیه بلیط نوزاد برای او وجود ندارد.';
-    if (code === 'CHILD_AGE_INVALID')
-      return 'بلیط کودک یا نوزاد صندلی‌دار فقط برای مسافر کمتر از ۱۲ سال در تاریخ پرواز قابل استفاده است.';
-    if (code === 'TOO_MANY_LAP_INFANTS')
-      return 'هر مسافر بزرگسال فقط می‌تواند یک نوزاد بدون صندلی همراه داشته باشد.';
-    return 'مسافر ۱۲ ساله یا بزرگ‌تر باید با نرخ بزرگسال ثبت شود.';
+    return passengerAgeErrorMessage(code, locale) ?? CHECKOUT_COPY.fa.completePaxError;
   }
 
   function goBack() {
@@ -468,6 +448,18 @@ export default function CheckoutPage() {
       );
       return;
     }
+    if (
+      draft.outboundLeg &&
+      (!draft.outboundLeg.flight.priceIrr ||
+        draft.outboundLeg.flight.priceIrr === '0')
+    ) {
+      setError(
+        locale === 'en'
+          ? 'The outbound flight price is unavailable.'
+          : 'نرخ پرواز رفت دریافت نشد؛ امکان ثبت رزرو وجود ندارد.',
+      );
+      return;
+    }
     const seatCodes = resolveSeatCodesForBooking();
     if (!seatCodes) {
       setError(
@@ -481,6 +473,56 @@ export default function CheckoutPage() {
     setBusy(true);
     setError(null);
     try {
+      const passengerPayload = (seatList: string[]) => {
+        let seatIndex = 0;
+        return passengers.map((p) => {
+          const birthDate = parseLocaleDateToIso(
+            `${p.birthYear}/${p.birthMonth}/${p.birthDay}`,
+            locale,
+          )?.slice(0, 10);
+          if (!birthDate) throw new Error(t.completePaxError);
+          return {
+            fullName: passengerFullName(p),
+            passengerType: p.passengerType,
+            birthDate,
+            nationalId:
+              p.docType === 'NATIONAL_ID'
+                ? p.nationalId || undefined
+                : undefined,
+            seatCode:
+              p.passengerType === 'INFANT'
+                ? undefined
+                : seatList[seatIndex++]!,
+          };
+        });
+      };
+
+      if (draft.outboundLeg) {
+        const outbound = draft.outboundLeg;
+        const outboundSeats =
+          outbound.selectedSeats.length > 0 ? outbound.selectedSeats : [];
+        const outboundBooking = await createBooking({
+          flightInstanceId: outbound.flightInstanceId,
+          cabin: outbound.cabin,
+          passengers: passengerPayload(outboundSeats),
+        });
+        const returnBooking = await createBooking({
+          flightInstanceId: draft.flightInstanceId,
+          cabin: draft.cabin,
+          passengers: passengerPayload(seatCodes),
+          extras: extras
+            .filter((extra) => extra.selected)
+            .map((extra) => ({ id: extra.id, quantity: extra.quantity })),
+        });
+        sessionStorage.setItem(
+          'blujet_pending_return_payment',
+          returnBooking.id,
+        );
+        clearCheckoutDraft();
+        navigate(`/payment/${outboundBooking.id}`);
+        return;
+      }
+
       let seatIndex = 0;
       const booking = await createBooking({
         flightInstanceId: draft.flightInstanceId,
@@ -618,7 +660,11 @@ export default function CheckoutPage() {
       ? draft.flight.priceIrr
       : '0';
   const passengerCount = Math.max(1, passengers.length);
-  const ticketIrr = passengerTotalIrr(priceIrr, draft.passengerMix);
+  const returnTicketIrr = passengerTotalIrr(priceIrr, draft.passengerMix);
+  const outboundTicketIrr = draft.outboundLeg
+    ? passengerTotalIrr(draft.outboundLeg.flight.priceIrr, draft.passengerMix)
+    : 0n;
+  const ticketIrr = returnTicketIrr + outboundTicketIrr;
   const extrasIrr = extras
     .filter((extra) => extra.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
@@ -641,7 +687,7 @@ export default function CheckoutPage() {
           type="button"
           data-testid="checkout-login-close"
           aria-label={locale === 'en' ? 'Close' : locale === 'ar' ? 'إغلاق' : 'بستن'}
-          onClick={() => navigate(-1)}
+          onClick={() => setLoginOpen(false)}
           className="absolute start-5 top-5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f5f9] text-xl text-[#66758a]"
         >
           ×
@@ -671,11 +717,13 @@ export default function CheckoutPage() {
           checkoutStyle
           onAuthenticated={() => {
             setLoginOpen(false);
+            if (step === 'pax') setStep('extras');
+            else if (step === 'review') void submitBooking();
           }}
         />
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => setLoginOpen(false)}
           className="mt-5 w-full text-center text-sm font-bold text-[#7d8797] transition hover:text-[#0d2640]"
         >
           {locale === 'en' ? 'Cancel' : locale === 'ar' ? 'إلغاء' : 'انصراف'}
@@ -684,7 +732,24 @@ export default function CheckoutPage() {
     </div>
   ) : null;
 
-  const stepBody = status === 'authenticated' ? (
+  const editPaxModal =
+    editPaxOpen && draft ? (
+      <ReviewPassengerEditModal
+        locale={locale}
+        passengers={passengers}
+        savedPassengers={savedPassengers}
+        departureAt={draft.flight.departureAt}
+        onClose={() => setEditPaxOpen(false)}
+        onSave={(next) => {
+          setPassengers(next);
+          setEditPaxOpen(false);
+          setError(null);
+        }}
+      />
+    ) : null;
+
+  const isAuthenticated = status === 'authenticated';
+  const stepBody = (
     <>
       {step === 'pax' && (
         <PassengerStep
@@ -692,6 +757,7 @@ export default function CheckoutPage() {
           passengers={passengers}
           onChange={setPassengers}
           savedPassengers={savedPassengers}
+          savedPassengersEnabled={isAuthenticated}
           departureAt={draft.flight.departureAt}
         />
       )}
@@ -716,15 +782,10 @@ export default function CheckoutPage() {
           passengers={passengers}
           extras={extras}
           selectedSeats={selectedSeats}
+          onEditPassengers={() => setEditPaxOpen(true)}
         />
       )}
     </>
-  ) : (
-    <div
-      className="min-h-[260px] rounded-2xl border border-[#eef1f5] bg-white"
-      aria-hidden="true"
-      data-testid="checkout-auth-gate-placeholder"
-    />
   );
 
   // Explicit mobile/desktop trees (design bundle) — do not rely on Tailwind
@@ -758,6 +819,13 @@ export default function CheckoutPage() {
             cabin={draft.cabin}
             locale={locale}
           />
+          {draft.outboundLeg && (
+            <FlightSummaryCard
+              flight={draft.outboundLeg.flight}
+              cabin={draft.outboundLeg.cabin}
+              locale={locale}
+            />
+          )}
           {stepBody}
           {error && (
             <div
@@ -814,6 +882,7 @@ export default function CheckoutPage() {
           </button>
         </div>
         {loginModal}
+        {editPaxModal}
       </PublicPageShell>
     );
   }
@@ -832,6 +901,13 @@ export default function CheckoutPage() {
             cabin={draft.cabin}
             locale={locale}
           />
+          {draft.outboundLeg && (
+            <FlightSummaryCard
+              flight={draft.outboundLeg.flight}
+              cabin={draft.outboundLeg.cabin}
+              locale={locale}
+            />
+          )}
           {stepBody}
         </div>
         <PricingSidebar
@@ -850,6 +926,7 @@ export default function CheckoutPage() {
         />
       </div>
       {loginModal}
+      {editPaxModal}
     </PublicPageShell>
   );
 }
