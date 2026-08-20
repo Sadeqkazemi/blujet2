@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import FinanceReportsPage from './FinanceReportsPage';
 import * as api from '../../api/finance-manager';
+import type { FinanceReportFilters } from '../../api/finance-manager';
 
 describe('FinanceReportsPage', () => {
   it('renders real partner rows and refetches when switching to charters', async () => {
@@ -10,7 +11,16 @@ describe('FinanceReportsPage', () => {
       kind: 'partners',
       scope: 'AGENCIES',
       period: 'month',
-      rows: [{ id: 'a1', name: 'آژانس سپهر', totalIrr: '3100000000', paidIrr: '2800000000', outstandingIrr: '300000000', soldSeats: 12 }],
+      rows: [
+        {
+          id: 'a1',
+          name: 'آژانس سپهر',
+          totalIrr: '3100000000',
+          paidIrr: '2800000000',
+          outstandingIrr: '300000000',
+          soldSeats: 12,
+        },
+      ],
       summary: { totalIrr: '3100000000', paidIrr: '2800000000' },
     });
 
@@ -19,14 +29,70 @@ describe('FinanceReportsPage', () => {
     expect(screen.getByText('۳۰٬۰۰۰٬۰۰۰ تومان')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'چارترها' }));
-    await waitFor(() => expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'CHARTERS' })));
+    await waitFor(() =>
+      expect(report).toHaveBeenLastCalledWith(
+        expect.objectContaining({ scope: 'CHARTERS' }),
+      ),
+    );
   });
 
   it('shows the flight-search empty state from a real empty response', async () => {
-    vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({ kind: 'partners', scope: 'AGENCIES', period: 'month', rows: [], summary: { totalIrr: '0', paidIrr: '0' } });
+    vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({
+      kind: 'partners',
+      scope: 'AGENCIES',
+      period: 'month',
+      rows: [],
+      summary: { totalIrr: '0', paidIrr: '0' },
+    });
     vi.spyOn(api, 'searchFinanceFlights').mockResolvedValue({ rows: [] });
     render(<FinanceReportsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'جستجوی پرواز' }));
     expect(await screen.findByText('پرواز منطبق پیدا نشد.')).toBeInTheDocument();
+  });
+
+  it('shows customer report seat split columns from real flight rows', async () => {
+    vi.spyOn(api, 'fetchFinanceReport').mockImplementation(
+      async (filters: FinanceReportFilters) => {
+        if (filters.scope === 'CUSTOMERS') {
+          return {
+            kind: 'customers' as const,
+            scope: 'CUSTOMERS' as const,
+            period: filters.period ?? 'month',
+            rows: [
+              {
+                flightInstanceId: 'fi1',
+                flightNo: 'BJ-100',
+                departureAt: '2026-07-01T05:00:00.000Z',
+                originCode: 'THR',
+                destCode: 'MHD',
+                originCityFa: 'تهران',
+                destCityFa: 'مشهد',
+                capacity: 180,
+                soldSeats: 100,
+                unsoldSeats: 80,
+                totalIrr: '5000000000',
+                agencyCount: 2,
+                agencySeats: 40,
+              },
+            ],
+            summary: { totalIrr: '5000000000', soldSeats: 100 },
+          };
+        }
+        return {
+          kind: 'partners' as const,
+          scope: filters.scope,
+          period: 'month' as const,
+          rows: [],
+          summary: { totalIrr: '0', paidIrr: '0' },
+        };
+      },
+    );
+
+    render(<FinanceReportsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'مشتریان' }));
+    expect(await screen.findByText('BJ-100')).toBeInTheDocument();
+    expect(screen.getByText('عادی')).toBeInTheDocument();
+    expect(screen.getByText('آژانس')).toBeInTheDocument();
+    expect(screen.getByText('فروخته‌نشده')).toBeInTheDocument();
   });
 });

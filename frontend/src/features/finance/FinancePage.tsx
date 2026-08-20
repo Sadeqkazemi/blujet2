@@ -1417,7 +1417,9 @@ export default function FinancePage() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <h1 className="mb-1 text-xl font-black text-panel-ink">مالی</h1>
-        <p className="mb-6 text-sm text-panel-muted">فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی</p>
+        <p className="mb-6 text-sm text-panel-muted">
+          مانیتورینگ فروش، تراکنش‌ها و تسویه آژانس‌ها
+        </p>
         <FinanceOpsView />
       </div>
     );

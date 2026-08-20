@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchStaffReports } from '../../api/reporting';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
+import { useAuth } from '../../hooks/useAuth';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { StaffReportsResult } from '../../types/reporting';
@@ -20,6 +21,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default function StaffReportsPage() {
+  const { user } = useAuth();
+  const deptLabel = user?.role === 'FINANCE_MANAGER' ? 'واحد مالی' : 'واحد بازرگانی';
   const [data, setData] = useState<StaffReportsResult | null>(null);
   const [staffId, setStaffId] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -57,7 +60,7 @@ export default function StaffReportsPage() {
       <div>
         <h1 className="m-0 text-[20.5px] font-black text-white">گزارش کارمندان</h1>
         <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-          اقدامات کارمندان واحد بازرگانی — برای هر کارمند یک تب جداگانه
+          اقدامات کارمندان {deptLabel} — برای هر کارمند یک تب جداگانه
         </p>
       </div>
 
@@ -135,7 +138,7 @@ export default function StaffReportsPage() {
         </div>
 
         <div className="mb-3 border-b border-[#1f2a3d] pb-3 text-xs text-[#8fa1bb]">
-          {selected ? `${selected.fullName}${selected.rank ? ` · ${selected.rank}` : ''}` : 'همهٔ کارمندان واحد بازرگانی'}{' '}
+          {selected ? `${selected.fullName}${selected.rank ? ` · ${selected.rank}` : ''}` : `همهٔ کارمندان ${deptLabel}`}{' '}
           · <span className="font-num font-bold text-[#cdd9ec]">{faDigits(data.reports.length)}</span> گزارش
         </div>
 

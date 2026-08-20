@@ -129,6 +129,7 @@ describe('FinancePage', () => {
     const remindSpy = vi.spyOn(agenciesApi, 'remindAgencyInvoice').mockResolvedValue({ queued: true });
 
     renderFinancePage();
+    expect(await screen.findByText('مانیتورینگ فروش، تراکنش‌ها و تسویه آژانس‌ها')).toBeInTheDocument();
     expect(await screen.findByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
     expect(screen.getByTestId('finance-ops-view')).toBeInTheDocument();
     expect(screen.getByTestId('finance-kpi-revenue')).toHaveTextContent('۵۰۰ میلیون');

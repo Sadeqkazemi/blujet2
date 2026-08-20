@@ -3,7 +3,6 @@ import { searchPassengers } from '../../api/reporting';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { faDigits, faMoney } from '../../lib/fa-format';
-import { downloadCsv } from '../../lib/download-csv';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { PassengerReportHit } from '../../types/reporting';
 
@@ -16,6 +15,23 @@ const STATUS_LABEL: Record<string, string> = {
   EXPIRED: 'منقضی‌شده',
   REFUNDED: 'مستردشده',
 };
+
+function downloadPassengerExcel(hits: PassengerReportHit[]) {
+  const rows = hits
+    .map(
+      (h) =>
+        `<tr><td>${h.fullName}</td><td>${h.maskedNationalId ?? ''}</td><td>${h.pnr}</td><td>${STATUS_LABEL[h.status] ?? h.status}</td><td>${h.flightNo}</td><td>${h.originCode} → ${h.destCode}</td><td>${formatJalaliDate(h.departureAt)}</td><td>${h.seatCode ?? ''}</td><td>${faMoney(h.priceIrr)}</td></tr>`,
+    )
+    .join('');
+  const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/></head><body><table><thead><tr><th>نام</th><th>کد ملی</th><th>PNR</th><th>وضعیت</th><th>پرواز</th><th>مسیر</th><th>تاریخ</th><th>صندلی</th><th>مبلغ</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  const blob = new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'passenger-report.xls';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const QUICK_NAMES_KEY = 'blujet_pax_report_quick_names';
 const MAX_QUICK_NAMES = 8;
@@ -92,21 +108,7 @@ export default function PassengerReportsPage() {
       setNotice('ابتدا جستجو کنید تا نتیجه‌ای برای خروجی وجود داشته باشد.');
       return;
     }
-    downloadCsv(
-      'passenger-report.csv',
-      ['نام', 'کد ملی', 'PNR', 'وضعیت', 'پرواز', 'مسیر', 'تاریخ', 'صندلی', 'مبلغ'],
-      hits.map((h) => [
-        h.fullName,
-        h.maskedNationalId ?? '',
-        h.pnr,
-        STATUS_LABEL[h.status] ?? h.status,
-        h.flightNo,
-        `${h.originCode} → ${h.destCode}`,
-        formatJalaliDate(h.departureAt),
-        h.seatCode ?? '',
-        faMoney(h.priceIrr),
-      ]),
-    );
+    downloadPassengerExcel(hits);
     setNotice('خروجی Excel دانلود شد ✓');
   }
 
