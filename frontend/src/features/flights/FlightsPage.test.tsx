@@ -286,7 +286,7 @@ describe("FlightsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("Commercial shows cities tab and embedded pricing on active tab", async () => {
+  it("Commercial shows cities tab and moves embedded pricing to ops tab", async () => {
     mockRole("COMMERCIAL_MANAGER");
     mockData();
     vi.spyOn(pricingApi, "fetchCommercialPricing").mockResolvedValue({
@@ -295,13 +295,27 @@ describe("FlightsPage", () => {
 
     render(<FlightsPage />);
     expect(
-      await screen.findByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
+      await screen.findByRole("button", { name: "تعیین پرواز" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "عملیات" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "پروازهای آینده" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
+    ).not.toBeInTheDocument();
 
     const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(screen.getByRole("button", { name: "عملیات" }));
+    expect(
+      await screen.findByText("تعیین قیمت پرواز و ارسال برای بررسی مدیر عملیات"),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText("تعیین قیمت پرواز و ارسال به گردش تأیید"),
+    ).toBeInTheDocument();
+
     await userEvent.click(
       screen.getByRole("button", { name: "شهرهای پروازی" }),
     );

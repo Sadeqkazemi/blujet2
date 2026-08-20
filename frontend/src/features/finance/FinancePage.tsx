@@ -10,7 +10,7 @@ import {
   fetchRevenueMix,
   fetchSalesChart,
 } from '../../api/reporting';
-import LowSalesBanner from '../../components/LowSalesBanner';
+import { fetchCommercialPricing, runAiAnalysis } from '../../api/pricing';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import type { PanelShellContext } from '../../types/panel-shell';
@@ -895,18 +895,119 @@ export function filterFlightSalesRows(
   });
 }
 
+export type FinancePriceSuggestion = {
+  suggestedIrr: string;
+  reason: string;
+  deltaPct: number | null;
+};
+
+function buildFinanceSuggestions(
+  flights: Awaited<ReturnType<typeof fetchCommercialPricing>>['flights'],
+): Record<string, FinancePriceSuggestion> {
+  const out: Record<string, FinancePriceSuggestion> = {};
+  for (const f of flights) {
+    const flightNo = f.flight.flightNo;
+    const currentIrr = BigInt(
+      f.pricing?.proposedPriceIrr ?? f.pricing?.registeredPriceIrr ?? f.basePriceIrr ?? '0',
+    );
+    const ai = f.pricing?.aiSuggestion;
+    if (ai?.priceIrr) {
+      const suggested = BigInt(Math.round(ai.priceIrr));
+      const delta =
+        currentIrr > 0n
+          ? Number(((suggested - currentIrr) * 100n) / currentIrr)
+          : null;
+      out[flightNo] = {
+        suggestedIrr: suggested.toString(),
+        reason: ai.reason,
+        deltaPct: delta,
+      };
+      continue;
+    }
+    if (!f.competitorPriceIrr) continue;
+    const competitor = BigInt(f.competitorPriceIrr);
+    const suggested = (competitor * 98n) / 100n;
+    const delta =
+      currentIrr > 0n ? Number(((suggested - currentIrr) * 100n) / currentIrr) : null;
+    out[flightNo] = {
+      suggestedIrr: suggested.toString(),
+      reason:
+        suggested < competitor
+          ? 'کاهش برای رقابت با رقبا'
+          : 'ظرفیت بازار اجازه می‌دهد',
+      deltaPct: delta,
+    };
+  }
+  return out;
+}
+
+function FinanceCompetitorAnalysis({
+  suggestions,
+  state,
+  onAnalyze,
+}: {
+  suggestions: Record<string, FinancePriceSuggestion>;
+  state: 'idle' | 'loading' | 'done';
+  onAnalyze: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#2a3550] bg-gradient-to-l from-[#172339] to-[#1d2a44] px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[rgba(168,85,247,.2)] text-[#c084fc]">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+            <path d="M12 3l1.9 5.8L20 9l-4.8 3.6L17 19l-5-3.6L7 19l1.8-6.4L4 9l6.1-.2L12 3z" />
+          </svg>
+        </span>
+        <div>
+          <div className="text-[14.5px] font-extrabold text-white">تحلیل هوشمند قیمت رقبا</div>
+          <div className="mt-0.5 text-[11.5px] text-[#9fb0c7]">
+            هوش مصنوعی با بررسی قیمت رقبا برای هر پرواز قیمت بهینه پیشنهاد می‌دهد
+            {state === 'done' && Object.keys(suggestions).length > 0
+              ? ` — ${faDigits(Object.keys(suggestions).length)} پرواز`
+              : ''}
+          </div>
+        </div>
+      </div>
+      {state === 'loading' ? (
+        <span className="flex items-center gap-2 text-[12.5px] font-semibold text-white">
+          <span className="inline-block h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          در حال تحلیل رقبا…
+        </span>
+      ) : state === 'done' ? (
+        <button
+          type="button"
+          onClick={onAnalyze}
+          className="rounded-[10px] border border-white/30 px-4 py-2 text-xs font-bold text-white"
+        >
+          تحلیل دوباره
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onAnalyze}
+          className="rounded-[10px] bg-[#3b82f6] px-[18px] py-2.5 text-[12.5px] font-extrabold text-white"
+        >
+          تحلیل و پیشنهاد قیمت
+        </button>
+      )}
+    </div>
+  );
+}
+
 function FlightSalesPicker({
   rows,
   selectedFlightNo,
   onSelect,
   search,
   onSearchChange,
+  priceSuggestions,
 }: {
   rows: AggregatedFlightSales[];
   selectedFlightNo: string | null;
   onSelect: (row: AggregatedFlightSales) => void;
   search: string;
   onSearchChange: (v: string) => void;
+  priceSuggestions?: Record<string, FinancePriceSuggestion>;
 }) {
   const hasQuery = search.trim().length > 0;
   const filtered = filterFlightSalesRows(rows, search);
@@ -964,6 +1065,7 @@ function FlightSalesPicker({
                 r.flightCount > 1
                   ? `${faDigits(r.flightCount)} پرواز`
                   : formatJalaliDate(r.departureAt);
+              const sug = priceSuggestions?.[r.flightNo];
               return (
                 <button
                   key={r.flightNo}
@@ -983,6 +1085,17 @@ function FlightSalesPicker({
                     <div className="text-[10px] text-[#6b7b94]">
                       پرواز <span dir="ltr">{r.flightNo}</span> · {meta}
                     </div>
+                    {sug && (
+                      <div className="mt-1 text-[10px] font-bold text-[#34d399]">
+                        پیشنهاد: {faMoney(sug.suggestedIrr)} تومان
+                        {sug.deltaPct != null && (
+                          <span className={sug.deltaPct >= 0 ? ' text-[#34d399]' : ' text-[#f87171]'}>
+                            {' '}
+                            {sug.deltaPct >= 0 ? '▲' : '▼'} {faDigits(Math.abs(sug.deltaPct))}٪
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="shrink-0 text-left whitespace-nowrap">
                     <div className="font-num text-xs font-extrabold text-[#60a5fa]">
@@ -1018,6 +1131,22 @@ function FinanceAnalyticView() {
   const [selectedFlightNo, setSelectedFlightNo] = useState<string | null>(null);
   const [flightSearch, setFlightSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [finAiState, setFinAiState] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [priceSuggestions, setPriceSuggestions] = useState<Record<string, FinancePriceSuggestion>>({});
+
+  async function analyzeFinancePrices() {
+    setFinAiState('loading');
+    setError(null);
+    try {
+      await runAiAnalysis();
+      const pricing = await fetchCommercialPricing();
+      setPriceSuggestions(buildFinanceSuggestions(pricing.flights));
+      setFinAiState('done');
+    } catch {
+      setError('تحلیل قیمت رقبا انجام نشد؛ دوباره تلاش کنید.');
+      setFinAiState('idle');
+    }
+  }
 
   // Bar / day / month modes: existing chart + period-scoped KPIs.
   useEffect(() => {
@@ -1174,6 +1303,7 @@ function FinanceAnalyticView() {
                 onSelect={(row) => setSelectedFlightNo(row.flightNo)}
                 search={flightSearch}
                 onSearchChange={setFlightSearch}
+                priceSuggestions={priceSuggestions}
               />
             </>
           ) : (
@@ -1183,6 +1313,7 @@ function FinanceAnalyticView() {
               onSelect={(row) => setSelectedFlightNo(row.flightNo)}
               search={flightSearch}
               onSearchChange={setFlightSearch}
+              priceSuggestions={priceSuggestions}
             />
           )
         ) : !chart.isQueryReady ? (
@@ -1267,6 +1398,11 @@ function FinanceAnalyticView() {
       )}
 
       <FlightsStrip flights={isFlightMode && flightSeats ? flightSeats : flights} />
+      <FinanceCompetitorAnalysis
+        suggestions={priceSuggestions}
+        state={finAiState}
+        onAnalyze={() => void analyzeFinancePrices()}
+      />
       <RevenueMixCard mix={mix} theme="dark" />
     </div>
   );

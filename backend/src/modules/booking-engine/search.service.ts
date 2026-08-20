@@ -144,6 +144,9 @@ export class SearchService {
       `("${alias}"."saleEndsAt" IS NULL OR "${alias}"."saleEndsAt" >= :now)`,
       { now },
     );
+    qb.andWhere(
+      `COALESCE((${alias}."commercialPanelSettings"->>'siteVisible')::boolean, true) = true`,
+    );
     return qb;
   }
 

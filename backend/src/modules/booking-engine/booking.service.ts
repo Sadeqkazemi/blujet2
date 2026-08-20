@@ -40,6 +40,10 @@ import { enumerateSeats } from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { assertSellableForSale } from '../flights/definition-sellability';
+import {
+  parseCommercialPanelSettings,
+  resolveSiteVisible,
+} from '../flights/commercial-panel-settings';
 import { calculateActiveCharges } from '../flights/charge-rules';
 import { serializeCabinCapacities } from '../flights/flight-definition.util';
 import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
@@ -266,6 +270,16 @@ export class BookingService {
       throw new ConflictException({
         code: ErrorCode.SALE_WINDOW_CLOSED,
         message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
+    if (
+      !resolveSiteVisible(
+        parseCommercialPanelSettings(instance.commercialPanelSettings),
+      )
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'این پرواز هنوز برای نمایش و فروش در سایت مجوز ندارد.',
       });
     }
 
@@ -722,6 +736,16 @@ export class BookingService {
       throw new ConflictException({
         code: ErrorCode.SALE_WINDOW_CLOSED,
         message: 'مهلت فروش این پرواز به پایان رسیده یا هنوز آغاز نشده است.',
+      });
+    }
+    if (
+      !resolveSiteVisible(
+        parseCommercialPanelSettings(instance.commercialPanelSettings),
+      )
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.SALE_WINDOW_CLOSED,
+        message: 'این پرواز هنوز برای نمایش و فروش در سایت مجوز ندارد.',
       });
     }
 
