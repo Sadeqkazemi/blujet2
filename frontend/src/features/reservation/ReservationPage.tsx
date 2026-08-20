@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
   cancelBooking,
@@ -246,7 +247,13 @@ function ItReservationView() {
     [pnrGroups],
   );
 
+  const issuedRows = useMemo(
+    () => recentRows.filter((r) => r.status === 'TICKETED' || r.status === 'FLOWN'),
+    [recentRows],
+  );
+
   const recentPager = usePagination(recentRows);
+  const issuedPager = usePagination(issuedRows);
   const agenciesPager = usePagination(agencies ?? []);
   const flightsPager = usePagination(flights ?? []);
 
@@ -606,11 +613,73 @@ function ItReservationView() {
               variant="dark"
             />
           </section>
+
+          <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+            <div className="border-b border-[#1f2a3d] px-[15px] py-3">
+              <h2 className="text-[13.5px] font-extrabold text-white">بلیط‌های صادرشده</h2>
+              <p className="mt-1 text-[10.5px] text-[#6b7b94]">
+                رزروهایی با وضعیت صادرشده یا پروازشده
+              </p>
+            </div>
+            <div
+              className={`${RECENT_PNR_GRID} border-b border-[#1f2a3d] px-[15px] py-[11px] text-[10.5px] font-bold text-[#6b7b94]`}
+            >
+              <span>PNR</span>
+              <span>مسیر</span>
+              <span>مسافر</span>
+              <span>وضعیت</span>
+            </div>
+            {issuedRows.length === 0 ? (
+              <div className="px-[15px] py-[34px] text-center text-xs text-[#6b7b94]">
+                بلیط صادرشده‌ای ثبت نشده است.
+              </div>
+            ) : (
+              issuedPager.pageItems.map((r) => {
+                const st = IT_STATUS_LABEL[r.status] ?? IT_STATUS_LABEL.TICKETED;
+                return (
+                  <div
+                    key={`issued-${r.pnr}`}
+                    className={`${RECENT_PNR_GRID} border-b border-[#16202e] px-[15px] py-3 text-xs last:border-0`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setDetailPnr(r.pnr)}
+                      className={`${PNR_CODE_CELL} underline decoration-dashed underline-offset-4`}
+                    >
+                      {r.pnr}
+                    </button>
+                    <span className="min-w-0 truncate text-[#cdd6e3]">{r.route}</span>
+                    <span className="min-w-0 truncate text-[#9fb0c7]">{r.passenger}</span>
+                    <span className={`w-max rounded-[14px] px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
+                      {st.label}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+            <Pagination
+              page={issuedPager.page}
+              totalPages={issuedPager.totalPages}
+              onChange={issuedPager.setPage}
+              variant="dark"
+            />
+          </section>
         </div>
       )}
 
       {subTab === 'agency' && (
         <div className="flex flex-col gap-[11px]">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-4 py-3">
+            <p className="text-[11px] text-[#9fb0c7]">
+              مدیریت کامل کلیدها، Scope و سیاست دسترسی در وب‌سرویس‌ها انجام می‌شود.
+            </p>
+            <Link
+              to="/panel/webservices"
+              className="rounded-[10px] bg-[#3b82f6] px-3.5 py-2 text-[11px] font-extrabold text-white"
+            >
+              وب‌سرویس‌ها و API ←
+            </Link>
+          </div>
           {agencies === null ? (
             <p className="py-8 text-center text-xs text-[#6b7b94]">در حال بارگذاری…</p>
           ) : agencies.length === 0 ? (
@@ -634,6 +703,12 @@ function ItReservationView() {
                   <div className="text-[10px] text-[#6b7b94]">درخواست‌ها</div>
                   <div className="font-num mt-0.5 text-[13px] font-extrabold text-[#e7ecf3]">
                     {faDigits(a.callCount)}
+                  </div>
+                </div>
+                <div className="flex-none text-center">
+                  <div className="text-[10px] text-[#6b7b94]">آخرین اتصال</div>
+                  <div className="mt-0.5 text-[11px] font-bold text-[#9fb0c7]">
+                    {a.lastUsedAt ? formatJalaliDateTime(a.lastUsedAt) : '—'}
                   </div>
                 </div>
                 <span

@@ -136,6 +136,34 @@ export class ListPnrQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  @ApiPropertyOptional({
+    description: 'فیلتر وضعیت رزرو — مثلاً TICKETED برای بلیط‌های صادرشده',
+    enum: [
+      'DRAFT',
+      'HELD',
+      'PAID',
+      'TICKETED',
+      'CANCELLED',
+      'EXPIRED',
+      'REFUNDED',
+      'FLOWN',
+      'NO_SHOW',
+    ],
+  })
+  @IsOptional()
+  @IsIn([
+    'DRAFT',
+    'HELD',
+    'PAID',
+    'TICKETED',
+    'CANCELLED',
+    'EXPIRED',
+    'REFUNDED',
+    'FLOWN',
+    'NO_SHOW',
+  ])
+  status?: string;
 }
 
 export class ListReservationFlightsQueryDto {

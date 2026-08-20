@@ -1,21 +1,44 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, MoreThanOrEqual, Repository } from 'typeorm';
+import { normalizeCapabilities } from '../../common/agency-api-capabilities';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AgencyWebserviceRequest } from '../../database/entities/agency-webservice-request.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
-import type { AgencyApiScope, AgencyApiKeyStatus } from '../../database/enums';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
+import { Passenger } from '../../database/entities/passenger.entity';
+import type {
+  AgencyApiCapability,
+  AgencyApiEnvironment,
+  AgencyApiKeyStatus,
+  AgencyApiScope,
+  AgencyFlightDomain,
+} from '../../database/enums';
 import { AgenciesService } from '../agencies/agencies.service';
 import type { DecideWebserviceRequestDto } from '../agencies/dto/decide-webservice-request.dto';
+import { enumerateSeats } from '../reservation/seat-layout';
+import { resolveAircraftType } from '../flights/aircraft-type.util';
+import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 
 type ClientUpdate = {
   status?: AgencyApiKeyStatus;
   regenerate?: boolean;
   stepUpChallengeId?: string;
   stepUpCode?: string;
+  scope?: AgencyApiScope;
+  capabilities?: AgencyApiCapability[];
+  environment?: AgencyApiEnvironment;
+  flightDomain?: AgencyFlightDomain;
+  ipWhitelist?: string[];
+  rateLimitPerMinute?: number | null;
+  expiresAt?: string | null;
 };
 
 @Injectable()
@@ -29,6 +52,12 @@ export class ItWebservicesService {
     private readonly agencyRepo: Repository<AgencyProfile>,
     @InjectRepository(AuditLog)
     private readonly auditRepo: Repository<AuditLog>,
+    @InjectRepository(FlightInstance)
+    private readonly flightInstanceRepo: Repository<FlightInstance>,
+    @InjectRepository(Passenger)
+    private readonly passengerRepo: Repository<Passenger>,
+    @InjectRepository(AircraftSeatMap)
+    private readonly seatMapRepo: Repository<AircraftSeatMap>,
     private readonly agencies: AgenciesService,
   ) {}
 
@@ -118,11 +147,17 @@ export class ItWebservicesService {
         agency: key.agency.user.fullName,
         keyHint: `bjk_••••${key.id.replace(/-/g, '').slice(0, 4)}`,
         scope: key.scope,
+        capabilities: normalizeCapabilities(key.capabilities, key.scope),
+        environment: key.environment,
+        flightDomain: key.flightDomain,
+        ipWhitelist: key.ipWhitelist ?? [],
+        rateLimitPerMinute: key.rateLimitPerMinute,
         status: key.status,
         activatedAt: key.activatedAt,
         expiresAt: key.expiresAt,
         lastUsedAt: key.lastUsedAt,
         callCount: key.callCount,
+        errorRatePct: null as number | null,
       })),
       eligibleAgencies: eligibleAgencies.map((agency) => ({
         id: agency.userId,
@@ -139,7 +174,7 @@ export class ItWebservicesService {
         level:
           event.category === 'SECURITY'
             ? 'ERROR'
-            : /رد|تعلیق|مجدد/.test(event.action)
+            : /رد|تعلیق|مجدد|نرخ|Rate|IP/.test(event.action)
               ? 'WARN'
               : 'INFO',
         createdAt: event.createdAt,
@@ -175,6 +210,14 @@ export class ItWebservicesService {
     scope: AgencyApiScope,
     stepUpChallengeId: string,
     stepUpCode: string,
+    options: {
+      environment?: AgencyApiEnvironment;
+      flightDomain?: AgencyFlightDomain;
+      capabilities?: AgencyApiCapability[];
+      ipWhitelist?: string[];
+      rateLimitPerMinute?: number | null;
+      expiresAt?: string | null;
+    } = {},
   ) {
     return this.agencies.issueApiKey(
       actor,
@@ -182,6 +225,7 @@ export class ItWebservicesService {
       scope,
       stepUpChallengeId,
       stepUpCode,
+      options,
     );
   }
 
@@ -198,5 +242,70 @@ export class ItWebservicesService {
       });
     }
     return this.agencies.updateApiKey(actor, key.agencyId, key.id, dto);
+  }
+
+  /**
+   * Design «آزمایشگر استعلام ظرفیت»: same capability gate the live API uses
+   * for availability — no fabricated seat counts when the flight is missing.
+   */
+  async testAvailability(keyId: string, flightNo: string) {
+    const key = await this.keyRepo.findOneBy({ id: keyId });
+    if (!key) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کلاینت API یافت نشد.',
+      });
+    }
+
+    const capabilities = normalizeCapabilities(key.capabilities, key.scope);
+    if (!capabilities.includes('AVAILABILITY')) {
+      throw new ForbiddenException({
+        code: ErrorCode.FORBIDDEN,
+        message: 'دسترسی مجاز نیست',
+      });
+    }
+
+    const normalized = flightNo.trim().toUpperCase();
+    const instance = await this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .innerJoinAndSelect('fi.flight', 'flight')
+      .innerJoinAndSelect('flight.route', 'route')
+      .where('UPPER(flight.flightNo) = :flightNo', { flightNo: normalized })
+      .andWhere('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.departureAt > NOW()')
+      .orderBy('fi.departureAt', 'ASC')
+      .getOne();
+
+    if (!instance) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز فعالی با این شماره یافت نشد.',
+      });
+    }
+
+    const aircraftType = resolveAircraftType(instance);
+    const seatMap = await this.seatMapRepo.findOneBy({ aircraftType });
+    const capacity = seatMap ? enumerateSeats(seatMap).length : 0;
+    const sold = await this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .where('b.flightInstanceId = :id', { id: instance.id })
+      .andWhere('b.status NOT IN (:...cancelled)', {
+        cancelled: ['CANCELLED', 'EXPIRED'],
+      })
+      .andWhere('p.seatCode IS NOT NULL')
+      .getCount();
+
+    return {
+      allowed: true,
+      flightInstanceId: instance.id,
+      flightNo: instance.flight.flightNo,
+      originCode: instance.flight.route.originCode,
+      destCode: instance.flight.route.destCode,
+      departureAt: instance.departureAt,
+      capacity,
+      seatsSold: sold,
+      seatsLeft: Math.max(0, capacity - sold),
+    };
   }
 }

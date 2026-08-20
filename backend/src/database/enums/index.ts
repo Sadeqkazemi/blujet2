@@ -244,6 +244,34 @@ export const AgencyApiScope = {
 export type AgencyApiScope =
   (typeof AgencyApiScope)[keyof typeof AgencyApiScope];
 
+/** Fine-grained partner-API capabilities managed from IT webservices. */
+export const AgencyApiCapability = {
+  RESERVATION: 'RESERVATION',
+  TICKETING: 'TICKETING',
+  PRICING: 'PRICING',
+  FLIGHT_INFO: 'FLIGHT_INFO',
+  REFUND: 'REFUND',
+  CHECK_IN: 'CHECK_IN',
+  AVAILABILITY: 'AVAILABILITY',
+} as const;
+export type AgencyApiCapability =
+  (typeof AgencyApiCapability)[keyof typeof AgencyApiCapability];
+
+export const AgencyApiEnvironment = {
+  SANDBOX: 'SANDBOX',
+  PRODUCTION: 'PRODUCTION',
+} as const;
+export type AgencyApiEnvironment =
+  (typeof AgencyApiEnvironment)[keyof typeof AgencyApiEnvironment];
+
+export const AgencyFlightDomain = {
+  ALL: 'ALL',
+  DOMESTIC: 'DOMESTIC',
+  INTERNATIONAL: 'INTERNATIONAL',
+} as const;
+export type AgencyFlightDomain =
+  (typeof AgencyFlightDomain)[keyof typeof AgencyFlightDomain];
+
 export const AgencyApiKeyStatus = {
   ACTIVE: 'ACTIVE',
   SUSPENDED: 'SUSPENDED',
