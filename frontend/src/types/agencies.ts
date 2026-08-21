@@ -208,8 +208,8 @@ export interface AgencySeatRequestRow {
   licenseNo: string;
   routeFa: string;
   seats: number;
-  /** 1|3|12 in the commercial UI; 6 remains valid for the legacy portal contract. */
-  months: 1 | 3 | 6 | 12;
+  /** 0 means weekly; the remaining values are purchase terms in months. */
+  months: 0 | 1 | 3 | 6 | 12;
   aircraftType: string;
   unitPriceIrr: string;
   totalIrr: string;

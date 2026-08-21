@@ -12,6 +12,7 @@ import * as crypto from 'node:crypto';
 import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { AgencyRequestOtp } from '../../database/entities/agency-request-otp.entity';
@@ -1598,7 +1599,13 @@ export class AgenciesService {
         }
 
         const dueAt = this.parseDueAt(dto.dueAt);
-        const totalIrr = locked.unitPriceIrr * BigInt(locked.seats);
+        const occurrenceCount = await tx.count(AgencySeatRequestFlight, {
+          where: { seatRequestId: locked.id },
+        });
+        const totalIrr =
+          locked.unitPriceIrr *
+          BigInt(locked.seats) *
+          BigInt(Math.max(occurrenceCount, 1));
         const invoice = await this.issueInvoice(
           actor,
           locked.agencyId,
@@ -2143,7 +2150,7 @@ export class AgenciesService {
         : origin && dest
           ? `${origin} - ${dest}`
           : '—';
-    const months = (row.termMonths ?? 1) as 1 | 3 | 6 | 12;
+    const months = (row.termMonths ?? 1) as 0 | 1 | 3 | 6 | 12;
     return {
       id: row.id,
       agencyId: row.agencyId,
@@ -2157,7 +2164,11 @@ export class AgenciesService {
       months,
       aircraftType: row.aircraftType,
       unitPriceIrr: row.unitPriceIrr.toString(),
-      totalIrr: (row.unitPriceIrr * BigInt(row.seats)).toString(),
+      totalIrr: (
+        row.unitPriceIrr *
+        BigInt(row.seats) *
+        BigInt(Math.max(row.flights?.length ?? 0, 1))
+      ).toString(),
       payMethod: row.payMethod,
       status: row.status,
       invoiceNo: row.invoice?.invoiceNo ?? null,

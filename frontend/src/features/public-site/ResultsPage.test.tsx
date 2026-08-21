@@ -228,6 +228,7 @@ describe('ResultsPage', () => {
     ]);
     renderPage();
     await screen.findByTestId('result-card');
+    expect(screen.getByRole('button', { name: 'پیشنهاد بلوجت' })).toBeInTheDocument();
     await expandFirstCard();
 
     expect(screen.getByRole('button', { name: 'خرید بلیط' })).toBeDisabled();
@@ -314,6 +315,7 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('edit-search-dest')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-date')).toBeInTheDocument();
     expect(screen.getByTestId('edit-search-pax')).toBeInTheDocument();
+    expect(screen.queryByTestId('edit-search-pax-adults-inc')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('edit-search-date'));
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
@@ -333,6 +335,7 @@ describe('ResultsPage', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
+    await userEvent.click(screen.getByTestId('edit-search-pax'));
     await userEvent.click(screen.getByTestId('edit-search-pax-adults-inc'));
     await userEvent.click(screen.getByTestId('edit-search-pax-children-inc'));
     await userEvent.click(screen.getByRole('button', { name: 'جستجوی پرواز' }));

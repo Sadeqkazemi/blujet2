@@ -41,6 +41,12 @@ describe('FlightPriceCalendar', () => {
     expect(screen.getByTestId('price-calendar-day-2026-07-30')).toHaveAttribute('data-empty', 'true');
     expect(screen.getByTestId('price-calendar-cheapest-2026-07-31')).toBeInTheDocument();
     expect(screen.getByTestId('price-calendar')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getAllByTestId(/^price-calendar-visible-day-/)).toHaveLength(6);
+    expect(screen.getByRole('button', { name: 'روزهای بعدی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'روزهای قبلی' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'روزهای بعدی' }));
+    expect(screen.getByTestId('price-calendar-visible-day-2026-08-04')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('price-calendar-day-2026-08-02'));
     expect(onSelect).toHaveBeenCalledWith('2026-08-02');

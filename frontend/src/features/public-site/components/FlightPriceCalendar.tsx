@@ -32,6 +32,7 @@ export default function FlightPriceCalendar({
   const [days, setDays] = useState<PriceCalendarDay[]>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [reloadKey, setReloadKey] = useState(0);
+  const [windowStart, setWindowStart] = useState(0);
 
   const load = useCallback(async () => {
     if (!origin || !dest || !selectedDate) {
@@ -43,6 +44,7 @@ export default function FlightPriceCalendar({
     try {
       const data = await fetchPriceCalendar(origin, dest, selectedDate.slice(0, 10));
       setDays(data);
+      setWindowStart(0);
       setState(data.length === 0 ? 'empty' : 'ready');
     } catch {
       setDays([]);
@@ -55,6 +57,7 @@ export default function FlightPriceCalendar({
   }, [load, reloadKey]);
 
   const cheapestDate = useMemo(() => findCheapestPriceCalendarDate(days), [days]);
+  const visibleDays = days.slice(windowStart, windowStart + 6);
 
   if (!origin || !dest || !selectedDate) return null;
 
@@ -141,9 +144,9 @@ export default function FlightPriceCalendar({
             data-testid="price-calendar-strip"
             style={{
               display: 'flex',
+              alignItems: 'stretch',
               gap: 9,
-              overflowX: 'auto',
-              overflowY: 'visible',
+              overflow: 'visible',
               paddingBottom: 2,
               paddingTop: 10,
               maxWidth: '100%',
@@ -151,7 +154,16 @@ export default function FlightPriceCalendar({
               scrollbarWidth: 'thin',
             }}
           >
-            {days.map((day) => {
+            <button
+              type="button"
+              aria-label={isRTL ? 'روزهای بعدی' : 'Next days'}
+              disabled={windowStart + 6 >= days.length}
+              onClick={() => setWindowStart((value) => Math.min(Math.max(0, days.length - 6), value + 1))}
+              style={{ width: 40, flex: 'none', borderRadius: 12, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart + 6 >= days.length ? .35 : 1 }}
+            >
+              ‹
+            </button>
+            {visibleDays.map((day) => {
               const selected = day.date === selectedDate.slice(0, 10);
               const isCheapest = cheapestDate != null && day.date === cheapestDate;
               const empty = formatPriceCalendarPrice(day.minPriceIrr, locale, copy.emptyDay) === copy.emptyDay;
@@ -168,13 +180,14 @@ export default function FlightPriceCalendar({
                   key={day.date}
                   type="button"
                   data-testid={`price-calendar-day-${day.date}`}
+                  data-visible-testid={`price-calendar-visible-day-${day.date}`}
                   data-selected={selected ? 'true' : 'false'}
                   data-empty={empty ? 'true' : 'false'}
                   aria-pressed={selected}
                   onClick={() => onSelectDate(day.date)}
                   style={{
-                    flex: '1 0 auto',
-                    minWidth: 112,
+                    flex: '1 1 0',
+                    minWidth: 0,
                     maxWidth: 160,
                     cursor: 'pointer',
                     borderRadius: 12,
@@ -191,6 +204,7 @@ export default function FlightPriceCalendar({
                     boxSizing: 'border-box',
                   }}
                 >
+                  <span data-testid={`price-calendar-visible-day-${day.date}`} style={{ display: 'none' }} />
                   {isCheapest && !empty && (
                     <span
                       data-testid={`price-calendar-cheapest-${day.date}`}
@@ -220,6 +234,15 @@ export default function FlightPriceCalendar({
                 </button>
               );
             })}
+            <button
+              type="button"
+              aria-label={isRTL ? 'روزهای قبلی' : 'Previous days'}
+              disabled={windowStart === 0}
+              onClick={() => setWindowStart((value) => Math.max(0, value - 1))}
+              style={{ width: 40, flex: 'none', borderRadius: 12, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart === 0 ? .35 : 1 }}
+            >
+              ›
+            </button>
           </div>
         )}
       </div>

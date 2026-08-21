@@ -38,11 +38,14 @@ describe('AgencyTicketPage', () => {
     await user.selectOptions(await screen.findByTestId('agency-ticket-origin'), 'THR');
     await user.selectOptions(screen.getByTestId('agency-ticket-destination'), 'MHD');
     await user.click(screen.getByTestId('agency-ticket-date'));
-    await user.selectOptions(screen.getByTestId('agency-ticket-passengers'), '2');
+    await user.click(screen.getByTestId('agency-ticket-passengers'));
+    await user.click(screen.getByTestId('agency-ticket-pax-adults-inc'));
+    await user.click(screen.getByTestId('agency-ticket-pax-children-inc'));
+    await user.click(screen.getByTestId('agency-ticket-pax-confirm'));
     await user.click(screen.getByTestId('agency-ticket-search'));
 
     const location = await screen.findByTestId('results-location');
-    expect(location).toHaveTextContent('/results?origin=THR&dest=MHD&date=2026-09-10&adults=2&children=0&infants=0&cabin=ECONOMY');
+    expect(location).toHaveTextContent('/results?origin=THR&dest=MHD&date=2026-09-10&adults=2&children=1&infants=0&cabin=ECONOMY');
   });
 
   it('does not navigate until origin, destination, and date are complete', async () => {

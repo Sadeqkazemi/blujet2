@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { fetchInbox, fetchProfile } from '../../api/agency-portal';
+import { fetchCredit, fetchInbox, fetchProfile } from '../../api/agency-portal';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import AgencyPortalHeader from './AgencyPortalHeader';
@@ -29,6 +29,7 @@ export default function AgencyPortalShell() {
 
   const [agencyName, setAgencyName] = useState(user?.fullName ?? '');
   const [licenseNo, setLicenseNo] = useState<string | null>(null);
+  const [remainingIrr, setRemainingIrr] = useState<string | null>(null);
   const [inboxCount, setInboxCount] = useState(0);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -47,6 +48,9 @@ export default function AgencyPortalShell() {
     fetchInbox()
       .then((msgs) => setInboxCount(msgs.length))
       .catch(() => setInboxCount(0));
+    fetchCredit()
+      .then((credit) => setRemainingIrr(credit.remainingIrr))
+      .catch(() => setRemainingIrr(null));
   }, []);
 
   async function onSignOut() {
@@ -69,12 +73,16 @@ export default function AgencyPortalShell() {
         minHeight: '100vh',
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '248px 1fr',
+        gridTemplateRows: 'auto 1fr',
+        alignContent: 'start',
       }}
     >
       <AgencyPortalHeader
         isMobile={isMobile}
         activeKey={activeKey}
         agencyName={agencyName}
+        licenseNo={licenseNo}
+        remainingIrr={remainingIrr}
         onSignOut={() => setLogoutConfirmOpen(true)}
       />
 

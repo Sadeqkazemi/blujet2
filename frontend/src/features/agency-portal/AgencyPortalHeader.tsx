@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
+import { localeMoney } from '../../lib/fa-format';
 import { AGENCY_NAV_ITEMS, agencyInitials } from './agency-nav-config';
 import type { AgencyNavKey } from './agency-nav-config';
 
@@ -41,10 +42,12 @@ interface Props {
   isMobile: boolean;
   activeKey: AgencyNavKey;
   agencyName: string;
+  licenseNo: string | null;
+  remainingIrr: string | null;
   onSignOut: () => void;
 }
 
-export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, onSignOut }: Props) {
+export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, licenseNo, remainingIrr, onSignOut }: Props) {
   const { user } = useAuth();
   const { locale, setLocale } = useLocale();
   const t = useT();
@@ -132,28 +135,36 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, on
           overflow: 'hidden',
         }}
       >
-        <div style={{ padding: 15, background: 'linear-gradient(135deg,#0d2640,#16406e)', color: '#fff' }}>
+        <div style={{ padding: '18px 17px 12px', color: '#16202e' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
                 width: 46,
                 height: 46,
                 borderRadius: 10,
-                background: 'rgba(255,255,255,.16)',
+                background: '#2f7fd4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontWeight: 800,
                 fontSize: 13.5,
+                color: '#fff',
               }}
             >
               {initials}
             </div>
             <div style={{ lineHeight: 1.5 }}>
               <div style={{ fontSize: 13.5, fontWeight: 800 }}>{displayName}</div>
-              <div style={{ fontSize: 10.5, color: '#caa53a', fontWeight: 700 }}>{at.b2bPartner}</div>
+              <div dir="ltr" style={{ fontSize: 10.5, color: '#8a96a6', fontWeight: 700 }}>{licenseNo || '—'}</div>
             </div>
           </div>
+        </div>
+        <div style={{ margin: '0 17px 12px', borderRadius: 12, background: '#f6f8fb', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 10.5, color: '#8a96a6' }}>{locale === 'fa' ? 'اعتبار قابل استفاده' : locale === 'ar' ? 'الرصيد المتاح' : 'Available credit'}</div>
+            <b className="font-num" style={{ display: 'block', marginTop: 4, fontSize: 14, color: '#16202e' }}>{remainingIrr == null ? '—' : localeMoney(remainingIrr, locale)}</b>
+          </div>
+          <span aria-hidden style={{ width: 34, height: 34, borderRadius: 9, background: '#fff', border: '1px solid #e6eaf0', display: 'grid', placeItems: 'center', color: '#5a6678' }}>▣</span>
         </div>
         <div style={{ padding: 5 }}>
           <Link
@@ -165,14 +176,23 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, on
             {at.agencyPanel}
           </Link>
           <Link
-            to="/manage-booking"
+            to="/agency/sales"
             onClick={() => setUserMenuOpen(false)}
             style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
           >
             <span style={{ color: '#1668c4' }}>🧳</span>
-            {t('tripsLabel')}
+            {locale === 'fa' ? 'پروازهای خریداری‌شده' : locale === 'ar' ? 'الرحلات المشتراة' : 'Purchased flights'}
+          </Link>
+          <Link to="/agency/webservice" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}>
+            <span style={{ color: '#1668c4' }}>&lt;/&gt;</span>
+            {locale === 'fa' ? 'وب‌سرویس' : locale === 'ar' ? 'خدمة الويب' : 'Web service'}
+          </Link>
+          <Link to="/agency/profile" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}>
+            <span style={{ color: '#1668c4' }}>▯</span>
+            {locale === 'fa' ? 'مدارک و پروفایل' : locale === 'ar' ? 'المستندات والملف الشخصي' : 'Documents & profile'}
           </Link>
           <span
+            data-testid="agency-header-logout"
             onClick={() => {
               setUserMenuOpen(false);
               onSignOut();

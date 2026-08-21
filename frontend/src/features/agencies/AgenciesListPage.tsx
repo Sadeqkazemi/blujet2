@@ -14,7 +14,7 @@ import { faDigits, faMoney, faNumber } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
-import { TIER_LABELS, statusBadge } from './agency-labels';
+import { TIER_LABELS, seatRequestTermLabel, statusBadge } from './agency-labels';
 import WebserviceRequestDetailModal from './WebserviceRequestDetailModal';
 import SeatRequestDetailModal from './SeatRequestDetailModal';
 import PanelNotifBell from '../../components/PanelNotifBell';
@@ -80,7 +80,7 @@ function SeatRequestRowCard({ rq, onOpen }: { rq: AgencySeatRequestRow; onOpen: 
           {rq.agencyName} · {rq.routeFa}
         </div>
         <div className="mt-[3px] text-[11px] text-[#8494ac]">
-          {faDigits(rq.seats)} صندلی · {faDigits(rq.months)} ماهه · {faMoney(rq.totalIrr)} تومان
+          {faDigits(rq.seats)} صندلی · {seatRequestTermLabel(rq.months)} · {faMoney(rq.totalIrr)} تومان
         </div>
       </div>
       <span

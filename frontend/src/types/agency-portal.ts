@@ -143,7 +143,8 @@ export interface AgencySeatRequestResult {
   flightInstanceId: string;
   seats: number;
   preferredWeekdays?: number[];
-  termMonths?: 3 | 6 | 12;
+  termMonths?: 0 | 1 | 3 | 6 | 12;
+  payMethod?: 'INVOICE' | 'CREDIT';
 }
 
 export interface AgencySeatRequestHistoryRow {

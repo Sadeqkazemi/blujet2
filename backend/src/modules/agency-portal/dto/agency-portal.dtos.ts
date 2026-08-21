@@ -89,12 +89,21 @@ export class RequestAgencySeatsDto {
   preferredWeekdays?: number[];
 
   @ApiPropertyOptional({
-    enum: [1, 3, 6, 12],
+    enum: [0, 1, 3, 6, 12],
     example: 3,
     description:
-      'مدت به ماه. قرارداد قدیمی 3|6|12 است؛ UI جدید 1|3|12. هر چهار مقدار پذیرفته و به صورت smallint ذخیره می‌شود.',
+      'دوره درخواست؛ مقدار 0 یعنی هفتگی و سایر مقادیر تعداد ماه‌های دوره هستند.',
   })
   @IsOptional()
-  @IsIn([1, 3, 6, 12])
-  termMonths?: 1 | 3 | 6 | 12;
+  @IsIn([0, 1, 3, 6, 12])
+  termMonths?: 0 | 1 | 3 | 6 | 12;
+
+  @ApiPropertyOptional({
+    enum: ['INVOICE', 'CREDIT'],
+    example: 'INVOICE',
+    description: 'روش تسویه درخواست: فاکتور نقدی یا استفاده از اعتبار آژانس',
+  })
+  @IsOptional()
+  @IsIn(['INVOICE', 'CREDIT'])
+  payMethod?: 'INVOICE' | 'CREDIT';
 }

@@ -29,11 +29,12 @@ describe("ScheduleTemplatesTab", () => {
     expect(
       screen.getByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'بستن فرم مسیر جدید' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'افزودن مسیر جدید' })).toHaveAttribute(
       'aria-expanded',
       'true',
     );
-    await user.click(screen.getByRole('button', { name: 'بستن فرم مسیر جدید' }));
+    expect(screen.getByTestId('schedule-route-form')).toHaveClass('md:grid-cols-2');
+    await user.click(screen.getByRole('button', { name: 'انصراف' }));
     expect(
       screen.queryByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
     ).not.toBeInTheDocument();
