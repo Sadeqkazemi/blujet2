@@ -277,7 +277,7 @@ describe("FlightsPage", () => {
       await screen.findByRole("button", { name: "پروازهای آینده" }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: "✦ تحلیل قیمت‌گذاری با هوش مصنوعی" }),
+      screen.getByRole("button", { name: "پیشنهاد قیمت هوش مصنوعی" }),
     );
     expect(
       await screen.findByText(

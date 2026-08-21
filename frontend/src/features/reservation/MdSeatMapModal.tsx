@@ -124,7 +124,9 @@ export default function MdSeatMapModal({
   const auth = useOptionalAuth();
   const canManage =
     canManageOverride ??
-    ['CEO', 'BOARD_CHAIR', 'COMMERCIAL_MANAGER'].includes(auth?.user?.role ?? '');
+    ['CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'COMMERCIAL_MANAGER'].includes(
+      auth?.user?.role ?? '',
+    );
   const [seatMap, setSeatMap] = useState<SeatMap | null>(null);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -245,7 +247,9 @@ export default function MdSeatMapModal({
       return;
     }
     if (!canManage) {
-      onNotice('این نقشه فقط خواندنی است؛ قفل صندلی فقط برای مدیرعامل، مدیر بازرگانی و رئیس هیئت‌مدیره مجاز است.');
+      onNotice(
+        'این نقشه فقط خواندنی است؛ قفل صندلی برای مدیرعامل، مدیر ارشد، مدیر بازرگانی و رئیس هیئت‌مدیره مجاز است.',
+      );
       return;
     }
     setInfoSeat(null);

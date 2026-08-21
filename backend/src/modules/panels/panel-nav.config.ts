@@ -76,18 +76,23 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
   ],
-  // Senior Manager sidebar — mirrors CEO executive tabs for shared surfaces;
-  // `reservation` labeled هواپیما like CEO (content: ExecReservationView).
+  // Senior Manager sidebar — HTML design order + product Phase 3/4/9 tabs
+  // (+ reservation seat lock per product request 2026-08-21).
   SENIOR_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
+    { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
     { key: 'admins', labelFa: 'مدیران و ادمین‌ها', implemented: true },
+    { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
+    { key: 'referrals', labelFa: 'ارجاعات', implemented: true },
     { key: 'mgrreports', labelFa: 'گزارش مدیران', implemented: true },
     { key: 'vip', labelFa: 'مشتریان VIP', implemented: true },
     { key: 'survey', labelFa: 'نظرسنجی مسافران', implemented: true },
     { key: 'panels', labelFa: 'دسترسی به پنل‌ها', implemented: true },
     { key: 'security', labelFa: 'امنیت و رمز عبور', implemented: true },
+    { key: 'reservation', labelFa: 'سامانه رزرواسیون', implemented: true },
   ],
   FINANCE_MANAGER: [
     { key: 'dashboard', labelFa: 'داشبورد', implemented: true },

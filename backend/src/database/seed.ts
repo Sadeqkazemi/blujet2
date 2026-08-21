@@ -1952,21 +1952,30 @@ async function main() {
       // One demo managerial lock so the seat map/lock UI has real data —
       // already APPROVED (Phase 13D) with a real future hold-to-ticket
       // deadline, not the schema's placeholder migration defaults.
-      await seatLockRepo.save(
-        seatLockRepo.create({
-          flightInstanceId: demoInstance.id,
-          seatCode: '4A',
-          lockedById: chairUser.id,
-          passengerName: 'رزرو مدیریتی — رئیس هیئت مدیره',
-          reason: 'بازدید رسمی هیئت مدیره',
-          classification: LockClassification.PAYABLE,
-          requesterRank: Role.BOARD_CHAIR,
-          approvalStatus: LockApprovalStatus.APPROVED,
-          approvedById: staffByUsername.get('ceo')!.id,
-          approvedAt: new Date(),
-          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
-        }),
-      );
+      // Idempotent: partial unique index blocks a second active lock on 4A.
+      const activeDemoLock = await seatLockRepo
+        .createQueryBuilder('l')
+        .where('l.flightInstanceId = :fid', { fid: demoInstance.id })
+        .andWhere('l.seatCode = :code', { code: '4A' })
+        .andWhere('l.releasedAt IS NULL')
+        .getOne();
+      if (!activeDemoLock) {
+        await seatLockRepo.save(
+          seatLockRepo.create({
+            flightInstanceId: demoInstance.id,
+            seatCode: '4A',
+            lockedById: chairUser.id,
+            passengerName: 'رزرو مدیریتی — رئیس هیئت مدیره',
+            reason: 'بازدید رسمی هیئت مدیره',
+            classification: LockClassification.PAYABLE,
+            requesterRank: Role.BOARD_CHAIR,
+            approvalStatus: LockApprovalStatus.APPROVED,
+            approvedById: staffByUsername.get('ceo')!.id,
+            approvedAt: new Date(),
+            expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+          }),
+        );
+      }
     }
   }
 

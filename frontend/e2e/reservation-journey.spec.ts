@@ -198,7 +198,7 @@ test('BOARD_CHAIR locks a seat on the seat map, sees it reflected, then releases
   await chip.click();
 });
 
-test('SENIOR_MANAGER is view-only on PNR detail', async ({ page }) => {
+test('SENIOR_MANAGER can change seat and cancel on PNR detail', async ({ page }) => {
   await loginAs(page, 'itadmin');
   const passengerName = `مسافر ارشد E2E ${Date.now()}`;
   const pnr = await issueTestPnr(page, passengerName);
@@ -210,20 +210,28 @@ test('SENIOR_MANAGER is view-only on PNR detail', async ({ page }) => {
   await page.getByRole('button', { name: 'جستجو' }).click();
   await page.getByRole('button', { name: pnr, exact: true }).first().click();
   await expect(page.getByText(`رزرو ${pnr}`)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'ثبت تغییر' })).not.toBeVisible();
-  await expect(page.getByRole('button', { name: 'لغو رزرو' })).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'ثبت تغییر' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'لغو رزرو' })).toBeVisible();
 });
 
-test('SENIOR_MANAGER sees the seat map read-only — no lock or issue controls', async ({ page }) => {
+test('SENIOR_MANAGER can open seat map with lock controls enabled', async ({ page }) => {
   await loginAs(page, 'senior');
   await page.getByRole('link', { name: 'سامانه رزرواسیون' }).click();
-  await page.getByRole('button', { name: 'مدیریت رزروها' }).click();
-  await expect(page.getByText('THR', { exact: false }).first()).toBeVisible({ timeout: 15000 });
-  await page.getByRole('button', { name: /^نقشهٔ صندلی EP-/ }).first().click();
-
-  await expect(page.getByText(/اشغال/)).toBeVisible();
-  const seat = page.getByRole('button', { name: '5B', exact: true });
-  await expect(seat).toBeDisabled();
+  await page.getByRole('button', { name: 'پروازها' }).click();
+  await expect(page.getByPlaceholder('جستجوی پرواز — مسیر یا شماره پرواز')).toBeVisible({
+    timeout: 15000,
+  });
+  const row = page.locator('button').filter({ hasText: 'در حال فروش' }).first();
+  if (await row.count()) {
+    await row.click();
+  } else {
+    await page.locator('button').filter({ hasText: /THR|تهران/ }).first().click();
+  }
+  await expect(page.getByTestId('reservation-md80-seat-map').or(page.getByText(/اشغال/))).toBeVisible({
+    timeout: 15000,
+  });
+  const freeSeat = page.getByRole('button', { name: /^[0-9]+[A-F]$/ }).first();
+  await expect(freeSeat).toBeEnabled();
 });
 
 test('Non-reservation role has no reservation nav entry (role isolation)', async ({ page }) => {

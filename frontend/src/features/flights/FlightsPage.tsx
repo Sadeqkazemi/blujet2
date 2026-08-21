@@ -28,7 +28,6 @@ import {
   type FlightApprovalStatus,
 } from "../../lib/flight-definition";
 import { dayjs, formatJalaliDateTime } from "../../lib/jalali";
-import { downloadCsv } from "../../lib/download-csv";
 import Modal from "../../components/Modal";
 import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
@@ -598,33 +597,42 @@ export default function FlightsPage() {
       setNotice("پروازی برای خروجی وجود ندارد.");
       return;
     }
-    downloadCsv(
-      "completed-flights.csv",
-      [
-        "مسیر",
-        "شماره پرواز",
-        "تاریخ پرواز",
-        "بلیط",
-        "قیمت استاندارد",
-        "فروش سیستمی",
-        "فروش چارتری",
-        "فروش آژانس",
-        "سود",
-        "زیان",
-      ],
-      rows.map((d) => [
-        routeLabel(d.originCode, d.destCode),
-        d.flightNo,
-        formatJalaliDateTime(d.departureAt),
-        String(d.tickets),
-        faMoney(d.basePriceIrr),
-        faMoney(d.channelRevenueIrr.SYSTEM),
-        faMoney(d.channelRevenueIrr.CHARTER),
-        faMoney(d.channelRevenueIrr.AGENCY),
-        faMoney(d.profitIrr),
-        faMoney(d.lossIrr),
-      ]),
-    );
+    const headers = [
+      "مسیر",
+      "شماره پرواز",
+      "تاریخ پرواز",
+      "بلیط",
+      "نرخ اصلی",
+      "متوسط نرخ",
+      "سیستمی",
+      "چارتری",
+      "آژانس",
+      "سود",
+      "ضرر",
+    ];
+    const bodyRows = rows.map((d) => [
+      routeLabel(d.originCode, d.destCode),
+      d.flightNo,
+      formatJalaliDateTime(d.departureAt),
+      String(d.tickets),
+      faMoney(d.basePriceIrr),
+      faMoney(d.avgPriceIrr),
+      faMoney(d.channelRevenueIrr.SYSTEM),
+      faMoney(d.channelRevenueIrr.CHARTER),
+      faMoney(d.channelRevenueIrr.AGENCY),
+      faMoney(d.profitIrr),
+      faMoney(d.lossIrr),
+    ]);
+    const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/></head><body><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${bodyRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></body></html>`;
+    const blob = new Blob([`\ufeff${html}`], {
+      type: "application/vnd.ms-excel",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "completed-flights.xls";
+    a.click();
+    URL.revokeObjectURL(url);
     setNotice("خروجی Excel پروازهای انجام‌شده دانلود شد ✓");
   }
 
@@ -1167,7 +1175,7 @@ export default function FlightsPage() {
                 </div>
                 <div className="overflow-x-auto">
                   <div
-                    className={isCommercial ? "min-w-[920px]" : "min-w-[900px]"}
+                    className={isCommercial ? "min-w-[920px]" : "min-w-[1100px]"}
                   >
                     {isCommercial ? (
                       <>
@@ -1226,14 +1234,15 @@ export default function FlightsPage() {
                       </>
                     ) : (
                       <>
-                        <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-panel-border px-5 py-2 text-[10px] font-bold text-panel-muted">
+                        <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-2 border-b border-panel-border px-5 py-2 text-[10px] font-bold text-panel-muted">
                           <span>مسیر</span>
                           <span>پرواز</span>
                           <span>بلیط</span>
                           <span>نرخ اصلی</span>
                           <span>متوسط نرخ</span>
                           <span>سیستمی</span>
-                          <span>چارتری / آژانس</span>
+                          <span>چارتری</span>
+                          <span>آژانس</span>
                           <span>سود حاصله</span>
                           <span>ضرر</span>
                         </div>
@@ -1245,7 +1254,7 @@ export default function FlightsPage() {
                                   setExpandedDone(expandedDone === d.id ? null : d.id);
                                   setLifecycleFlight(d);
                                 }}
-                                className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
+                                className="grid w-full grid-cols-[1.5fr_0.8fr_0.6fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center gap-2 border-b border-panel-border px-5 py-3 text-right text-[11px] transition hover:bg-panel-surface-2/50"
                               >
                                 <span>
                                   <span className="block font-bold text-panel-ink">
@@ -1270,8 +1279,10 @@ export default function FlightsPage() {
                                 <span className="font-num text-accent">
                                   {faMoney(d.channelRevenueIrr.SYSTEM)}
                                 </span>
-                                <span className="font-num text-[#7c3aed]">
-                                  {faMoney(d.channelRevenueIrr.CHARTER)} /{" "}
+                                <span className="font-num text-[#a855f7]">
+                                  {faMoney(d.channelRevenueIrr.CHARTER)}
+                                </span>
+                                <span className="font-num text-[#34d399]">
                                   {faMoney(d.channelRevenueIrr.AGENCY)}
                                 </span>
                                 <span className="font-num font-black text-[#34d399]">
@@ -1484,7 +1495,7 @@ export default function FlightsPage() {
                     hidden={!canManageFlights}
                     className="rounded-lg bg-gradient-to-l from-accent to-[#9333ea] px-3 py-2 text-xs font-bold text-white"
                   >
-                    ✦ تحلیل قیمت‌گذاری با هوش مصنوعی
+                    پیشنهاد قیمت هوش مصنوعی
                   </button>
                 </div>
                 <div className="flex flex-col gap-3 p-4">
