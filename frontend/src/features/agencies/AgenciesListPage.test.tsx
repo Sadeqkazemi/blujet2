@@ -34,6 +34,8 @@ const LIST: AgencyListResult = {
       usedIrr: '310000000',
       remainingIrr: '1490000000',
       pendingInvoiceCount: 1,
+      monthlyTicketsSold: 3840,
+      monthlySalesIrr: '482000000000',
     },
     {
       id: 'a2',
@@ -47,6 +49,8 @@ const LIST: AgencyListResult = {
       usedIrr: '1330000000',
       remainingIrr: '-430000000',
       pendingInvoiceCount: 1,
+      monthlyTicketsSold: 2150,
+      monthlySalesIrr: '196000000000',
     },
   ],
   kpis: {
@@ -131,6 +135,9 @@ describe('AgenciesListPage', () => {
     renderPage();
 
     expect(await screen.findByText('آژانس blujet')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'مدیریت آژانس‌ها' })).toBeInTheDocument();
+    expect(screen.getByLabelText('جستجو در صفحات این پنل')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'اعلان‌ها' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'آژانس‌های همکار' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'درخواست همکاری' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'آژانس‌های دارای بدهی' })).toBeInTheDocument();
@@ -139,6 +146,8 @@ describe('AgenciesListPage', () => {
     expect(screen.queryByText('آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده')).not.toBeInTheDocument();
     expect(screen.queryByText('مجموع اعتبار اعطاشده')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'اعتبار و تسویه' })).not.toBeInTheDocument();
+    expect(screen.getByText('۳٬۸۴۰ بلیط')).toBeInTheDocument();
+    expect(screen.getByText('۴۸٬۲۰۰٬۰۰۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 
   it('Commercial Manager: coop-requests tab shows pending requests', async () => {

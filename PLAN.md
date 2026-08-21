@@ -3568,3 +3568,18 @@ contracts and retires the production mock adapters.
   navigation coverage passed. See
   `docs/features/agency-portal-design-sync.md`.
 
+# Commercial Manager screenshot gap sync (2026-08-21)
+
+- [x] Aligned the Commercial Manager sidebar and dashboard composition with
+  the supplied reference without duplicating services; the aircraft-definition
+  page remains available in that role per the final product decision.
+- [x] Rebuilt the commercial agency-list rows around real current-month ticket
+  and ledger sales aggregates, retained the cooperation/debtor queues, and
+  aligned overview/finance/messages/history detail tabs with the reference.
+- [x] Changed flight-route creation to an explicit add-button disclosure while
+  retaining real preview/create APIs, and aligned commercial fare-class detail
+  section order.
+- [x] Verified 65 focused frontend tests, 23 backend E2E tests, both production
+  builds, focused frontend lint, and `git diff --check`. See
+  `docs/features/commercial-manager-screenshot-gap-sync.md`.
+

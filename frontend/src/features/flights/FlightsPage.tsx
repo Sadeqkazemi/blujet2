@@ -1866,7 +1866,7 @@ export default function FlightsPage() {
               </div>
 
               {(detail.classBreakdown ?? []).length > 0 && (
-                <div className="rounded-xl border border-panel-border p-3">
+                <div className="order-2 rounded-xl border border-panel-border p-3" data-commercial-section="public-fare-classes">
                   <h3 className="mb-2 text-xs font-bold text-panel-ink">قیمت سایت به ازای کلاس</h3>
                   <div className="flex flex-col gap-2">
                     {(detail.classBreakdown ?? []).map((row) => {
@@ -1910,7 +1910,7 @@ export default function FlightsPage() {
               )}
 
               {(detail.classBreakdown ?? []).length > 0 && (
-                <div className="rounded-xl border border-panel-border p-3">
+                <div className="order-1 rounded-xl border border-panel-border p-3" data-commercial-section="agency-fare-release">
                   <h3 className="mb-2 text-xs font-bold text-panel-ink">آزادسازی صندلی برای آژانس</h3>
                   <div className="flex flex-col gap-2">
                     {(detail.classBreakdown ?? []).map((row) => {
@@ -1990,7 +1990,7 @@ export default function FlightsPage() {
               )}
 
               {(detail.priceHistory ?? []).length > 0 && (
-                <div className="rounded-xl border border-panel-border p-3">
+                <div className="order-3 rounded-xl border border-panel-border p-3" data-commercial-section="price-history">
                   <h3 className="mb-2 text-xs font-bold text-panel-ink">تاریخچه تغییر قیمت</h3>
                   <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
                     {(detail.priceHistory ?? []).map((entry) => (

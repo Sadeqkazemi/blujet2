@@ -4,9 +4,10 @@ const COMMERCIAL_NAV_ORDER = [
   'dashboard',
   'agencies',
   'routes',
+  'aircraft',
   'flights',
   'services',
-  'aircraft',
+  'ancillary-services',
   'reports',
   'staff',
   'clubrules',
@@ -16,15 +17,20 @@ const COMMERCIAL_NAV_ORDER = [
 ] as const;
 
 /**
- * The approved commercial handoff adds «خدمات». The travel-cost API already
- * authorizes COMMERCIAL_MANAGER, while older panel-nav responses do not yet
- * advertise the tab. Keep that compatibility shim in the frontend-only branch
- * until the backend navigation contract is approved separately.
+ * Normalize older/newer server contracts to the approved Commercial Manager
+ * sidebar: one services entry while retaining the aircraft-definition page.
+ * Both service routes remain implemented, but when the backend advertises its canonical
+ * `ancillary-services` item we must not also inject the legacy `services`
+ * compatibility item.
  */
 export function commercialNavWithServices(items: PanelNavItem[]): PanelNavItem[] {
-  const next = items.some((item) => item.key === 'services')
-    ? items
-    : [...items, { key: 'services', labelFa: 'خدمات', implemented: true }];
+  const hasCanonicalServices = items.some((item) => item.key === 'ancillary-services');
+  const hasLegacyServices = items.some((item) => item.key === 'services');
+  const next = hasCanonicalServices
+    ? items.filter((item) => item.key !== 'services')
+    : hasLegacyServices
+      ? items
+      : [...items, { key: 'services', labelFa: 'خدمات', implemented: true }];
   const order = new Map<string, number>(COMMERCIAL_NAV_ORDER.map((key, index) => [key, index]));
   return [...next].sort(
     (a, b) => (order.get(a.key) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.key) ?? Number.MAX_SAFE_INTEGER),

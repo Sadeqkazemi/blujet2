@@ -57,14 +57,14 @@ describe('Panels (e2e)', () => {
     expect(keys).toEqual([
       'dashboard',
       'agencies',
-      'flights',
       'routes',
       'aircraft',
+      'flights',
+      'ancillary-services',
       'reports',
       'staff',
       'clubrules',
       'webservice',
-      'ancillary-services',
       'finance',
       'cartable',
     ]);

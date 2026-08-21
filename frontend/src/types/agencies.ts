@@ -21,6 +21,8 @@ export interface AgencyListRow {
   usedIrr: string;
   remainingIrr: string;
   pendingInvoiceCount: number;
+  monthlyTicketsSold: number;
+  monthlySalesIrr: string;
 }
 
 export interface AgencyListKpis {

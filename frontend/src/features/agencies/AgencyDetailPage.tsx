@@ -1201,7 +1201,11 @@ export default function AgencyDetailPage() {
 
       {isCommercial || isFinance || isSenior ? (
         <>
-          <div className="flex gap-1.5">
+          <div
+            className={`gap-1.5 border border-panel-border bg-panel-surface p-1 ${
+              isCommercial ? 'grid grid-cols-4 rounded-xl' : 'flex rounded-xl'
+            }`}
+          >
             {(
               [
                 { key: 'overview', label: 'نمای کلی' },
@@ -1215,7 +1219,7 @@ export default function AgencyDetailPage() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
                   tab === t.key ? 'bg-accent text-white' : 'bg-panel-canvas text-panel-muted hover:bg-panel-surface-2'
                 }`}
               >
@@ -1228,7 +1232,7 @@ export default function AgencyDetailPage() {
             <div className="space-y-4">
               {statsRow}
               {scoreCard}
-              {(isFinance || isSenior) && creditCard}
+              {creditCard}
               {infoAndActivity}
               {isCommercial && flightsSoldSection}
               {isCommercial && purchasedServicesSection}

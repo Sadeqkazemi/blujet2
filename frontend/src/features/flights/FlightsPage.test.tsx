@@ -328,7 +328,14 @@ describe("FlightsPage", () => {
   it("exposes published-fare and MD-80 seat controls only to the Commercial Manager", async () => {
     mockRole("COMMERCIAL_MANAGER");
     mockData();
-    vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue(DETAIL);
+    vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue({
+      ...DETAIL,
+      classBreakdown: [
+        { label: 'اکونومی', cabin: 'ECONOMY', capacity: 120, sold: 70 },
+      ],
+      classSitePrices: { اکونومی: '38000000' },
+      agencyRelease: { اکونومی: { seats: 20, priceIrr: '35000000' } },
+    });
 
     const { default: userEvent } = await import("@testing-library/user-event");
     render(<FlightsPage />);
@@ -336,6 +343,12 @@ describe("FlightsPage", () => {
 
     const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
     expect(within(dialog).getByRole("button", { name: /MD/ })).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('آزادسازی صندلی برای آژانس').closest('[data-commercial-section]'),
+    ).toHaveClass('order-1');
+    expect(
+      within(dialog).getByText('قیمت سایت به ازای کلاس').closest('[data-commercial-section]'),
+    ).toHaveClass('order-2');
   });
 
   it("does not expose published-fare or seat-lock controls to an employee", async () => {

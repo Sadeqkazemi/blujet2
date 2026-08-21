@@ -68,6 +68,7 @@ export default function ScheduleTemplatesTab() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [deactivateRow, setDeactivateRow] =
     useState<ScheduleTemplateRow | null>(null);
   const [routeTab, setRouteTab] = useState<"active" | "history">("active");
@@ -210,6 +211,7 @@ export default function ScheduleTemplatesTab() {
       setPreview(null);
       setPreviewedPayloadKey(null);
       setNotice("مسیر فصلی و پروازهای متناظر با موفقیت ایجاد شدند.");
+      setFormOpen(false);
       await load();
     } catch (cause) {
       setError(
@@ -280,6 +282,16 @@ export default function ScheduleTemplatesTab() {
 
   return (
     <div className="flex flex-col gap-5" data-testid="schedule-templates-tab">
+      <button
+        type="button"
+        aria-expanded={formOpen}
+        onClick={() => setFormOpen((current) => !current)}
+        className="flex w-max items-center gap-2 rounded-[10px] bg-accent px-4 py-3 text-xs font-black text-white transition hover:brightness-110"
+      >
+        <span aria-hidden>{formOpen ? '−' : '+'}</span>
+        {formOpen ? 'بستن فرم مسیر جدید' : 'افزودن مسیر جدید'}
+      </button>
+      {formOpen && (
       <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
         <h2 className="text-base font-black text-panel-ink">
           تعریف مسیر پروازی جدید
@@ -303,7 +315,7 @@ export default function ScheduleTemplatesTab() {
         )}
         <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-3">
           <label className="text-xs font-bold text-panel-muted">
-            مبدأ
+            مبدأ *
             <select
               value={form.originAirportId}
               onChange={(e) =>
@@ -320,7 +332,7 @@ export default function ScheduleTemplatesTab() {
             </select>
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            مقصد
+            مقصد *
             <select
               value={form.destinationAirportId}
               onChange={(e) =>
@@ -337,7 +349,7 @@ export default function ScheduleTemplatesTab() {
             </select>
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            شماره پرواز
+            شماره پرواز (پایه) *
             <input
               dir="ltr"
               value={form.flightNoBase}
@@ -349,7 +361,7 @@ export default function ScheduleTemplatesTab() {
             />
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            هواپیما
+            نوع هواپیما *
             <select
               value={form.aircraftDefinitionId}
               onChange={(e) =>
@@ -366,7 +378,7 @@ export default function ScheduleTemplatesTab() {
             </select>
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            تعداد صندلی
+            تعداد صندلی هواپیما *
             <input
               readOnly
               value={
@@ -377,7 +389,7 @@ export default function ScheduleTemplatesTab() {
             />
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            ساعت پرواز
+            ساعت پرواز *
             <input
               type="time"
               value={form.departureTime}
@@ -388,7 +400,7 @@ export default function ScheduleTemplatesTab() {
             />
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            مدت پرواز (دقیقه)
+            مدت پرواز (دقیقه) *
             <input
               inputMode="numeric"
               value={form.durationMinutes}
@@ -461,7 +473,7 @@ export default function ScheduleTemplatesTab() {
             </div>
           </div>
           <label className="text-xs font-bold text-panel-muted">
-            قیمت آژانس (تومان)
+            قیمت هر صندلی برای آژانس‌ها (تومان) *
             <input
               aria-label="قیمت آژانس (تومان)"
               inputMode="numeric"
@@ -483,7 +495,7 @@ export default function ScheduleTemplatesTab() {
             </span>
           </label>
           <label className="text-xs font-bold text-panel-muted">
-            قیمت قانونی (تومان)
+            قیمت مصوب / نرخ قانونی سازمان (تومان) *
             <input
               aria-label="قیمت قانونی (تومان)"
               inputMode="numeric"
@@ -518,7 +530,7 @@ export default function ScheduleTemplatesTab() {
               disabled={busy || !previewIsCurrent}
               className="rounded-lg bg-accent px-4 py-3 text-xs font-black text-white disabled:opacity-40"
             >
-              ایجاد مسیر
+              ایجاد مسیر و برنامه پروازی فصل
             </button>
           </div>
           {previewIsCurrent && preview && (
@@ -548,6 +560,7 @@ export default function ScheduleTemplatesTab() {
           )}
         </form>
       </section>
+      )}
       <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
         <div className="mb-4 flex gap-2 rounded-xl border border-panel-border bg-panel-canvas p-1">
           <button

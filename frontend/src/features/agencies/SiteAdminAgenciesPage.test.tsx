@@ -21,6 +21,8 @@ const LIST: AgencyListResult = {
       usedIrr: '310000000',
       remainingIrr: '1490000000',
       pendingInvoiceCount: 0,
+      monthlyTicketsSold: 0,
+      monthlySalesIrr: '0',
     },
     {
       id: 'a2',
@@ -34,6 +36,8 @@ const LIST: AgencyListResult = {
       usedIrr: '100000000',
       remainingIrr: '800000000',
       pendingInvoiceCount: 0,
+      monthlyTicketsSold: 0,
+      monthlySalesIrr: '0',
     },
   ],
   kpis: {
@@ -139,6 +143,8 @@ describe('SiteAdminAgenciesPage', () => {
         usedIrr: '0',
         remainingIrr: '1000000',
         pendingInvoiceCount: 0,
+        monthlyTicketsSold: 0,
+        monthlySalesIrr: '0',
       })),
       kpis: {
         activeCount: 12,

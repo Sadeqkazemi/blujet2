@@ -7,7 +7,7 @@ import {
 import { PanelsService } from './panels.service';
 
 describe('operations panel access contract', () => {
-  it('publishes the aircraft catalog only in commercial navigation', () => {
+  it('publishes aircraft definition only in commercial navigation', () => {
     expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
       'aircraft',
     );

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
   fetchAgencies,
@@ -10,13 +10,15 @@ import {
   fetchAggregateInvoices,
   fetchAggregateSeatRequests,
 } from '../../api/agencies';
-import { faDigits, faMoney } from '../../lib/fa-format';
+import { faDigits, faMoney, faNumber } from '../../lib/fa-format';
 import { formatJalaliDate } from '../../lib/jalali';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { TIER_LABELS, statusBadge } from './agency-labels';
 import WebserviceRequestDetailModal from './WebserviceRequestDetailModal';
 import SeatRequestDetailModal from './SeatRequestDetailModal';
+import PanelNotifBell from '../../components/PanelNotifBell';
+import PanelSearchBox from '../../components/PanelSearchBox';
 import type {
   AgencyAggregateInvoiceRow,
   AgencyListResult,
@@ -26,6 +28,7 @@ import type {
   AggregateInvoiceStatus,
 } from '../../types/agencies';
 import type { AgencyWebserviceQueueRow } from '../../types/agency-portal';
+import type { PanelShellContext } from '../../types/panel-shell';
 
 type SubTab = 'list' | 'credit';
 
@@ -91,6 +94,7 @@ function SeatRequestRowCard({ rq, onOpen }: { rq: AgencySeatRequestRow; onOpen: 
 }
 
 export default function AgenciesListPage() {
+  const shell = useOutletContext<PanelShellContext | null>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const role = user?.role;
@@ -266,13 +270,23 @@ export default function AgenciesListPage() {
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-panel-ink">آژانس‌ها</h1>
-        <p className="mt-1 text-sm text-panel-muted">
-          {isCommercial
-            ? 'آژانس‌های همکار، درخواست‌ها و پروفایل هر آژانس'
-            : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-black text-panel-ink">
+            {isCommercial ? 'مدیریت آژانس‌ها' : 'آژانس‌ها'}
+          </h1>
+          <p className="mt-1 text-sm text-panel-muted">
+            {isCommercial
+              ? 'آژانس‌های همکار، درخواست‌ها و پروفایل هر آژانس'
+              : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
+          </p>
+        </div>
+        {isCommercial && (
+          <div className="flex items-center gap-2.5">
+            <PanelSearchBox nav={shell?.nav ?? []} />
+            <PanelNotifBell alerts={shell?.lowSalesAlerts?.slice(1) ?? []} variant="dark" />
+          </div>
+        )}
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
@@ -554,9 +568,6 @@ export default function AgenciesListPage() {
 
           {drilldown === null && commercialTab === 'list' && (
             <>
-              {seatRequestsPreview}
-              {webserviceRequestsPreview}
-
               <h3 className="m-0 mt-1 text-[14.5px] font-extrabold text-white">آژانس‌های همکار</h3>
 
               <div className="relative mb-0.5">
@@ -596,18 +607,17 @@ export default function AgenciesListPage() {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-bold text-panel-ink">{a.fullName}</div>
                             <div className="mt-0.5 text-[11px] text-panel-muted">
-                              مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city} · سطح همکاری{' '}
-                              <span className="font-bold text-[#b45309]">{TIER_LABELS[a.tier]}</span>
+                              مجوز <span className="ltr font-num">{a.licenseNo}</span> · {a.city}
                             </div>
                           </div>
-                          <div className="w-44">
-                            <div className="mb-1 flex items-center justify-between text-[10px] text-panel-muted">
-                              <span>اعتبار (مانده / سقف)</span>
-                              <span className="font-num">
-                                {faMoney(Math.max(Number(a.remainingIrr), 0))} / {faMoney(a.limitIrr)}
-                              </span>
+                          <div className="min-w-[118px] text-left">
+                            <div className="text-[10px] text-panel-muted">فروش این ماه</div>
+                            <div className="font-num mt-0.5 text-sm font-black text-panel-ink">
+                              {faNumber(a.monthlyTicketsSold)} بلیط
                             </div>
-                            <CreditBar usedIrr={Math.max(Number(a.usedIrr), 0)} limitIrr={Number(a.limitIrr)} />
+                            <div className="font-num mt-0.5 text-[10px] font-bold text-[#34d399]">
+                              {faMoney(a.monthlySalesIrr)} تومان
+                            </div>
                           </div>
                           <div className="text-left">
                             <div className="text-[10px] text-panel-muted">بدهی جاری</div>
@@ -616,6 +626,7 @@ export default function AgenciesListPage() {
                             </div>
                           </div>
                           <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${badge.className}`}>{badge.label}</span>
+                          <span aria-hidden className="text-lg text-panel-muted">‹</span>
                         </button>
                       </li>
                     );
@@ -624,6 +635,13 @@ export default function AgenciesListPage() {
               )}
               {!loading && (result?.agencies.length ?? 0) > 0 && (
                 <Pagination page={agenciesPager.page} totalPages={agenciesPager.totalPages} onChange={agenciesPager.setPage} variant="dark" />
+              )}
+
+              {(pendingSeatRequests.length > 0 || wsRequests.length > 0) && (
+                <div className="mt-2 flex flex-col gap-[15px]" data-testid="commercial-agency-request-queues">
+                  {seatRequestsPreview}
+                  {webserviceRequestsPreview}
+                </div>
               )}
             </>
           )}

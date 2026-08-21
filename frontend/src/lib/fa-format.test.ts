@@ -3,6 +3,7 @@ import {
   arDigits,
   compareIrrStrings,
   faDigits,
+  faNumber,
   faMoney,
   faMoneyCompact,
   faMoneyCompactNumber,
@@ -22,6 +23,12 @@ describe('faDigits', () => {
 
   it('leaves non-digit characters untouched', () => {
     expect(faDigits('PNR-42')).toBe('PNR-۴۲');
+  });
+});
+
+describe('faNumber', () => {
+  it('groups a plain count with Persian digits', () => {
+    expect(faNumber(3840)).toBe('۳٬۸۴۰');
   });
 });
 

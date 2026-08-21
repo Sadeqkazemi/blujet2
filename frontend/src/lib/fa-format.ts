@@ -6,6 +6,11 @@ export function faDigits(value: string | number): string {
   return String(value).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
 }
 
+/** Formats a plain integer count with Persian digits and thousands separators. */
+export function faNumber(value: number): string {
+  return faDigits(Math.round(value).toLocaleString('en-US').replace(/,/g, '٬'));
+}
+
 /** Converts Latin digits in a string/number to Eastern Arabic-Indic digits. */
 export function arDigits(value: string | number): string {
   return String(value).replace(/[0-9]/g, (d) => AR_DIGITS[Number(d)]);

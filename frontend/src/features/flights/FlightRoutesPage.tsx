@@ -12,9 +12,13 @@ export default function FlightRoutesPage() {
           مسیرهای پروازی
         </h1>
         <p className="mt-1 text-[11.5px] leading-6 text-panel-muted">
-          مسیر، شماره پرواز، برنامه هفتگی و ظرفیت هواپیما را به‌صورت مستقل
-          مدیریت کنید.
+          تعریف مسیر، روزهای هفته و بازه فصلی پروازها برای آژانس‌ها
         </p>
+      </div>
+      <div className="mb-4 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 text-[11px] leading-6 text-panel-muted">
+        مسیر پروازی را با روزهای هفته و ساعت پرواز تعریف کنید؛ سامانه برای بازه
+        فصل، پروازهای همان روزها را پس از کنترل تداخل ایجاد می‌کند. در پایان
+        فصل می‌توانید برنامه فصل بعد را دوباره تعریف کنید.
       </div>
       <ScheduleTemplatesTab />
     </div>

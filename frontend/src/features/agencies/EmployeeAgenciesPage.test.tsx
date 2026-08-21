@@ -20,6 +20,8 @@ const agency = {
   usedIrr: '0',
   remainingIrr: '0',
   pendingInvoiceCount: 0,
+  monthlyTicketsSold: 0,
+  monthlySalesIrr: '0',
 };
 
 const request = {

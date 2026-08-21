@@ -22,8 +22,21 @@ describe("ScheduleTemplatesTab", () => {
 
     expect(await screen.findByText('هنوز مسیر پروازی فعالی تعریف نشده است.')).toBeInTheDocument();
     expect(
+      screen.queryByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
+    ).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'افزودن مسیر جدید' }));
+    expect(
       screen.getByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'بستن فرم مسیر جدید' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: 'بستن فرم مسیر جدید' }));
+    expect(
+      screen.queryByRole("heading", { name: "تعریف مسیر پروازی جدید" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/تهران.*مشهد/)).not.toBeInTheDocument();
   });
 
@@ -39,6 +52,7 @@ describe("ScheduleTemplatesTab", () => {
     const user = userEvent.setup();
 
     render(<ScheduleTemplatesTab />);
+    await user.click(screen.getByRole('button', { name: 'افزودن مسیر جدید' }));
     await screen.findByRole("heading", { name: "تعریف مسیر پروازی جدید" });
 
     const agencyPrice = screen.getByLabelText("قیمت آژانس (تومان)");

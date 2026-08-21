@@ -3673,6 +3673,19 @@ Implemented on `cursor/backend-commercial-overhaul-20260818` (from
 `claude/frontend-overhaul-20260816`). Frontend mock adapters are swapped
 for real `api/agencies.ts` / `api/ancillary-services.ts` calls.
 
+## Commercial partner-list monthly metrics (2026-08-21)
+
+`GET /agencies` keeps its existing role gates and adds two fields to every
+agency row for the Commercial Manager partner-list design:
+
+- `monthlyTicketsSold` is a number derived from passengers on that agency's
+  `PAID`/`TICKETED` bookings created during the current server month.
+- `monthlySalesIrr` is a decimal IRR string derived only from current-month
+  immutable `LedgerEntry(type=SALE, bookingId IS NOT NULL)` rows.
+
+Empty aggregates return `0` / `"0"`. No client-side summing or mock fallback is
+used.
+
 ## Cross-agency invoice aggregate (used by: AgenciesListPage "همه فاکتورها")
 
 | Method | Path | Roles | Notes |
