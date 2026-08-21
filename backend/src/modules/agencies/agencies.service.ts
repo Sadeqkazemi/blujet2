@@ -384,8 +384,16 @@ export class AgenciesService {
       .orderBy('a.joinedAt', 'DESC')
       .getMany();
     const agencyIds = profiles.map((p) => p.userId);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [usedByAgency, unpaidCounts, creditLines] = await Promise.all([
+    const [
+      usedByAgency,
+      unpaidCounts,
+      creditLines,
+      monthlySalesRows,
+      monthlyTicketRows,
+    ] = await Promise.all([
       this.computeUsedIrr(agencyIds),
       agencyIds.length
         ? this.invoiceRepo
@@ -402,11 +410,43 @@ export class AgenciesService {
       agencyIds.length
         ? this.creditLineRepo.find({ where: { agencyId: In(agencyIds) } })
         : Promise.resolve<AgencyCreditLine[]>([]),
+      agencyIds.length
+        ? this.ledgerEntryRepo
+            .createQueryBuilder('entry')
+            .select('entry.agencyId', 'agencyId')
+            .addSelect('COALESCE(SUM(entry.signedAmountIrr), 0)', 'sum')
+            .where('entry.agencyId IN (:...ids)', { ids: agencyIds })
+            .andWhere('entry.type = :type', { type: 'SALE' })
+            .andWhere('entry.bookingId IS NOT NULL')
+            .andWhere('entry.occurredAt >= :startOfMonth', { startOfMonth })
+            .groupBy('entry.agencyId')
+            .getRawMany<{ agencyId: string; sum: string }>()
+        : Promise.resolve<{ agencyId: string; sum: string }[]>([]),
+      agencyIds.length
+        ? this.passengerRepo
+            .createQueryBuilder('passenger')
+            .innerJoin('passenger.booking', 'booking')
+            .select('booking.agencyId', 'agencyId')
+            .addSelect('COUNT(passenger.id)', 'count')
+            .where('booking.agencyId IN (:...ids)', { ids: agencyIds })
+            .andWhere('booking.status IN (:...statuses)', {
+              statuses: ['PAID', 'TICKETED'],
+            })
+            .andWhere('booking.createdAt >= :startOfMonth', { startOfMonth })
+            .groupBy('booking.agencyId')
+            .getRawMany<{ agencyId: string; count: string }>()
+        : Promise.resolve<{ agencyId: string; count: string }[]>([]),
     ]);
     const unpaidByAgency = new Map(
       unpaidCounts.map((r) => [r.agencyId, Number(r.count)]),
     );
     const creditLineByAgency = new Map(creditLines.map((c) => [c.agencyId, c]));
+    const monthlySalesByAgency = new Map(
+      monthlySalesRows.map((row) => [row.agencyId, BigInt(row.sum ?? '0')]),
+    );
+    const monthlyTicketsByAgency = new Map(
+      monthlyTicketRows.map((row) => [row.agencyId, Number(row.count)]),
+    );
 
     const rows = profiles.map((p) => {
       const usedIrr = maxIrr(usedByAgency.get(p.userId) ?? ZERO_IRR, ZERO_IRR);
@@ -423,6 +463,8 @@ export class AgenciesService {
         usedIrr,
         remainingIrr: subIrr(limitIrr, usedIrr),
         pendingInvoiceCount: unpaidByAgency.get(p.userId) ?? 0,
+        monthlyTicketsSold: monthlyTicketsByAgency.get(p.userId) ?? 0,
+        monthlySalesIrr: monthlySalesByAgency.get(p.userId) ?? ZERO_IRR,
       };
     });
 

@@ -194,6 +194,7 @@ describe('AgencyDetailPage', () => {
 
     expect(await screen.findByRole('button', { name: 'نمای کلی' })).toBeInTheDocument();
     expect(screen.getByText('امتیاز فعالیت آژانس')).toBeInTheDocument();
+    expect(screen.getByText('اعتبار آژانس')).toBeInTheDocument();
     expect(screen.queryByText('دسترسی API رزرواسیون')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'مالی' }));

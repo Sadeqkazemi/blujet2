@@ -113,6 +113,32 @@ describe('Commercial manager overhaul (e2e)', () => {
     return saved;
   }
 
+  describe('GET /agencies current-month metrics', () => {
+    it('returns typed zero aggregates for an agency with no bookings or ledger sales', async () => {
+      const agency = await createFreshAgency();
+      const commercial = await loginAs(app, 'comm');
+
+      const response = await request(app.getHttpServer())
+        .get('/agencies')
+        .set('Authorization', auth(commercial.accessToken))
+        .expect(200);
+      const row = (
+        response.body.data.agencies as Array<{
+          id: string;
+          monthlyTicketsSold: number;
+          monthlySalesIrr: string;
+        }>
+      ).find((item) => item.id === agency.id);
+
+      expect(row).toMatchObject({
+        monthlyTicketsSold: 0,
+        monthlySalesIrr: '0',
+      });
+      expect(typeof row?.monthlyTicketsSold).toBe('number');
+      expect(typeof row?.monthlySalesIrr).toBe('string');
+    });
+  });
+
   describe('GET /agencies/invoices', () => {
     it('is forbidden for finance and empty for commercial when none exist', async () => {
       const finance = await loginAs(app, 'finance');
