@@ -13,6 +13,9 @@ import { EntityManager, In, IsNull, Not, Repository } from 'typeorm';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { AgencyRequestOtp } from '../../database/entities/agency-request-otp.entity';
@@ -64,7 +67,6 @@ import type {
   AgencyDocumentStatus,
   AgencyFlightDomain,
   AgencyMembershipStatus,
-  AgencySeatRequestStatus,
   AgencyWebserviceRequestStatus,
   AggregateInvoiceStatus,
 } from '../../database/enums';
@@ -1542,6 +1544,156 @@ export class AgenciesService {
     );
   }
 
+  private async assertAgencyCredit(
+    tx: EntityManager,
+    agencyId: string,
+    amountIrr: Irr,
+  ) {
+    const credit = await tx
+      .createQueryBuilder(AgencyCreditLine, 'credit')
+      .setLock('pessimistic_write')
+      .where('credit."agencyId" = :agencyId', { agencyId })
+      .getOne();
+    if (!credit) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'برای این آژانس خط اعتباری فعالی ثبت نشده است.',
+      });
+    }
+    const raw = await tx
+      .createQueryBuilder(LedgerEntry, 'entry')
+      .select('COALESCE(SUM(entry."signedAmountIrr"), 0)', 'used')
+      .where('entry."agencyId" = :agencyId', { agencyId })
+      .andWhere('entry.type IN (:...types)', {
+        types: ['SALE', 'SETTLEMENT'],
+      })
+      .getRawOne<{ used: string }>();
+    const used = BigInt(raw?.used ?? '0');
+    if (subIrr(credit.limitIrr, used) < amountIrr) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'اعتبار قابل استفاده آژانس برای این درخواست کافی نیست.',
+      });
+    }
+  }
+
+  /** Converts a paid/credit-approved request into bookable inventory. The
+   * flight row is the mutex shared with manual commercial allotment writes;
+   * the fare-rule row is additionally locked so two requests for one class
+   * cannot overrun the released class pool. */
+  private async activateSeatRequestAllotments(
+    tx: EntityManager,
+    request: AgencySeatRequest,
+    actorId: string,
+  ) {
+    if (!request.cabin || !request.fareClassCode) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'درخواست قدیمی فاقد کلاس نرخی است و باید دوباره ثبت شود.',
+      });
+    }
+    const occurrences = await tx.find(AgencySeatRequestFlight, {
+      where: { seatRequestId: request.id },
+      order: { createdAt: 'ASC' },
+    });
+    if (occurrences.length === 0) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'هیچ پروازی برای این درخواست ثبت نشده است.',
+      });
+    }
+
+    for (const occurrence of occurrences) {
+      const alreadyActivated = await tx.findOne(AgencyAllotment, {
+        where: {
+          seatRequestId: request.id,
+          flightInstanceId: occurrence.flightInstanceId,
+        },
+      });
+      if (alreadyActivated) continue;
+
+      const instance = await tx
+        .createQueryBuilder(FlightInstance, 'instance')
+        .setLock('pessimistic_write')
+        .where('instance.id = :id', { id: occurrence.flightInstanceId })
+        .getOne();
+      if (
+        !instance ||
+        instance.status !== 'SCHEDULED' ||
+        instance.definitionStatus !== 'PUBLISHED' ||
+        instance.departureAt <= new Date()
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'یکی از پروازهای دوره دیگر فعال و قابل فروش نیست.',
+        });
+      }
+
+      const rule = await tx
+        .createQueryBuilder(FareRule, 'rule')
+        .setLock('pessimistic_write')
+        .where('rule."flightInstanceId" = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('rule.cabin = :cabin', { cabin: request.cabin })
+        .andWhere('rule."classCode" = :classCode', {
+          classCode: request.fareClassCode,
+        })
+        .getOne();
+      if (!rule || !rule.agencyReleasePriceIrr || rule.agencySeatsReleased < 1) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'سهمیه این کلاس توسط مدیر بازرگانی بسته یا حذف شده است.',
+        });
+      }
+
+      const activeClassAllotments = await tx
+        .createQueryBuilder(AgencyAllotment, 'allotment')
+        .setLock('pessimistic_write')
+        .where('allotment."flightInstanceId" = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('allotment.cabin = :cabin', { cabin: request.cabin })
+        .andWhere('allotment."fareClassCode" = :classCode', {
+          classCode: request.fareClassCode,
+        })
+        .andWhere(
+          '(allotment.type = :hard OR allotment."releaseAt" IS NULL OR allotment."releaseAt" > :now)',
+          { hard: 'HARD', now: new Date() },
+        )
+        .getMany();
+      const used = activeClassAllotments.reduce(
+        (sum, allotment) => sum + allotment.seatsAllocated,
+        0,
+      );
+      const hardLimit = Math.min(
+        rule.agencySeatsReleased,
+        rule.seatsAllocated,
+      );
+      if (used + request.seats > hardLimit) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'سهمیه آزاد این کلاس برای یکی از پروازهای دوره کافی نیست.',
+        });
+      }
+
+      await tx.save(
+        tx.create(AgencyAllotment, {
+          agencyId: request.agencyId,
+          flightInstanceId: instance.id,
+          cabin: request.cabin,
+          fareClassCode: request.fareClassCode,
+          seatRequestId: request.id,
+          seatsAllocated: request.seats,
+          type: 'HARD',
+          releaseAt: null,
+          contractPriceIrr: request.unitPriceIrr,
+          createdById: actorId,
+        }),
+      );
+    }
+  }
+
   async decideSeatRequest(
     actor: AuthenticatedUser,
     id: string,
@@ -1571,11 +1723,7 @@ export class AgenciesService {
             message: 'درخواست صندلی یافت نشد.',
           });
         }
-        const pending: AgencySeatRequestStatus[] = [
-          'PENDING',
-          'PENDING_FINANCE',
-        ];
-        if (!pending.includes(locked.status)) {
+        if (locked.status !== 'PENDING') {
           throw new ConflictException({
             code: ErrorCode.CONFLICT,
             message: 'این درخواست قبلاً بررسی شده است.',
@@ -1598,7 +1746,6 @@ export class AgenciesService {
           return { row: locked, invoice: null, oldStatus };
         }
 
-        const dueAt = this.parseDueAt(dto.dueAt);
         const occurrenceCount = await tx.count(AgencySeatRequestFlight, {
           where: { seatRequestId: locked.id },
         });
@@ -1606,19 +1753,35 @@ export class AgenciesService {
           locked.unitPriceIrr *
           BigInt(locked.seats) *
           BigInt(Math.max(occurrenceCount, 1));
-        const invoice = await this.issueInvoice(
-          actor,
-          locked.agencyId,
-          {
-            amountIrr: totalIrr,
-            dueAt: dueAt.toISOString(),
-            descriptionFa: 'فاکتور تعهد صندلی چارتری',
-          },
-          tx,
-        );
-        locked.status = 'APPROVED';
-        locked.invoiceId = invoice.id;
-        locked.dueAt = dueAt;
+        let invoice: AgencyInvoice | null = null;
+        if (locked.payMethod === 'CREDIT') {
+          await this.assertAgencyCredit(tx, locked.agencyId, totalIrr);
+          await this.activateSeatRequestAllotments(tx, locked, actor.id);
+          await tx.save(
+            tx.create(LedgerEntry, {
+              agencyId: locked.agencyId,
+              type: 'SALE',
+              signedAmountIrr: totalIrr,
+              createdById: actor.id,
+            }),
+          );
+          locked.status = 'APPROVED';
+        } else {
+          const dueAt = this.parseDueAt(dto.dueAt);
+          invoice = await this.issueInvoice(
+            actor,
+            locked.agencyId,
+            {
+              amountIrr: totalIrr,
+              dueAt: dueAt.toISOString(),
+              descriptionFa: 'فاکتور خرید سهمیه صندلی آژانس',
+            },
+            tx,
+          );
+          locked.status = 'PENDING_FINANCE';
+          locked.invoiceId = invoice.id;
+          locked.dueAt = dueAt;
+        }
         locked.decidedById = actor.id;
         locked.decidedAt = new Date();
         await tx.save(locked);
@@ -1626,7 +1789,9 @@ export class AgenciesService {
           'AGENCY_REQUEST',
           locked.id,
           'APPROVED',
-          `تأیید درخواست صندلی و صدور فاکتور ${invoice.invoiceNo}`,
+          invoice
+            ? `تأیید تجاری درخواست صندلی و صدور فاکتور ${invoice.invoiceNo}`
+            : `تأیید و فعال‌سازی اعتباری سهمیه توسط ${actor.fullName}`,
           tx,
         );
         return { row: locked, invoice, oldStatus };
@@ -1665,7 +1830,10 @@ export class AgenciesService {
 
     return {
       id: result.row.id,
-      status: result.row.status as 'APPROVED' | 'REJECTED',
+      status: result.row.status as
+        | 'PENDING_FINANCE'
+        | 'APPROVED'
+        | 'REJECTED',
     };
   }
 
@@ -1740,40 +1908,62 @@ export class AgenciesService {
   }
 
   async payInvoice(actor: AuthenticatedUser, id: string, invoiceId: string) {
-    const invoice = await this.invoiceRepo.findOneBy({ id: invoiceId });
-    if (!invoice || invoice.agencyId !== id) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'فاکتور یافت نشد.',
-      });
-    }
-
     const updated = await this.invoiceRepo.manager.transaction(async (tx) => {
-      // Conditional update guards against a concurrent double-pay race —
-      // affected===0 means another request already marked it PAID first.
-      const result = await tx.update(
-        AgencyInvoice,
-        { id: invoiceId, status: Not('PAID') },
-        { status: 'PAID', paidAt: new Date() },
-      );
-      if ((result.affected ?? 0) === 0) {
+      const lockedInvoice = await tx
+        .createQueryBuilder(AgencyInvoice, 'invoice')
+        .setLock('pessimistic_write')
+        .where('invoice.id = :invoiceId', { invoiceId })
+        .getOne();
+      if (!lockedInvoice || lockedInvoice.agencyId !== id) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'فاکتور یافت نشد.',
+        });
+      }
+      if (lockedInvoice.status === 'PAID') {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این فاکتور قبلاً تسویه شده است.',
         });
       }
+
+      const seatRequest = await tx
+        .createQueryBuilder(AgencySeatRequest, 'request')
+        .setLock('pessimistic_write')
+        .where('request."invoiceId" = :invoiceId', { invoiceId })
+        .getOne();
+      if (seatRequest) {
+        if (seatRequest.status !== 'PENDING_FINANCE') {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'وضعیت درخواست صندلی برای پرداخت معتبر نیست.',
+          });
+        }
+        await this.activateSeatRequestAllotments(tx, seatRequest, actor.id);
+        await tx.save(
+          tx.create(LedgerEntry, {
+            agencyId: id,
+            type: 'SALE',
+            signedAmountIrr: lockedInvoice.amountIrr,
+            createdById: actor.id,
+          }),
+        );
+        seatRequest.status = 'APPROVED';
+        await tx.save(seatRequest);
+      }
+
+      lockedInvoice.status = 'PAID';
+      lockedInvoice.paidAt = new Date();
+      await tx.save(lockedInvoice);
       await tx.save(
         tx.create(LedgerEntry, {
           agencyId: id,
           type: 'SETTLEMENT',
-          signedAmountIrr: negateIrr(invoice.amountIrr),
+          signedAmountIrr: negateIrr(lockedInvoice.amountIrr),
           createdById: actor.id,
         }),
       );
-      return tx
-        .createQueryBuilder(AgencyInvoice, 'i')
-        .where('i.id = :id', { id: invoiceId })
-        .getOneOrFail();
+      return lockedInvoice;
     });
 
     await this.audit.record({
@@ -1781,7 +1971,7 @@ export class AgenciesService {
       actorRole: actor.role,
       category: 'AGENCY',
       action: 'تسویه فاکتور آژانس',
-      detail: `فاکتور ${invoice.invoiceNo} توسط ${actor.fullName} تسویه شد.`,
+      detail: `فاکتور ${updated.invoiceNo} توسط ${actor.fullName} تسویه شد.`,
       entityType: 'AgencyInvoice',
       entityId: invoiceId,
     });

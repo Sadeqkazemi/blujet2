@@ -158,7 +158,7 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 | PATCH | `/cartable/:id/approve` | EXEC_ROLES (assignee only) | `{ note }` — required, per the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.». Resolving a task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED). |
 | PATCH | `/cartable/:id/reject` | EXEC_ROLES (assignee only) | `{ note }` required. The design's red button is labeled «انصراف» but behaves as reject — kept as reject server-side. |
 | PATCH | `/cartable/:id/transfer` | EXEC_ROLES (assignee only) | `{ toId, note }` — creates a new OPEN task for `toId`, marks this one TRANSFERRED. 409 on already-resolved tasks (no double-resolution). |
-| POST | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates BOARD_CHAIR's cartable task. |
+| POST | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates one cartable task for every active `BOARD_CHAIR` account. The first valid decision wins atomically and closes the sibling tasks with the same result, so stale duplicate decisions cannot overwrite it. |
 | GET | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Own latest request status — drives the banner's pending/approved state. |
 
 ### `backend/src/modules/staff-directory/`
@@ -183,7 +183,7 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| POST | `/manager-messages` | EXEC_ROLES | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = recipient cartable tasks (SUPPORT/AGENCIES accepted but undeliverable until Phase 8, returns a documented `PARTIAL_DELIVERY` warning in data). |
+| POST | `/manager-messages` | EXEC_ROLES | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
 | GET | `/manager-messages/sent` | EXEC_ROLES | Sender's own history (the mocks discard sent messages; the real system keeps the record). |
 
 ### `backend/src/modules/files/`
@@ -3606,25 +3606,31 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   price, term, and decision status. The agency id always comes from the JWT;
   no client-supplied tenant id is accepted.
 
-- `GET /agency-portal/seat-request-options` (`AGENCY`) returns future scheduled
-  route instances created through commercial flight planning. Routes are
-  visible before CEO publication so an agency can submit its commercial
-  request during planning. For each instance it returns route/flight details,
-  physical capacity, active agency commitments, the caller's own commitments,
-  and `availableToRequest`. Availability is derived server-side as physical
-  capacity minus active charter commitments, active agency commitments, and
-  occupied seats in DRAFT/HELD/PAID/TICKETED bookings.
+- `GET /agency-portal/seat-request-options` (`AGENCY`) returns only future,
+  CEO-approved/published flight instances whose commercial manager has released
+  a positive agency quota for at least one fare class. Each response row is one
+  flight occurrence plus one fare class and includes `cabin`, `fareClassCode`,
+  `agencySeatsReleased`, `agencySeatsAllocated`, `availableToRequest`, and the
+  commercial `agencyReleasePriceIrr`. Availability is derived from the released
+  class quota minus active paid/credit agency allotments for that exact
+  flight/class; physical aircraft capacity remains a hard upper bound. Expired
+  public holds and draft bookings never consume the agency release.
 - `POST /agency-portal/seat-requests` (`AGENCY`) accepts
-  `{ flightInstanceId, seats, preferredWeekdays?, termMonths?, payMethod? }`, validates the
+  `{ flightInstanceId, cabin, fareClassCode, seats, preferredWeekdays?, termMonths?, payMethod? }`, validates the
   current capacity again, persists a structured `agency_seat_requests` row
   (plus `agency_seat_request_flights`), and creates a cartable notification
   for every active `COMMERCIAL_MANAGER` (`sourceId` = the structured row id).
   `termMonths` accepts `0 | 1 | 3 | 6 | 12`; `0` means one week. The request
-  includes every matching occurrence of the same route/flight/aircraft within
-  the selected term and preferred weekdays. It does not directly reserve inventory;
-  `payMethod` accepts `INVOICE | CREDIT` and defaults to `INVOICE`;
-  the existing commercial commitment workflow remains the only path that
-  activates and locks agency inventory.
+  includes every matching occurrence of the same route/flight/aircraft/class
+  within the selected term and preferred weekdays. A pending request does not
+  reserve inventory. `payMethod` accepts `INVOICE | CREDIT` and defaults to
+  `INVOICE`. Commercial approval revalidates every selected occurrence under
+  database row locks: CREDIT approval atomically checks the ledger-derived
+  remaining credit and activates one class-bound `AgencyAllotment` per
+  occurrence; INVOICE approval creates one unpaid invoice and moves the request
+  to `PENDING_FINANCE`. Paying that invoice revalidates the released quotas and
+  atomically activates the allotments. Repeated approval/payment cannot create
+  duplicate allotments.
 - Guest desktop checkout now completes phone/OTP authentication inside the
   results-page modal and resumes the stored flight/cabin/passenger selection.
   Mobile retains its existing login-or-sign-up choice. Desktop passenger,
@@ -3715,7 +3721,25 @@ valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER`, `FINANCE_MANAGER` | Read-only structured queue for finance; decision remains commercial-only. Money fields are decimal strings. |
-| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` / `PENDING_FINANCE` may be decided; repeats return `409 CONFLICT`. Approval creates exactly one `AgencyInvoice` via the existing invoice service (`descriptionFa` = فاکتور تعهد صندلی چارتری) and links `invoiceId`. Rejection creates no invoice. Cartable tasks for that `sourceId` are closed. Audit records actor, old/new status, and invoice reference. Missing `dueAt` on approve defaults to +7 days. |
+| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` may be decided; repeats return `409 CONFLICT`. CREDIT approval validates credit + class quota and creates the class-bound allotments immediately. INVOICE approval creates exactly one `AgencyInvoice`, links it, and moves to `PENDING_FINANCE`; allotments are created only by successful payment. Rejection creates no invoice/allotment. Cartable tasks for that `sourceId` are closed and audit records the transition. Missing `dueAt` defaults to +7 days. |
+
+### Flight lifecycle and aircraft-derived capacity (2026-08-21)
+
+- Sell-out is an inventory state (`derivedStatus=FULL`), not a lifecycle
+  transition. A sold-out `SCHEDULED` instance remains in active inventory
+  until `departureAt`; the lifecycle worker changes it to `DEPARTED`, and only
+  then can passenger/booking projections become `FLOWN`.
+- Schedule-template and flight-definition capacity is read from the selected
+  `AircraftDefinition` cabin map. Commercial users do not enter a second total
+  seat count; they only configure sellable quantities by fare class and channel
+  (public/agency/charter), all bounded by the aircraft cabin capacities.
+- Updating an agency fare-class release is serialized with request activation.
+  The release cannot be reduced below already activated agency allotments and
+  cannot exceed the still sellable capacity of that fare class.
+- When `GET /flights/overview` detects occupancy below 60% during the final
+  seven days, it emits one idempotent SYSTEM warning per flight/recipient to
+  active `COMMERCIAL_MANAGER`, `FINANCE_MANAGER`, `SENIOR_MANAGER`, `CEO`, and
+  `BOARD_CHAIR` accounts. Repeated overview reads do not duplicate the alert.
 
 ## Ancillary services pricing — manager + public
 

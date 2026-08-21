@@ -24,7 +24,7 @@ describe('md80-seat-layout', () => {
     expect(md80ColsForRow(3)).toEqual({
       left: ['A', 'B'],
       right: ['E', 'F'],
-      cabin: 'BUSINESS',
+      cabin: 'FIRST',
     });
     expect(md80ColsForRow(12)).toEqual({
       left: ['A', 'B'],

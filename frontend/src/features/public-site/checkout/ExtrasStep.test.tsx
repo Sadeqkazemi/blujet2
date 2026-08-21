@@ -216,7 +216,8 @@ describe('ExtrasStep — design parity', () => {
     );
 
     expect(screen.getByTestId('checkout-seat-3A')).toBeDisabled();
-    await user.click(screen.getByTestId('checkout-seat-7A'));
-    expect(onToggleSeat).toHaveBeenCalledWith('7A');
+    expect(screen.getByTestId('checkout-seat-7A')).toBeDisabled();
+    await user.click(screen.getByTestId('checkout-seat-12A'));
+    expect(onToggleSeat).toHaveBeenCalledWith('12A');
   });
 });

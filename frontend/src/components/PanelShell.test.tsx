@@ -35,14 +35,14 @@ describe('PanelShell', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderShell();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'خروج از پنل' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'خروج از حساب' }));
     expect(signOut).not.toHaveBeenCalled();
     expect(screen.getByTestId('panel-logout-confirm')).toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('panel-logout-confirm-cancel'));
     expect(screen.queryByTestId('panel-logout-confirm')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'خروج از پنل' }));
+    await userEvent.click(screen.getByRole('button', { name: 'خروج از حساب' }));
     await userEvent.click(screen.getByTestId('panel-logout-confirm-confirm'));
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
   });

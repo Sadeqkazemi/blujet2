@@ -5,6 +5,7 @@ import * as crypto from 'node:crypto';
 import * as argon2 from 'argon2';
 import { DataSource } from 'typeorm';
 import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
+import { AgencyAllotment } from '../src/database/entities/agency-allotment.entity';
 import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AgencySeatRequest } from '../src/database/entities/agency-seat-request.entity';
@@ -13,7 +14,9 @@ import { AncillaryService } from '../src/database/entities/ancillary-service.ent
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { CartableTask } from '../src/database/entities/cartable-task.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
+import { FareRule } from '../src/database/entities/fare-rule.entity';
 import { User } from '../src/database/entities/user.entity';
+import { CabinClass, FlightDefinitionStatus } from '../src/database/enums';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -108,6 +111,21 @@ describe('Commercial manager overhaul (e2e)', () => {
         scheduleId: null,
         aircraftTypeOverride: sample.aircraftTypeOverride ?? 'Airbus A320',
         basePriceIrr: sample.basePriceIrr ?? 5_000_000n,
+        definitionStatus: FlightDefinitionStatus.PUBLISHED,
+      }),
+    );
+    await dataSource.getRepository(FareRule).save(
+      dataSource.getRepository(FareRule).create({
+        flightInstanceId: saved.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: 'Y',
+        priceIrr: 5_000_000n,
+        sitePriceIrr: 5_000_000n,
+        seatsAllocated: 80,
+        agencySeatsReleased: 40,
+        agencyReleasePriceIrr: 4_500_000n,
+        agencySpecialOffer: false,
+        taxIrr: 0n,
       }),
     );
     saved.flight = sample.flight;
@@ -210,7 +228,13 @@ describe('Commercial manager overhaul (e2e)', () => {
       const submitted = await request(app.getHttpServer())
         .post('/agency-portal/seat-requests')
         .set('Authorization', auth(agencyToken))
-        .send({ flightInstanceId: instance.id, seats: 4, termMonths: 1 });
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          fareClassCode: 'Y',
+          seats: 4,
+          payMethod: 'INVOICE',
+        });
       expect(submitted.status).toBe(201);
       expect(submitted.body.data?.id).toBeTruthy();
       const requestId = submitted.body.data.id as string;
@@ -220,7 +244,9 @@ describe('Commercial manager overhaul (e2e)', () => {
         .findOneByOrFail({ id: requestId });
       expect(persisted.status).toBe('PENDING');
       expect(persisted.seats).toBe(4);
-      expect(persisted.termMonths).toBe(1);
+      expect(persisted.termMonths).toBeNull();
+      expect(persisted.cabin).toBe('ECONOMY');
+      expect(persisted.fareClassCode).toBe('Y');
 
       const ownHistory = await request(app.getHttpServer())
         .get('/agency-portal/seat-requests')
@@ -292,7 +318,7 @@ describe('Commercial manager overhaul (e2e)', () => {
         .set('Authorization', auth(commercial.accessToken))
         .send({ approve: true, dueAt: '2026-09-01T00:00:00.000Z' })
         .expect(200);
-      expect(approved.body.data.status).toBe('APPROVED');
+      expect(approved.body.data.status).toBe('PENDING_FINANCE');
 
       const invoices = await dataSource.getRepository(AgencyInvoice).findBy({
         agencyId: agency.id,
@@ -302,7 +328,7 @@ describe('Commercial manager overhaul (e2e)', () => {
         .countBy({ seatRequestId: requestId });
       expect(occurrenceCount).toBeGreaterThan(0);
       expect(invoices).toHaveLength(1);
-      expect(invoices[0]?.descriptionFa).toBe('فاکتور تعهد صندلی چارتری');
+      expect(invoices[0]?.descriptionFa).toBe('فاکتور خرید سهمیه صندلی آژانس');
       expect(invoices[0]?.amountIrr.toString()).toBe(
         (persisted.unitPriceIrr * 4n * BigInt(occurrenceCount)).toString(),
       );
@@ -317,6 +343,32 @@ describe('Commercial manager overhaul (e2e)', () => {
           .getRepository(AgencyInvoice)
           .countBy({ agencyId: agency.id }),
       ).toBe(1);
+
+      expect(
+        await dataSource
+          .getRepository(AgencyAllotment)
+          .countBy({ seatRequestId: requestId }),
+      ).toBe(0);
+      await request(app.getHttpServer())
+        .post(`/agency-portal/invoices/${invoices[0]!.id}/pay`)
+        .set('Authorization', auth(agencyToken))
+        .expect(201);
+      const activated = await dataSource
+        .getRepository(AgencyAllotment)
+        .findBy({ seatRequestId: requestId });
+      expect(activated).toHaveLength(occurrenceCount);
+      expect(activated[0]).toMatchObject({
+        cabin: 'ECONOMY',
+        fareClassCode: 'Y',
+        seatsAllocated: 4,
+      });
+      expect(
+        (
+          await dataSource
+            .getRepository(AgencySeatRequest)
+            .findOneByOrFail({ id: requestId })
+        ).status,
+      ).toBe('APPROVED');
 
       const closed = await dataSource.getRepository(CartableTask).findBy({
         sourceType: 'AGENCY_REQUEST',
@@ -337,7 +389,13 @@ describe('Commercial manager overhaul (e2e)', () => {
       const submitted = await request(app.getHttpServer())
         .post('/agency-portal/seat-requests')
         .set('Authorization', auth(agencyToken))
-        .send({ flightInstanceId: instance.id, seats: 2, termMonths: 3 });
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          fareClassCode: 'Y',
+          seats: 2,
+          payMethod: 'INVOICE',
+        });
       expect(submitted.status).toBe(201);
       const requestId = submitted.body.data.id as string;
       const commercial = await loginAs(app, 'comm');

@@ -61,7 +61,29 @@ describe('commercial active inventory policy', () => {
     ).toBe(true);
   });
 
-  it('flags weak sales inside the 72-hour window from server time', () => {
+  it('keeps a sold-out flight active until its departure time', () => {
+    expect(
+      isCommercialInventoryVisible(
+        {
+          status: 'SCHEDULED',
+          definitionStatus: FlightDefinitionStatus.PUBLISHED,
+          approvedSnapshot: null,
+        },
+        now,
+      ),
+    ).toBe(true);
+
+    const health = commercialSalesHealth(
+      new Date('2026-08-14T10:00:00.000Z'),
+      140,
+      140,
+      now,
+    );
+    expect(health.occupancyPct).toBe(100);
+    expect(health.isWeak).toBe(false);
+  });
+
+  it('flags weak sales inside the seven-day window from server time', () => {
     const health = commercialSalesHealth(
       new Date('2026-08-14T10:00:00.000Z'),
       20,
@@ -85,7 +107,7 @@ describe('commercial active inventory policy', () => {
     ).toBe(false);
     expect(
       commercialSalesHealth(
-        new Date('2026-08-17T10:00:00.000Z'),
+        new Date('2026-08-21T11:00:00.000Z'),
         20,
         140,
         now,

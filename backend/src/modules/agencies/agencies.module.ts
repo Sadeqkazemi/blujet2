@@ -8,6 +8,9 @@ import { AgencyApiKey } from '../../database/entities/agency-api-key.entity';
 import { AgencyInvoice } from '../../database/entities/agency-invoice.entity';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
+import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
+import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Airport } from '../../database/entities/airport.entity';
 import { AgencyMessage } from '../../database/entities/agency-message.entity';
 import { AgencyCreditRequest } from '../../database/entities/agency-credit-request.entity';
@@ -40,6 +43,9 @@ import { SmsModule } from '../sms/sms.module';
       AgencyInvoice,
       AgencySeatRequest,
       AgencySeatRequestFlight,
+      AgencyAllotment,
+      FareRule,
+      FlightInstance,
       Airport,
       AgencyMessage,
       AgencyCreditRequest,

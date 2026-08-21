@@ -24,6 +24,7 @@ import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { User } from '../../database/entities/user.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
@@ -46,6 +47,7 @@ import {
 } from '../../common/money';
 import type { Irr } from '../../common/money';
 import { RedisService } from '../../redis/redis.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   FlightDefinitionStatus,
   FlightInstanceStatus,
@@ -68,7 +70,8 @@ const FUTURE_WINDOW_DAYS = 7;
 /** Statuses that count as a sold seat (design: «صندلی فروخته‌شده»). */
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
-const WEAK_SALES_WINDOW_HOURS = 72;
+/** Product rule: weak-sale escalation begins one week before departure. */
+const WEAK_SALES_WINDOW_HOURS = 7 * 24;
 const WEAK_SALES_OCCUPANCY_PCT = 60;
 
 function stringifyScalar(value: unknown, fallback = ''): string {
@@ -168,12 +171,57 @@ export class FlightsService {
     private readonly scheduleTemplateRepo: Repository<FlightScheduleTemplate>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepo: Repository<AuditLog>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly audit: AuditService,
     @Inject(PRICE_SUGGESTION_PROVIDER)
     private readonly priceSuggestions: PriceSuggestionProvider,
     private readonly stepUp: StepUpService,
     private readonly redis: RedisService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  private async emitWeakSalesAlerts(
+    rows: Array<{
+      id: string;
+      flightNo: string;
+      departureAt: string;
+      salesHealth: { isWeak: boolean; reasonFa: string };
+    }>,
+  ) {
+    const weak = rows.filter((row) => row.salesHealth.isWeak);
+    if (weak.length === 0) return;
+    const recipients = await this.userRepo.find({
+      where: {
+        role: In([
+          'COMMERCIAL_MANAGER',
+          'FINANCE_MANAGER',
+          'SENIOR_MANAGER',
+          'CEO',
+          'BOARD_CHAIR',
+        ]),
+        isActive: true,
+        deletedAt: IsNull(),
+      },
+      select: { id: true },
+    });
+    await Promise.allSettled(
+      weak.flatMap((flight) =>
+        recipients.map((recipient) =>
+          this.notifications.notify({
+            recipientId: recipient.id,
+            category: 'SYSTEM',
+            action: 'WEAK_FLIGHT_SALES',
+            title: `هشدار فروش ضعیف پرواز ${flight.flightNo}`,
+            body: flight.salesHealth.reasonFa,
+            entityType: 'FlightInstance',
+            entityId: flight.id,
+            dedupeKey: `weak-sales:${flight.id}:${recipient.id}`,
+          }),
+        ),
+      ),
+    );
+  }
 
   private async soldByInstance(
     instanceIds: string[],
@@ -440,6 +488,8 @@ export class FlightsService {
       agencySeatsAllocated: i.agencySeatsAllocated,
       aiSuggestion: i.aiSuggestion as unknown as PersistedAiSuggestion | null,
     }));
+
+    await this.emitWeakSalesAlerts(active);
 
     const completed = await this.completedReport();
 
@@ -1565,43 +1615,63 @@ export class FlightsService {
     ruleId: string,
     dto: { seats: number; priceIrr: Irr; specialOffer?: boolean },
   ) {
-    const rule = await this.loadFareRuleForCommercialControl(
-      instanceId,
-      ruleId,
-    );
-    const soldRow = await this.passengerRepo
-      .createQueryBuilder('p')
-      .innerJoin('p.booking', 'b')
-      .select('COUNT(p.id)', 'soldSeats')
-      .where('b.flightInstanceId = :instanceId', { instanceId })
-      .andWhere('b.cabin = :cabin', { cabin: rule.cabin })
-      .andWhere('b.fareClassCode = :classCode', { classCode: rule.classCode })
-      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
-      .andWhere('p.occupiesSeat = true')
-      .andWhere('p.deletedAt IS NULL')
-      .getRawOne<{ soldSeats: string }>();
-    const remaining = Math.max(
-      0,
-      rule.seatsAllocated - Number(soldRow?.soldSeats ?? 0),
-    );
-    if (dto.seats > remaining) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: `حداکثر ${remaining} صندلی از این کلاس قابل آزادسازی است.`,
-      });
-    }
-    rule.agencySeatsReleased = dto.seats;
-    rule.agencyReleasePriceIrr = dto.seats > 0 ? dto.priceIrr : null;
-    rule.agencySpecialOffer = dto.seats > 0 && (dto.specialOffer ?? false);
-    const saved = await this.fareRuleRepo.save(rule);
+    const saved = await this.dataSource.transaction(async (tx) => {
+      const rule = await tx
+        .createQueryBuilder(FareRule, 'r')
+        .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+        .leftJoinAndSelect('flightInstance.flight', 'flight')
+        .setLock('pessimistic_write', undefined, ['r'])
+        .where('r.id = :ruleId', { ruleId })
+        .getOne();
+      if (!rule || rule.flightInstanceId !== instanceId) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'کلاس نرخی یافت نشد.',
+        });
+      }
+
+      // Keep this query on the transaction connection and serialize it after
+      // the FareRule lock. The activation path takes the same locks, so a
+      // release cannot race an agency payment/allotment activation.
+      const allocatedRow = await tx
+        .createQueryBuilder(AgencyAllotment, 'allotment')
+        .select('COALESCE(SUM(allotment.seatsAllocated), 0)', 'allocated')
+        .where('allotment.flightInstanceId = :instanceId', { instanceId })
+        .andWhere('allotment.cabin = :cabin', { cabin: rule.cabin })
+        .andWhere('allotment.fareClassCode = :classCode', {
+          classCode: rule.classCode,
+        })
+        .andWhere(
+          '(allotment.type = :hard OR allotment.releaseAt IS NULL OR allotment.releaseAt > :now)',
+          { hard: 'HARD', now: new Date() },
+        )
+        .getRawOne<{ allocated: string }>();
+      const activated = Number(allocatedRow?.allocated ?? 0);
+      if (dto.seats < activated) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `سهمیه آژانسی نمی‌تواند از ${activated} صندلی فعال‌شده کمتر باشد.`,
+        });
+      }
+      if (dto.seats > rule.seatsAllocated) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `حداکثر ${rule.seatsAllocated} صندلی از این کلاس قابل آزادسازی است.`,
+        });
+      }
+      rule.agencySeatsReleased = dto.seats;
+      rule.agencyReleasePriceIrr = dto.seats > 0 ? dto.priceIrr : null;
+      rule.agencySpecialOffer = dto.seats > 0 && (dto.specialOffer ?? false);
+      return tx.save(rule);
+    });
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'PRICING',
       action: 'آزادسازی آژانسی کلاس نرخی',
-      detail: `${dto.seats} صندلی از کلاس ${rule.classCode} پرواز ${rule.flightInstance.flight.flightNo} برای فروش آژانسی تنظیم شد.`,
+      detail: `${dto.seats} صندلی از کلاس ${saved.classCode} پرواز ${saved.flightInstance.flight.flightNo} برای فروش آژانسی تنظیم شد.`,
       entityType: 'FareRule',
-      entityId: rule.id,
+      entityId: saved.id,
       metadata: {
         seats: dto.seats,
         priceIrr: dto.priceIrr.toString(),

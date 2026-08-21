@@ -23,6 +23,7 @@ import { FlightChargeRule } from '../../database/entities/flight-charge-rule.ent
 import { FlightReview } from '../../database/entities/flight-review.entity';
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { User } from '../../database/entities/user.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
@@ -62,6 +63,7 @@ import { AuthModule } from '../auth/auth.module';
       FlightReview,
       FlightScheduleTemplate,
       AuditLog,
+      User,
     ]),
     PanelsModule,
     AuditModule,

@@ -96,6 +96,8 @@ export function fetchMySeatRequests() {
 
 export function requestAgencySeats(dto: {
   flightInstanceId: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  fareClassCode: string;
   seats: number;
   preferredWeekdays?: number[];
   termMonths?: 0 | 1 | 3 | 6 | 12;
@@ -107,7 +109,7 @@ export function requestAgencySeats(dto: {
 export function createAllotmentBooking(
   allotmentId: string,
   dto: {
-    cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS';
+    cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
     passengers: {
       fullName: string;
       nationalId?: string;

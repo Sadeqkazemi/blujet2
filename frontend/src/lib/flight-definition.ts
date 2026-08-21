@@ -1,6 +1,6 @@
 import { faDigits, latinDigits } from "./fa-format";
 
-export type CabinKind = "BUSINESS" | "COMFORT" | "ECONOMY";
+export type CabinKind = "FIRST" | "BUSINESS" | "COMFORT" | "ECONOMY";
 
 export type FlightApprovalStatus =
   | "DRAFT"
@@ -19,12 +19,13 @@ export type ChargeMethod = 'FIXED' | 'PERCENT';
 export const FLIGHT_NO_PATTERN = /^[A-Z]{2}\d{4}$/;
 
 export const CABIN_OPTIONS: { value: CabinKind; label: string }[] = [
+  { value: 'FIRST', label: 'فرست' },
   { value: 'BUSINESS', label: 'بیزینس' },
   { value: 'COMFORT', label: 'کامفورت' },
   { value: 'ECONOMY', label: 'اکونومی' },
 ];
 
-export const CABIN_KIND_ORDER: CabinKind[] = ['ECONOMY', 'COMFORT', 'BUSINESS'];
+export const CABIN_KIND_ORDER: CabinKind[] = ['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'];
 
 export const APPROVAL_STATUS_META: Record<
   FlightApprovalStatus,
@@ -137,14 +138,22 @@ export function publicCabinLabel(
   locale: 'fa' | 'en' | 'ar' = 'fa',
 ): string {
   if (locale === 'en') {
-    return cabin === 'BUSINESS' ? 'Business' : cabin === 'COMFORT' ? 'Comfort' : 'Economy';
+    return cabin === 'FIRST'
+      ? 'First'
+      : cabin === 'BUSINESS'
+        ? 'Business'
+        : cabin === 'COMFORT'
+          ? 'Comfort'
+          : 'Economy';
   }
   if (locale === 'ar') {
-    return cabin === 'BUSINESS'
-      ? 'رجال الأعمال'
-      : cabin === 'COMFORT'
-        ? 'كومفورت'
-        : 'اقتصادية';
+    return cabin === 'FIRST'
+      ? 'الدرجة الأولى'
+      : cabin === 'BUSINESS'
+        ? 'رجال الأعمال'
+        : cabin === 'COMFORT'
+          ? 'كومفورت'
+          : 'اقتصادية';
   }
   return cabinLabel(cabin);
 }
@@ -228,5 +237,6 @@ export function previewChargeTotalsByCabin(
     ECONOMY: previewChargeTotalIrr(basePriceIrr, rules, 'ECONOMY'),
     COMFORT: previewChargeTotalIrr(basePriceIrr, rules, 'COMFORT'),
     BUSINESS: previewChargeTotalIrr(basePriceIrr, rules, 'BUSINESS'),
+    FIRST: previewChargeTotalIrr(basePriceIrr, rules, 'FIRST'),
   };
 }

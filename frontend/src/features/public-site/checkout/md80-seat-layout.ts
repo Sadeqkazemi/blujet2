@@ -80,12 +80,19 @@ export function md80Rows(): number[] {
 export function md80ColsForRow(row: number): {
   left: readonly string[];
   right: readonly string[];
-  cabin: 'BUSINESS' | 'ECONOMY';
+  cabin: Md80CabinSection;
 } {
   if (row >= 3 && row <= 6) {
     return {
       left: MD80_BUSINESS_LEFT,
       right: MD80_BUSINESS_RIGHT,
+      cabin: 'FIRST',
+    };
+  }
+  if (row >= MD80_MAIN_CABIN_EXTRA_ROW_START && row <= MD80_MAIN_CABIN_EXTRA_ROW_END) {
+    return {
+      left: MD80_ECONOMY_LEFT,
+      right: MD80_ECONOMY_RIGHT,
       cabin: 'BUSINESS',
     };
   }
@@ -102,14 +109,14 @@ export function buildMd80Seats(
 ): Array<{
   seatCode: string;
   row: number;
-  cabin: 'BUSINESS' | 'ECONOMY';
+  cabin: Md80CabinSection;
   status: 'FREE' | 'TAKEN';
 }> {
   const taken = new Set(takenCodes);
   const out: Array<{
     seatCode: string;
     row: number;
-    cabin: 'BUSINESS' | 'ECONOMY';
+    cabin: Md80CabinSection;
     status: 'FREE' | 'TAKEN';
   }> = [];
   for (const row of md80Rows()) {

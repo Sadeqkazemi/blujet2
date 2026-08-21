@@ -11,7 +11,11 @@ import {
   PrimaryColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { AgencySeatRequestPayMethod, AgencySeatRequestStatus } from '../enums';
+import {
+  AgencySeatRequestPayMethod,
+  AgencySeatRequestStatus,
+  CabinClass,
+} from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyInvoice } from './agency-invoice.entity';
 import { AgencySeatRequestFlight } from './agency-seat-request-flight.entity';
@@ -50,6 +54,17 @@ export class AgencySeatRequest {
 
   @Column({ type: 'text' })
   aircraftType!: string;
+
+  @Column({
+    type: 'enum',
+    enum: CabinClass,
+    enumName: 'CabinClass',
+    nullable: true,
+  })
+  cabin!: CabinClass | null;
+
+  @Column({ type: 'text', nullable: true })
+  fareClassCode!: string | null;
 
   @Column({ type: 'int' })
   seats!: number;

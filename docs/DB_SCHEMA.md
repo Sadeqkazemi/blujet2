@@ -190,6 +190,10 @@ decisions (marked ⚑) are product decisions surfaced for approval, not
 silently invented.
 
 - `CartableTask { id, assigneeId→User, category: ADMIN|AGENCY|MANAGER, title, description, senderId→User?, senderLabelFa? (display fallback when no User row backs the sender), sourceType?: MANAGER_MESSAGE|MANAGER_REFERRAL|AGENCY_REQUEST|CHAIR_PERMISSION, sourceId?, status: OPEN|APPROVED|REJECTED|TRANSFERRED, resolutionNote?, transferredToId→User?, resolvedAt?, createdAt }`
+- A chair-permission source may have one OPEN `CartableTask` per active
+  `BOARD_CHAIR` account. The permission row is the authoritative decision:
+  the first conditional `PENDING → APPROVED|REJECTED` update wins and all OPEN
+  sibling tasks for the same `sourceId` are closed with that result.
   - The design's review modal offers exactly three actions — تأیید /
     انصراف(=رد) / انتقال — with a **required** «نظر مدیر» note; there is no
     generic "done" state and no due-date on cartable rows (both confirmed
@@ -2787,15 +2791,32 @@ row.
 - `NULL` means the account follows its role defaults (backward compatibility). An empty array is an explicit restriction to unmapped/common surfaces only.
 - These keys are subtractive. They do not replace role-based authorization and cannot expand a user's role.
 
-## Agency seat-request planning (2026-08-11)
+## Agency seat-request planning and activation (updated 2026-08-21)
 
-No new business table is introduced. A pending agency request is a workflow
-message, not inventory, and is persisted in the existing `cartable_tasks`
-table with `sourceType = AGENCY_REQUEST`; the request is also recorded in
-`audit_logs`. Capacity remains sourced from `flight_instances`, active
-`charter_commitments`, active `agency_seat_commitments`, and occupied
-passengers. Only approval through the existing commercial commitment API can
-create inventory that search and booking subtract from online availability.
+A pending agency request remains workflow state, not inventory. The structured
+request is persisted in `agency_seat_requests` and its selected occurrences in
+`agency_seat_request_flights`; `cartable_tasks(sourceType=AGENCY_REQUEST)` is
+the actionable notification and `audit_logs` records every transition.
+
+Migration `1788604800000-AgencyClassAllotments` adds nullable/backward-compatible
+`cabin` (`CabinClass`) and `fareClassCode` columns to both
+`agency_seat_requests` and `agency_allotments`, plus `seatRequestId` on
+`agency_allotments`. A unique partial index on
+`(seatRequestId, flightInstanceId) WHERE seatRequestId IS NOT NULL` makes
+request activation idempotent. New portal requests always populate cabin and
+class; legacy/manual allotments may keep them null.
+
+The commercial release source of truth is `fare_rules.agencySeatsReleased` and
+`fare_rules.agencyReleasePriceIrr` for the exact flight/cabin/class. Pending
+requests do not reduce that quota. CREDIT approval or linked-invoice payment
+locks the request, occurrences, fare rules, flight instances and existing
+allotments; it then creates one `AgencyAllotment` per occurrence only when the
+sum remains within both the released class quota and the aircraft cabin map.
+The allotment becomes bookable inventory only after this atomic activation.
+
+`FlightInstance.status` is time-driven: sold-out capacity never changes
+`SCHEDULED` to a completed state. `DEPARTED` is set only at/after
+`departureAt`; booking/passenger `FLOWN` projections follow that lifecycle.
 
 ## API Gateway hardening (2026-08-13)
 
@@ -2832,7 +2853,8 @@ Migration `1787731200000-CommercialSeatRequestsAncillaries`:
   nullable (accepted `1|3|6|12`), `unitPriceIrr bigint`, `payMethod`
   (`CREDIT|INVOICE`), `status` (`PENDING|PENDING_FINANCE|APPROVED|REJECTED`),
   `invoiceId` FK nullable, `dueAt` nullable, `decidedById` nullable,
-  `decidedAt` nullable, `createdAt`, `updatedAt`. Indexes on
+  `decidedAt` nullable, `cabin` nullable, `fareClassCode` nullable,
+  `createdAt`, `updatedAt`. Indexes on
   `(agencyId, status)` and `(status, createdAt)`.
 - `agency_seat_request_flights`: `id`, `seatRequestId` FK CASCADE,
   `flightInstanceId` FK RESTRICT, `createdAt`. Unique

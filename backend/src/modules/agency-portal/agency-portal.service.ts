@@ -29,6 +29,7 @@ import { WebservicePricingService } from '../webservice-pricing/webservice-prici
 import { ErrorCode } from '../../common/errors';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
 import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -80,6 +81,8 @@ export class AgencyPortalService {
     private readonly seatRequestRepo: Repository<AgencySeatRequest>,
     @InjectRepository(AgencySeatRequestFlight)
     private readonly seatRequestFlightRepo: Repository<AgencySeatRequestFlight>,
+    @InjectRepository(FareRule)
+    private readonly fareRuleRepo: Repository<FareRule>,
     private readonly audit: AuditService,
     private readonly cartable: CartableService,
     private readonly agencies: AgenciesService,
@@ -577,6 +580,8 @@ export class AgencyPortalService {
           destinationCode: r.flightInstance.flight.route.destCode,
           departureAt: r.flightInstance.departureAt,
           aircraftType: r.flightInstance.flight.aircraftType,
+          cabin: r.cabin,
+          fareClassCode: r.fareClassCode,
           seatsAllocated: r.seatsAllocated,
           seatsUsed: usedSeats,
           type: r.type,
@@ -600,6 +605,7 @@ export class AgencyPortalService {
       where: {
         departureAt: MoreThanOrEqual(new Date()),
         status: FlightInstanceStatus.SCHEDULED,
+        definitionStatus: 'PUBLISHED',
       },
       relations: { flight: { route: true } },
       order: { departureAt: 'ASC' },
@@ -609,68 +615,59 @@ export class AgencyPortalService {
     const instanceIds = instances.map((instance) => instance.id);
     if (instanceIds.length === 0) return [];
 
-    const [agencyRows, charterRows, soldRows] = await Promise.all([
-      this.agencySeatCommitmentRepo
-        .createQueryBuilder('commitment')
-        .select('commitment."flightInstanceId"', 'flightInstanceId')
-        .addSelect('COALESCE(SUM(commitment.seats), 0)', 'total')
+    const [fareRules, allotmentRows] = await Promise.all([
+      this.fareRuleRepo
+        .createQueryBuilder('rule')
+        .where('rule."flightInstanceId" IN (:...instanceIds)', { instanceIds })
+        .andWhere('rule."agencySeatsReleased" > 0')
+        .andWhere('rule."agencyReleasePriceIrr" IS NOT NULL')
+        .orderBy('rule.cabin', 'ASC')
+        .addOrderBy('rule."classCode"', 'ASC')
+        .getMany(),
+      this.allotmentRepo
+        .createQueryBuilder('allotment')
+        .select('allotment."flightInstanceId"', 'flightInstanceId')
+        .addSelect('allotment.cabin', 'cabin')
+        .addSelect('allotment."fareClassCode"', 'fareClassCode')
+        .addSelect('COALESCE(SUM(allotment."seatsAllocated"), 0)', 'total')
         .addSelect(
-          'COALESCE(SUM(CASE WHEN commitment."agencyId" = :agencyId THEN commitment.seats ELSE 0 END), 0)',
+          'COALESCE(SUM(CASE WHEN allotment."agencyId" = :agencyId THEN allotment."seatsAllocated" ELSE 0 END), 0)',
           'own',
         )
-        .where('commitment."flightInstanceId" IN (:...instanceIds)', {
-          instanceIds,
-          agencyId: actor.id,
-        })
-        .andWhere('commitment.status = :status', {
-          status: CommitmentStatus.ACTIVE,
-        })
-        .groupBy('commitment."flightInstanceId"')
-        .getRawMany<{ flightInstanceId: string; total: string; own: string }>(),
-      this.charterCommitmentRepo
-        .createQueryBuilder('commitment')
-        .select('commitment."flightInstanceId"', 'flightInstanceId')
-        .addSelect('COALESCE(SUM(commitment.seats), 0)', 'total')
-        .where('commitment."flightInstanceId" IN (:...instanceIds)', {
-          instanceIds,
-        })
-        .andWhere('commitment.status = :status', {
-          status: CommitmentStatus.ACTIVE,
-        })
-        .groupBy('commitment."flightInstanceId"')
-        .getRawMany<{ flightInstanceId: string; total: string }>(),
-      this.passengerRepo
-        .createQueryBuilder('passenger')
-        .innerJoin('passenger.booking', 'booking')
-        .select('booking."flightInstanceId"', 'flightInstanceId')
-        .addSelect('COUNT(passenger.id)', 'total')
-        .where('booking."flightInstanceId" IN (:...instanceIds)', {
-          instanceIds,
-        })
-        .andWhere('booking.status IN (:...statuses)', {
-          statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
-        })
-        .andWhere('passenger."occupiesSeat" = TRUE')
-        .groupBy('booking."flightInstanceId"')
-        .getRawMany<{ flightInstanceId: string; total: string }>(),
+        .where('allotment."flightInstanceId" IN (:...instanceIds)', { instanceIds })
+        .andWhere('allotment.cabin IS NOT NULL')
+        .andWhere('allotment."fareClassCode" IS NOT NULL')
+        .andWhere(
+          '(allotment.type = :hard OR allotment."releaseAt" IS NULL OR allotment."releaseAt" > :now)',
+          { hard: 'HARD', now: new Date(), agencyId: actor.id },
+        )
+        .groupBy('allotment."flightInstanceId"')
+        .addGroupBy('allotment.cabin')
+        .addGroupBy('allotment."fareClassCode"')
+        .getRawMany<{
+          flightInstanceId: string;
+          cabin: string;
+          fareClassCode: string;
+          total: string;
+          own: string;
+        }>(),
     ]);
 
-    const agencyByInstance = new Map(
-      agencyRows.map((row) => [row.flightInstanceId, row]),
-    );
-    const charterByInstance = new Map(
-      charterRows.map((row) => [row.flightInstanceId, Number(row.total)]),
-    );
-    const soldByInstance = new Map(
-      soldRows.map((row) => [row.flightInstanceId, Number(row.total)]),
+    const instanceById = new Map(instances.map((instance) => [instance.id, instance]));
+    const allotmentByClass = new Map(
+      allotmentRows.map((row) => [
+        `${row.flightInstanceId}:${row.cabin}:${row.fareClassCode}`,
+        row,
+      ]),
     );
 
-    return instances.map((instance) => {
-      const agency = agencyByInstance.get(instance.id);
-      const allocated = Number(agency?.total ?? 0);
-      const ownAllocated = Number(agency?.own ?? 0);
-      const committed = allocated + (charterByInstance.get(instance.id) ?? 0);
-      const sold = soldByInstance.get(instance.id) ?? 0;
+    return fareRules.flatMap((rule) => {
+      const instance = instanceById.get(rule.flightInstanceId);
+      if (!instance) return [];
+      const key = `${instance.id}:${rule.cabin}:${rule.classCode}`;
+      const allotment = allotmentByClass.get(key);
+      const allocated = Number(allotment?.total ?? 0);
+      const ownAllocated = Number(allotment?.own ?? 0);
       return {
         flightInstanceId: instance.id,
         flightNo: instance.flight.flightNo,
@@ -679,11 +676,15 @@ export class AgencyPortalService {
         departureAt: instance.departureAt,
         aircraftType:
           instance.aircraftTypeOverride ?? instance.flight.aircraftType,
-        capacity: instance.capacity,
+        cabin: rule.cabin,
+        fareClassCode: rule.classCode,
+        capacity: rule.seatsAllocated,
+        agencySeatsReleased: rule.agencySeatsReleased,
         agencyAllocated: allocated,
         ownAllocated,
-        availableToRequest: Math.max(instance.capacity - committed - sold, 0),
-        pricePerSeatIrr: instance.basePriceIrr,
+        availableToRequest: Math.max(rule.agencySeatsReleased - allocated, 0),
+        pricePerSeatIrr: rule.agencyReleasePriceIrr,
+        specialOffer: rule.agencySpecialOffer,
         definitionStatus: instance.definitionStatus,
       };
     });
@@ -708,6 +709,8 @@ export class AgencyPortalService {
         ? `${row.route.originCode} → ${row.route.destCode}`
         : null,
       aircraftType: row.aircraftType,
+      cabin: row.cabin,
+      fareClassCode: row.fareClassCode,
       seats: row.seats,
       termMonths: row.termMonths,
       unitPriceIrr: row.unitPriceIrr,
@@ -739,6 +742,8 @@ export class AgencyPortalService {
     actor: AuthenticatedUser,
     dto: {
       flightInstanceId: string;
+      cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+      fareClassCode: string;
       seats: number;
       preferredWeekdays?: number[];
       termMonths?: 0 | 1 | 3 | 6 | 12;
@@ -749,7 +754,10 @@ export class AgencyPortalService {
     const profile = uatUser ? null : await this.getOwnProfileOrThrow(actor);
     const options = await this.seatRequestOptions(actor);
     const option = options.find(
-      (row) => row.flightInstanceId === dto.flightInstanceId,
+      (row) =>
+        row.flightInstanceId === dto.flightInstanceId &&
+        row.cabin === dto.cabin &&
+        row.fareClassCode === dto.fareClassCode,
     );
     if (!option) {
       throw new NotFoundException({
@@ -788,6 +796,8 @@ export class AgencyPortalService {
               candidate.destCode === option.destCode &&
               candidate.flightNo === option.flightNo &&
               candidate.aircraftType === option.aircraftType &&
+              candidate.cabin === option.cabin &&
+              candidate.fareClassCode === option.fareClassCode &&
               departure >= selectedDeparture &&
               departure <= periodEnd &&
               (requestedWeekdays.size === 0 ||
@@ -833,6 +843,8 @@ export class AgencyPortalService {
           agencyId: actor.id,
           routeId: instance.flight.routeId,
           aircraftType: option.aircraftType,
+          cabin: option.cabin,
+          fareClassCode: option.fareClassCode,
           seats: dto.seats,
           termMonths: dto.termMonths ?? null,
           unitPriceIrr,

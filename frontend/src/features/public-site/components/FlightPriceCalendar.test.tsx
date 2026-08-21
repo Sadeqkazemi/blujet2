@@ -38,9 +38,15 @@ describe('FlightPriceCalendar', () => {
 
     expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
     expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveStyle({
+      background: '#1668c4',
+    });
+    expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveTextContent('تومان');
     expect(screen.getByTestId('price-calendar-day-2026-07-30')).toHaveAttribute('data-empty', 'true');
     expect(screen.getByTestId('price-calendar-cheapest-2026-07-31')).toBeInTheDocument();
     expect(screen.getByTestId('price-calendar')).toHaveAttribute('dir', 'rtl');
+    expect(screen.queryByText('تقویم قیمت')).not.toBeInTheDocument();
+    expect(screen.queryByText('مقایسه قیمت پرواز در روزهای نزدیک')).not.toBeInTheDocument();
     expect(screen.getAllByTestId(/^price-calendar-visible-day-/)).toHaveLength(6);
     expect(screen.getByRole('button', { name: 'روزهای بعدی' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'روزهای قبلی' })).toBeInTheDocument();
