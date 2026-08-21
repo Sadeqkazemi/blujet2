@@ -366,6 +366,7 @@ describe('CheckoutPage', () => {
     await userEvent.click(screen.getByTestId('checkout-next'));
     expect(await screen.findByTestId('checkout-extras-step')).toBeInTheDocument();
 
+    await userEvent.click(screen.getByTestId('checkout-seat-toggle'));
     await userEvent.click(await screen.findByTestId('checkout-seat-7A'));
     await userEvent.click(screen.getByTestId(`checkout-extra-${BAGGAGE_ID}-toggle`));
     await userEvent.click(screen.getByTestId('checkout-next'));

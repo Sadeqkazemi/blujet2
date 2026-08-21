@@ -47,6 +47,7 @@ describe('Customers (SITE_ADMIN and SENIOR_MANAGER) (e2e)', () => {
         nationalIdHash: hashPii('0012345679'),
         birthDate: new Date('1990-01-01'),
         passportNoEnc: encryptPii('A12345678'),
+        addressEnc: encryptPii('تهران، خیابان ولیعصر، پلاک ۱۲'),
         emailVerifiedAt: new Date(),
         updatedAt: new Date(),
       },

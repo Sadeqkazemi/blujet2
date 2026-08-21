@@ -97,7 +97,11 @@ export default function JalaliDatePicker({
   const locale = localeProp ?? priceCalendar?.locale ?? "fa";
   const calendarSystem = calendarForLocale(locale);
   const [open, setOpen] = useState(false);
-  const mobileViewport = useMobileVisualViewport(open && isPriceCalendar);
+  const mobileViewport = useMobileVisualViewport(open);
+  const visibleViewportWidth =
+    mobileViewport?.visibleWidth ??
+    (typeof window === "undefined" ? 0 : window.innerWidth);
+  const isResponsiveCalendar = visibleViewportWidth < 1024;
   const [draftIso, setDraftIso] = useState<string | null>(
     value ? value.slice(0, 10) : null,
   );
@@ -145,7 +149,7 @@ export default function JalaliDatePicker({
       setPopupPos(null);
       return;
     }
-    if (isPriceCalendar) return;
+    if (isPriceCalendar || isResponsiveCalendar) return;
 
     function place() {
       if (!rootRef.current || !popupRef.current) return;
@@ -153,17 +157,13 @@ export default function JalaliDatePicker({
       const popup = popupRef.current.getBoundingClientRect();
       const margin = 8;
       const vw = window.innerWidth;
-      const vh = window.innerHeight;
       let left = isRTL ? trigger.right - popup.width : trigger.left;
       left = Math.max(margin, Math.min(left, vw - popup.width - margin));
-      const spaceBelow = vh - trigger.bottom;
-      const placeAbove =
-        spaceBelow < popup.height + margin && trigger.top > spaceBelow;
-      setPopupPos(
-        placeAbove
-          ? { bottom: vh - trigger.top + margin, left, top: undefined }
-          : { top: trigger.bottom + margin, left, bottom: undefined },
-      );
+      setPopupPos({
+        top: window.scrollY + trigger.bottom + margin,
+        left: window.scrollX + left,
+        bottom: undefined,
+      });
     }
 
     place();
@@ -173,32 +173,7 @@ export default function JalaliDatePicker({
       window.removeEventListener("scroll", place, true);
       window.removeEventListener("resize", place);
     };
-  }, [open, isRTL, viewMonth, isPriceCalendar]);
-
-  useEffect(() => {
-    if (!open || !isPriceCalendar) return;
-    const scrollY = window.scrollY;
-    const previousBodyPosition = document.body.style.position;
-    const previousBodyTop = document.body.style.top;
-    const previousBodyWidth = document.body.style.width;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.position = previousBodyPosition;
-      document.body.style.top = previousBodyTop;
-      document.body.style.width = previousBodyWidth;
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      window.scrollTo({ top: scrollY, left: 0, behavior: "auto" });
-    };
-  }, [open, isPriceCalendar]);
+  }, [open, isRTL, viewMonth, isPriceCalendar, isResponsiveCalendar]);
 
   useEffect(() => {
     if (!open || !priceCalendar) return;
@@ -289,8 +264,7 @@ export default function JalaliDatePicker({
   const popupBg = dark ? "#141d2e" : "#fff";
   const popupBorder = dark ? "#2a3550" : "#e6eaf0";
   const priceCalendarMargin = 12;
-  const viewportWidth =
-    mobileViewport?.visibleWidth ?? (typeof window === "undefined" ? 0 : window.innerWidth);
+  const viewportWidth = visibleViewportWidth;
   const viewportHeight =
     mobileViewport?.visibleHeight ?? (typeof window === "undefined" ? 0 : window.innerHeight);
   const pricePopupWidth = Math.min(840, Math.max(0, viewportWidth - priceCalendarMargin * 2));
@@ -299,7 +273,21 @@ export default function JalaliDatePicker({
     Math.max(priceCalendarMargin, (viewportWidth - pricePopupWidth) / 2);
   const pricePopupTop = (mobileViewport?.offsetTop ?? 0) + priceCalendarMargin;
   const pricePopupMaxHeight = Math.max(0, viewportHeight - priceCalendarMargin * 2);
-  const dropdownReady = isPriceCalendar || popupPos !== null;
+  const isModalCalendar = isPriceCalendar || isResponsiveCalendar;
+  const responsiveSheetGap = Math.min(
+    64,
+    Math.max(28, Math.round((viewportHeight || 800) * 0.08)),
+  );
+  const responsivePopupWidth = viewportWidth;
+  const responsivePopupLeft = mobileViewport?.offsetLeft ?? 0;
+  const responsiveAvailableHeight = Math.max(0, viewportHeight - responsiveSheetGap);
+  const responsivePopupHeight = Math.min(
+    responsiveAvailableHeight,
+    isPriceCalendar ? 620 : 470,
+  );
+  const responsivePopupTop =
+    (mobileViewport?.offsetTop ?? 0) + viewportHeight - responsivePopupHeight;
+  const dropdownReady = isModalCalendar || popupPos !== null;
 
   return (
     <div
@@ -428,7 +416,7 @@ export default function JalaliDatePicker({
 
       {open && (
         <CalendarPortal>
-          {priceCalendar && (
+          {isModalCalendar && (
             <div
               data-testid={testId ? `${testId}-overlay` : undefined}
               onClick={() => setOpen(false)}
@@ -446,31 +434,101 @@ export default function JalaliDatePicker({
           <div
           ref={popupRef}
           data-testid={testId ? `${testId}-popup` : undefined}
-          role={priceCalendar ? "dialog" : undefined}
-          aria-modal={priceCalendar ? true : undefined}
+          role={isModalCalendar ? "dialog" : undefined}
+          aria-modal={isModalCalendar ? true : undefined}
           style={{
-            position: "fixed",
-            top: priceCalendar ? pricePopupTop : popupPos?.top,
-            bottom: priceCalendar ? undefined : popupPos?.bottom,
-            left: priceCalendar ? pricePopupLeft : (popupPos?.left ?? 0),
+            position: isModalCalendar ? "fixed" : "absolute",
+            top: isResponsiveCalendar
+              ? responsivePopupTop
+              : priceCalendar
+                ? pricePopupTop
+                : popupPos?.top,
+            bottom: isModalCalendar ? undefined : popupPos?.bottom,
+            left: isResponsiveCalendar
+              ? responsivePopupLeft
+              : priceCalendar
+                ? pricePopupLeft
+                : (popupPos?.left ?? 0),
             visibility: dropdownReady ? "visible" : "hidden",
-            width: priceCalendar ? pricePopupWidth : 300,
-            maxWidth: priceCalendar ? 840 : "calc(100vw - 16px)",
-            maxHeight: priceCalendar ? pricePopupMaxHeight : undefined,
-            overflowY: priceCalendar ? "auto" : undefined,
-            overscrollBehavior: priceCalendar ? "contain" : undefined,
+            width: isResponsiveCalendar
+              ? responsivePopupWidth
+              : priceCalendar
+                ? pricePopupWidth
+                : 300,
+            height: isResponsiveCalendar ? responsivePopupHeight : undefined,
+            maxWidth: isResponsiveCalendar ? "100%" : priceCalendar ? 840 : "calc(100vw - 24px)",
+            maxHeight: isResponsiveCalendar
+              ? responsivePopupHeight
+              : isPriceCalendar
+                ? pricePopupMaxHeight
+                : undefined,
+            overflowY: isModalCalendar ? "auto" : undefined,
+            overscrollBehavior: isModalCalendar ? "contain" : undefined,
             boxSizing: "border-box",
             background: popupBg,
             border: `1px solid ${popupBorder}`,
-            borderRadius: 18,
+            borderRadius: isResponsiveCalendar ? "22px 22px 0 0" : 18,
             boxShadow: dark
               ? "0 24px 60px -16px rgba(0,0,0,.6)"
               : "0 24px 56px -14px rgba(13,38,102,.34)",
-            padding: priceCalendar ? "18px 16px 14px" : "18px 20px",
-            zIndex: priceCalendar ? 1200 : 200,
+            padding: isResponsiveCalendar
+              ? "8px 20px 18px"
+              : priceCalendar
+                ? "18px 16px 14px"
+                : "18px 20px",
+            zIndex: isModalCalendar ? 1200 : 200,
             color: dark ? "#e7ecf3" : undefined,
           }}
         >
+          {isResponsiveCalendar && (
+            <>
+              <div
+                aria-hidden="true"
+                style={{
+                  width: 40,
+                  height: 4,
+                  borderRadius: 999,
+                  background: "#cfd5de",
+                  margin: "2px auto 14px",
+                }}
+              />
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  direction: "ltr",
+                  borderBottom: `1px solid ${popupBorder}`,
+                  paddingBottom: 12,
+                  marginBottom: 14,
+                }}
+              >
+                <button
+                  type="button"
+                  aria-label={locale === "en" ? "Close" : locale === "ar" ? "إغلاق" : "بستن"}
+                  data-testid={testId ? `${testId}-mobile-close` : undefined}
+                  onClick={() => setOpen(false)}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: mutedColor,
+                    fontFamily: "inherit",
+                    fontSize: 22,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                  }}
+                >
+                  ×
+                </button>
+                <strong
+                  dir={isRTL ? "rtl" : "ltr"}
+                  style={{ color: dark ? "#e7ecf3" : "#0d2640", fontSize: 14 }}
+                >
+                  {label}
+                </strong>
+              </div>
+            </>
+          )}
           <div
             style={{
               display: "flex",
@@ -527,6 +585,7 @@ export default function JalaliDatePicker({
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              direction: "ltr",
               marginBottom: 12,
             }}
           >
@@ -545,7 +604,7 @@ export default function JalaliDatePicker({
                 cursor: "pointer",
               }}
             >
-              ›
+              ‹
             </span>
             <div
               data-testid={testId ? `${testId}-month-label` : undefined}
@@ -574,7 +633,7 @@ export default function JalaliDatePicker({
                 cursor: "pointer",
               }}
             >
-              ‹
+              ›
             </span>
           </div>
 

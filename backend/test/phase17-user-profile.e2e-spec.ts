@@ -39,7 +39,7 @@ describe('Phase 17 — user profile (e2e)', () => {
     expect(res.body.data.completionPct).toBeLessThan(100);
   });
 
-  it('PATCH validates the national-ID checksum and encrypts it at rest (not stored plaintext)', async () => {
+  it('PATCH validates identity, persists birth date, and encrypts national ID and address at rest', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, '09901119922');
 
     const invalid = await request(app.getHttpServer())
@@ -51,16 +51,25 @@ describe('Phase 17 — user profile (e2e)', () => {
     const valid = await request(app.getHttpServer())
       .patch('/my/profile')
       .set('Authorization', auth(accessToken))
-      .send({ nationalId: '0012345679', passportNo: 'A12345678' });
+      .send({
+        nationalId: '0012345679',
+        passportNo: 'A12345678',
+        birthDate: '1990-01-01',
+        address: 'تهران، خیابان ولیعصر، پلاک ۱۲',
+      });
     expect(valid.status).toBe(200);
     expect(valid.body.data.nationalId).toBe('0012345679');
     expect(valid.body.data.passportNo).toBe('A12345678');
+    expect(valid.body.data.birthDate).toBeTruthy();
+    expect(valid.body.data.address).toBe('تهران، خیابان ولیعصر، پلاک ۱۲');
 
     const row = await dataSource
       .getRepository(User)
       .findOneByOrFail({ id: userId! });
     expect(row.nationalIdEnc).not.toContain('0012345679');
     expect(row.nationalIdHash).toBeTruthy();
+    expect(row.addressEnc).toBeTruthy();
+    expect(row.addressEnc).not.toContain('خیابان ولیعصر');
   });
 
   it('email verification: request → wrong code rejected → correct code stamps emailVerifiedAt', async () => {

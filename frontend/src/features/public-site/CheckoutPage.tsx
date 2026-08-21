@@ -340,9 +340,20 @@ export default function CheckoutPage() {
   }
 
   function toggleExtra(id: ExtraServiceState['id']) {
-    setExtras((arr) =>
-      arr.map((e) => (e.id === id ? { ...e, selected: !e.selected } : e)),
-    );
+    setExtras((arr) => {
+      const target = arr.find((extra) => extra.id === id);
+      if (target?.code === 'SEAT_SELECTION' && target.selected) {
+        setSelectedSeats([]);
+        if (draft) {
+          const updated = { ...draft, selectedSeats: [] };
+          setDraft(updated);
+          saveCheckoutDraft(updated);
+        }
+      }
+      return arr.map((e) =>
+        e.id === id ? { ...e, selected: !e.selected } : e,
+      );
+    });
   }
 
   function changeExtraQuantity(id: ExtraServiceState['id'], quantity: number) {
@@ -797,6 +808,7 @@ export default function CheckoutPage() {
           businessLocked={businessLocked}
           bookedCabin={draft?.cabin ?? 'ECONOMY'}
           aircraftType={draft?.flight.aircraftType ?? 'MD-80'}
+          clubBalance={clubBalance}
         />
       )}
       {step === 'review' && (

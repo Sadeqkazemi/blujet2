@@ -8,4 +8,5 @@ export interface MoneyInputProps {
   className?: string;
   'aria-label'?: string;
   testId?: string;
+  theme?: 'dark' | 'light';
 }

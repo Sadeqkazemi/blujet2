@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { useIsMobile } from '../../hooks/useIsMobile';
+import { latinDigits } from '../../lib/fa-format';
 import type { SavedBankAccount } from '../../types/public-site';
 
 const STR: Record<
@@ -90,20 +92,22 @@ export default function AccountBankAccountsTab({
   onCreate,
 }: Props) {
   const { locale } = useLocale();
+  const isMobile = useIsMobile();
   const t = STR[locale];
   const [form, setForm] = useState<BankAccountForm>(emptyBankForm());
   const [localError, setLocalError] = useState<string | null>(null);
-  const cols2 = locale === 'en' ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)';
+  const cols2 = isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const card = form.cardNo.replace(/\D/g, '');
-    const sheba = form.sheba.trim();
+    const shebaDigits = latinDigits(form.sheba).replace(/[^0-9]/g, '').slice(0, 24);
+    const sheba = `IR${shebaDigits}`;
     if (card.length !== 16) {
       setLocalError(t.cardRequired);
       return;
     }
-    if (!sheba) {
+    if (shebaDigits.length !== 24) {
       setLocalError(t.shebaRequired);
       return;
     }
@@ -244,7 +248,15 @@ export default function AccountBankAccountsTab({
         data-testid="account-banks-form"
         style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}
       >
-        <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: '0 0 16px' }}>{t.addHdr}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+          <span style={{ width: 38, height: 38, display: 'grid', placeItems: 'center', borderRadius: 11, color: '#1668c4', background: '#eef4fb' }} aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M7 15h4"/></svg>
+          </span>
+          <div>
+            <h3 style={{ fontSize: 14.5, fontWeight: 800, margin: 0 }}>{t.addHdr}</h3>
+            <div style={{ marginTop: 3, color: '#9aa4b2', fontSize: 10.5 }}>{t.sub}</div>
+          </div>
+        </div>
         {(localError || formError) && (
           <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: '0 0 12px' }}>
             {localError ?? formError}
@@ -258,34 +270,46 @@ export default function AccountBankAccountsTab({
             maxWidth: 540,
           }}
         >
-          <input
-            placeholder={t.cardPh}
-            dir="ltr"
-            inputMode="numeric"
-            value={form.cardNo}
-            onChange={(e) => setForm((f) => ({ ...f, cardNo: e.target.value }))}
-            data-testid="bank-input-card"
-            style={inputStyle}
-          />
-          <input
-            placeholder={t.shebaPh}
-            dir="ltr"
-            inputMode="numeric"
-            value={form.sheba}
-            onChange={(e) => setForm((f) => ({ ...f, sheba: e.target.value }))}
-            data-testid="bank-input-sheba"
-            style={inputStyle}
-          />
+          <label style={fieldLabelStyle}>
+            <span>{t.cardPh}</span>
+            <input
+              aria-label={t.cardPh}
+              placeholder="••••  ••••  ••••  ••••"
+              dir="ltr"
+              inputMode="numeric"
+              autoComplete="cc-number"
+              value={form.cardNo}
+              onChange={(e) => setForm((f) => ({ ...f, cardNo: latinDigits(e.target.value).replace(/\D/g, '').slice(0, 16) }))}
+              data-testid="bank-input-card"
+              style={inputStyle}
+            />
+          </label>
+          <label style={fieldLabelStyle}>
+            <span>{t.shebaPh}</span>
+            <div style={{ position: 'relative' }}>
+              <input
+                aria-label={t.shebaPh}
+                placeholder="۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰۰"
+                dir="ltr"
+                inputMode="numeric"
+                value={form.sheba.replace(/^IR/i, '')}
+                onChange={(e) => setForm((f) => ({ ...f, sheba: latinDigits(e.target.value).replace(/\D/g, '').slice(0, 24) }))}
+                data-testid="bank-input-sheba"
+                style={{ ...inputStyle, paddingLeft: 42 }}
+              />
+              <span dir="ltr" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 12, fontWeight: 800, color: '#1668c4' }}>IR</span>
+            </div>
+          </label>
         </div>
         <button
           type="submit"
           data-testid="bank-submit"
           disabled={formBusy}
           style={{
-            display: 'inline-flex',
+            display: 'flex',
             marginTop: 14,
             height: 44,
-            padding: '0 20px',
+            padding: '0 24px',
             alignItems: 'center',
             borderRadius: 11,
             background: '#1668c4',
@@ -295,6 +319,8 @@ export default function AccountBankAccountsTab({
             border: 'none',
             cursor: formBusy ? 'wait' : 'pointer',
             fontFamily: 'inherit',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: 'center',
           }}
         >
           {formBusy ? '…' : t.submit}
@@ -316,4 +342,13 @@ const inputStyle: React.CSSProperties = {
   textAlign: 'left',
   fontFamily: 'Roboto Mono, monospace',
   outline: 'none',
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 7,
+  color: '#5a6678',
+  fontSize: 11.5,
+  fontWeight: 700,
 };

@@ -3621,3 +3621,18 @@ contracts and retires the production mock adapters.
 - [x] Removed the redundant npm Vazirmatn package so production rendering does
   not depend on loading the Persian font from a package-generated asset.
 
+# Public checkout and account polish (2026-08-21)
+
+- [x] Kept seat selection and pet travel as permanent checkout services; the
+  seat map is collapsed by default and opens only after fee acceptance or at
+  least 15,000 loyalty points.
+- [x] Added encrypted customer address editing alongside birth date and made
+  the six-field profile-completion calculation server-owned.
+- [x] Stabilized Persian wallet amount entry, rebuilt the responsive card/IBAN
+  form, and made the desktop calendar open below its field while the compact
+  responsive bottom sheet keeps the page scrollable.
+- [x] Completed the agency-panel services menu with the same seat, baggage,
+  refund, pet, and wheelchair links used by the public-site header.
+- [x] Added migration, API/schema documentation, and focused frontend/backend
+  regression coverage. See `docs/features/public-checkout-profile-polish.md`.
+
