@@ -164,6 +164,7 @@ export default function AgencyWebservicePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [note, setNote] = useState('');
 
   const wsPlans = ([1, 3, 12] as const).map((key) => ({
     key,
@@ -197,7 +198,10 @@ export default function AgencyWebservicePage() {
     setSubmitting(true);
     setError(null);
     try {
-      await requestWebservice(wsType, plan);
+      const requestNote = note.trim();
+      if (requestNote) await requestWebservice(wsType, plan, requestNote);
+      else await requestWebservice(wsType, plan);
+      setNote('');
       reload();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.submitErrorFallback);
@@ -273,6 +277,17 @@ export default function AgencyWebservicePage() {
             ))}
           </div>
 
+          <label className="mb-5 block text-xs font-bold text-[#5a6678]">
+            {locale === 'fa' ? 'توضیحات درخواست' : locale === 'ar' ? 'تفاصيل الطلب' : 'Request details'}
+            <textarea
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder={locale === 'fa' ? 'کاربرد مورد نظر و سامانه متصل‌شونده را توضیح دهید…' : locale === 'ar' ? 'اشرح الاستخدام والنظام المتصل…' : 'Describe the intended use and connected system…'}
+              rows={3}
+              className="mt-2 w-full rounded-xl border border-[#e8eef6] bg-[#fafbfd] p-3 text-sm font-normal outline-none focus:border-[#1668c4]"
+            />
+          </label>
+
           <div className="flex items-center justify-between rounded-xl bg-[#fafbfd] p-4">
             <div>
               <div className="text-[10.5px] text-[#8a96a6]">{t.payableLabel}</div>
@@ -330,6 +345,33 @@ export default function AgencyWebservicePage() {
           >
             📄 {t.viewDocsLabel}
           </Link>
+        </div>
+      )}
+
+      {requests.length > 0 && (
+        <div className="rounded-2xl border border-[#e8eef6] bg-white shadow-sm">
+          <h2 className="border-b border-[#edf0f5] px-5 py-4 text-sm font-black text-[#0d2640]">
+            {locale === 'fa' ? 'درخواست‌های خرید من' : locale === 'ar' ? 'طلبات الشراء الخاصة بي' : 'My purchase requests'}
+          </h2>
+          <div>
+            {requests.map((request) => {
+              const status = request.status === 'PENDING'
+                ? (locale === 'fa' ? 'در حال بررسی' : locale === 'ar' ? 'قيد المراجعة' : 'Under review')
+                : request.status === 'APPROVED'
+                  ? (locale === 'fa' ? 'تأییدشده' : locale === 'ar' ? 'مقبول' : 'Approved')
+                  : (locale === 'fa' ? 'ردشده' : locale === 'ar' ? 'مرفوض' : 'Rejected');
+              return (
+                <div key={request.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf0f5] px-5 py-4 text-xs last:border-0">
+                  <div>
+                    <div className="font-black text-[#1a2d42]">{SCOPE_LABEL[request.scope][locale]}</div>
+                    <div className="mt-1 text-[10px] text-muted">{request.months} · {formatLocaleDate(request.createdAt, locale)}</div>
+                  </div>
+                  <div className="font-black text-[#0d2640]">{localeMoney(request.priceIrr, locale)} {t.toman}</div>
+                  <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${request.status === 'PENDING' ? 'bg-[#fff1e5] text-[#c87322]' : request.status === 'APPROVED' ? 'bg-[#e9f7f0] text-[#23895f]' : 'bg-red-50 text-red-600'}`}>{status}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

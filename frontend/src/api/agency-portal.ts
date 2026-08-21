@@ -15,6 +15,7 @@ import type {
   AgencyProfile,
   AgencySalesReport,
   AgencySeatRequestOption,
+  AgencySeatRequestHistoryRow,
   AgencySeatRequestResult,
   AgencyWebserviceRequest,
 } from '../types/agency-portal';
@@ -87,6 +88,10 @@ export function fetchAllotments() {
 
 export function fetchSeatRequestOptions() {
   return apiGet<AgencySeatRequestOption[]>('/agency-portal/seat-request-options');
+}
+
+export function fetchMySeatRequests() {
+  return apiGet<AgencySeatRequestHistoryRow[]>('/agency-portal/seat-requests');
 }
 
 export function requestAgencySeats(dto: {

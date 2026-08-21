@@ -3552,3 +3552,19 @@ contracts and retires the production mock adapters.
   and backend production builds, lint, and `git diff --check`. See
   `docs/features/site-admin-rules-sync.md`.
 
+# Agency portal screenshot sync (2026-08-21)
+
+- [x] Added the missing ticket-purchase page and connected it to the public
+  airport catalog and `/results` search contract used by the homepage.
+- [x] Matched the supplied allocated-seats, web-service, API-docs, credit,
+  sales, inbox, and message-modal layouts while retaining real tenant-scoped
+  APIs and honest empty states.
+- [x] Added the agency-owned seat-request-history read endpoint; tenant id is
+  derived only from the authenticated agency JWT.
+- [x] Verified 30 focused frontend tests, 39 backend e2e tests, both production
+  builds, frontend lint, targeted backend lint, and `git diff --check`.
+- [ ] Local browser visual smoke is pending because the in-app browser blocked
+  every localhost bridge even though both local servers responded; component
+  navigation coverage passed. See
+  `docs/features/agency-portal-design-sync.md`.
+

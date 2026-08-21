@@ -8,15 +8,18 @@ import { useEffect, useState } from 'react';
 import {
   createAllotmentBooking,
   fetchAllotments,
+  fetchMySeatRequests,
   fetchSeatRequestOptions,
   requestAgencySeats,
 } from '../../api/agency-portal';
 import { fetchSeatMap } from '../../api/publicSite';
 import { publicCabinLabel } from '../../lib/flight-definition';
+import { localeMoney } from '../../lib/fa-format';
 import { formatLocaleDateTime, localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
 import type { AgencySeatRequestOption } from '../../types/agency-portal';
+import type { AgencySeatRequestHistoryRow } from '../../types/agency-portal';
 import { airportCityLabel } from '../../lib/airport-cities';
 import type { CabinClass, SeatMapResult } from '../../types/public-site';
 
@@ -105,6 +108,8 @@ export default function AgencySeatsPage() {
   const t = STR[locale];
   const [rows, setRows] = useState<AgencyAllotmentRow[] | null>(null);
   const [requestOptions, setRequestOptions] = useState<AgencySeatRequestOption[] | null>(null);
+  const [requestHistory, setRequestHistory] = useState<AgencySeatRequestHistoryRow[]>([]);
+  const [activeView, setActiveView] = useState<'routes' | 'requested' | 'invoices' | 'active' | 'rejected'>('routes');
   const [originCode, setOriginCode] = useState('');
   const [destCode, setDestCode] = useState('');
   const [requestFlightId, setRequestFlightId] = useState('');
@@ -143,6 +148,9 @@ export default function AgencySeatsPage() {
         setRequestOptions([]);
         setError(t.errorFallback);
       });
+    void fetchMySeatRequests()
+      .then(setRequestHistory)
+      .catch(() => setRequestHistory([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -158,6 +166,11 @@ export default function AgencySeatsPage() {
     (row) => row.originCode === originCode && row.destCode === destCode,
   );
   const requestFlight = matchingFlights.find((row) => row.flightInstanceId === requestFlightId) ?? null;
+  const availableRouteCount = new Set((requestOptions ?? []).map((row) => `${row.originCode}-${row.destCode}`)).size;
+  const pendingRequests = requestHistory.filter((row) => row.status === 'PENDING' || row.status === 'PENDING_FINANCE');
+  const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
+  const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
+  const activeAllotments = (rows ?? []).filter((row) => row.active);
 
   async function submitSeatRequest() {
     if (!requestFlight || requestedSeats < 1) return;
@@ -237,6 +250,22 @@ export default function AgencySeatsPage() {
 
   return (
     <div>
+      <div className="mb-4 rounded-xl border border-[#d6e4f8] bg-[#eef6ff] p-4 text-xs leading-6 text-[#3f546b]">
+        ⓘ {t.infoBanner}
+      </div>
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-[#edf0f5] bg-white p-1.5 md:grid-cols-5">
+        {([
+          ['routes', locale === 'fa' ? 'مسیر پروازی موجود' : locale === 'ar' ? 'المسارات المتاحة' : 'Available routes', availableRouteCount],
+          ['requested', locale === 'fa' ? 'پروازهای درخواست‌شده' : locale === 'ar' ? 'الرحلات المطلوبة' : 'Requested flights', pendingRequests.length],
+          ['invoices', locale === 'fa' ? 'فاکتور پروازهای پرداخت‌نشده' : locale === 'ar' ? 'فواتير الرحلات غير المدفوعة' : 'Unpaid flight invoices', unpaidRequests.length],
+          ['active', locale === 'fa' ? 'پروازهای فعال' : locale === 'ar' ? 'الرحلات النشطة' : 'Active flights', activeAllotments.length],
+          ['rejected', locale === 'fa' ? 'پروازهای کنسل‌شده' : locale === 'ar' ? 'الرحلات الملغاة' : 'Cancelled flights', rejectedRequests.length],
+        ] as const).map(([key, label, count]) => (
+          <button key={key} type="button" onClick={() => setActiveView(key)} className={`rounded-xl px-3 py-3 text-[11px] font-black transition ${activeView === key ? 'bg-[#1668c4] text-white' : 'text-[#687587]'}`}>{label} ({localeDigits(count, locale)})</button>
+        ))}
+      </div>
+
+      {activeView === 'routes' && (
       <section
         className="mb-5 rounded-2xl border border-[#e1e8f2] bg-white p-5 shadow-sm"
         data-testid="agency-seat-request-panel"
@@ -387,18 +416,28 @@ export default function AgencySeatsPage() {
           </p>
         )}
       </section>
-
-      <div className="mb-5 rounded-xl border border-[#d6e4f8] bg-[#f2f7fd] p-4 text-xs leading-6 text-[#3f546b]">
-        {t.infoBanner}
-      </div>
+      )}
 
       {error && <p className="mb-4 text-xs text-danger">{error}</p>}
       {notice && <p className="mb-4 rounded-xl bg-[#e8f5ee] p-3 text-xs font-bold text-[#1f8a5b]">{notice}</p>}
 
-      {rows && rows.length === 0 && <p className="text-center text-xs text-muted">{t.empty}</p>}
+      {activeView === 'active' && rows && activeAllotments.length === 0 && <p className="rounded-2xl border border-[#edf0f5] bg-white py-12 text-center text-xs text-muted">{t.empty}</p>}
 
-      <div className="flex flex-col gap-4">
-        {(rows ?? []).map((f) => {
+      {(activeView === 'requested' || activeView === 'rejected' || activeView === 'invoices') && (
+        <div className="space-y-3">
+          {(activeView === 'requested' ? pendingRequests : activeView === 'rejected' ? rejectedRequests : unpaidRequests).map((request) => (
+            <div key={request.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#edf0f5] bg-white p-5">
+              <div><div className="text-sm font-black text-[#0d2640]">{request.route || request.flights.map((flight) => flight.flightNo).join('، ')}</div><div className="mt-1 text-[11px] text-muted">{localeDigits(request.seats, locale)} {locale === 'fa' ? 'صندلی' : 'seats'} · {formatLocaleDateTime(request.createdAt, locale)}</div></div>
+              <div className="text-sm font-black text-[#23895f]">{localeMoney(request.totalPriceIrr, locale)} {locale === 'fa' ? 'تومان' : 'Toman'}</div>
+              <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${request.status === 'REJECTED' ? 'bg-red-50 text-red-600' : 'bg-[#fff1e5] text-[#c87322]'}`}>{request.status === 'REJECTED' ? (locale === 'fa' ? 'ردشده' : 'Rejected') : request.invoice ? request.invoice.invoiceNo : (locale === 'fa' ? 'در حال بررسی' : 'Under review')}</span>
+            </div>
+          ))}
+          {(activeView === 'requested' ? pendingRequests : activeView === 'rejected' ? rejectedRequests : unpaidRequests).length === 0 && <p className="rounded-2xl border border-[#edf0f5] bg-white py-12 text-center text-xs text-muted">{t.empty}</p>}
+        </div>
+      )}
+
+      {activeView === 'active' && <div className="flex flex-col gap-4">
+        {activeAllotments.map((f) => {
           const left = Math.max(f.seatsAllocated - f.seatsUsed, 0);
           return (
             <div
@@ -551,7 +590,7 @@ export default function AgencySeatsPage() {
             </div>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

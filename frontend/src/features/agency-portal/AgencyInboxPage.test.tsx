@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyInboxPage from './AgencyInboxPage';
@@ -40,9 +40,10 @@ describe('AgencyInboxPage', () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /پیام جدید/ }));
+    const dialog = screen.getByRole('dialog', { name: 'پیام جدید' });
     await user.type(screen.getByPlaceholderText('موضوع پیام'), 'تسویه فاکتور');
     await user.type(screen.getByPlaceholderText('پیام خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
-    await user.click(screen.getByRole('button', { name: 'ارسال' }));
+    await user.click(within(dialog).getByRole('button', { name: 'ارسال' }));
 
     await waitFor(() => expect(postSpy).toHaveBeenCalledWith('موضوع: تسویه فاکتور\n\nحتماً تا پنجشنبه پرداخت می‌شود.'));
   });
@@ -54,8 +55,9 @@ describe('AgencyInboxPage', () => {
 
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /New message/ }));
+    const dialog = screen.getByRole('dialog', { name: 'New message' });
     expect(screen.getByPlaceholderText('Write your message…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Send' })).toBeInTheDocument();
   });
 
   it('renders translated heading and empty state in Arabic', async () => {

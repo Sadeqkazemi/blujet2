@@ -195,6 +195,27 @@ describe('Commercial manager overhaul (e2e)', () => {
       expect(persisted.seats).toBe(4);
       expect(persisted.termMonths).toBe(1);
 
+      const ownHistory = await request(app.getHttpServer())
+        .get('/agency-portal/seat-requests')
+        .set('Authorization', auth(agencyToken))
+        .expect(200);
+      const ownRow = (
+        ownHistory.body.data as Array<{
+          id: string;
+          status: string;
+          seats: number;
+          totalPriceIrr: string;
+          flights: Array<{ flightInstanceId: string }>;
+        }>
+      ).find((item) => item.id === requestId);
+      expect(ownRow).toMatchObject({
+        id: requestId,
+        status: 'PENDING',
+        seats: 4,
+      });
+      expect(typeof ownRow?.totalPriceIrr).toBe('string');
+      expect(ownRow?.flights[0]?.flightInstanceId).toBe(instance.id);
+
       const tasks = await dataSource.getRepository(CartableTask).findBy({
         sourceType: 'AGENCY_REQUEST',
         sourceId: requestId,

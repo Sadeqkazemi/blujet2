@@ -3601,6 +3601,11 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 
 ## Agency seat requests and desktop checkout (2026-08-11)
 
+- `GET /agency-portal/seat-requests` (`AGENCY`) returns only the caller's own
+  seat-request history, including route, selected flights, invoice metadata,
+  price, term, and decision status. The agency id always comes from the JWT;
+  no client-supplied tenant id is accepted.
+
 - `GET /agency-portal/seat-request-options` (`AGENCY`) returns future scheduled
   route instances created through commercial flight planning. Routes are
   visible before CEO publication so an agency can submit its commercial

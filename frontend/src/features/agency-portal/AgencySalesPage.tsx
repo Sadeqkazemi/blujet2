@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { downloadSalesExport, fetchSales } from '../../api/agency-portal';
-import { formatLocalePercent, localeMoney } from '../../lib/fa-format';
+import { downloadSalesExport, fetchApiKeys, fetchInvoices, fetchSales } from '../../api/agency-portal';
+import { localeMoney } from '../../lib/fa-format';
 import { formatLocaleDate, localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencySalesReport } from '../../types/agency-portal';
@@ -138,22 +138,34 @@ export default function AgencySalesPage() {
   const [error, setError] = useState<string | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [extraKpis, setExtraKpis] = useState({ activeWebservices: 0, unpaidInvoices: 0 });
 
   useEffect(() => {
     fetchSales()
       .then(setData)
       .catch(() => setError(t.errorFallback));
+    Promise.allSettled([fetchApiKeys(), fetchInvoices()]).then(([keysResult, invoicesResult]) => {
+      setExtraKpis({
+        activeWebservices: keysResult.status === 'fulfilled' ? keysResult.value.filter((key) => key.status === 'ACTIVE').length : 0,
+        unpaidInvoices: invoicesResult.status === 'fulfilled' ? invoicesResult.value.filter((invoice) => invoice.status !== 'PAID').length : 0,
+      });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!data) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
+  const screenshotLabels = {
+    fa: { routes: 'فروش هر پرواز', services: 'وب‌سرویس‌های خریداری‌شده', invoices: 'فاکتورهای پرداخت‌نشده', routeUnit: 'مسیر فعال', serviceUnit: 'سرویس', invoiceUnit: 'فاکتور' },
+    en: { routes: 'Sales per Flight', services: 'Purchased Web Services', invoices: 'Unpaid Invoices', routeUnit: 'active routes', serviceUnit: 'services', invoiceUnit: 'invoices' },
+    ar: { routes: 'المبيعات لكل رحلة', services: 'خدمات الويب المشتراة', invoices: 'الفواتير غير المدفوعة', routeUnit: 'مسارات نشطة', serviceUnit: 'خدمات', invoiceUnit: 'فواتير' },
+  }[locale];
   const kpis = [
-    { label: t.kpiTotalSales, value: localeMoney(data.summary.totalSalesIrr, locale) },
-    { label: t.kpiTicketsIssued, value: localeDigits(data.summary.ticketsIssued, locale) },
-    { label: t.kpiAvgFare, value: localeMoney(data.summary.avgFareIrr, locale) },
-    { label: t.kpiRefundRate, value: formatLocalePercent(data.summary.refundRatePct, locale) },
+    { label: t.kpiTotalSales, value: `${localeMoney(data.summary.totalSalesIrr, locale)} ${t.toman}`, tone: 'blue' },
+    { label: screenshotLabels.routes, value: `${localeDigits(data.perFlight.length, locale)} ${screenshotLabels.routeUnit}`, tone: 'green' },
+    { label: screenshotLabels.services, value: `${localeDigits(extraKpis.activeWebservices, locale)} ${screenshotLabels.serviceUnit}`, tone: 'purple' },
+    { label: screenshotLabels.invoices, value: `${localeDigits(extraKpis.unpaidInvoices, locale)} ${screenshotLabels.invoiceUnit}`, tone: 'orange' },
   ];
 
   async function onExport() {
@@ -189,11 +201,11 @@ export default function AgencySalesPage() {
       </div>
       {exportError && <p className="mb-4 text-xs text-danger">{exportError}</p>}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {kpis.map((k) => (
-          <div key={k.label} className="rounded-xl border border-border bg-white p-4">
+          <div key={k.label} className="rounded-2xl border border-[#e8edf3] bg-white p-5">
             <div className="text-[11px] text-muted">{k.label}</div>
-            <div className="mt-1 text-lg font-black text-ink">{k.value}</div>
+            <div className="mt-2 text-xl font-black text-[#0d2640]">{k.value}</div>
           </div>
         ))}
       </div>
