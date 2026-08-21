@@ -1,5 +1,5 @@
 export type CustomerClubLevel = 'SILVER' | 'GOLD' | 'PLATINUM';
-export type ProfileCompletionField = 'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail';
+export type ProfileCompletionField = 'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'address' | 'verifiedEmail';
 
 export interface CustomerListItem {
   id: string;

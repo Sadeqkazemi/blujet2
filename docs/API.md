@@ -923,11 +923,13 @@ See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
 - `GET /my/profile` (new, `USER` role — matches the existing `/my/wallet`,
   `/my/refunds`, `/my/club-points` customer self-service convention) —
   current values of `fullName`, `nationalId` (decrypted for the owner
-  only), `birthDate`, `passportNo` (decrypted), `emailVerifiedAt`, plus a
+  only), `birthDate`, `passportNo` (decrypted), `address` (decrypted for the
+  owner only), `emailVerifiedAt`, plus a
   server-computed `completionPct`.
 - `PATCH /my/profile` (new, `USER` role) — partial update of the same
   fields; national ID validated with the official checksum server-side
-  (CLAUDE.md security rule), encrypted at rest immediately.
+  (CLAUDE.md security rule). National ID, passport and address are encrypted
+  at rest immediately.
 - `POST /my/profile/email/verify-request` (new, `USER` role, `@Throttle`
   5/min) — sends a short-lived code to the account's current `email` via
   the existing `TwoFactorProvider`. 400 if no email is set yet.
@@ -3747,15 +3749,16 @@ Distinct from `webservice-pricing` (B2B API plans) and complementary to
 `travel_extra_settings` (checkout purchase ids). Mapped built-in OTHER keys
 overlay checkout extras: baggage→EXTRA_BAGGAGE, meal→SPECIAL_MEAL,
 insurance→TRAVEL_INSURANCE, cip→CIP, refund-fee→REFUND_FEE,
-seat-selection→SEAT_SELECTION. Seat-type rows are manager-only. Pet,
-wheelchair, and custom OTHER rows appear on the public ancillary list but
-are not added to the checkout extras catalog (closed `TravelExtraCode` enum).
+seat-selection→SEAT_SELECTION and pet→PET. Seat-type rows are manager-only.
+Wheelchair and custom OTHER rows appear on the public ancillary list. Product
+policy keeps `seat-selection` and `pet` enabled and purchasable; attempts to
+disable/delete either rule return `VALIDATION_FAILED`.
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ seatServices, otherServices }`. |
 | PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (≥ 0 decimal string). |
-| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`. |
+| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`; `seat-selection` and `pet` cannot be disabled. |
 | POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`. |
 | DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`. |
 | GET | `/public/ancillary-services` | public | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |

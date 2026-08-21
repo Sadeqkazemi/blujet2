@@ -13,6 +13,8 @@ const STR: Record<
     nationalIdLabel: string;
     birthDateLabel: string;
     passportLabel: string;
+    addressLabel: string;
+    birthDatePlaceholder: string;
     emailLabel: string;
     saveButton: string;
     savingButton: string;
@@ -32,6 +34,8 @@ const STR: Record<
     nationalIdLabel: 'کد ملی',
     birthDateLabel: 'تاریخ تولد',
     passportLabel: 'شماره گذرنامه',
+    addressLabel: 'آدرس محل سکونت',
+    birthDatePlaceholder: 'مثلاً ۱۳۷۰/۰۵/۱۲',
     emailLabel: 'ایمیل',
     saveButton: 'ذخیره اطلاعات',
     savingButton: 'در حال ذخیره…',
@@ -50,6 +54,8 @@ const STR: Record<
     nationalIdLabel: 'National ID',
     birthDateLabel: 'Date of Birth',
     passportLabel: 'Passport Number',
+    addressLabel: 'Residential Address',
+    birthDatePlaceholder: 'e.g. 1991/07/21',
     emailLabel: 'Email',
     saveButton: 'Save Info',
     savingButton: 'Saving…',
@@ -68,6 +74,8 @@ const STR: Record<
     nationalIdLabel: 'الرقم الوطني',
     birthDateLabel: 'تاريخ الميلاد',
     passportLabel: 'رقم جواز السفر',
+    addressLabel: 'عنوان السكن',
+    birthDatePlaceholder: 'مثلاً 1991/07/21',
     emailLabel: 'البريد الإلكتروني',
     saveButton: 'حفظ المعلومات',
     savingButton: 'جارٍ الحفظ…',
@@ -96,6 +104,7 @@ interface ProfileForm {
   nationalId: string;
   birthDate: string;
   passportNo: string;
+  address: string;
 }
 
 interface Props {
@@ -149,6 +158,11 @@ export default function AccountInfoTab({
       dir: 'ltr' as const,
     },
     { label: t.passportLabel, value: fieldValue(profile?.passportNo ?? profileForm.passportNo), dir: 'ltr' as const },
+    {
+      label: t.addressLabel,
+      value: fieldValue(profile?.address ?? profileForm.address),
+      dir: locale === 'en' ? ('ltr' as const) : ('rtl' as const),
+    },
     { label: t.emailLabel, value: fieldValue(profile?.email ?? undefined), dir: 'ltr' as const },
   ];
 
@@ -216,6 +230,20 @@ export default function AccountInfoTab({
               />
             </div>
             <div>
+              <label htmlFor="profile-birthDate" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.birthDateLabel}
+              </label>
+              <input
+                id="profile-birthDate"
+                dir="ltr"
+                inputMode="numeric"
+                placeholder={t.birthDatePlaceholder}
+                value={profileForm.birthDate}
+                onChange={(e) => onProfileFormChange({ ...profileForm, birthDate: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+              />
+            </div>
+            <div>
               <label htmlFor="profile-passportNo" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
                 {t.passportLabel}
               </label>
@@ -225,6 +253,18 @@ export default function AccountInfoTab({
                 value={profileForm.passportNo}
                 onChange={(e) => onProfileFormChange({ ...profileForm, passportNo: e.target.value })}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+              />
+            </div>
+            <div>
+              <label htmlFor="profile-address" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.addressLabel}
+              </label>
+              <textarea
+                id="profile-address"
+                rows={3}
+                value={profileForm.address}
+                onChange={(e) => onProfileFormChange({ ...profileForm, address: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, resize: 'vertical', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.8 }}
               />
             </div>
             <button

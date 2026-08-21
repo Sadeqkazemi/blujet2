@@ -119,6 +119,10 @@ export class User {
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   birthDate!: Date | null;
 
+  /** Customer residence/postal address. PII: AES-256-GCM encrypted at rest. */
+  @Column({ type: 'text', nullable: true })
+  addressEnc!: string | null;
+
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   emailVerifiedAt!: Date | null;
 

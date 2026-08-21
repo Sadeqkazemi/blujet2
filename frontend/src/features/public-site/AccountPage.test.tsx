@@ -81,6 +81,7 @@ const PROFILE: UserProfile = {
   nationalId: null,
   birthDate: null,
   passportNo: null,
+  address: null,
   email: null,
   emailVerifiedAt: null,
   completionPct: 20,
@@ -503,13 +504,17 @@ describe('AccountPage', () => {
     await userEvent.click(await screen.findByTestId('profile-edit-toggle'));
     const nationalIdInput = await screen.findByLabelText('کد ملی');
     await userEvent.type(nationalIdInput, '0012345679');
+    await userEvent.type(screen.getByLabelText('تاریخ تولد'), '۱۳۷۰/۰۵/۱۲');
+    await userEvent.type(screen.getByLabelText('آدرس محل سکونت'), 'تهران، خیابان آزادی، پلاک ۱۲');
     await userEvent.click(screen.getByRole('button', { name: 'ذخیره اطلاعات' }));
 
     await screen.findByText('اطلاعات پروفایل ذخیره شد ✓');
     expect(update).toHaveBeenCalledWith({
       fullName: 'نگار رضایی',
       nationalId: '0012345679',
+      birthDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       passportNo: undefined,
+      address: 'تهران، خیابان آزادی، پلاک ۱۲',
     });
   });
 
@@ -600,6 +605,7 @@ describe('AccountPage', () => {
     renderPage('/account?tab=wallet');
 
     await userEvent.type(screen.getByTestId('wallet-topup-amount'), '۵۰۰٬۰۰۰');
+    expect(screen.getByTestId('wallet-topup-amount')).toHaveValue('۵۰۰٬۰۰۰');
     expect(screen.getByTestId('wallet-topup-amount-words')).toHaveTextContent('پانصد هزار تومان');
     await userEvent.click(screen.getByTestId('wallet-topup-submit'));
 
