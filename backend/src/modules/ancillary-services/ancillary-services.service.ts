@@ -85,12 +85,14 @@ export class AncillaryServicesService implements OnModuleInit {
       where: { enabled: true, category: AncillaryServiceCategory.OTHER },
       order: { isCustom: 'ASC', key: 'ASC' },
     });
-    return rows.map((row) => ({
-      key: row.key,
-      titleFa: row.titleFa,
-      descriptionFa: row.descriptionFa,
-      priceIrr: row.priceIrr.toString(),
-    }));
+    return rows
+      .filter((row) => row.key !== 'pet')
+      .map((row) => ({
+        key: row.key,
+        titleFa: row.titleFa,
+        descriptionFa: row.descriptionFa,
+        priceIrr: row.priceIrr.toString(),
+      }));
   }
 
   async setPrice(actor: AuthenticatedUser, key: string, priceIrr: Irr) {
