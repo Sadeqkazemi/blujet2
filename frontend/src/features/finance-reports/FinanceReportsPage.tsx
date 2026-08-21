@@ -127,23 +127,105 @@ function PartnerTable({ result }: { result: Extract<FinanceReportResult, { kind:
   );
 }
 
-function FlightTable({ rows, onSelect }: { rows: FinanceFlightRow[]; onSelect?: (row: FinanceFlightRow) => void }) {
+function FlightTable({
+  rows,
+  onSelect,
+  rich,
+  summary,
+  period,
+}: {
+  rows: FinanceFlightRow[];
+  onSelect?: (row: FinanceFlightRow) => void;
+  rich?: boolean;
+  summary?: { totalIrr: string; soldSeats: number };
+  period?: FinanceReportPeriod;
+}) {
   if (!rows.length) return <EmptyState text="پروازی در بازه انتخاب‌شده وجود ندارد." />;
+  const periodLabel =
+    period === 'day'
+      ? 'روزانه'
+      : period === 'month'
+        ? 'ماهانه'
+        : period === 'q3'
+          ? 'سه‌ماهه'
+          : period === 'q6'
+            ? 'شش‌ماهه'
+            : period === 'year'
+              ? 'سالانه'
+              : 'پرواز';
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-right text-xs">
-        <thead className="text-[10px] text-[#6b7b94]"><tr><th className="px-4 py-3">شماره پرواز</th><th className="px-4 py-3">مسیر</th><th className="px-4 py-3">تاریخ</th><th className="px-4 py-3">فروش مشتریان</th><th className="px-4 py-3">صندلی فروخته‌شده</th><th /></tr></thead>
-        <tbody>{rows.map((row) => (
-          <tr key={row.flightInstanceId} className="border-t border-[#222e43] text-white">
-            <td className="font-num px-4 py-4 font-extrabold">{row.flightNo}</td>
-            <td className="px-4 py-4">{row.originCityFa} ← {row.destCityFa}</td>
-            <td className="px-4 py-4 text-[#9fb0c7]">{formatJalaliDate(row.departureAt)}</td>
-            <td className="font-num px-4 py-4">{faMoneyCompact(row.totalIrr)} تومان</td>
-            <td className="font-num px-4 py-4">{faDigits(row.soldSeats)}</td>
-            <td className="px-4 py-4">{onSelect && <button type="button" onClick={() => onSelect(row)} className="rounded-lg border border-[#31518a] px-3 py-1.5 text-[#7da7ff]">جزئیات</button>}</td>
-          </tr>
-        ))}</tbody>
-      </table>
+    <div>
+      {summary && rich && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#222e43] px-5 py-4">
+          <div>
+            <div className="text-[10px] text-[#6b7b94]">جمع فروش مشتریان — {periodLabel}</div>
+            <div className="font-num mt-1 text-lg font-black text-white">
+              {faMoneyCompact(summary.totalIrr)} تومان
+            </div>
+          </div>
+          <div className="text-[11px] text-[#9fb0c7]">
+            صندلی فروخته‌شده:{' '}
+            <span className="font-num font-bold text-white">{faDigits(summary.soldSeats)}</span>
+          </div>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className={`w-full text-right text-xs ${rich ? 'min-w-[980px]' : 'min-w-[820px]'}`}>
+          <thead className="text-[10px] text-[#6b7b94]">
+            <tr>
+              <th className="px-4 py-3">شماره پرواز</th>
+              <th className="px-4 py-3">مسیر</th>
+              <th className="px-4 py-3">تاریخ</th>
+              <th className="px-4 py-3">فروش مشتریان</th>
+              {rich ? (
+                <>
+                  <th className="px-4 py-3">عادی</th>
+                  <th className="px-4 py-3">آژانس</th>
+                  <th className="px-4 py-3">فروخته‌نشده</th>
+                </>
+              ) : (
+                <th className="px-4 py-3">صندلی فروخته‌شده</th>
+              )}
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const direct = Math.max(0, row.soldSeats - row.agencySeats);
+              return (
+                <tr key={row.flightInstanceId} className="border-t border-[#222e43] text-white">
+                  <td className="font-num px-4 py-4 font-extrabold">{row.flightNo}</td>
+                  <td className="px-4 py-4">
+                    {row.originCityFa} ← {row.destCityFa}
+                  </td>
+                  <td className="px-4 py-4 text-[#9fb0c7]">{formatJalaliDate(row.departureAt)}</td>
+                  <td className="font-num px-4 py-4">{faMoneyCompact(row.totalIrr)} تومان</td>
+                  {rich ? (
+                    <>
+                      <td className="font-num px-4 py-4">{faDigits(direct)}</td>
+                      <td className="font-num px-4 py-4">{faDigits(row.agencySeats)}</td>
+                      <td className="font-num px-4 py-4 text-[#f59e0b]">{faDigits(row.unsoldSeats)}</td>
+                    </>
+                  ) : (
+                    <td className="font-num px-4 py-4">{faDigits(row.soldSeats)}</td>
+                  )}
+                  <td className="px-4 py-4">
+                    {onSelect && (
+                      <button
+                        type="button"
+                        onClick={() => onSelect(row)}
+                        className="rounded-lg border border-[#31518a] px-3 py-1.5 text-[#7da7ff]"
+                      >
+                        جزئیات
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -235,14 +317,64 @@ export default function FinanceReportsPage() {
               <div className="flex justify-end px-5 pb-4"><div className="flex rounded-[11px] border border-[#28344c] bg-[#18223a] p-1">{PERIODS.map((item) => <button key={item.key} type="button" onClick={() => setPeriod(item.key)} className={`rounded-[8px] px-4 py-2 text-[11px] font-bold ${period === item.key ? 'bg-[#4f7ff0] text-white' : 'text-[#9fb0c7]'}`}>{item.label}</button>)}</div></div>
             )}
             <div className="border-t border-[#222e43]">
-              {error ? <ErrorState onRetry={() => setReload((value) => value + 1)} /> : !result ? <EmptyState text="در حال دریافت گزارش…" /> : result.kind === 'partners' ? <PartnerTable result={result} /> : <FlightTable rows={result.rows} onSelect={selectFlight} />}
+              {error ? (
+                <ErrorState onRetry={() => setReload((value) => value + 1)} />
+              ) : !result ? (
+                <EmptyState text="در حال دریافت گزارش…" />
+              ) : result.kind === 'partners' ? (
+                <PartnerTable result={result} />
+              ) : (
+                <FlightTable
+                  rows={result.rows}
+                  onSelect={selectFlight}
+                  rich={tab === 'CUSTOMERS'}
+                  summary={result.summary}
+                  period={result.period}
+                />
+              )}
             </div>
           </section>
 
           {tab === 'CUSTOMERS' && (period === 'day' || period === 'month') && (
-            <section className="mt-4 rounded-[15px] border border-[#222e43] bg-[#141d2e] p-5">
-              <div className="mb-4"><h2 className="text-base font-extrabold text-white">گزارش پروازهای انجام‌شده بر اساس ماه</h2><p className="mt-1 text-[10px] text-[#6b7b94]">یک ماه یا روز را انتخاب کنید تا جزئیات همان بازه نمایش داده شود</p></div>
-              {period === 'month' ? <MonthPicker selected={month} onSelect={setMonth} /> : <div className="max-w-[280px]"><CalendarPicker month={month} day={day} onMonth={setMonth} onDay={setDay} /></div>}
+            <section className="mt-4 grid gap-4 lg:grid-cols-[280px_1fr]">
+              <div className="rounded-[15px] border border-[#222e43] bg-[#141d2e] p-5">
+                <div className="mb-4">
+                  <h2 className="text-base font-extrabold text-white">
+                    {period === 'day' ? 'انتخاب روز' : 'انتخاب ماه'}
+                  </h2>
+                  <p className="mt-1 text-[10px] text-[#6b7b94]">
+                    {period === 'day'
+                      ? 'یک روز را از تقویم انتخاب کنید تا گزارش کامل پروازهای آن روز نمایش داده شود.'
+                      : 'یک ماه را انتخاب کنید تا جزئیات فروش پروازهای همان ماه نمایش داده شود.'}
+                  </p>
+                </div>
+                {period === 'month' ? (
+                  <MonthPicker selected={month} onSelect={setMonth} />
+                ) : (
+                  <CalendarPicker month={month} day={day} onMonth={setMonth} onDay={setDay} />
+                )}
+              </div>
+              <div className="rounded-[15px] border border-[#222e43] bg-[#141d2e] p-5">
+                <h2 className="mb-2 text-base font-extrabold text-white">خلاصه بازه</h2>
+                {result?.kind === 'customers' ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-[#26334b] bg-[#111a2b] p-4">
+                      <span className="block text-[10px] text-[#6b7b94]">فروش مشتریان</span>
+                      <strong className="font-num mt-2 block text-lg text-white">
+                        {faMoneyCompact(result.summary.totalIrr)} تومان
+                      </strong>
+                    </div>
+                    <div className="rounded-xl border border-[#26334b] bg-[#111a2b] p-4">
+                      <span className="block text-[10px] text-[#6b7b94]">صندلی فروخته‌شده</span>
+                      <strong className="font-num mt-2 block text-lg text-white">
+                        {faDigits(result.summary.soldSeats)}
+                      </strong>
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState text="در حال دریافت خلاصه…" />
+                )}
+              </div>
             </section>
           )}
         </>
@@ -257,7 +389,47 @@ export default function FinanceReportsPage() {
           </section>
           {selectedFlight && (
             <section className="mt-4 rounded-[15px] border border-[#222e43] bg-[#141d2e] p-5">
-              <div className="mb-5 flex flex-wrap justify-between gap-3"><div><h2 className="text-base font-extrabold">گزارش پرواز {selectedFlight.summary.flightNo} — {selectedFlight.summary.originCityFa} ← {selectedFlight.summary.destCityFa}</h2><p className="mt-1 text-[10px] text-[#6b7b94]">تفکیک فروش و بدهی آژانس‌ها</p></div><span className="font-num text-lg font-black">{faMoney(selectedFlight.summary.totalIrr)} تومان</span></div>
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-extrabold">گزارش پرواز {selectedFlight.summary.flightNo} — {selectedFlight.summary.originCityFa} ← {selectedFlight.summary.destCityFa}</h2>
+                  <p className="mt-1 text-[10px] text-[#6b7b94]">تفکیک فروش و بدهی آژانس‌ها</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <ExportButtons
+                    busy={exportBusy}
+                    onExport={(format) => {
+                      const headers = ['نام آژانس', 'تعداد صندلی', 'مبلغ فروش', 'پرداخت‌شده', 'بدهی'];
+                      const bodyRows = selectedFlight.agencies.map((a) => [
+                        a.agencyName,
+                        String(a.soldSeats),
+                        String(a.salesIrr),
+                        String(a.paidIrr),
+                        String(a.outstandingIrr),
+                      ]);
+                      const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/></head><body><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${bodyRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+                      const blob =
+                        format === 'csv'
+                          ? new Blob(
+                              [
+                                '\ufeff' +
+                                  [headers.join(','), ...bodyRows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(','))].join(
+                                    '\n',
+                                  ),
+                              ],
+                              { type: 'text/csv;charset=utf-8' },
+                            )
+                          : new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'csv' ? 'csv' : 'xls'}`;
+                      link.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  />
+                  <span className="font-num text-lg font-black">{faMoney(selectedFlight.summary.totalIrr)} تومان</span>
+                </div>
+              </div>
               <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">{[['مسافران عادی', selectedFlight.summary.soldSeats - selectedFlight.summary.agencySeats], ['صندلی آژانس‌ها', selectedFlight.summary.agencySeats], ['تعداد آژانس‌ها', selectedFlight.summary.agencyCount], ['صندلی فروش‌نرفته', selectedFlight.summary.unsoldSeats]].map(([label, value]) => <div key={label} className="rounded-xl border border-[#26334b] bg-[#111a2b] p-4"><span className="block text-[10px] text-[#6b7b94]">{label}</span><strong className="font-num mt-2 block text-lg text-white">{faDigits(value)}</strong></div>)}</div>
               {selectedFlight.agencies.length === 0 ? <EmptyState text="این پرواز فروش آژانسی ندارد." /> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-xs"><thead className="text-[10px] text-[#6b7b94]"><tr><th className="p-3">نام آژانس</th><th className="p-3">تعداد صندلی</th><th className="p-3">مبلغ فروش</th><th className="p-3">پرداخت‌شده</th><th className="p-3">بدهی</th></tr></thead><tbody>{selectedFlight.agencies.map((agency) => <tr key={agency.agencyId} className="border-t border-[#222e43]"><td className="p-3 font-bold">{agency.agencyName}</td><td className="font-num p-3">{faDigits(agency.soldSeats)}</td><td className="font-num p-3">{faMoney(agency.salesIrr)} تومان</td><td className="font-num p-3 text-[#34d399]">{faMoney(agency.paidIrr)} تومان</td><td className="font-num p-3 text-[#f59e0b]">{faMoney(agency.outstandingIrr)} تومان</td></tr>)}</tbody></table></div>}
             </section>

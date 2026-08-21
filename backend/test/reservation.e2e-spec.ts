@@ -589,7 +589,7 @@ describe('Reservation (e2e)', () => {
 
   // ── Role isolation ──────────────────────────────────────────────────
 
-  it('FINANCE_MANAGER is isolated while COMMERCIAL_MANAGER can view and lock seats', async () => {
+  it('FINANCE_MANAGER cannot view or lock seats while COMMERCIAL_MANAGER can', async () => {
     const instance = await createScheduledInstance();
     const finance = await loginAs(app, 'finance');
     const commercial = await loginAs(app, 'comm');
@@ -598,6 +598,16 @@ describe('Reservation (e2e)', () => {
       .get(`/reservation/seatmap/${instance.id}`)
       .set(auth(finance.accessToken));
     expect(financeRead.status).toBe(403);
+
+    const financeLock = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(finance.accessToken))
+      .send({
+        seatCode: '16B',
+        reason: 'نباید برای مدیر مالی مجاز باشد',
+        classification: 'PAYABLE',
+      });
+    expect(financeLock.status).toBe(403);
 
     const commercialRead = await request(app.getHttpServer())
       .get(`/reservation/seatmap/${instance.id}`)

@@ -3,6 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import StaffReportsPage from './StaffReportsPage';
 import * as reportingApi from '../../api/reporting';
+import * as useAuthModule from '../../hooks/useAuth';
+import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { StaffReportsResult } from '../../types/reporting';
 
 const DATA: StaffReportsResult = {
@@ -27,10 +29,19 @@ const DATA: StaffReportsResult = {
 
 describe('StaffReportsPage', () => {
   it('renders the staff tabs, real audit feed, and the new-employee banner; filters by employee', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUserWithRole('FINANCE_MANAGER'),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
     const fetchSpy = vi.spyOn(reportingApi, 'fetchStaffReports').mockResolvedValue(DATA);
 
     render(<StaffReportsPage />);
     expect(await screen.findByText('ثبت تسویه آژانس')).toBeInTheDocument();
+    expect(screen.getByText(/اقدامات کارمندان واحد مالی/)).toBeInTheDocument();
     expect(screen.getByText('کارمند جدید توسط مدیر IT اضافه شد')).toBeInTheDocument();
 
     const user = userEvent.setup();

@@ -94,8 +94,31 @@ describe('AgencyDetailPage', () => {
 
   it('Finance Manager sees credit + settle, issued invoices (no issue button), and no API-key/messages', async () => {
     mockRole('FINANCE_MANAGER');
-    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_SCORE);
+    vi.spyOn(agenciesApi, 'fetchAgencyDetail').mockResolvedValue(DETAIL_WITH_EXTRAS);
     stubStaffReviewFetches();
+    vi.spyOn(agenciesApi, 'fetchAggregateSeatRequests').mockResolvedValue([
+      {
+        id: 'sr1',
+        agencyId: 'a1',
+        agencyName: 'آژانس blujet',
+        managerName: 'کامران یوسفی',
+        phone: '09120000000',
+        city: 'تهران',
+        licenseNo: 'AG-10234',
+        routeFa: 'تهران → دبی',
+        seats: 20,
+        months: 3,
+        aircraftType: 'ATR 72',
+        unitPriceIrr: '25000000',
+        totalIrr: '500000000',
+        payMethod: 'CREDIT',
+        status: 'APPROVED',
+        invoiceNo: 'INV-1002',
+        dueAt: null,
+        flights: [],
+        createdAt: '2026-07-01T10:00:00.000Z',
+      },
+    ]);
     vi.spyOn(agenciesApi, 'fetchAgencyInvoices').mockResolvedValue([
       {
         id: 'inv1',
@@ -112,13 +135,26 @@ describe('AgencyDetailPage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('اعتبار آژانس')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'نمای کلی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'مالی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'سابقه' })).toBeInTheDocument();
+    expect(screen.getByText('اعتبار آژانس')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ثبت تسویه' })).toBeInTheDocument();
     expect(screen.getByText('امتیاز فعالیت آژانس')).toBeInTheDocument();
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: 'مالی' }));
     expect(await screen.findByText('فاکتورهای صادرشده')).toBeInTheDocument();
-    expect(screen.getByText('INV-1002')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'یادآوری' })).toBeInTheDocument();
+    expect(screen.getAllByText('INV-1002').length).toBeGreaterThan(0);
+    expect(screen.getByText('فاکتورهای پرداخت‌نشده')).toBeInTheDocument();
+    expect(screen.getByText('درآمد کل فروش')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'یادآوری' }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole('button', { name: 'ثبت پرداخت این فاکتور' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'سابقه' }));
+    expect(await screen.findByText('تاریخچهٔ پرداخت')).toBeInTheDocument();
+    expect(screen.getByText('فروش بلیط پرواز W5-101')).toBeInTheDocument();
+    expect(screen.getByText('تهران → دبی')).toBeInTheDocument();
 
     expect(screen.queryByText('دسترسی API رزرواسیون')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'صدور فاکتور' })).not.toBeInTheDocument();
@@ -333,6 +369,7 @@ describe('AgencyDetailPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
+    await userEvent.click(await screen.findByRole('button', { name: 'مالی' }));
     expect(await screen.findByText('مدارک آپلودشده')).toBeInTheDocument();
     expect(screen.getByText('مجوز فعالیت')).toBeInTheDocument();
     expect(screen.getByText('مجوز.pdf')).toBeInTheDocument();
@@ -371,6 +408,7 @@ describe('AgencyDetailPage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
+    await userEvent.click(await screen.findByRole('button', { name: 'مالی' }));
     expect(await screen.findByText('درخواست‌های افزایش اعتبار')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
     await waitFor(() => expect(decide).toHaveBeenCalledWith('a1', 'cr1', true));

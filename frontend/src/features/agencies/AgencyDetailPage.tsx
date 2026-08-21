@@ -140,7 +140,7 @@ export default function AgencyDetailPage() {
   const [seatRequestHistory, setSeatRequestHistory] = useState<AgencySeatRequestRow[]>([]);
 
   useEffect(() => {
-    if (role !== 'COMMERCIAL_MANAGER') return;
+    if (role !== 'COMMERCIAL_MANAGER' && role !== 'FINANCE_MANAGER') return;
     let cancelled = false;
     fetchAggregateSeatRequests()
       .then((rows) => {
@@ -980,17 +980,22 @@ export default function AgencyDetailPage() {
   );
 
   const unpaidInvoices = invoices.filter((inv) => inv.status !== 'PAID');
+  const paidInvoices = invoices.filter((inv) => inv.status === 'PAID');
+  const financeSummary = extras?.financeSummary ?? {
+    paidTotalIrr: paidInvoices.reduce((s, i) => s + Number(i.amountIrr), 0),
+    unpaidTotalIrr: unpaidInvoices.reduce((s, i) => s + Number(i.amountIrr), 0),
+  };
 
-  const financeKpiRow = extras && (
+  const financeKpiRow = (isCommercial || isFinance) && (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       <StatBox label="درآمد کل فروش" value={`${faMoney(detail.stats.totalSalesIrr)} تومان`} />
-      <StatBox label="مجموع پرداخت‌شده" value={`${faMoney(extras.financeSummary.paidTotalIrr)} تومان`} />
-      <StatBox label="مانده پرداخت‌نشده" value={`${faMoney(extras.financeSummary.unpaidTotalIrr)} تومان`} />
+      <StatBox label="مجموع پرداخت‌شده" value={`${faMoney(financeSummary.paidTotalIrr)} تومان`} />
+      <StatBox label="مانده پرداخت‌نشده" value={`${faMoney(financeSummary.unpaidTotalIrr)} تومان`} />
       <StatBox label="مانده اعتبار" value={`${faMoney(detail.credit.remainingIrr)} تومان`} />
     </div>
   );
 
-  const unpaidInvoicesSection = isCommercial && unpaidInvoices.length > 0 && (
+  const unpaidInvoicesSection = (isCommercial || isFinance) && unpaidInvoices.length > 0 && (
     <SectionCard
       title="فاکتورهای پرداخت‌نشده"
       action={
@@ -1194,14 +1199,16 @@ export default function AgencyDetailPage() {
         )}
       </header>
 
-      {isCommercial ? (
+      {isCommercial || isFinance || isSenior ? (
         <>
           <div className="flex gap-1.5">
             {(
               [
                 { key: 'overview', label: 'نمای کلی' },
                 { key: 'finance', label: 'مالی' },
-                { key: 'messages', label: 'مکاتبه‌ها' },
+                ...(isCommercial
+                  ? [{ key: 'messages' as const, label: 'مکاتبه‌ها' }]
+                  : []),
                 { key: 'history', label: 'سابقه' },
               ] as { key: CommercialTab; label: string }[]
             ).map((t) => (
@@ -1221,24 +1228,26 @@ export default function AgencyDetailPage() {
             <div className="space-y-4">
               {statsRow}
               {scoreCard}
+              {(isFinance || isSenior) && creditCard}
               {infoAndActivity}
-              {flightsSoldSection}
-              {purchasedServicesSection}
+              {isCommercial && flightsSoldSection}
+              {isCommercial && purchasedServicesSection}
+              {isSenior && apiKeyCard}
             </div>
           )}
           {tab === 'finance' && (
             <div className="space-y-4">
-              {financeKpiRow}
+              {(isCommercial || isFinance) && financeKpiRow}
               {creditCard}
               {invoicesSection}
               {unpaidInvoicesSection}
-              {transactionsSection}
+              {(isCommercial || isFinance) && transactionsSection}
               {documentsCard}
               {creditRequestsCard}
               {webserviceRequestsCard}
             </div>
           )}
-          {tab === 'messages' && messagesSection}
+          {tab === 'messages' && isCommercial && messagesSection}
           {tab === 'history' && historyContent}
         </>
       ) : (

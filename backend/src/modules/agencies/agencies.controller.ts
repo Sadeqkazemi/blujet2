@@ -157,8 +157,11 @@ export class AgenciesController {
   }
 
   @Get('seat-requests')
-  @Roles('COMMERCIAL_MANAGER')
-  @ApiOperation({ summary: 'صف درخواست‌های خرید صندلی همه آژانس‌ها' })
+  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER')
+  @ApiOperation({
+    summary:
+      'صف درخواست‌های خرید صندلی همه آژانس‌ها (خواندن؛ تصمیم فقط بازرگانی)',
+  })
   async listSeatRequests() {
     const data = await this.agencies.listSeatRequests();
     return { success: true, data };

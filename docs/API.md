@@ -120,7 +120,7 @@ the parent resource.
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/agencies` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `q?` (name/license/manager/city search), `debtorsOnly?` (Commercial's "آژانس‌های دارای بدهی" panel). Returns list + the same 4 KPI cards (active count, total credit granted, total used/debt, pending-settlement count) confirmed identical across all three panels. |
-| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER only, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance sub-sections. |
+| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER and FINANCE_MANAGER, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance/history sub-sections. |
 | PATCH | `/agencies/:id/suspend` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ reason }` (required) → sets `suspendedAt`/`suspendReason`, `AuditLog(category=AGENCY)`. |
 | PATCH | `/agencies/:id/reactivate` | same as suspend | Clears suspension. |
 | GET | `/agencies/:id/credit` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ limitIrr, usedIrr (derived), remainingIrr }`. |
@@ -3692,7 +3692,7 @@ valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER` | Structured queue. Money fields are decimal strings. |
+| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER`, `FINANCE_MANAGER` | Read-only structured queue for finance; decision remains commercial-only. Money fields are decimal strings. |
 | PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` / `PENDING_FINANCE` may be decided; repeats return `409 CONFLICT`. Approval creates exactly one `AgencyInvoice` via the existing invoice service (`descriptionFa` = فاکتور تعهد صندلی چارتری) and links `invoiceId`. Rejection creates no invoice. Cartable tasks for that `sourceId` are closed. Audit records actor, old/new status, and invoice reference. Missing `dueAt` on approve defaults to +7 days. |
 
 ## Ancillary services pricing — manager + public

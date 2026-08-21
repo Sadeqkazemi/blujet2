@@ -516,8 +516,11 @@ export class AgenciesService {
     const includeScore =
       actor.role === 'FINANCE_MANAGER' || actor.role === 'COMMERCIAL_MANAGER';
 
+    // Finance Manager needs the same ledger/KPI extras for the design's
+    // مالی + سابقه tabs (transactions, financeSummary). flightsSold /
+    // purchasedServices are harmless read-only aggregates for finance too.
     const commercialExtras =
-      actor.role === 'COMMERCIAL_MANAGER'
+      actor.role === 'COMMERCIAL_MANAGER' || actor.role === 'FINANCE_MANAGER'
         ? await this.commercialDetailExtras(id)
         : undefined;
 
