@@ -153,7 +153,11 @@ function initialsOf(name: string) {
 
 function ItReservationView() {
   const { user } = useAuth();
-  const canLock = user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'IT_MANAGER';
+  const canLock =
+    user?.role === 'CEO' ||
+    user?.role === 'BOARD_CHAIR' ||
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'IT_MANAGER';
 
   const [subTab, setSubTab] = useState<ItSubTab>('dash');
   const [stats, setStats] = useState<ReservationDashboardStats | null>(null);
@@ -994,7 +998,11 @@ function ExecReservationView() {
     user?.role === 'CEO' ||
     user?.role === 'BOARD_CHAIR' ||
     user?.role === 'SENIOR_MANAGER';
-  const canLock = user?.role === 'CEO' || user?.role === 'BOARD_CHAIR' || user?.role === 'IT_MANAGER';
+  const canLock =
+    user?.role === 'CEO' ||
+    user?.role === 'BOARD_CHAIR' ||
+    user?.role === 'SENIOR_MANAGER' ||
+    user?.role === 'IT_MANAGER';
 
   const [subTab, setSubTab] = useState<SubTab>('pnr');
   const [stats, setStats] = useState<ReservationDashboardStats | null>(null);

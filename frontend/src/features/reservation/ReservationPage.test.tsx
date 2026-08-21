@@ -362,7 +362,7 @@ describe('ReservationPage', () => {
     expect(screen.getByRole('button', { name: 'لغو رزرو' })).toBeInTheDocument();
   });
 
-  it('SENIOR_MANAGER is view-only in the detail modal', async () => {
+  it('SENIOR_MANAGER can change seat and cancel in the detail modal', async () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue(STATS);
     vi.spyOn(reservationApi, 'fetchPnrList').mockResolvedValue(GROUPS);
@@ -375,8 +375,8 @@ describe('ReservationPage', () => {
     await user.click(await screen.findByRole('button', { name: 'BJDEMO1' }));
 
     await waitFor(() => expect(screen.getByText('رزرو BJDEMO1')).toBeInTheDocument());
-    expect(screen.queryByRole('button', { name: 'ثبت تغییر' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'لغو رزرو' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ثبت تغییر' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'لغو رزرو' })).toBeInTheDocument();
   });
 
   it('CEO/SENIOR مدیریت رزروها shows flat PNR|مسیر|مسافر|وضعیت columns', async () => {

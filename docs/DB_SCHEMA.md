@@ -343,19 +343,13 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
 Shared `ReservationSystem` component contract, confirmed from
 `ReservationSystem.dc.html`'s script (`canLock = this.props.role === 'super'`)
 and its own copy ("لاک‌کردن صندلی فقط توسط مدیر عامل یا رئیس هیئت مدیره
-انجام می‌شود"). ⚑ **Product decision (open item resolved by the user,
-2026-07-17):** `canLock` = `CEO`, `BOARD_CHAIR`, `IT_MANAGER` (the design
-hardcodes `resRole:"super"` for the IT panel's mount, and CEO/Chair's own
-`state.role` resolves to `"super"` too); `SENIOR_MANAGER` gets view-only
-access to the same seat map, matching the design's confirmed behavior.
-Reachable nav entries (per `panel-nav.config.ts`, already confirmed in
-Phase 1's extraction): only `BOARD_CHAIR`, `SENIOR_MANAGER`, `IT_MANAGER`
-get a سامانه رزرواسیون/هواپیما sidebar tab — CEO also has `reservation`
-(label **هواپیما**) in `PANEL_NAV`, matching `roleDefs.ceo.access` and the
-approved CEO design screenshots; CEO's `canLock` grant is therefore
-reachable from the sidebar (same as BOARD_CHAIR), not API-level only
-(consistent with the design's own copy naming CEO as an authorized locker)
-and has no UI entry point yet.
+انجام می‌شود"). ⚑ **Product update (2026-08-21):** managerial seat lock is
+allowed for `CEO`, `BOARD_CHAIR`, `SENIOR_MANAGER`, and
+`COMMERCIAL_MANAGER`; `IT_MANAGER` remains read-only on the seat map. PNR
+issue/change/cancel additionally allows `IT_MANAGER`. `SENIOR_MANAGER` is no
+longer view-only and has a reachable `reservation` sidebar entry labeled
+سامانه رزرواسیون. `CEO`, `BOARD_CHAIR`, `COMMERCIAL_MANAGER`, and
+`IT_MANAGER` retain their existing reachable reservation/seat-map surfaces.
 
 - `AircraftSeatMap { id, aircraftType (unique) →Flight.aircraftType, businessRowStart/End, businessColsLeft/Right, economyRowStart/End, economyColsLeft/Right, excludedSeatCodes String[] }` — CLAUDE.md: "seat map config lives per aircraft type in the DB, not hardcoded." Seeded for `"Airbus A320"` (legacy 2-2/2-3 → 146 seats) and `"MD-80"` from the approved cabin chart (`design-reference-v2/MD-80-seatmap.pdf`): First Class rows 3–6 as `A,B|E,F` (16), Economy rows 7–32 as `A,B|D,E,F` minus rear exit/galley seats `28A/B,29A/B,30A/B` (124) = **140** total.
 - `SeatLock { id, flightInstanceId→FlightInstance, seatCode, lockedById→User, agencyId?→AgencyProfile, passengerName?, passengerNationalIdEnc?, passengerNationalIdHash?, passengerMobileEnc?, releasedById?→User, releasedAt? }` — a lock may target an agency, a named/anonymous passenger, or remain anonymous. PII fields follow the same encrypt+hash pattern as `ClubMember`; agency identity is a real foreign key. A partial unique index (`WHERE releasedAt IS NULL`) enforces exactly one active lock per seat at the DB level, not just an app-side check — CLAUDE.md's seat-inventory concurrency rule.
@@ -492,10 +486,11 @@ the IT panels view reads `PanelAccessFlag` (read-only).
    guess was never implemented and is superseded; no migration needed, just
    a doc correction (Phase 2's channel list above is historical/inaccurate,
    kept as-is for the historical record rather than silently rewritten).
-2. ~~`ReservationSystem`'s `role="super"` string literal...~~ Already resolved
-   per Phase 9 above (`CAN_LOCK_ROLES = [CEO, BOARD_CHAIR, IT_MANAGER]`,
-   `SENIOR_MANAGER` view-only) — this open item was left unchecked after the
-   decision shipped; marking it done here.
+2. ~~`ReservationSystem`'s `role="super"` string literal...~~ Resolved in
+   Phase 9 and updated 2026-08-21: `CAN_SEAT_LOCK_ROLES` contains `CEO`,
+   `BOARD_CHAIR`, `SENIOR_MANAGER`, and `COMMERCIAL_MANAGER`;
+   `CAN_LOCK_ROLES` additionally contains `IT_MANAGER` for PNR operations.
+   Senior Manager is no longer view-only.
 
 ---
 

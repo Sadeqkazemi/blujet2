@@ -600,7 +600,7 @@ export default function PanelShell() {
                     onClick={() => setLogoutConfirmOpen(true)}
                     className={`text-[10.5px] transition ${user?.role === 'SITE_ADMIN' ? 'font-bold text-[#f87171] hover:text-[#fca5a5]' : 'text-[#9fb0c7] hover:text-white'}`}
                   >
-                    خروج از حساب
+                    خروج از پنل
                   </button>
                 )}
               </div>
@@ -609,7 +609,7 @@ export default function PanelShell() {
                   type="button"
                   onClick={() => setLogoutConfirmOpen(true)}
                   title="خروج"
-                  aria-label="خروج از حساب"
+                  aria-label="خروج از پنل"
                   className="flex-none text-[#6b7b94] transition hover:text-white"
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
@@ -626,7 +626,7 @@ export default function PanelShell() {
               onClick={() => setLogoutConfirmOpen(true)}
               className={`w-full rounded-[11px] border py-2 text-xs transition ${user?.role === 'SITE_ADMIN' ? 'border-red-400/20 text-[#f87171] hover:bg-red-400/5' : 'border-panel-border text-panel-muted hover:bg-white/5'}`}
             >
-              خروج از حساب
+              خروج از پنل
             </button>
           </div>
         )}
@@ -656,7 +656,7 @@ export default function PanelShell() {
       </main>
       <ConfirmActionDialog
         open={logoutConfirmOpen}
-        title="خروج از حساب"
+        title="خروج از پنل"
         message="آیا مطمئن هستید که می‌خواهید از پنل مدیریت خارج شوید؟"
         confirmLabel="بله، خارج شو"
         cancelLabel="انصراف"

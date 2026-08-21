@@ -191,12 +191,12 @@ describe('Reservation (e2e)', () => {
   it('POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior');
+    const finance = await loginAs(app, 'finance');
     const it = await loginAs(app, 'itadmin');
 
     const forbidden = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
-      .set(auth(senior.accessToken))
+      .set(auth(finance.accessToken))
       .send({
         seatCode: '3A',
         reason: 'بازدید هیئت مدیره',
@@ -275,7 +275,7 @@ describe('Reservation (e2e)', () => {
   it('PATCH release: canLock only, 409 on already-released, seat becomes lockable again', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior');
+    const finance = await loginAs(app, 'finance');
 
     const locked = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instance.id}/lock`)
@@ -289,7 +289,7 @@ describe('Reservation (e2e)', () => {
 
     const forbidden = await request(app.getHttpServer())
       .patch(`/reservation/seatmap/locks/${lockId}/release`)
-      .set(auth(senior.accessToken));
+      .set(auth(finance.accessToken));
     expect(forbidden.status).toBe(403);
 
     const released = await request(app.getHttpServer())
@@ -327,9 +327,9 @@ describe('Reservation (e2e)', () => {
   it('POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior');
+    const finance = await loginAs(app, 'finance');
 
-    const forbidden = await issuePnr(senior.accessToken, instance.id, '7A');
+    const forbidden = await issuePnr(finance.accessToken, instance.id, '7A');
     expect(forbidden.status).toBe(403);
 
     const issued = await issuePnr(
@@ -434,13 +434,13 @@ describe('Reservation (e2e)', () => {
   it('PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking', async () => {
     const instance = await createScheduledInstance();
     const chair = await loginAs(app, 'chair');
-    const senior = await loginAs(app, 'senior');
+    const finance = await loginAs(app, 'finance');
     const a = await issuePnr(chair.accessToken, instance.id, '10A', 'مسافر آ');
     const b = await issuePnr(chair.accessToken, instance.id, '10B', 'مسافر ب');
 
     const forbidden = await request(app.getHttpServer())
       .patch(`/reservation/pnr/${a.body.data.pnr}/seat`)
-      .set(auth(senior.accessToken))
+      .set(auth(finance.accessToken))
       .send({ seatCode: '11A' });
     expect(forbidden.status).toBe(403);
 
@@ -625,7 +625,7 @@ describe('Reservation (e2e)', () => {
     expect(commercialLock.status).toBe(201);
   });
 
-  it('SENIOR_MANAGER: reads succeed, every write is 403 (view-only)', async () => {
+  it('SENIOR_MANAGER can lock seats and manage PNRs (same canLock as CEO)', async () => {
     const instance = await createScheduledInstance();
     const it = await loginAs(app, 'itadmin');
     const issued = await issuePnr(it.accessToken, instance.id, '14D');
@@ -641,12 +641,22 @@ describe('Reservation (e2e)', () => {
       .set(auth(senior.accessToken));
     expect(readPnr.status).toBe(200);
 
+    const lock = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instance.id}/lock`)
+      .set(auth(senior.accessToken))
+      .send({
+        seatCode: '16B',
+        reason: 'قفل مدیریتی مدیر ارشد',
+        classification: 'PAYABLE',
+      });
+    expect(lock.status).toBe(201);
+
     const writeCancel = await request(app.getHttpServer())
       .patch(`/reservation/pnr/${issued.body.data.pnr}/cancel`)
       .set(auth(senior.accessToken));
-    expect(writeCancel.status).toBe(403);
+    expect(writeCancel.status).toBe(200);
 
     const writeIssue = await issuePnr(senior.accessToken, instance.id, '15A');
-    expect(writeIssue.status).toBe(403);
+    expect(writeIssue.status).toBe(201);
   });
 });

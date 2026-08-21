@@ -21,7 +21,7 @@ seed's ambiguous historical/demo instances).
 
 ### Seat map & locking
 - [x] `GET /reservation/seatmap/:flightInstanceId` computed from `AircraftSeatMap` + sold `Passenger.seatCode` + active `SeatLock`s; correct row/column layout — `'GET /reservation/seatmap/:id computes rows from AircraftSeatMap with correct capacity'`
-- [x] `POST /reservation/seatmap/:id/lock`: canSeatLock roles only (`CEO`/`BOARD_CHAIR`; 403 for SENIOR_MANAGER and IT_MANAGER); 409 on already-sold/-locked seat; PII encrypted+hashed, never returned in plaintext; audited (RESERVATION) — `'POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited'` (includes IT → 403)
+- [x] `POST /reservation/seatmap/:id/lock`: canSeatLock roles (`CEO`/`BOARD_CHAIR`/`SENIOR_MANAGER`/`COMMERCIAL_MANAGER`; 403 for IT_MANAGER); 409 on already-sold/-locked seat; PII encrypted+hashed, never returned in plaintext; audited (RESERVATION) — `'POST lock: canLock roles only, 409 on already-locked, encrypted PII never returned, audited'` (includes IT → 403)
 - [x] Concurrent lock attempts on the same seat: exactly one succeeds (DB partial-unique-index enforced) — `'concurrent lock attempts on the same seat: exactly one succeeds (DB-enforced)'` (5 parallel requests, 1×201/4×409)
 - [x] `PATCH /reservation/seatmap/locks/:id/release`: canSeatLock only; 409 on already-released; seat relockable after release — `'PATCH release: canLock only, 409 on already-released, seat becomes lockable again'`
 - [x] `GET /reservation/seatmap/:id` includes sold-seat passenger `{ fullName, pnr, nationalId, bookingStatus, priceIrr }` for staff panels — `'GET /reservation/seatmap/:id includes sold-seat passenger details for staff'`
@@ -29,17 +29,17 @@ seed's ambiguous historical/demo instances).
 ### PNR management
 - [x] `GET /reservation/pnr` grouped-by-flight, `q=` filters PNR/passenger name — `'GET /reservation/pnr lists grouped by flight and q= filters by PNR/passenger'`
 - [x] `GET /reservation/pnr/:pnr` full detail; 404 for unknown PNR — `'GET /reservation/pnr/:pnr returns detail; unknown PNR -> 404'`
-- [x] `PATCH /reservation/pnr/:pnr/seat`: canLock only (403 SENIOR_MANAGER); 409 on taken seat; 409 on CANCELLED booking; audited — `'PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking'`
+- [x] `PATCH /reservation/pnr/:pnr/seat`: canLock only; 409 on taken seat; 409 on CANCELLED booking; audited — `'PATCH /reservation/pnr/:pnr/seat changes seat; 409 on a taken seat and on a CANCELLED booking'`
 - [x] `PATCH /reservation/pnr/:pnr/cancel`: canLock only; frees the seat for resale; 409 if already CANCELLED — `'PATCH /reservation/pnr/:pnr/cancel frees the seat for resale; 409 if already cancelled'`
 
 ### Search & manual issuance
 - [x] `GET /reservation/search`: origin/dest/date → SCHEDULED instances + computed price + free-seat count — `'GET /reservation/search finds SCHEDULED instances on origin/dest/date with computed price + free seats'`
-- [x] `POST /reservation/pnr` (manual issuance): canLock only (403 SENIOR_MANAGER); TICKETED Booking+Passenger+LedgerEntry(SALE), no payment step; 409 on unavailable seat; audited — `'POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited'`
+- [x] `POST /reservation/pnr` (manual issuance): canLock only; TICKETED Booking+Passenger+LedgerEntry(SALE), no payment step; 409 on unavailable seat; audited — `'POST /reservation/pnr issues a TICKETED booking directly (no payment step), 409 on unavailable seat, audited'`
 - [x] `GET /reservation/dashboard-stats` real counts, no fabricated fields — `'GET /reservation/dashboard-stats returns real counts, no fabricated fields'`
 
 ### Role isolation
-- [x] FINANCE_MANAGER/COMMERCIAL_MANAGER 403 on every endpoint — `'FINANCE_MANAGER and COMMERCIAL_MANAGER get 403 on every /reservation/* endpoint'`
-- [x] SENIOR_MANAGER: reads 200, every write 403 — `'SENIOR_MANAGER: reads succeed, every write is 403 (view-only)'`
+- [x] FINANCE_MANAGER 403 on every endpoint — finance isolation assertions in `backend/test/reservation.e2e-spec.ts`; commercial may read the seat map via `RESERVATION_ROLES`, while finance remains excluded
+- [x] SENIOR_MANAGER: seat lock + PNR writes succeed — `'SENIOR_MANAGER can lock seats and manage PNRs (same canLock as CEO)'`
 
 ### Frontend (design-reference-v2 `ReservationSystem` shell)
 - [x] Four sub-tabs: داشبورد / مدیریت رزروها / دسترسی آژانس‌ها / پروازها — `ReservationPage.test.tsx` + `reservation-journey.spec.ts`
@@ -48,14 +48,15 @@ seed's ambiguous historical/demo instances).
 - [x] Agency API access list or empty state — `'agency tab shows empty state…'` / `'agency tab lists agencies…'`
 - [x] Flights occupancy table — `'flights tab renders occupancy rows or empty state'`
 - [x] Flights tab: click a flight → seat-map popup; sold seat shows reserver name; IT cannot lock — `FlightSeatMapModal.test.tsx` + `'clicking a flight opens the seat-map popup (IT cannot lock)'`
-- [x] SENIOR_MANAGER view-only detail modal — `'SENIOR_MANAGER is view-only in the detail modal'`
-- [x] Role isolation: FINANCE_MANAGER/COMMERCIAL_MANAGER have no reservation nav entry — E2E
+- [x] SENIOR_MANAGER can change seat / cancel in detail modal — `'SENIOR_MANAGER can change seat and cancel in the detail modal'`
+- [x] `PANEL_NAV.SENIOR_MANAGER` includes سامانه رزرواسیون — `panels.e2e-spec.ts`
+- [x] Role isolation: FINANCE_MANAGER have no reservation nav entry — E2E
 
 ### E2E
 - [x] IT Manager sees the four-tab shell — `'IT Manager sees the design four-tab reservation shell'`
 - [x] IT Manager finds an API-issued PNR and cancels it in مدیریت رزروها — `'IT Manager finds an issued PNR in مدیریت رزروها and cancels it'`
 - [x] BOARD_CHAIR opens PNR detail with change/cancel — `'BOARD_CHAIR can open PNR detail with change/cancel controls'`
-- [x] SENIOR_MANAGER view-only on PNR detail — `'SENIOR_MANAGER is view-only on PNR detail'`
+- [x] SENIOR_MANAGER can lock/manage (nav + canLock) — `'SENIOR_MANAGER can lock seats and manage PNRs (same canLock as CEO)'`
 - [x] Non-reservation role has no reservation nav entry — `'Non-reservation role has no reservation nav entry (role isolation)'`
 
 ### Phase 30 — data-driven seat-map aisle gap
