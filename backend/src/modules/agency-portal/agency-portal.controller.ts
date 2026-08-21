@@ -163,6 +163,12 @@ export class AgencyPortalController {
     return { success: true, data: await this.portal.seatRequestOptions(actor) };
   }
 
+  @Get('seat-requests')
+  @ApiOperation({ summary: 'تاریخچه درخواست‌های صندلی خودِ آژانس' })
+  async mySeatRequests(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.portal.mySeatRequests(actor) };
+  }
+
   @Post('seat-requests')
   @ApiOperation({
     summary: 'ثبت درخواست خرید صندلی و ارجاع واقعی به مدیر بازرگانی',

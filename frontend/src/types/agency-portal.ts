@@ -31,6 +31,7 @@ export interface AgencyInvoice {
   issuedAt: string;
   dueAt: string;
   amountIrr: string;
+  descriptionFa?: string | null;
   status: AgencyInvoiceStatus;
   paidAt: string | null;
 }
@@ -143,6 +144,28 @@ export interface AgencySeatRequestResult {
   seats: number;
   preferredWeekdays?: number[];
   termMonths?: 3 | 6 | 12;
+}
+
+export interface AgencySeatRequestHistoryRow {
+  id: string;
+  status: 'PENDING' | 'PENDING_FINANCE' | 'APPROVED' | 'REJECTED';
+  route: string | null;
+  aircraftType: string;
+  seats: number;
+  termMonths: number | null;
+  unitPriceIrr: string;
+  totalPriceIrr: string;
+  payMethod: 'INVOICE' | 'CREDIT';
+  invoice: {
+    id: string;
+    invoiceNo: string;
+    status: AgencyInvoiceStatus;
+    amountIrr: string;
+    dueAt: string;
+  } | null;
+  flights: { flightInstanceId: string; flightNo: string; departureAt: string }[];
+  decidedAt: string | null;
+  createdAt: string;
 }
 
 export interface AgencyDocument {

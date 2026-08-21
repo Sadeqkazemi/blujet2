@@ -8,7 +8,7 @@ import {
   requestCreditIncrease,
 } from '../../api/agency-portal';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
-import { formatLocaleDate, formatLocaleDateTime } from '../../lib/locale-format';
+import { formatLocaleDate, formatLocaleDateTime, localeDigits } from '../../lib/locale-format';
 import { ApiRequestError } from '../../api/envelope';
 import Modal from '../../components/Modal';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -195,6 +195,8 @@ export default function AgencyCreditPage() {
   const [requestNote, setRequestNote] = useState('');
   const [requestError, setRequestError] = useState<string | null>(null);
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [activeTab, setActiveTab] = useState<'unpaid' | 'paid' | 'ledger'>('unpaid');
+  const [invoiceQuery, setInvoiceQuery] = useState('');
 
   function reload() {
     Promise.all([fetchCredit(), fetchInvoices(), fetchLedger(), fetchMyCreditRequests()])
@@ -246,121 +248,108 @@ export default function AgencyCreditPage() {
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!credit) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
+  const pageCopy = {
+    fa: { heading: 'اعتبار و مانده حساب', issued: 'فاکتورهای صادرشده توسط ایرلاین', unpaid: 'پرداخت‌نشده', paid: 'پرداخت‌شده', ledger: 'گردش حساب اخیر', search: 'جستجو بر اساس شماره یا عنوان فاکتور…', calendar: 'تقویم', pendingCount: 'فاکتور در انتظار پرداخت' },
+    en: { heading: 'Credit and account balance', issued: 'Invoices issued by the airline', unpaid: 'Unpaid', paid: 'Paid', ledger: 'Recent activity', search: 'Search invoice number or title…', calendar: 'Calendar', pendingCount: 'invoice awaiting payment' },
+    ar: { heading: 'الرصيد وكشف الحساب', issued: 'الفواتير الصادرة عن شركة الطيران', unpaid: 'غير مدفوع', paid: 'مدفوع', ledger: 'النشاط الأخير', search: 'ابحث برقم الفاتورة أو عنوانها…', calendar: 'التقويم', pendingCount: 'فاتورة بانتظار الدفع' },
+  }[locale];
+  const visibleInvoices = invoices.filter((invoice) => {
+    const statusMatch = activeTab === 'unpaid' ? invoice.status !== 'PAID' : activeTab === 'paid' ? invoice.status === 'PAID' : false;
+    if (!statusMatch) return false;
+    const query = invoiceQuery.trim().toLowerCase();
+    return !query || invoice.invoiceNo.toLowerCase().includes(query) || invoice.descriptionFa?.toLowerCase().includes(query);
+  });
+  const unpaidCount = invoices.filter((invoice) => invoice.status !== 'PAID').length;
+
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-end">
+    <div data-testid="agency-credit-page">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-black text-[#0d2640]">{pageCopy.heading}</h1>
         <button
           onClick={() => setRequestOpen(true)}
-          className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110"
+          className="flex h-11 items-center gap-2 rounded-xl bg-accent px-5 text-xs font-black text-white transition hover:brightness-110"
         >
-          {t.addCreditBtn}
+          <span aria-hidden>＋</span> {t.addCreditBtn}
         </button>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-border bg-white p-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="rounded-2xl border border-[#edf0f5] bg-white p-5">
           <div className="text-[11px] text-muted">{t.creditLimitLabel}</div>
-          <div className="mt-1 text-lg font-black text-ink">{localeMoney(credit.limitIrr, locale)} {t.toman}</div>
+          <div className="mt-2 text-xl font-black text-[#0d2640]">{localeMoney(credit.limitIrr, locale)} {t.toman}</div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-2xl border border-[#edf0f5] bg-white p-5">
           <div className="text-[11px] text-muted">{t.creditUsedLabel}</div>
-          <div className="mt-1 text-lg font-black text-ink">{localeMoney(credit.usedIrr, locale)} {t.toman}</div>
+          <div className="mt-2 text-xl font-black text-[#e2583e]">{localeMoney(credit.usedIrr, locale)} {t.toman}</div>
         </div>
-        <div className="rounded-xl border border-border bg-white p-4">
+        <div className="rounded-2xl border border-[#edf0f5] bg-white p-5">
           <div className="text-[11px] text-muted">{t.creditRemainingLabel}</div>
-          <div className="mt-1 text-lg font-black text-accent">{localeMoney(credit.remainingIrr, locale)} {t.toman}</div>
+          <div className="mt-2 text-xl font-black text-[#23895f]">{localeMoney(credit.remainingIrr, locale)} {t.toman}</div>
         </div>
       </div>
 
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.invoicesHeading}</div>
-        {invoices.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.invoicesEmpty}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-border text-[10px] text-muted">
-                  <th className="py-2 font-bold">{t.colInvoiceNo}</th>
-                  <th className="py-2 font-bold">{t.colDueDate}</th>
-                  <th className="py-2 font-bold">{t.colAmount}</th>
-                  <th className="py-2 font-bold">{t.colStatus}</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => {
-                  const st = INVOICE_STATUS_LOCAL[inv.status];
-                  return (
-                    <tr key={inv.id} className="border-b border-border/60">
-                      <td className="py-2.5">
-                        <span className="ltr">{inv.invoiceNo}</span>
-                      </td>
-                      <td className="py-2.5">{formatLocaleDate(inv.dueAt, locale)}</td>
-                      <td className="py-2.5 font-bold">{localeMoney(inv.amountIrr, locale)} {t.toman}</td>
-                      <td className="py-2.5">
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>
-                          {st.label[locale]}
-                        </span>
-                      </td>
-                      <td className="py-2.5">
-                        {inv.status !== 'PAID' && (
-                          <button
-                            disabled={payingId === inv.id}
-                            onClick={() => void onPay(inv.id)}
-                            className="rounded-md bg-[#10b98118] px-2.5 py-1 text-[10px] font-bold text-[#059669] transition hover:bg-[#10b98130] disabled:opacity-60"
-                          >
-                            {payingId === inv.id ? t.payingBtn : t.payBtn}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="overflow-hidden rounded-2xl border border-[#edf0f5] bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#edf0f5] px-4 py-3.5">
+          <h2 className="text-sm font-black text-[#0d2640]">{pageCopy.issued}</h2>
+          {unpaidCount > 0 && <span className="rounded-full bg-[#fff4e8] px-3 py-1 text-[10px] font-bold text-[#d27a22]">{localeDigits(unpaidCount, locale)} {pageCopy.pendingCount}</span>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-b border-[#edf0f5] bg-[#fafbfd] px-4 py-2.5">
+          {([
+            ['unpaid', pageCopy.unpaid],
+            ['paid', pageCopy.paid],
+            ['ledger', pageCopy.ledger],
+          ] as const).map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setActiveTab(key)} className={`rounded-lg px-4 py-2 text-xs font-bold ${activeTab === key ? 'bg-[#1668c4] text-white' : 'text-[#687587]'}`}>{label}</button>
+          ))}
+        </div>
+        {activeTab !== 'ledger' && (
+          <div className="flex gap-2 border-b border-[#edf0f5] p-3">
+            <input value={invoiceQuery} onChange={(event) => setInvoiceQuery(event.target.value)} placeholder={pageCopy.search} className="h-11 min-w-0 flex-1 rounded-xl border border-[#e4e9f0] bg-[#fafbfd] px-4 text-xs outline-none focus:border-[#1668c4]" />
+            <button type="button" className="h-11 rounded-xl border border-[#e4e9f0] bg-white px-4 text-xs font-bold text-[#536274]">▣ {pageCopy.calendar}</button>
           </div>
         )}
-      </div>
-
-      {creditRequests.length > 0 && (
-        <div className="mb-6 rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 text-sm font-bold text-ink">{t.creditRequestsHeading}</div>
-          <div className="flex flex-col gap-2">
-            {creditRequests.map((r) => {
-              const st = CREDIT_REQUEST_STATUS[r.status];
+        {activeTab === 'ledger' ? (
+          ledger.length === 0 ? <p className="py-10 text-center text-xs text-muted">{t.ledgerEmpty}</p> : (
+            <div>
+              {ledger.map((entry) => {
+                const creditEntry = Number(entry.signedAmountIrr) < 0;
+                return (
+                  <div key={entry.id} className="flex items-center justify-between gap-4 border-b border-[#edf0f5] px-4 py-4 last:border-0">
+                    <div><div className="text-xs font-bold text-[#1a2d42]">{LEDGER_LABEL[entry.type][locale]}</div><div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(entry.occurredAt, locale)}</div></div>
+                    <span className={`text-xs font-black ${creditEntry ? 'text-[#23895f]' : 'text-[#e2583e]'}`}>{creditEntry ? '+' : '−'}{localeMoney(Math.abs(Number(entry.signedAmountIrr)), locale)} {t.toman}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : visibleInvoices.length === 0 ? (
+          <p className="py-10 text-center text-xs text-muted">{t.invoicesEmpty}</p>
+        ) : (
+          <div>
+            {visibleInvoices.map((inv) => {
+              const st = INVOICE_STATUS_LOCAL[inv.status];
               return (
-                <div key={r.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
-                  <span className="font-bold">{localeMoney(r.requestedLimitIrr, locale)} {t.toman}</span>
-                  <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${st.className}`}>{st.label[locale]}</span>
+                <div key={inv.id} className="flex flex-wrap items-center justify-between gap-4 border-b border-[#edf0f5] px-4 py-4 last:border-0">
+                  <div className="flex min-w-[260px] flex-1 items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#eef5fc] text-[#1668c4]">▤</span>
+                    <div>
+                      <div className="text-xs font-black text-[#1a2d42]">{inv.descriptionFa?.trim() || t.invoicesHeading}</div>
+                      <div className="ltr mt-1 text-[10px] font-bold text-muted">{inv.invoiceNo}</div>
+                      <div className="mt-1 text-[10px] text-muted">{t.colDueDate}: {formatLocaleDate(inv.dueAt, locale)}</div>
+                    </div>
+                  </div>
+                  <div className="text-sm font-black text-[#0d2640]">{localeMoney(inv.amountIrr, locale)} {t.toman}<div className={`mt-1 text-[10px] ${st.className.split(' ').at(-1)}`}>{st.label[locale]}</div></div>
+                  {inv.status !== 'PAID' ? (
+                    <button disabled={payingId === inv.id} onClick={() => void onPay(inv.id)} className="h-11 rounded-xl bg-[#1668c4] px-5 text-xs font-black text-white disabled:opacity-60">{payingId === inv.id ? t.payingBtn : t.payBtn}</button>
+                  ) : <span className="rounded-xl bg-[#e9f7f0] px-4 py-3 text-xs font-bold text-[#23895f]">✓ {st.label[locale]}</span>}
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.ledgerHeading}</div>
-        {ledger.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.ledgerEmpty}</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {ledger.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-xs">
-                <div>
-                  <div className="font-bold">{LEDGER_LABEL[entry.type][locale]}</div>
-                  <div className="text-[10px] text-muted">{formatLocaleDateTime(entry.occurredAt, locale)}</div>
-                </div>
-                <span className={`font-bold ${Number(entry.signedAmountIrr) < 0 ? 'text-[#059669]' : 'text-danger'}`}>
-                  {Number(entry.signedAmountIrr) < 0 ? '+' : '−'}
-                  {localeMoney(Math.abs(Number(entry.signedAmountIrr)), locale)}
-                </span>
-              </div>
-            ))}
-          </div>
         )}
       </div>
+
+      {creditRequests.length > 0 && <div className="mt-4 rounded-2xl border border-[#edf0f5] bg-white p-4"><div className="mb-3 text-sm font-black text-[#0d2640]">{t.creditRequestsHeading}</div><div className="space-y-2">{creditRequests.map((request) => { const st = CREDIT_REQUEST_STATUS[request.status]; return <div key={request.id} className="flex items-center justify-between rounded-xl bg-[#fafbfd] px-4 py-3 text-xs"><span className="font-black">{localeMoney(request.requestedLimitIrr, locale)} {t.toman}</span><span className={`rounded-full px-3 py-1 text-[10px] font-bold ${st.className}`}>{st.label[locale]}</span></div>; })}</div></div>}
 
       {requestOpen && (
         <Modal title={t.modalTitle} onClose={() => setRequestOpen(false)}>

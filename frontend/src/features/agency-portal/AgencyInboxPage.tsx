@@ -3,6 +3,18 @@ import { fetchInbox, postInboxMessage } from '../../api/agency-portal';
 import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
+import Modal from '../../components/Modal';
+
+function messageParts(message: AgencyMessage) {
+  const lines = message.body.split(/\r?\n/);
+  const subjectLine = lines.find((line) => /^(موضوع|Subject|الموضوع):/i.test(line.trim()));
+  const subject = subjectLine?.replace(/^[^:]+:\s*/, '').trim() || '';
+  const body = lines
+    .filter((line) => !/^(گیرنده|Recipient|المستلم|موضوع|Subject|الموضوع):/i.test(line.trim()))
+    .join('\n')
+    .trim() || message.body;
+  return { subject, body };
+}
 
 // کارتابل و پیام‌ها — most strings reuse
 // design-reference-v2/پنل آژانس.dc.html's own isEN vocabulary
@@ -76,10 +88,14 @@ export default function AgencyInboxPage() {
   const [composeOpen, setComposeOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   function reload() {
     fetchInbox()
-      .then(setMessages)
+      .then((rows) => {
+        setMessages(rows);
+        setSelectedId((current) => current ?? rows[0]?.id ?? null);
+      })
       .catch(() => setError(t.errorFallback));
   }
 
@@ -107,57 +123,86 @@ export default function AgencyInboxPage() {
     }
   }
 
+  async function onReply(replySubject: string) {
+    if (!body.trim()) return;
+    setSending(true);
+    setValidationError(null);
+    try {
+      await postInboxMessage(`${t.subject}: ${replySubject}\n\n${body.trim()}`);
+      setBody('');
+      reload();
+    } catch {
+      setError(t.sendErrorFallback);
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!messages) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
+  const selected = messages.find((message) => message.id === selectedId) ?? messages[0] ?? null;
+  const fallbackSubject = locale === 'fa' ? 'پیام مدیریت' : locale === 'ar' ? 'رسالة الإدارة' : 'Management message';
+  const replyPlaceholder = locale === 'fa' ? 'پاسخ خود را بنویسید…' : locale === 'ar' ? 'اكتب ردك…' : 'Write your reply…';
+
   return (
-    <div>
+    <div data-testid="agency-inbox-page">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <div><h1 className="text-lg font-black text-ink">{t.heading}</h1><p className="mt-1 text-xs text-muted">{t.subtitle}</p></div>
-        <button type="button" onClick={() => setComposeOpen(true)} className="rounded-lg bg-accent px-4 py-2.5 text-xs font-black text-white">+ {t.newMessage}</button>
-      </div>
-      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border bg-white p-5">
-        {messages.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.empty}</p>
-        ) : (
-          messages.map((m) => (
-            <div
-              key={m.id}
-              className={`max-w-[70%] rounded-xl px-3.5 py-2.5 text-xs ${
-                m.senderIsAgency
-                  ? 'self-end bg-accent/10 text-ink'
-                  : 'self-start bg-[#f3f5f8] text-ink'
-              }`}
-            >
-              <div className="mb-1 text-[10px] font-bold text-muted">
-                {m.senderIsAgency ? t.youLabel : 'blujet'}
-              </div>
-              <div>{m.body}</div>
-              <div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(m.createdAt, locale)}</div>
-            </div>
-          ))
-        )}
+        <div><h1 className="text-lg font-black text-[#0d2640]">{locale === 'fa' ? 'صندوق پیام‌ها' : t.heading}</h1></div>
+        <button type="button" onClick={() => setComposeOpen(true)} className="rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-white">＋ {t.newMessage}</button>
       </div>
 
-      {composeOpen && <form onSubmit={onSend} className="rounded-2xl border border-[#d6e4f8] bg-white p-5 shadow-sm" data-testid="agency-compose-message">
-        <h2 className="mb-4 text-sm font-black text-ink">{t.newMessage}</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-bold text-muted">{t.recipient}
-            <select className="mt-1.5 h-11 w-full rounded-lg border border-border bg-white px-3 text-sm" defaultValue="commercial"><option value="commercial">blujet · {t.subtitle}</option></select>
-          </label>
-          <label className="text-xs font-bold text-muted">{t.subject}
-            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t.subjectPlaceholder} className="mt-1.5 h-11 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-accent" />
-          </label>
-          <label className="text-xs font-bold text-muted sm:col-span-2">{t.placeholder}
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.placeholder} rows={5} className="mt-1.5 w-full rounded-lg border border-border p-3 text-sm outline-none focus:border-accent" />
-          </label>
+      {messages.length === 0 ? (
+        <div className="rounded-2xl border border-[#edf0f5] bg-white py-16 text-center text-xs text-muted">{t.empty}</div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+          <section className="overflow-hidden rounded-2xl border border-[#e8edf3] bg-white">
+            <h2 className="border-b border-[#edf0f5] px-5 py-4 text-sm font-black text-[#0d2640]">{locale === 'fa' ? 'صندوق پیام‌ها' : t.heading}</h2>
+            {messages.map((message) => {
+              const parts = messageParts(message);
+              const active = selected?.id === message.id;
+              return (
+                <button key={message.id} type="button" onClick={() => setSelectedId(message.id)} className={`block w-full border-b border-[#edf0f5] px-5 py-4 text-start last:border-0 ${active ? 'bg-[#f5f9fe]' : 'bg-white hover:bg-[#fafbfd]'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <strong className="text-xs font-black text-[#1a2d42]">{message.senderIsAgency ? t.youLabel : locale === 'fa' ? 'مدیریت blujet' : 'blujet management'}</strong>
+                    <time className="text-[10px] text-[#a0a9b5]">{formatLocaleDateTime(message.createdAt, locale)}</time>
+                  </div>
+                  <p className="mt-2 truncate text-[11px] text-[#6f7b8b]">{parts.subject || fallbackSubject}</p>
+                </button>
+              );
+            })}
+          </section>
+
+          {selected && (() => {
+            const parts = messageParts(selected);
+            return (
+              <section className="rounded-2xl border border-[#e8edf3] bg-white p-5">
+                <div className="flex items-start justify-between gap-3 border-b border-[#edf0f5] pb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eef5fc] text-xs font-black text-[#1668c4]">مت</span>
+                    <div><div className="text-xs font-black text-[#1a2d42]">{selected.senderIsAgency ? t.youLabel : locale === 'fa' ? 'مدیریت blujet' : 'blujet management'}</div><div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(selected.createdAt, locale)}</div></div>
+                  </div>
+                  <span className="rounded-lg bg-[#eef5fc] px-3 py-1 text-[10px] font-bold text-[#1668c4]">{locale === 'fa' ? 'مکاتبه' : 'Message'}</span>
+                </div>
+                <h3 className="mt-5 text-base font-black text-[#0d2640]">{parts.subject || fallbackSubject}</h3>
+                <p className="mt-4 whitespace-pre-line text-sm leading-8 text-[#526174]">{parts.body}</p>
+                <div className="mt-6 flex gap-2 border-t border-[#edf0f5] pt-4">
+                  <input value={body} onChange={(event) => setBody(event.target.value)} placeholder={replyPlaceholder} className="h-12 min-w-0 flex-1 rounded-xl border border-[#e1e6ee] bg-[#fafbfd] px-4 text-sm outline-none focus:border-[#1668c4]" />
+                  <button type="button" disabled={!body.trim() || sending} onClick={() => void onReply(parts.subject || fallbackSubject)} className="h-12 rounded-xl bg-[#1668c4] px-5 text-sm font-black text-white disabled:opacity-50">{t.sendBtn}</button>
+                </div>
+              </section>
+            );
+          })()}
         </div>
-        {validationError && <p role="alert" className="mt-3 text-xs text-danger">{validationError}</p>}
-        <div className="mt-4 flex gap-2">
-          <button type="submit" disabled={sending} className="rounded-lg bg-accent px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">{t.sendBtn}</button>
-          <button type="button" onClick={() => { setComposeOpen(false); setValidationError(null); }} className="rounded-lg border border-border px-5 py-2.5 text-sm font-bold text-muted">{t.cancel}</button>
-        </div>
-      </form>}
+      )}
+
+      {composeOpen && <Modal title={t.newMessage} onClose={() => setComposeOpen(false)} variant="light" maxWidthClass="max-w-xl"><form onSubmit={onSend} className="space-y-4" data-testid="agency-compose-message">
+        <label className="block text-xs font-bold text-muted">{t.recipient}<select className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm" defaultValue="commercial"><option value="commercial">blujet · {t.subtitle}</option></select></label>
+        <label className="block text-xs font-bold text-muted">{t.subject}<input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t.subjectPlaceholder} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
+        <label className="block text-xs font-bold text-muted">{t.placeholder}<textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.placeholder} rows={5} className="mt-2 w-full rounded-xl border border-border bg-[#fafbfd] p-3 text-sm outline-none focus:border-accent" /></label>
+        {validationError && <p role="alert" className="text-xs text-danger">{validationError}</p>}
+        <div className="flex gap-2"><button type="submit" disabled={sending} className="h-12 flex-1 rounded-xl bg-accent px-5 text-sm font-bold text-white disabled:opacity-60">{t.sendBtn}</button><button type="button" onClick={() => { setComposeOpen(false); setValidationError(null); }} className="h-12 rounded-xl bg-[#f1f3f7] px-5 text-sm font-bold text-muted">{t.cancel}</button></div>
+      </form></Modal>}
     </div>
   );
 }

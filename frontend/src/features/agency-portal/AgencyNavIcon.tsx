@@ -2,6 +2,7 @@ import type { AgencyNavIconKey } from './agency-nav-config';
 
 const PATHS: Record<AgencyNavIconKey, string> = {
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  ticket: '<path d="M5 11V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/><path d="M5 11h11a2 2 0 0 1 2 2v3H5z"/><path d="M5 16v3M18 16v3"/><path d="M15 7h5M17.5 4.5v5"/>',
   seat: '<path d="M5 11V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"/><path d="M5 11h11a2 2 0 0 1 2 2v3H5z"/><path d="M5 16v3M18 16v3"/>',
   credit: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
   report: '<path d="M3 3v18h18"/><path d="M7 14l3.5-3.5 3 3L20 7"/>',

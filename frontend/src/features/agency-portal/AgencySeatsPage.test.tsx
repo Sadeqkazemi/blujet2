@@ -34,6 +34,7 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.spyOn(portalApi, 'fetchSeatRequestOptions').mockResolvedValue([]);
+  vi.spyOn(portalApi, 'fetchMySeatRequests').mockResolvedValue([]);
 });
 
 describe('AgencySeatsPage', () => {
@@ -108,9 +109,11 @@ describe('AgencySeatsPage', () => {
   });
 
   it('renders real per-flight allotment cards with allocated/sold/remaining counts', async () => {
+    const user = userEvent.setup();
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
     expect(await screen.findByTestId('alloc-card')).toBeInTheDocument();
     expect(screen.getByText('تخصیص‌یافته')).toBeInTheDocument();
     expect(screen.getByText('فعال')).toBeInTheDocument();
@@ -118,27 +121,33 @@ describe('AgencySeatsPage', () => {
   });
 
   it('shows the empty state when the agency has no allotments', async () => {
+    const user = userEvent.setup();
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
     expect(await screen.findByText('هنوز سهمیه‌ای برای آژانس شما ثبت نشده است.')).toBeInTheDocument();
   });
 
   it('renders translated info banner and labels in English', async () => {
+    const user = userEvent.setup();
     mockLocale('en');
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /Active flights/ }));
     expect(await screen.findByText('Allocated')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText(/available for you to sell/)).toBeInTheDocument();
   });
 
   it('renders translated labels in Arabic', async () => {
+    const user = userEvent.setup();
     mockLocale('ar');
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /الرحلات النشطة/ }));
     expect(await screen.findByText('مخصَّص')).toBeInTheDocument();
     expect(screen.getByText('نشط')).toBeInTheDocument();
   });
@@ -168,6 +177,7 @@ describe('AgencySeatsPage', () => {
     });
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
     await user.click(await screen.findByRole('button', { name: 'ثبت فروش' }));
     await user.type(screen.getByLabelText('نام و نام خانوادگی مسافر'), 'نگار رضایی');
     await user.selectOptions(screen.getByLabelText('صندلی'), '4A');
@@ -209,6 +219,7 @@ describe('AgencySeatsPage', () => {
     });
     render(<AgencySeatsPage />);
 
+    await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
     await user.click(await screen.findByRole('button', { name: 'ثبت فروش' }));
     await user.selectOptions(screen.getByLabelText('کلاس پروازی'), 'COMFORT');
     await user.type(screen.getByLabelText('نام و نام خانوادگی مسافر'), 'نگار رضایی');

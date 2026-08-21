@@ -689,6 +689,49 @@ export class AgencyPortalService {
     });
   }
 
+  async mySeatRequests(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
+    await this.getOwnProfileOrThrow(actor);
+    const rows = await this.seatRequestRepo.find({
+      where: { agencyId: actor.id },
+      relations: {
+        route: true,
+        invoice: true,
+        flights: { flightInstance: { flight: true } },
+      },
+      order: { createdAt: 'DESC' },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      route: row.route
+        ? `${row.route.originCode} → ${row.route.destCode}`
+        : null,
+      aircraftType: row.aircraftType,
+      seats: row.seats,
+      termMonths: row.termMonths,
+      unitPriceIrr: row.unitPriceIrr,
+      totalPriceIrr: row.unitPriceIrr * BigInt(row.seats),
+      payMethod: row.payMethod,
+      invoice: row.invoice
+        ? {
+            id: row.invoice.id,
+            invoiceNo: row.invoice.invoiceNo,
+            status: row.invoice.status,
+            amountIrr: row.invoice.amountIrr,
+            dueAt: row.invoice.dueAt,
+          }
+        : null,
+      flights: row.flights.map((flight) => ({
+        flightInstanceId: flight.flightInstanceId,
+        flightNo: flight.flightInstance.flight.flightNo,
+        departureAt: flight.flightInstance.departureAt,
+      })),
+      decidedAt: row.decidedAt,
+      createdAt: row.createdAt,
+    }));
+  }
+
   async requestSeats(
     actor: AuthenticatedUser,
     dto: {

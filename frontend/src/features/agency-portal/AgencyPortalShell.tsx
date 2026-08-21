@@ -8,6 +8,7 @@ import AgencyPortalHeader from './AgencyPortalHeader';
 import AgencyPortalSidebar from './AgencyPortalSidebar';
 import { AGENCY_PAGE_META, agencyNavKeyFromPath } from './agency-nav-config';
 import ConfirmActionDialog from '../../components/ConfirmActionDialog';
+import AgencyComposeMessageModal from './AgencyComposeMessageModal';
 
 const STR: Record<StoredLocale, { newMessage: string; logoutTitle: string; logoutMessage: string; logoutConfirm: string; logoutCancel: string; logoutBusy: string }> = {
   fa: { newMessage: 'پیام جدید', logoutTitle: 'خروج از حساب', logoutMessage: 'آیا مطمئن هستید که می‌خواهید از پنل آژانس خارج شوید؟', logoutConfirm: 'بله، خارج شو', logoutCancel: 'انصراف', logoutBusy: 'در حال خروج…' },
@@ -31,6 +32,8 @@ export default function AgencyPortalShell() {
   const [inboxCount, setInboxCount] = useState(0);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const showPageMeta = ['dashboard', 'seats', 'webservice', 'apidocs', 'profile'].includes(activeKey);
 
   useEffect(() => {
     fetchProfile()
@@ -96,13 +99,16 @@ export default function AgencyPortalShell() {
             marginBottom: 22,
           }}
         >
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{pageMeta.title[locale]}</h1>
-            <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{pageMeta.subtitle[locale]}</div>
-          </div>
+          {showPageMeta ? (
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{pageMeta.title[locale]}</h1>
+              <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{pageMeta.subtitle[locale]}</div>
+            </div>
+          ) : <span />}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Link
-              to="/agency/inbox"
+            <button
+              type="button"
+              onClick={() => setComposeOpen(true)}
               data-testid="agency-new-message"
               style={{
                 height: 42,
@@ -116,13 +122,16 @@ export default function AgencyPortalShell() {
                 fontSize: 12,
                 fontWeight: 700,
                 textDecoration: 'none',
+                border: 0,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
               }}
             >
               <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M12 5v14M5 12h14" />
               </svg>
               {t.newMessage}
-            </Link>
+            </button>
             <Link
               to="/agency/inbox"
               style={{
@@ -161,6 +170,12 @@ export default function AgencyPortalShell() {
         variant="light"
         testId="agency-logout-confirm"
       />
+      {composeOpen && (
+        <AgencyComposeMessageModal
+          onClose={() => setComposeOpen(false)}
+          onSent={() => setInboxCount((count) => count + 1)}
+        />
+      )}
     </div>
   );
 }

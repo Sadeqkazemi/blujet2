@@ -2,6 +2,7 @@ import type { StoredLocale } from '../../hooks/useLocale';
 
 export type AgencyNavKey =
   | 'dashboard'
+  | 'tickets'
   | 'seats'
   | 'webservice'
   | 'apidocs'
@@ -12,6 +13,7 @@ export type AgencyNavKey =
 
 export type AgencyNavIconKey =
   | 'dash'
+  | 'ticket'
   | 'seat'
   | 'webservice'
   | 'apidocs'
@@ -34,6 +36,12 @@ export const AGENCY_NAV_ITEMS: AgencyNavItem[] = [
     path: '/agency',
     icon: 'dash',
     label: { fa: 'داشبورد', en: 'Dashboard', ar: 'لوحة التحكم' },
+  },
+  {
+    key: 'tickets',
+    path: '/agency/tickets',
+    icon: 'ticket',
+    label: { fa: 'خرید بلیط', en: 'Buy Ticket', ar: 'شراء تذكرة' },
   },
   {
     key: 'seats',
@@ -90,6 +98,14 @@ export const AGENCY_PAGE_META: Record<
       fa: 'نمای کلی فروش، اعتبار و صندلی‌های شما',
       en: 'Overview of your sales, credit, and seats',
       ar: 'نظرة عامة على مبيعاتك ورصيدك ومقاعدك',
+    },
+  },
+  tickets: {
+    title: { fa: 'خرید بلیط', en: 'Buy Ticket', ar: 'شراء تذكرة' },
+    subtitle: {
+      fa: 'جستجوی پروازهای منتشرشده در موتور رزرو blujet',
+      en: 'Search published flights in the blujet booking engine',
+      ar: 'ابحث عن الرحلات المنشورة في محرك حجز blujet',
     },
   },
   seats: {
@@ -152,6 +168,7 @@ export const AGENCY_PAGE_META: Record<
 
 export function agencyNavKeyFromPath(pathname: string): AgencyNavKey {
   if (pathname === '/agency' || pathname === '/agency/') return 'dashboard';
+  if (pathname.startsWith('/agency/tickets')) return 'tickets';
   if (pathname.startsWith('/agency/seats')) return 'seats';
   if (pathname.startsWith('/agency/webservice')) return 'webservice';
   if (pathname.startsWith('/agency/apidocs')) return 'apidocs';

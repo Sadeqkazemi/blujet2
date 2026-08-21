@@ -36,8 +36,9 @@ describe('AgencySalesPage', () => {
     render(<AgencySalesPage />);
 
     expect(await screen.findByText('BJAG001')).toBeInTheDocument();
-    expect(screen.getByText('EP-821 — THR → DXB')).toBeInTheDocument();
-    expect(screen.getByText('۷۶٬۰۰۰٬۰۰۰')).toBeInTheDocument();
+    expect(screen.getByText('EP-821')).toBeInTheDocument();
+    expect(screen.getAllByText('THR → DXB')).not.toHaveLength(0);
+    expect(screen.getByText('۷۶٬۰۰۰٬۰۰۰ تومان')).toBeInTheDocument();
   });
 
   it('renders translated headings, KPI labels, and ticket status in English', async () => {
@@ -46,7 +47,7 @@ describe('AgencySalesPage', () => {
     render(<AgencySalesPage />);
 
     expect(await screen.findByText('Total Sales (Toman)')).toBeInTheDocument();
-    expect(screen.getByText('Sales per Flight')).toBeInTheDocument();
+    expect(screen.getAllByText('Sales per Flight')).toHaveLength(2);
     expect(screen.getByText('Ticketed')).toBeInTheDocument();
   });
 

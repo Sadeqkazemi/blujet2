@@ -20,6 +20,7 @@ import ForgotPasswordPage from './features/auth/ForgotPasswordPage';
 import AgencyLoginPage from './features/agency-portal/AgencyLoginPage';
 import AgencyPortalShell from './features/agency-portal/AgencyPortalShell';
 import AgencyDashboardPage from './features/agency-portal/AgencyDashboardPage';
+import AgencyTicketPage from './features/agency-portal/AgencyTicketPage';
 import AgencySeatsPage from './features/agency-portal/AgencySeatsPage';
 import AgencyWebservicePage from './features/agency-portal/AgencyWebservicePage';
 import AgencyApiDocsPage from './features/agency-portal/AgencyApiDocsPage';
@@ -147,6 +148,7 @@ export default function App() {
           <Route element={<AgencyProtectedRoute />}>
             <Route path="/agency" element={<AgencyPortalShell />}>
               <Route index element={<AgencyDashboardPage />} />
+              <Route path="tickets" element={<AgencyTicketPage />} />
               <Route path="seats" element={<AgencySeatsPage />} />
               <Route path="credit" element={<AgencyCreditPage />} />
               <Route path="webservice" element={<AgencyWebservicePage />} />
