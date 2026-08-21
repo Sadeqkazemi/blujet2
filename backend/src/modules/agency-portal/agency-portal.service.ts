@@ -18,7 +18,7 @@ import { User } from '../../database/entities/user.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
 import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
-import { CommitmentStatus, FlightInstanceStatus } from '../../database/enums';
+import { FlightInstanceStatus } from '../../database/enums';
 import { randomUUID } from 'node:crypto';
 import { isActiveUatSandboxAgency } from '../../database/temporary-panel-accounts';
 import { AuditService } from '../audit/audit.service';
@@ -634,7 +634,9 @@ export class AgencyPortalService {
           'COALESCE(SUM(CASE WHEN allotment."agencyId" = :agencyId THEN allotment."seatsAllocated" ELSE 0 END), 0)',
           'own',
         )
-        .where('allotment."flightInstanceId" IN (:...instanceIds)', { instanceIds })
+        .where('allotment."flightInstanceId" IN (:...instanceIds)', {
+          instanceIds,
+        })
         .andWhere('allotment.cabin IS NOT NULL')
         .andWhere('allotment."fareClassCode" IS NOT NULL')
         .andWhere(
@@ -653,7 +655,9 @@ export class AgencyPortalService {
         }>(),
     ]);
 
-    const instanceById = new Map(instances.map((instance) => [instance.id, instance]));
+    const instanceById = new Map(
+      instances.map((instance) => [instance.id, instance]),
+    );
     const allotmentByClass = new Map(
       allotmentRows.map((row) => [
         `${row.flightInstanceId}:${row.cabin}:${row.fareClassCode}`,
