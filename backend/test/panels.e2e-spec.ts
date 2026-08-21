@@ -58,6 +58,7 @@ describe('Panels (e2e)', () => {
       'dashboard',
       'agencies',
       'routes',
+      'aircraft',
       'flights',
       'ancillary-services',
       'reports',

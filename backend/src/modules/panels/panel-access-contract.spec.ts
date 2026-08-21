@@ -7,8 +7,8 @@ import {
 import { PanelsService } from './panels.service';
 
 describe('operations panel access contract', () => {
-  it('keeps aircraft definition out of commercial and senior navigation', () => {
-    expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).not.toContain(
+  it('publishes aircraft definition only in commercial navigation', () => {
+    expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
       'aircraft',
     );
     expect(PANEL_NAV.SENIOR_MANAGER?.map((item) => item.key)).not.toContain(

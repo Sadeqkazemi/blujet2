@@ -9,8 +9,9 @@ never be copied into production data.
 
 ### Shared shell and navigation
 
-- [x] The sidebar follows the approved order and shows exactly one «خدمات»
-  entry; the Commercial Manager does not receive «تعریف هواپیما».
+- [x] The sidebar follows the approved order, shows exactly one «خدمات»
+  entry, and retains «تعریف هواپیما» for the Commercial Manager per the final
+  product decision.
 - [x] Existing server-side role checks and the real pages behind every retained
   navigation item remain unchanged.
 

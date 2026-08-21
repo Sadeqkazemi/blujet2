@@ -3571,8 +3571,8 @@ contracts and retires the production mock adapters.
 # Commercial Manager screenshot gap sync (2026-08-21)
 
 - [x] Aligned the Commercial Manager sidebar and dashboard composition with
-  the supplied reference without duplicating services or exposing aircraft
-  definition in that role.
+  the supplied reference without duplicating services; the aircraft-definition
+  page remains available in that role per the final product decision.
 - [x] Rebuilt the commercial agency-list rows around real current-month ticket
   and ledger sales aggregates, retained the cooperation/debtor queues, and
   aligned overview/finance/messages/history detail tabs with the reference.

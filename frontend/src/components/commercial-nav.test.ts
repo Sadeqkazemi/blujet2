@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { commercialNavWithServices } from './commercial-nav';
 
 describe('commercialNavWithServices', () => {
-  it('uses one canonical services tab, hides aircraft, and follows the approved handoff order', () => {
+  it('uses one canonical services tab, retains aircraft, and follows the approved handoff order', () => {
     const result = commercialNavWithServices([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'agencies', labelFa: 'آژانس‌ها', implemented: true },
@@ -18,12 +18,13 @@ describe('commercialNavWithServices', () => {
       'dashboard',
       'agencies',
       'routes',
+      'aircraft',
       'flights',
       'ancillary-services',
       'reports',
     ]);
     expect(result.filter((item) => item.labelFa === 'خدمات')).toHaveLength(1);
-    expect(result.some((item) => item.key === 'aircraft')).toBe(false);
+    expect(result.some((item) => item.key === 'aircraft')).toBe(true);
   });
 
   it('does not duplicate a services item returned by a future backend nav response', () => {
