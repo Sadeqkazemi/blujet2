@@ -285,11 +285,11 @@ export default function ScheduleTemplatesTab() {
       <button
         type="button"
         aria-expanded={formOpen}
-        onClick={() => setFormOpen((current) => !current)}
-        className="flex w-max items-center gap-2 rounded-[10px] bg-accent px-4 py-3 text-xs font-black text-white transition hover:brightness-110"
+        onClick={() => setFormOpen(true)}
+        className="flex w-max self-end items-center gap-2 rounded-[10px] bg-accent px-4 py-3 text-xs font-black text-white transition hover:brightness-110"
       >
-        <span aria-hidden>{formOpen ? '−' : '+'}</span>
-        {formOpen ? 'بستن فرم مسیر جدید' : 'افزودن مسیر جدید'}
+        <span aria-hidden>+</span>
+        افزودن مسیر جدید
       </button>
       {formOpen && (
       <section className="rounded-xl border border-panel-border bg-panel-surface p-5">
@@ -313,7 +313,7 @@ export default function ScheduleTemplatesTab() {
             {notice}
           </p>
         )}
-        <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-3">
+        <form data-testid="schedule-route-form" onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
           <label className="text-xs font-bold text-panel-muted">
             مبدأ *
             <select
@@ -455,7 +455,7 @@ export default function ScheduleTemplatesTab() {
               singleLine
             />
           </div>
-          <div className="md:col-span-3">
+          <div className="md:col-span-2">
             <div className="mb-2 text-xs font-bold text-panel-muted">
               روزهای پرواز
             </div>
@@ -516,7 +516,7 @@ export default function ScheduleTemplatesTab() {
               {tomanInputWords(form.legalCeilingToman)}
             </span>
           </label>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 md:col-span-2">
             <button
               type="button"
               onClick={() => void runPreview()}
@@ -528,16 +528,28 @@ export default function ScheduleTemplatesTab() {
             <button
               type="submit"
               disabled={busy || !previewIsCurrent}
-              className="rounded-lg bg-accent px-4 py-3 text-xs font-black text-white disabled:opacity-40"
+              className="flex-1 rounded-lg bg-accent px-4 py-3 text-xs font-black text-white disabled:opacity-40"
             >
               ایجاد مسیر و برنامه پروازی فصل
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormOpen(false);
+                setPreview(null);
+                setPreviewedPayloadKey(null);
+                setError(null);
+              }}
+              className="rounded-lg border border-panel-border px-4 py-3 text-xs font-black text-panel-muted"
+            >
+              انصراف
             </button>
           </div>
           {previewIsCurrent && preview && (
             <div
               ref={previewRef}
               role="status"
-              className="md:col-span-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-panel-muted"
+              className="md:col-span-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-panel-muted"
             >
               <div className="font-black text-emerald-300">
                 پیش‌نمایش آماده است

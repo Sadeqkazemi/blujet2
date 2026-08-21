@@ -8,6 +8,7 @@ import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.en
 import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AgencySeatRequest } from '../src/database/entities/agency-seat-request.entity';
+import { AgencySeatRequestFlight } from '../src/database/entities/agency-seat-request-flight.entity';
 import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { CartableTask } from '../src/database/entities/cartable-task.entity';
@@ -240,7 +241,11 @@ describe('Commercial manager overhaul (e2e)', () => {
         seats: 4,
       });
       expect(typeof ownRow?.totalPriceIrr).toBe('string');
-      expect(ownRow?.flights[0]?.flightInstanceId).toBe(instance.id);
+      expect(
+        ownRow?.flights.some(
+          (flight) => flight.flightInstanceId === instance.id,
+        ),
+      ).toBe(true);
 
       const tasks = await dataSource.getRepository(CartableTask).findBy({
         sourceType: 'AGENCY_REQUEST',
@@ -292,10 +297,14 @@ describe('Commercial manager overhaul (e2e)', () => {
       const invoices = await dataSource.getRepository(AgencyInvoice).findBy({
         agencyId: agency.id,
       });
+      const occurrenceCount = await dataSource
+        .getRepository(AgencySeatRequestFlight)
+        .countBy({ seatRequestId: requestId });
+      expect(occurrenceCount).toBeGreaterThan(0);
       expect(invoices).toHaveLength(1);
       expect(invoices[0]?.descriptionFa).toBe('فاکتور تعهد صندلی چارتری');
       expect(invoices[0]?.amountIrr.toString()).toBe(
-        (persisted.unitPriceIrr * 4n).toString(),
+        (persisted.unitPriceIrr * 4n * BigInt(occurrenceCount)).toString(),
       );
 
       await request(app.getHttpServer())

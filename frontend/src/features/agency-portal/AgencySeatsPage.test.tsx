@@ -69,6 +69,7 @@ describe('AgencySeatsPage', () => {
 
     await user.selectOptions(await screen.findByTestId('agency-request-origin'), 'THR');
     await user.selectOptions(screen.getByTestId('agency-request-destination'), 'DXB');
+    await user.click(screen.getByTestId('agency-request-route-fi-request-1'));
     expect(await screen.findByTestId('agency-request-flight-detail')).toBeInTheDocument();
     const seats = screen.getByTestId('agency-request-seat-count');
     await user.click(seats);
@@ -80,6 +81,7 @@ describe('AgencySeatsPage', () => {
       seats: 12,
       preferredWeekdays: [],
       termMonths: 3,
+      payMethod: 'INVOICE',
     });
     expect(await screen.findByText('درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.')).toBeInTheDocument();
   });

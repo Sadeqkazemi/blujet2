@@ -3583,3 +3583,16 @@ contracts and retires the production mock adapters.
   builds, focused frontend lint, and `git diff --check`. See
   `docs/features/commercial-manager-screenshot-gap-sync.md`.
 
+# Reference UI gap corrections (2026-08-21)
+
+- [x] Corrected the commercial route disclosure flow and two-column seasonal
+  route form while retaining preview/create validation.
+- [x] Rebuilt agency route selection around real inventory cards, persisted the
+  selected invoice/credit settlement method, and aligned the profile and
+  passenger popovers with the supplied references.
+- [x] Added explicit price-calendar paging, Blujet recommendation sorting copy,
+  and the compact results edit-search flow.
+- [x] Verified 45 focused frontend tests, both production builds, focused lint,
+  local results-page browser smoke, and `git diff --check`. See
+  `docs/features/reference-ui-gap-corrections.md`.
+

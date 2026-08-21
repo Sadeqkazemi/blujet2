@@ -262,6 +262,7 @@ export default function ResultsEditSearchModal({
   const [draftAdults, setDraftAdults] = useState(passengerMix.adults);
   const [draftChildren, setDraftChildren] = useState(passengerMix.children);
   const [draftInfants, setDraftInfants] = useState(passengerMix.infants);
+  const [paxOpen, setPaxOpen] = useState(false);
   const [draftClass, setDraftClass] = useState<CabinClass>(cabin);
   const [calOpen, setCalOpen] = useState(false);
   const [calTarget, setCalTarget] = useState<'departure' | 'return'>('departure');
@@ -409,7 +410,7 @@ export default function ResultsEditSearchModal({
         style={{
           background: '#fff',
           borderRadius: 18,
-          width: 760,
+          width: 850,
           maxWidth: '100%',
           margin: 'auto',
           boxShadow: '0 30px 70px -20px rgba(0,0,0,.5)',
@@ -508,7 +509,7 @@ export default function ResultsEditSearchModal({
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: tripType === 'round' ? 'repeat(4,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))', gap: 10, marginTop: 14 }}>
             <div style={{ flex: 1, minWidth: 160, position: 'relative' }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.departureDateLabel}</div>
               <button
@@ -575,20 +576,34 @@ export default function ResultsEditSearchModal({
               </div>
             )}
 
-            <div style={{ flex: 1.4, minWidth: 200 }} data-testid="edit-search-pax">
+            <div style={{ position: 'relative', minWidth: 0 }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.paxCountLabel}</div>
-              <div
+              <button
+                type="button"
+                data-testid="edit-search-pax"
+                onClick={() => setPaxOpen((value) => !value)}
                 style={{
+                  width: '100%',
+                  height: 50,
                   border: '1.5px solid #e2e7ee',
                   borderRadius: 11,
                   background: '#fafbfd',
-                  padding: '8px 10px',
+                  padding: '0 12px',
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: 6,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  color: '#16202e',
+                  fontFamily: 'inherit',
+                  fontWeight: 700,
+                  cursor: 'pointer',
                 }}
               >
-                {paxRows.map((row) => (
+                <span>{localeDigits(draftAdults + draftChildren + draftInfants, locale)} {locale === 'fa' ? 'مسافر' : locale === 'ar' ? 'مسافر' : 'passengers'}</span>
+                <span style={{ color: '#8a96a6' }}>⌄</span>
+              </button>
+              {paxOpen && (
+                <div style={{ position: 'absolute', insetInlineStart: 0, top: 80, zIndex: 20, width: 290, background: '#fff', border: '1px solid #e2e7ee', borderRadius: 14, boxShadow: '0 18px 45px -14px rgba(13,38,64,.35)', padding: 12 }}>
+                  {paxRows.map((row) => (
                   <div
                     key={row.key}
                     style={{
@@ -652,8 +667,12 @@ export default function ResultsEditSearchModal({
                       </button>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                  <button type="button" onClick={() => setPaxOpen(false)} style={{ width: '100%', height: 40, marginTop: 8, border: 0, borderRadius: 10, background: '#1668c4', color: '#fff', fontFamily: 'inherit', fontWeight: 800, cursor: 'pointer' }}>
+                    {locale === 'fa' ? 'تأیید' : locale === 'ar' ? 'تأكيد' : 'Confirm'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div style={{ flex: 1, minWidth: 140 }}>

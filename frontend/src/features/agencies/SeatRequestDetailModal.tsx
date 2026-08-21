@@ -5,6 +5,7 @@ import { decideAggregateSeatRequest } from '../../api/agencies';
 import { faDigits, faMoney } from '../../lib/fa-format';
 import { formatJalaliDate, formatJalaliDateTime } from '../../lib/jalali';
 import type { AgencySeatRequestRow } from '../../types/agencies';
+import { seatRequestTermLabel } from './agency-labels';
 
 const PAY_METHOD_LABEL: Record<AgencySeatRequestRow['payMethod'], string> = {
   CREDIT: 'اعتباری',
@@ -92,7 +93,7 @@ export default function SeatRequestDetailModal({ request, onClose, onDecided }: 
         </div>
         <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] p-3">
           <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">دورهٔ خرید</div>
-          <div className="text-sm font-extrabold text-[#e7ecf3]">{faDigits(request.months)} ماهه</div>
+          <div className="text-sm font-extrabold text-[#e7ecf3]">{seatRequestTermLabel(request.months)}</div>
         </div>
         <div className="rounded-[11px] border border-[#22304a] bg-[#0f1623] p-3">
           <div className="mb-1.5 text-[10.5px] text-[#6b7b94]">نوع هواپیما</div>

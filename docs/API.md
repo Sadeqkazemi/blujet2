@@ -3615,11 +3615,14 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   capacity minus active charter commitments, active agency commitments, and
   occupied seats in DRAFT/HELD/PAID/TICKETED bookings.
 - `POST /agency-portal/seat-requests` (`AGENCY`) accepts
-  `{ flightInstanceId, seats, preferredWeekdays?, termMonths? }`, validates the
+  `{ flightInstanceId, seats, preferredWeekdays?, termMonths?, payMethod? }`, validates the
   current capacity again, persists a structured `agency_seat_requests` row
   (plus `agency_seat_request_flights`), and creates a cartable notification
   for every active `COMMERCIAL_MANAGER` (`sourceId` = the structured row id).
-  `termMonths` accepts `1 | 3 | 6 | 12`. It does not directly reserve inventory;
+  `termMonths` accepts `0 | 1 | 3 | 6 | 12`; `0` means one week. The request
+  includes every matching occurrence of the same route/flight/aircraft within
+  the selected term and preferred weekdays. It does not directly reserve inventory;
+  `payMethod` accepts `INVOICE | CREDIT` and defaults to `INVOICE`;
   the existing commercial commitment workflow remains the only path that
   activates and locks agency inventory.
 - Guest desktop checkout now completes phone/OTP authentication inside the
@@ -3704,7 +3707,8 @@ the باطل‌شده tab; existing create/pay/remind flows still write UNPAID/P
 `agency_seat_request_flights` and keeps the cartable task as a notification
 (`sourceType='AGENCY_REQUEST'`, `sourceId` = the structured row id).
 
-**termMonths:** accepted values are `1 | 3 | 6 | 12` (smallint). The legacy
+**termMonths:** accepted values are `0 | 1 | 3 | 6 | 12` (smallint); `0` means
+one week. The legacy
 portal contract was `3|6|12`; the commercial UI uses `1|3|12`. `6` remains
 valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
 

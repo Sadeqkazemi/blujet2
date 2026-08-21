@@ -29,7 +29,7 @@ import { useStepUp } from '../../hooks/useStepUp';
 import Modal from '../../components/Modal';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { fetchAggregateSeatRequests } from '../../api/agencies';
-import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, statusBadge } from './agency-labels';
+import { DOCUMENT_STATUS, DOCUMENT_TYPE_LABELS, INVOICE_STATUS, REQUEST_STATUS, TIER_LABELS, seatRequestTermLabel, statusBadge } from './agency-labels';
 import type {
   AgencyApiKey,
   AgencyApiScope,
@@ -1102,7 +1102,7 @@ export default function AgencyDetailPage() {
                   <div>
                     <div className="text-xs font-extrabold text-panel-ink">{r.routeFa}</div>
                     <div className="mt-0.5 text-[10.5px] text-panel-muted">
-                      {faDigits(r.seats)} صندلی · {faDigits(r.months)} ماهه · {faMoney(r.totalIrr)} تومان
+                      {faDigits(r.seats)} صندلی · {seatRequestTermLabel(r.months)} · {faMoney(r.totalIrr)} تومان
                     </div>
                   </div>
                   <span className="rounded-2xl px-2.5 py-1 text-[10px] font-bold" style={{ color: st.color, background: st.bg }}>

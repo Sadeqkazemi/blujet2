@@ -4,7 +4,7 @@
 // design-reference-v2/پنل آژانس.dc.html's own isEN vocabulary for this
 // exact tab (seatsInfoBanner, allocatedLabel, soldLabel, remainingLabel);
 // AR has no counterpart there and is hand-translated.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   createAllotmentBooking,
   fetchAllotments,
@@ -115,7 +115,8 @@ export default function AgencySeatsPage() {
   const [requestFlightId, setRequestFlightId] = useState('');
   const [requestedSeats, setRequestedSeats] = useState(1);
   const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([]);
-  const [termMonths, setTermMonths] = useState<3 | 6 | 12>(3);
+  const [termMonths, setTermMonths] = useState<0 | 1 | 3 | 6 | 12>(3);
+  const [payMethod, setPayMethod] = useState<'INVOICE' | 'CREDIT'>('INVOICE');
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [seatMap, setSeatMap] = useState<SeatMapResult | null>(null);
@@ -162,11 +163,61 @@ export default function AgencySeatsPage() {
         .map((row) => row.destCode),
     ),
   );
-  const matchingFlights = (requestOptions ?? []).filter(
-    (row) => row.originCode === originCode && row.destCode === destCode,
+  const routeGroups = useMemo(() => {
+    const groups = new Map<string, AgencySeatRequestOption[]>();
+    for (const option of requestOptions ?? []) {
+      const key = `${option.originCode}-${option.destCode}`;
+      groups.set(key, [...(groups.get(key) ?? []), option]);
+    }
+    return [...groups.entries()].map(([key, options]) => ({
+      key,
+      options: options.sort(
+        (left, right) =>
+          new Date(left.departureAt).getTime() -
+          new Date(right.departureAt).getTime(),
+      ),
+    }));
+  }, [requestOptions]);
+  const visibleRouteGroups = routeGroups.filter(({ options }) => {
+    const row = options[0];
+    return (
+      (!originCode || row.originCode === originCode) &&
+      (!destCode || row.destCode === destCode)
+    );
+  });
+  const requestGroup =
+    routeGroups.find(({ options }) =>
+      options.some((row) => row.flightInstanceId === requestFlightId),
+    ) ?? null;
+  const requestFlight =
+    requestGroup?.options.find(
+      (row) => row.flightInstanceId === requestFlightId,
+    ) ?? requestGroup?.options[0] ?? null;
+  const availableRouteCount = routeGroups.length;
+  const requestOccurrences = useMemo(() => {
+    if (!requestFlight || !requestGroup) return [];
+    const start = new Date(requestFlight.departureAt);
+    const end = new Date(start);
+    if (termMonths === 0) end.setUTCDate(end.getUTCDate() + 7);
+    else end.setUTCMonth(end.getUTCMonth() + termMonths);
+    return requestGroup.options.filter((row) => {
+      const departure = new Date(row.departureAt);
+      return (
+        departure >= start &&
+        departure <= end &&
+        (preferredWeekdays.length === 0 ||
+          preferredWeekdays.includes(departure.getUTCDay()))
+      );
+    });
+  }, [preferredWeekdays, requestFlight, requestGroup, termMonths]);
+  const requestGroupAllotments = (rows ?? []).filter((allotment) =>
+    requestOccurrences.some(
+      (occurrence) => occurrence.flightInstanceId === allotment.flightInstanceId,
+    ),
   );
-  const requestFlight = matchingFlights.find((row) => row.flightInstanceId === requestFlightId) ?? null;
-  const availableRouteCount = new Set((requestOptions ?? []).map((row) => `${row.originCode}-${row.destCode}`)).size;
+  const requestAvailable = requestOccurrences.length
+    ? Math.min(...requestOccurrences.map((occurrence) => occurrence.availableToRequest))
+    : 0;
   const pendingRequests = requestHistory.filter((row) => row.status === 'PENDING' || row.status === 'PENDING_FINANCE');
   const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
   const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
@@ -182,6 +233,7 @@ export default function AgencySeatsPage() {
         seats: requestedSeats,
         preferredWeekdays,
         termMonths,
+        payMethod,
       });
       setNotice(
         locale === 'en'
@@ -253,7 +305,7 @@ export default function AgencySeatsPage() {
       <div className="mb-4 rounded-xl border border-[#d6e4f8] bg-[#eef6ff] p-4 text-xs leading-6 text-[#3f546b]">
         ⓘ {t.infoBanner}
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-[#edf0f5] bg-white p-1.5 md:grid-cols-5">
+      <div className="mb-4 flex gap-2 overflow-x-auto rounded-2xl border border-[#edf0f5] bg-white p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-5 md:overflow-visible">
         {([
           ['routes', locale === 'fa' ? 'مسیر پروازی موجود' : locale === 'ar' ? 'المسارات المتاحة' : 'Available routes', availableRouteCount],
           ['requested', locale === 'fa' ? 'پروازهای درخواست‌شده' : locale === 'ar' ? 'الرحلات المطلوبة' : 'Requested flights', pendingRequests.length],
@@ -261,7 +313,17 @@ export default function AgencySeatsPage() {
           ['active', locale === 'fa' ? 'پروازهای فعال' : locale === 'ar' ? 'الرحلات النشطة' : 'Active flights', activeAllotments.length],
           ['rejected', locale === 'fa' ? 'پروازهای کنسل‌شده' : locale === 'ar' ? 'الرحلات الملغاة' : 'Cancelled flights', rejectedRequests.length],
         ] as const).map(([key, label, count]) => (
-          <button key={key} type="button" onClick={() => setActiveView(key)} className={`rounded-xl px-3 py-3 text-[11px] font-black transition ${activeView === key ? 'bg-[#1668c4] text-white' : 'text-[#687587]'}`}>{label} ({localeDigits(count, locale)})</button>
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveView(key)}
+            className={`flex min-w-[168px] flex-none items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-3 text-[11px] font-black transition md:min-w-0 ${activeView === key ? 'bg-[#1668c4] text-white shadow-sm' : 'bg-[#f8fafc] text-[#687587] hover:bg-[#f1f5fa]'}`}
+          >
+            <span>{label}</span>
+            <span className={`grid min-w-5 place-items-center rounded-full px-1.5 py-0.5 text-[10px] ${activeView === key ? 'bg-white/20 text-white' : 'bg-white text-[#1668c4]'}`}>
+              {localeDigits(count, locale)}
+            </span>
+          </button>
         ))}
       </div>
 
@@ -272,20 +334,11 @@ export default function AgencySeatsPage() {
       >
         <div className="mb-4">
           <h2 className="text-base font-black text-[#0d2640]">
-            {locale === 'en' ? 'Request allocated seats' : locale === 'ar' ? 'طلب مقاعد مخصصة' : 'درخواست صندلی اختصاصی'}
+            {locale === 'en' ? 'Available flight routes' : locale === 'ar' ? 'مسارات الرحلات المتاحة' : 'مسیرهای پروازی موجود'}
           </h2>
-          <p className="mt-1 text-[11px] leading-5 text-[#7d8ba0]">
-            {locale === 'en'
-              ? 'Choose an active route and flight; the request will be sent to the commercial manager.'
-              : locale === 'ar'
-                ? 'اختر المسار والرحلة النشطة لإرسال الطلب إلى المدير التجاري.'
-                : 'مبدأ و مقصد از مسیرهای فعال مدیر بازرگانی بارگذاری می‌شود؛ سپس پرواز و تعداد صندلی را انتخاب کنید.'}
-          </p>
         </div>
 
-        <div
-          className={`grid gap-3 ${matchingFlights.length > 1 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}
-        >
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <label className="text-[11px] font-bold text-[#3f546b]">
             {locale === 'en' ? 'Origin' : locale === 'ar' ? 'المغادرة' : 'مبدأ'}
             <select
@@ -310,10 +363,7 @@ export default function AgencySeatsPage() {
               onChange={(event) => {
                 const nextDest = event.target.value;
                 setDestCode(nextDest);
-                const firstFlight = (requestOptions ?? []).find(
-                  (row) => row.originCode === originCode && row.destCode === nextDest,
-                );
-                setRequestFlightId(firstFlight?.flightInstanceId ?? '');
+                setRequestFlightId('');
               }}
               className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none disabled:bg-[#f4f6f9]"
               data-testid="agency-request-destination"
@@ -322,25 +372,81 @@ export default function AgencySeatsPage() {
               {destinations.map((code) => <option key={code} value={code}>{airportCityLabel(code, locale)}</option>)}
             </select>
           </label>
-          <label
-            className={`text-[11px] font-bold text-[#3f546b] ${matchingFlights.length <= 1 ? 'hidden' : ''}`}
+          <button
+            type="button"
+            onClick={() => {
+              setOriginCode('');
+              setDestCode('');
+              setRequestFlightId('');
+            }}
+            className="mt-[18px] rounded-xl border border-[#d6e4f8] bg-[#f7f9fc] px-4 py-3 text-xs font-black text-[#5d6c80]"
           >
-            {locale === 'en' ? 'Flight' : locale === 'ar' ? 'الرحلة' : 'پرواز'}
-            <select
-              value={requestFlightId}
-              disabled={!destCode}
-              onChange={(event) => setRequestFlightId(event.target.value)}
-              className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none disabled:bg-[#f4f6f9]"
-              data-testid="agency-request-flight"
+            {locale === 'fa' ? 'پاک کردن' : locale === 'ar' ? 'مسح' : 'Clear'}
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-3" data-testid="agency-request-route-list">
+          {visibleRouteGroups.map(({ key, options }) => {
+            const row = options[0];
+            const last = options[options.length - 1];
+            const isSelected = requestGroup?.key === key;
+            const optionIds = new Set(options.map((option) => option.flightInstanceId));
+            const groupAllotments = (rows ?? []).filter((allotment) => optionIds.has(allotment.flightInstanceId));
+            const allocated = groupAllotments.reduce((sum, allotment) => sum + allotment.seatsAllocated, 0);
+            const sold = groupAllotments.reduce((sum, allotment) => sum + allotment.seatsUsed, 0);
+            const remaining = groupAllotments.reduce(
+              (sum, allotment) => sum + Math.max(allotment.seatsAllocated - allotment.seatsUsed, 0),
+              0,
+            );
+            return (
+            <article
+              key={key}
+              className={`w-full cursor-pointer overflow-hidden rounded-2xl border text-start transition ${isSelected ? 'border-[#9fc2ec] bg-[#f8fbff]' : 'border-[#e8eef6] bg-white hover:border-[#bfd4ef]'}`}
             >
-              <option value="">—</option>
-              {matchingFlights.map((row) => (
-                <option key={row.flightInstanceId} value={row.flightInstanceId}>
-                  {row.flightNo} · {formatLocaleDateTime(row.departureAt, locale)}
-                </option>
-              ))}
-            </select>
-          </label>
+              <button
+                type="button"
+                data-testid={`agency-request-route-${row.flightInstanceId}`}
+                onClick={() => {
+                  setOriginCode(row.originCode);
+                  setDestCode(row.destCode);
+                  setRequestFlightId(row.flightInstanceId);
+                  setPreferredWeekdays([]);
+                }}
+                className="flex w-full flex-wrap items-center justify-between gap-4 p-4 text-start"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#eef5fd] text-xl text-[#1668c4]">✈</span>
+                  <div>
+                    <b className="block text-sm text-[#0d2640]">{airportCityLabel(row.originCode, locale)} ← {airportCityLabel(row.destCode, locale)}</b>
+                    <span dir="ltr" className="mt-1 block text-[11px] text-[#7d8ba0]">{row.flightNo} · {row.aircraftType} · {localeDigits(options.length, locale)} پرواز</span>
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-[10px] text-[#7d8ba0]">{locale === 'fa' ? 'قیمت هر صندلی' : locale === 'ar' ? 'سعر المقعد' : 'Price per seat'}</span>
+                  <b className="mt-1 block text-sm text-[#23895f]">{localeMoney(row.pricePerSeatIrr ?? '0', locale)}</b>
+                </div>
+              </button>
+              <div className="mx-4 mb-3 rounded-xl bg-[#eef6ff] px-4 py-2 text-[11px] font-bold text-[#47637f]">
+                بازه فروش مسیر: {formatLocaleDateTime(row.departureAt, locale)} تا {formatLocaleDateTime(last.departureAt, locale)}
+              </div>
+              <div className="grid grid-cols-3 border-y border-[#edf1f6] bg-[#fafbfd]">
+                {[
+                  ['صندلی فعال', allocated],
+                  ['فروخته‌شده از سهم من', sold],
+                  ['باقی‌مانده برای فروش', remaining],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="p-3 text-center">
+                    <div className="text-[10px] text-[#7d8ba0]">{label}</div>
+                    <div className="mt-1 text-lg font-black text-[#1668c4]">{localeDigits(value as number, locale)} صندلی</div>
+                  </div>
+                ))}
+              </div>
+              <div className="m-4 rounded-xl bg-[#f7f4ff] p-3 text-center text-[11px] font-bold text-[#6547a8]">
+                وب‌سرویس مسیر یک کلید برای تمام پروازهای این مسیر ارائه می‌کند.
+              </div>
+            </article>
+            );
+          })}
         </div>
 
         {requestFlight && (
@@ -356,9 +462,9 @@ export default function AgencySeatsPage() {
               </div>
               <div className="grid min-w-[280px] flex-1 grid-cols-3 gap-2 md:max-w-[520px]">
                 {[
-                  [locale === 'en' ? 'Capacity' : locale === 'ar' ? 'السعة' : 'ظرفیت کل', requestFlight.capacity],
-                  [locale === 'en' ? 'Allocated' : locale === 'ar' ? 'المخصص' : 'تخصیص‌یافته', requestFlight.agencyAllocated],
-                  [locale === 'en' ? 'Available' : locale === 'ar' ? 'المتاح للطلب' : 'قابل درخواست', requestFlight.availableToRequest],
+                  [locale === 'en' ? 'Agency allocation' : locale === 'ar' ? 'حصة الوكالة' : 'سهمیه فعال آژانس', requestGroupAllotments.reduce((sum, allotment) => sum + allotment.seatsAllocated, 0)],
+                  [locale === 'en' ? 'Sold from allocation' : locale === 'ar' ? 'مباع من الحصة' : 'فروخته‌شده از سهم من', requestGroupAllotments.reduce((sum, allotment) => sum + allotment.seatsUsed, 0)],
+                  [locale === 'en' ? 'Available to request' : locale === 'ar' ? 'المتاح للطلب' : 'قابل درخواست در هر پرواز', requestAvailable],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-xl bg-white p-3 text-center">
                     <div className="text-[10px] text-[#7d8ba0]">{label}</div>
@@ -367,13 +473,16 @@ export default function AgencySeatsPage() {
                 ))}
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_1.4fr_1fr]">
+            <div className="mb-4 rounded-xl bg-[#f6f3ff] p-4 text-xs font-bold text-[#6547a8]">
+              {locale === 'fa' ? 'پس از ثبت، وضعیت این مسیر در تب «پروازهای درخواست‌شده» نمایش داده می‌شود؛ کلیدهای فعال فقط در بخش وب‌سرویس در دسترس‌اند.' : locale === 'ar' ? 'بعد الإرسال تظهر حالة المسار في تبويب الرحلات المطلوبة، وتبقى المفاتيح في قسم خدمة الويب.' : 'After submission, the route status appears under requested flights; active keys remain in Web service.'}
+            </div>
+            <div className="grid gap-3 md:grid-cols-[1fr_1.4fr]">
               <label className="text-[11px] font-bold text-[#3f546b]">
                 {locale === 'en' ? 'Seats needed' : locale === 'ar' ? 'عدد المقاعد المطلوبة' : 'تعداد صندلی مورد نیاز'}
                 <input
                   type="number"
                   min={1}
-                  max={requestFlight.availableToRequest}
+                  max={requestAvailable}
                   value={requestedSeats}
                   onChange={(event) => setRequestedSeats(Math.max(1, Number(event.target.value) || 1))}
                   className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
@@ -383,24 +492,44 @@ export default function AgencySeatsPage() {
               <fieldset className="text-[11px] font-bold text-[#3f546b]">
                 <legend>{locale === 'en' ? 'Preferred days' : locale === 'ar' ? 'الأيام المفضلة' : 'روزهای ترجیحی'}</legend>
                 <div className="mt-1 flex flex-wrap gap-2">
-                  {[['شنبه', 6], ['یکشنبه', 0], ['دوشنبه', 1], ['سه‌شنبه', 2], ['چهارشنبه', 3], ['پنجشنبه', 4]].map(([label, day]) => {
+                  {[['شنبه', 6], ['یکشنبه', 0], ['دوشنبه', 1], ['سه‌شنبه', 2], ['چهارشنبه', 3], ['پنجشنبه', 4], ['جمعه', 5]].map(([label, day]) => {
                     const selected = preferredWeekdays.includes(day as number);
                     return <button key={String(day)} type="button" onClick={() => setPreferredWeekdays(selected ? preferredWeekdays.filter((v) => v !== day) : [...preferredWeekdays, day as number])} className={`rounded-lg border px-3 py-2 ${selected ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8] bg-white'}`}>{label}</button>;
                   })}
                 </div>
               </fieldset>
-              <label className="text-[11px] font-bold text-[#3f546b]">
-                {locale === 'en' ? 'Purchase term' : locale === 'ar' ? 'مدة الشراء' : 'دوره خرید'}
-                <select value={termMonths} onChange={(event) => setTermMonths(Number(event.target.value) as 3 | 6 | 12)} className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none">
-                  <option value={3}>{locale === 'en' ? '3 months' : locale === 'ar' ? '٣ أشهر' : 'سه‌ماهه'}</option>
-                  <option value={6}>{locale === 'en' ? '6 months' : locale === 'ar' ? '٦ أشهر' : 'شش‌ماهه'}</option>
-                  <option value={12}>{locale === 'en' ? '12 months' : locale === 'ar' ? 'سنة واحدة' : 'یک‌ساله'}</option>
-                </select>
-              </label>
+            </div>
+            <fieldset className="mt-4 text-[11px] font-bold text-[#3f546b]">
+              <legend>{locale === 'en' ? 'Purchase term' : locale === 'ar' ? 'مدة الشراء' : 'دوره خرید'}</legend>
+              <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+                {([[0, 'هفتگی'], [1, 'ماهانه'], [3, 'سه‌ماهه'], [6, 'شش‌ماهه'], [12, 'یک‌ساله']] as const).map(([months, label]) => (
+                  <button key={months} type="button" data-testid={`agency-request-term-${months}`} onClick={() => setTermMonths(months)} className={`rounded-xl border px-3 py-3 ${termMonths === months ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8] bg-white'}`}>{locale === 'fa' ? label : `${months} month${months > 1 ? 's' : ''}`}</button>
+                ))}
+              </div>
+            </fieldset>
+            <div className="mt-4">
+              <div className="mb-2 text-[11px] font-bold text-[#3f546b]">{locale === 'fa' ? 'تاریخ شروع خرید' : locale === 'ar' ? 'تاريخ بدء الشراء' : 'Purchase start date'}</div>
+              <div className="rounded-xl border border-[#d6e4f8] bg-white px-4 py-3 text-sm font-bold text-[#0d2640]">{formatLocaleDateTime(requestFlight.departureAt, locale)}</div>
+            </div>
+            <div className="mt-3 rounded-xl bg-[#eef6ff] px-4 py-3 text-[11px] font-bold text-[#47637f]">
+              {locale === 'fa'
+                ? `${localeDigits(requestOccurrences.length, locale)} پرواز در بازه و روزهای انتخابی رزرو می‌شود.`
+                : `${requestOccurrences.length} matching flights will be included.`}
+            </div>
+            <div className="mt-4 rounded-xl border border-[#e8eef6] bg-white p-4">
+              <div className="mb-3 text-[11px] font-bold text-[#7d8ba0]">{locale === 'fa' ? 'روش پرداخت' : locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" data-testid="agency-request-pay-invoice" onClick={() => setPayMethod('INVOICE')} className={`rounded-xl border px-3 py-3 text-xs font-black ${payMethod === 'INVOICE' ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8]'}`}>{locale === 'fa' ? 'نقدی / صدور فاکتور' : 'Invoice'}</button>
+                <button type="button" data-testid="agency-request-pay-credit" onClick={() => setPayMethod('CREDIT')} className={`rounded-xl border px-3 py-3 text-xs font-black ${payMethod === 'CREDIT' ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8]'}`}>{locale === 'fa' ? 'اعتباری (درخواست اعتبار)' : 'Credit'}</button>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-[#e8eef6] bg-[#f8fafc] p-4 text-xs text-[#687587]">
+              <span>{locale === 'fa' ? `${localeMoney(requestFlight.pricePerSeatIrr ?? '0', locale)} × ${localeDigits(requestedSeats, locale)} صندلی × ${localeDigits(requestOccurrences.length, locale)} پرواز` : `${requestedSeats} seats × ${requestOccurrences.length} flights`}</span>
+              <b className="text-base text-[#0d2640]">{localeMoney((BigInt(requestFlight.pricePerSeatIrr ?? '0') * BigInt(requestedSeats) * BigInt(requestOccurrences.length)).toString(), locale)}</b>
             </div>
             <button
               type="button"
-              disabled={busy || requestedSeats > requestFlight.availableToRequest || requestFlight.availableToRequest < 1}
+              disabled={busy || requestOccurrences.length === 0 || requestedSeats > requestAvailable || requestAvailable < 1}
               onClick={() => void submitSeatRequest()}
               className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white disabled:opacity-50"
               data-testid="agency-submit-seat-request"

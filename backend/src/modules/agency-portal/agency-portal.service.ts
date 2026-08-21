@@ -711,7 +711,10 @@ export class AgencyPortalService {
       seats: row.seats,
       termMonths: row.termMonths,
       unitPriceIrr: row.unitPriceIrr,
-      totalPriceIrr: row.unitPriceIrr * BigInt(row.seats),
+      totalPriceIrr:
+        row.unitPriceIrr *
+        BigInt(row.seats) *
+        BigInt(Math.max(row.flights.length, 1)),
       payMethod: row.payMethod,
       invoice: row.invoice
         ? {
@@ -738,7 +741,8 @@ export class AgencyPortalService {
       flightInstanceId: string;
       seats: number;
       preferredWeekdays?: number[];
-      termMonths?: 1 | 3 | 6 | 12;
+      termMonths?: 0 | 1 | 3 | 6 | 12;
+      payMethod?: 'INVOICE' | 'CREDIT';
     },
   ) {
     const uatUser = await this.loadUatSandboxAgencyUser(actor);
@@ -763,6 +767,42 @@ export class AgencyPortalService {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'تعداد صندلی درخواستی بیشتر از ظرفیت آزاد این پرواز است.',
+      });
+    }
+
+    const selectedDeparture = new Date(option.departureAt);
+    const periodEnd = new Date(selectedDeparture);
+    if (dto.termMonths === 0) {
+      periodEnd.setUTCDate(periodEnd.getUTCDate() + 7);
+    } else if (dto.termMonths) {
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + dto.termMonths);
+    }
+    const requestedWeekdays = new Set(dto.preferredWeekdays ?? []);
+    const eligibleOptions =
+      dto.termMonths == null
+        ? [option]
+        : options.filter((candidate) => {
+            const departure = new Date(candidate.departureAt);
+            return (
+              candidate.originCode === option.originCode &&
+              candidate.destCode === option.destCode &&
+              candidate.flightNo === option.flightNo &&
+              candidate.aircraftType === option.aircraftType &&
+              departure >= selectedDeparture &&
+              departure <= periodEnd &&
+              (requestedWeekdays.size === 0 ||
+                requestedWeekdays.has(departure.getUTCDay()))
+            );
+          });
+    const requestOptions =
+      eligibleOptions.length > 0 ? eligibleOptions : [option];
+    const unavailableOccurrence = requestOptions.find(
+      (candidate) => dto.seats > candidate.availableToRequest,
+    );
+    if (unavailableOccurrence) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `ظرفیت آزاد پرواز ${unavailableOccurrence.flightNo} در یکی از تاریخ‌های دوره کمتر از تعداد درخواستی است.`,
       });
     }
 
@@ -796,23 +836,30 @@ export class AgencyPortalService {
           seats: dto.seats,
           termMonths: dto.termMonths ?? null,
           unitPriceIrr,
-          payMethod: 'INVOICE',
+          payMethod: dto.payMethod ?? 'INVOICE',
           status: 'PENDING',
         }),
       );
       await tx.save(
-        tx.create(AgencySeatRequestFlight, {
-          seatRequestId: requestId,
-          flightInstanceId: dto.flightInstanceId,
-        }),
+        requestOptions.map((candidate) =>
+          tx.create(AgencySeatRequestFlight, {
+            seatRequestId: requestId,
+            flightInstanceId: candidate.flightInstanceId,
+          }),
+        ),
       );
     });
 
     const weekdays = dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
-    const term = dto.termMonths ? `${dto.termMonths} ماه` : 'تک‌پرواز';
+    const term =
+      dto.termMonths === 0
+        ? 'یک هفته'
+        : dto.termMonths
+          ? `${dto.termMonths} ماه`
+          : 'تک‌پرواز';
     const senderLabel =
       profile?.managerName ?? uatUser?.fullName ?? actor.fullName;
-    const description = `آژانس «${senderLabel}» برای پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
+    const description = `آژانس «${senderLabel}» برای ${requestOptions.length} پرواز ${option.flightNo} در مسیر ${option.originCode} ← ${option.destCode} درخواست ${dto.seats} صندلی ثبت کرد. روزهای ترجیحی: ${weekdays}. دوره: ${term}.`;
 
     const recipientCount = await this.cartable.createTasksForRoles(
       ['COMMERCIAL_MANAGER'],

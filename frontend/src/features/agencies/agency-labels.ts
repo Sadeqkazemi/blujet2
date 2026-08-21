@@ -34,3 +34,7 @@ export const SUSPENDED_BADGE = { label: 'تعلیق‌شده', className: 'bg-da
 export function statusBadge(isActive: boolean) {
   return isActive ? ACTIVE_BADGE : SUSPENDED_BADGE;
 }
+
+export function seatRequestTermLabel(months: 0 | 1 | 3 | 6 | 12) {
+  return months === 0 ? 'هفتگی' : `${months.toLocaleString('fa-IR')} ماهه`;
+}

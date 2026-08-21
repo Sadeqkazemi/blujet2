@@ -34,6 +34,7 @@ describe('AgencyPortalShell logout', () => {
       isTemporaryReadOnly: false,
     });
     vi.spyOn(agencyApi, 'fetchInbox').mockResolvedValue([]);
+    vi.spyOn(agencyApi, 'fetchCredit').mockResolvedValue({ limitIrr: '50000000', usedIrr: '20000000', remainingIrr: '30000000' });
 
     render(
       <MemoryRouter initialEntries={['/agency']}>
@@ -53,5 +54,21 @@ describe('AgencyPortalShell logout', () => {
     await userEvent.click(screen.getByTestId('agency-logout-confirm-confirm'));
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
     expect(await screen.findByText('ورود آژانس')).toBeInTheDocument();
+  });
+
+  it('shows the real agency identity, credit, and reference shortcuts in the profile menu', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ status: 'authenticated', user: { id: 'a1', fullName: 'آژانس تست', role: 'AGENCY', preferredLocale: 'FA' }, requestLogin: vi.fn(), confirmTwoFactor: vi.fn(), agencyLogin: vi.fn(), signOut: vi.fn() });
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+    vi.spyOn(agencyApi, 'fetchProfile').mockResolvedValue({ fullName: 'آژانس تست', licenseNo: 'AG-4471', managerName: null, email: null, city: null, address: null, tier: null, isTemporaryReadOnly: false });
+    vi.spyOn(agencyApi, 'fetchInbox').mockResolvedValue([]);
+    vi.spyOn(agencyApi, 'fetchCredit').mockResolvedValue({ limitIrr: '50000000', usedIrr: '20000000', remainingIrr: '30000000' });
+    render(<MemoryRouter initialEntries={['/agency']}><Routes><Route path="/agency" element={<AgencyPortalShell />}><Route index element={<div />} /></Route></Routes></MemoryRouter>);
+    await userEvent.click(await screen.findByTestId('agency-user-menu-toggle'));
+    expect(await screen.findByText('AG-4471')).toBeInTheDocument();
+    expect(screen.getByText('اعتبار قابل استفاده')).toBeInTheDocument();
+    expect(screen.getByText('پروازهای خریداری‌شده')).toBeInTheDocument();
+    expect(screen.getByText('وب‌سرویس')).toBeInTheDocument();
+    expect(screen.getByText('مدارک و پروفایل')).toBeInTheDocument();
   });
 });

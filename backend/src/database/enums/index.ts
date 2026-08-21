@@ -315,9 +315,8 @@ export const AgencySeatRequestPayMethod = {
 export type AgencySeatRequestPayMethod =
   (typeof AgencySeatRequestPayMethod)[keyof typeof AgencySeatRequestPayMethod];
 
-/** Accepted `termMonths` values: union of the legacy agency-portal contract
- * (3|6|12) and the commercial UI (1|3|12). Persisted as smallint. */
-export const AGENCY_SEAT_REQUEST_TERM_MONTHS = [1, 3, 6, 12] as const;
+/** `0` represents one week; other values are terms in months. */
+export const AGENCY_SEAT_REQUEST_TERM_MONTHS = [0, 1, 3, 6, 12] as const;
 export type AgencySeatRequestTermMonths =
   (typeof AGENCY_SEAT_REQUEST_TERM_MONTHS)[number];
 

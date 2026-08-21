@@ -54,7 +54,7 @@ export class AgencySeatRequest {
   @Column({ type: 'int' })
   seats!: number;
 
-  /** 1 | 3 | 6 | 12. Null means the legacy single-flight (unspecified term). */
+  /** 0 = weekly; 1 | 3 | 6 | 12 are months. Null is a legacy single flight. */
   @Column({ type: 'smallint', nullable: true })
   termMonths!: number | null;
 
