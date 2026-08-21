@@ -92,12 +92,9 @@ export const AIRCRAFT_CABIN_OPTIONS: { value: AircraftCabinType; label: string }
   { value: 'ECONOMY', label: 'اکونومی' },
 ];
 
-/** Map aircraft cabin onto flight CabinKind (COMFORT stays COMFORT; FIRST has no flight cabin). */
+/** Map the physical aircraft cabin to the same cabin used by fares and inventory. */
 export function toFlightCabinKind(
   cabin: AircraftCabinType,
-): 'ECONOMY' | 'COMFORT' | 'BUSINESS' | null {
-  if (cabin === 'ECONOMY') return 'ECONOMY';
-  if (cabin === 'BUSINESS') return 'BUSINESS';
-  if (cabin === 'COMFORT') return 'COMFORT';
-  return null;
+): AircraftCabinType {
+  return cabin;
 }

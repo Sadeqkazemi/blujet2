@@ -77,7 +77,10 @@ describe("CabinCapacityEditor", () => {
     expect(screen.getByText("۱۲۰")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "افزودن کابین" }));
     expect(screen.getAllByTestId("cabin-row")).toHaveLength(3);
-    // All three kinds used — add disabled
+    expect(screen.getByRole("button", { name: "افزودن کابین" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "افزودن کابین" }));
+    expect(screen.getAllByTestId("cabin-row")).toHaveLength(4);
+    // FIRST, BUSINESS, COMFORT and ECONOMY are all used.
     expect(screen.getByRole("button", { name: "افزودن کابین" })).toBeDisabled();
   });
 });

@@ -426,38 +426,39 @@ export default function AccountSidebar({
             />
           </div>
         ))}
-        <div style={{ height: 1, background: '#eef1f5', margin: '11px 6px 7px' }} />
-        <button
-          type="button"
-          data-testid="account-logout"
-          onClick={() => setLogoutConfirmOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 11,
-            width: '100%',
-            padding: '9px 12px',
-            borderRadius: 11,
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 700,
-            color: '#e5484d',
-            whiteSpace: 'nowrap',
-            border: 'none',
-            background: 'transparent',
-            fontFamily: 'inherit',
-          }}
-        >
-          <span style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <path d="M16 17l5-5-5-5" />
-              <path d="M21 12H9" />
-            </svg>
-          </span>
-          {t.logout}
-        </button>
       </div>
+      <button
+        type="button"
+        data-testid="account-logout"
+        onClick={() => setLogoutConfirmOpen(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          minHeight: 62,
+          padding: '0 21px',
+          cursor: 'pointer',
+          fontSize: 13,
+          fontWeight: 700,
+          color: '#e5484d',
+          whiteSpace: 'nowrap',
+          border: 'none',
+          borderTop: '1px solid #eef1f5',
+          background: 'transparent',
+          fontFamily: 'inherit',
+          flex: 'none',
+        }}
+      >
+        <span style={{ width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <path d="M16 17l5-5-5-5" />
+            <path d="M21 12H9" />
+          </svg>
+        </span>
+        {t.logout}
+      </button>
       <ConfirmActionDialog
         open={logoutConfirmOpen}
         title={t.logoutTitle}

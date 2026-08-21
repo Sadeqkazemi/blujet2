@@ -185,17 +185,6 @@ export class CartableService {
     decision: 'APPROVED' | 'REJECTED',
     note: string,
   ) {
-    if (task.sourceType === 'CHAIR_PERMISSION' && task.sourceId) {
-      await this.chairPermissionRepo.update(
-        { id: task.sourceId },
-        {
-          status: decision,
-          decidedById: actor.id,
-          decidedAt: new Date(),
-        },
-      );
-    }
-
     // The recipient's review of a referral task doubles as the report
     // submission surface (⚑ in docs/DB_SCHEMA.md): approving submits the
     // note as the report; rejecting resolves the task without one.
@@ -232,19 +221,53 @@ export class CartableService {
   ) {
     const task = await this.getOwnOpenTaskOrThrow(actor, id);
 
-    // Conditional update guards against two concurrent resolutions.
-    const updated = await this.taskRepo.update(
-      { id, status: 'OPEN' },
-      { status: decision, resolutionNote: note, resolvedAt: new Date() },
-    );
-    if (!updated.affected) {
-      throw new ConflictException({
-        code: ErrorCode.CONFLICT,
-        message: 'این مورد قبلاً بررسی شده است.',
+    if (task.sourceType === 'CHAIR_PERMISSION' && task.sourceId) {
+      await this.taskRepo.manager.transaction(async (tx) => {
+        const permission = await tx
+          .createQueryBuilder(ChairReportPermission, 'permission')
+          .setLock('pessimistic_write')
+          .where('permission.id = :id', { id: task.sourceId })
+          .getOne();
+        if (!permission || permission.status !== 'PENDING') {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message: 'این درخواست قبلاً بررسی شده است.',
+          });
+        }
+        const now = new Date();
+        permission.status = decision;
+        permission.decidedById = actor.id;
+        permission.decidedAt = now;
+        await tx.save(permission);
+        await tx.update(
+          CartableTask,
+          {
+            sourceType: 'CHAIR_PERMISSION',
+            sourceId: task.sourceId,
+            status: 'OPEN',
+          },
+          {
+            status: decision,
+            resolutionNote: note,
+            resolvedAt: now,
+          },
+        );
       });
-    }
+    } else {
+      // Conditional update guards against two concurrent resolutions.
+      const updated = await this.taskRepo.update(
+        { id, status: 'OPEN' },
+        { status: decision, resolutionNote: note, resolvedAt: new Date() },
+      );
+      if (!updated.affected) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این مورد قبلاً بررسی شده است.',
+        });
+      }
 
-    await this.applySourceEffects(actor, task, decision, note);
+      await this.applySourceEffects(actor, task, decision, note);
+    }
 
     await this.audit.record({
       actorId: actor.id,
@@ -363,11 +386,11 @@ export class CartableService {
       });
     }
 
-    const chair = await this.userRepo.findOneBy({
+    const chairs = await this.userRepo.findBy({
       role: 'BOARD_CHAIR',
       isActive: true,
     });
-    if (!chair) {
+    if (chairs.length === 0) {
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'حساب رئیس هیئت مدیره در دسترس نیست.',
@@ -380,15 +403,17 @@ export class CartableService {
           tx.create(ChairReportPermission, { requesterId: actor.id }),
         );
         await tx.save(
-          tx.create(CartableTask, {
-            assigneeId: chair.id,
-            category: 'MANAGER',
-            title: 'درخواست مجوز ارسال گزارش به رئیس هیئت مدیره',
-            description: `${actor.fullName} درخواست مجوز ارسال گزارش مستقیم به رئیس هیئت مدیره را دارد.`,
-            senderId: actor.id,
-            sourceType: 'CHAIR_PERMISSION',
-            sourceId: created.id,
-          }),
+          chairs.map((chair) =>
+            tx.create(CartableTask, {
+              assigneeId: chair.id,
+              category: 'MANAGER',
+              title: 'درخواست مجوز ارسال گزارش به رئیس هیئت مدیره',
+              description: `${actor.fullName} درخواست مجوز ارسال گزارش مستقیم به رئیس هیئت مدیره را دارد.`,
+              senderId: actor.id,
+              sourceType: 'CHAIR_PERMISSION',
+              sourceId: created.id,
+            }),
+          ),
         );
         return created;
       },

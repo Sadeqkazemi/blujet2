@@ -77,6 +77,15 @@ export class RequestAgencySeatsDto {
   @MinLength(1)
   flightInstanceId: string;
 
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'])
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+
+  @ApiProperty({ example: 'Y' })
+  @IsString()
+  @MinLength(1)
+  fareClassCode: string;
+
   @ApiProperty({ example: 20, minimum: 1 })
   @IsInt()
   @Min(1)

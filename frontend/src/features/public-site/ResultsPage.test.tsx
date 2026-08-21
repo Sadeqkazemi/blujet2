@@ -183,7 +183,7 @@ describe('ResultsPage', () => {
     });
   });
 
-  it('does not render the standalone price calendar on mobile results', async () => {
+  it('does not render or request the price calendar on mobile results', async () => {
     mockLocale('fa');
     mockSearchApis();
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);

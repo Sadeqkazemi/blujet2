@@ -163,10 +163,12 @@ export default function AgencySeatsPage() {
         .map((row) => row.destCode),
     ),
   );
+  const optionKey = (option: AgencySeatRequestOption) =>
+    `${option.flightInstanceId}:${option.cabin}:${option.fareClassCode}`;
   const routeGroups = useMemo(() => {
     const groups = new Map<string, AgencySeatRequestOption[]>();
     for (const option of requestOptions ?? []) {
-      const key = `${option.originCode}-${option.destCode}`;
+      const key = `${option.originCode}-${option.destCode}-${option.flightNo}-${option.aircraftType}-${option.cabin}-${option.fareClassCode}`;
       groups.set(key, [...(groups.get(key) ?? []), option]);
     }
     return [...groups.entries()].map(([key, options]) => ({
@@ -178,8 +180,7 @@ export default function AgencySeatsPage() {
       ),
     }));
   }, [requestOptions]);
-  const visibleRouteGroups = routeGroups.filter(({ options }) => {
-    const row = options[0];
+  const visibleFlightOptions = (requestOptions ?? []).filter((row) => {
     return (
       (!originCode || row.originCode === originCode) &&
       (!destCode || row.destCode === destCode)
@@ -187,13 +188,13 @@ export default function AgencySeatsPage() {
   });
   const requestGroup =
     routeGroups.find(({ options }) =>
-      options.some((row) => row.flightInstanceId === requestFlightId),
+      options.some((row) => optionKey(row) === requestFlightId),
     ) ?? null;
   const requestFlight =
     requestGroup?.options.find(
-      (row) => row.flightInstanceId === requestFlightId,
+      (row) => optionKey(row) === requestFlightId,
     ) ?? requestGroup?.options[0] ?? null;
-  const availableRouteCount = routeGroups.length;
+  const availableRouteCount = requestOptions?.length ?? 0;
   const requestOccurrences = useMemo(() => {
     if (!requestFlight || !requestGroup) return [];
     const start = new Date(requestFlight.departureAt);
@@ -230,6 +231,8 @@ export default function AgencySeatsPage() {
     try {
       await requestAgencySeats({
         flightInstanceId: requestFlight.flightInstanceId,
+        cabin: requestFlight.cabin,
+        fareClassCode: requestFlight.fareClassCode,
         seats: requestedSeats,
         preferredWeekdays,
         termMonths,
@@ -259,7 +262,7 @@ export default function AgencySeatsPage() {
       fullName: '',
       nationalId: '',
       mobile: '',
-      cabin: 'ECONOMY',
+      cabin: row.cabin ?? 'ECONOMY',
       seatCode: '',
     });
     try {
@@ -386,12 +389,15 @@ export default function AgencySeatsPage() {
         </div>
 
         <div className="mt-4 space-y-3" data-testid="agency-request-route-list">
-          {visibleRouteGroups.map(({ key, options }) => {
-            const row = options[0];
-            const last = options[options.length - 1];
-            const isSelected = requestGroup?.key === key;
-            const optionIds = new Set(options.map((option) => option.flightInstanceId));
-            const groupAllotments = (rows ?? []).filter((allotment) => optionIds.has(allotment.flightInstanceId));
+          {visibleFlightOptions.map((row) => {
+            const key = optionKey(row);
+            const isSelected = requestFlightId === key;
+            const groupAllotments = (rows ?? []).filter(
+              (allotment) =>
+                allotment.flightInstanceId === row.flightInstanceId &&
+                (!allotment.cabin || allotment.cabin === row.cabin) &&
+                (!allotment.fareClassCode || allotment.fareClassCode === row.fareClassCode),
+            );
             const allocated = groupAllotments.reduce((sum, allotment) => sum + allotment.seatsAllocated, 0);
             const sold = groupAllotments.reduce((sum, allotment) => sum + allotment.seatsUsed, 0);
             const remaining = groupAllotments.reduce(
@@ -409,7 +415,7 @@ export default function AgencySeatsPage() {
                 onClick={() => {
                   setOriginCode(row.originCode);
                   setDestCode(row.destCode);
-                  setRequestFlightId(row.flightInstanceId);
+                  setRequestFlightId(isSelected ? '' : key);
                   setPreferredWeekdays([]);
                 }}
                 className="flex w-full flex-wrap items-center justify-between gap-4 p-4 text-start"
@@ -418,16 +424,19 @@ export default function AgencySeatsPage() {
                   <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#eef5fd] text-xl text-[#1668c4]">✈</span>
                   <div>
                     <b className="block text-sm text-[#0d2640]">{airportCityLabel(row.originCode, locale)} ← {airportCityLabel(row.destCode, locale)}</b>
-                    <span dir="ltr" className="mt-1 block text-[11px] text-[#7d8ba0]">{row.flightNo} · {row.aircraftType} · {localeDigits(options.length, locale)} پرواز</span>
+                    <span dir="ltr" className="mt-1 block text-[11px] text-[#7d8ba0]">{row.flightNo} · {row.aircraftType} · {row.cabin}/{row.fareClassCode}</span>
+                    <span className="mt-1 block text-[10px] text-[#7d8ba0]">{formatLocaleDateTime(row.departureAt, locale)}</span>
                   </div>
                 </div>
                 <div>
                   <span className="block text-[10px] text-[#7d8ba0]">{locale === 'fa' ? 'قیمت هر صندلی' : locale === 'ar' ? 'سعر المقعد' : 'Price per seat'}</span>
                   <b className="mt-1 block text-sm text-[#23895f]">{localeMoney(row.pricePerSeatIrr ?? '0', locale)}</b>
                 </div>
+                <span aria-hidden="true" className={`text-[#1668c4] transition ${isSelected ? 'rotate-180' : ''}`}>⌄</span>
               </button>
+              {isSelected && <div data-testid={`agency-request-flight-${row.flightInstanceId}-expanded`}>
               <div className="mx-4 mb-3 rounded-xl bg-[#eef6ff] px-4 py-2 text-[11px] font-bold text-[#47637f]">
-                بازه فروش مسیر: {formatLocaleDateTime(row.departureAt, locale)} تا {formatLocaleDateTime(last.departureAt, locale)}
+                سهمیه آزادشده توسط بازرگانی: {localeDigits(row.agencySeatsReleased, locale)} صندلی · قابل درخواست: {localeDigits(row.availableToRequest, locale)}
               </div>
               <div className="grid grid-cols-3 border-y border-[#edf1f6] bg-[#fafbfd]">
                 {[
@@ -442,8 +451,9 @@ export default function AgencySeatsPage() {
                 ))}
               </div>
               <div className="m-4 rounded-xl bg-[#f7f4ff] p-3 text-center text-[11px] font-bold text-[#6547a8]">
-                وب‌سرویس مسیر یک کلید برای تمام پروازهای این مسیر ارائه می‌کند.
+                این باکس فقط همین پرواز و کلاس نرخی را مدیریت می‌کند.
               </div>
+              </div>}
             </article>
             );
           })}
@@ -657,6 +667,7 @@ export default function AgencySeatsPage() {
                         {t.cabin}
                         <select
                           value={form.cabin}
+                          disabled={Boolean(f.cabin)}
                           onChange={(event) =>
                             setForm({
                               ...form,
@@ -664,7 +675,7 @@ export default function AgencySeatsPage() {
                               seatCode: '',
                             })
                           }
-                          className="mt-1 w-full rounded-lg border border-[#d6e4f8] bg-white p-2.5 text-sm outline-none"
+                          className="mt-1 w-full rounded-lg border border-[#d6e4f8] bg-white p-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:bg-[#f2f5f9]"
                         >
                           <option value="ECONOMY">
                             {publicCabinLabel('ECONOMY', locale)}
@@ -674,6 +685,9 @@ export default function AgencySeatsPage() {
                           </option>
                           <option value="BUSINESS">
                             {publicCabinLabel('BUSINESS', locale)}
+                          </option>
+                          <option value="FIRST">
+                            {publicCabinLabel('FIRST', locale)}
                           </option>
                         </select>
                       </label>

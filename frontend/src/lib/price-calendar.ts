@@ -80,6 +80,7 @@ export type PriceCalendarCopy = {
   loading: string;
   error: string;
   retry: string;
+  currency: string;
 };
 
 export function priceCalendarCopy(locale: StoredLocale): PriceCalendarCopy {
@@ -92,6 +93,7 @@ export function priceCalendarCopy(locale: StoredLocale): PriceCalendarCopy {
       loading: 'Loading prices…',
       error: 'Could not load the price calendar.',
       retry: 'Retry',
+      currency: 'Toman',
     };
   }
   if (locale === 'ar') {
@@ -103,6 +105,7 @@ export function priceCalendarCopy(locale: StoredLocale): PriceCalendarCopy {
       loading: 'جاري تحميل الأسعار…',
       error: 'تعذّر تحميل تقويم الأسعار.',
       retry: 'إعادة المحاولة',
+      currency: 'تومان',
     };
   }
   return {
@@ -113,5 +116,6 @@ export function priceCalendarCopy(locale: StoredLocale): PriceCalendarCopy {
     loading: 'در حال بارگذاری قیمت‌ها…',
     error: 'بارگذاری تقویم قیمت ناموفق بود.',
     retry: 'تلاش مجدد',
+    currency: 'تومان',
   };
 }

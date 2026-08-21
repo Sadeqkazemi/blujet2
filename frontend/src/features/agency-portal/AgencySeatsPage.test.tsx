@@ -15,6 +15,8 @@ const ROWS: AgencyAllotmentRow[] = [
     flightNo: 'BJ-100',
     departureAt: '2026-08-01T05:00:00.000Z',
     aircraftType: 'Airbus A320',
+    cabin: 'ECONOMY',
+    fareClassCode: 'Y',
     seatsAllocated: 20,
     seatsUsed: 12,
     type: 'HARD',
@@ -47,12 +49,16 @@ describe('AgencySeatsPage', () => {
       destCode: 'DXB',
       departureAt: '2026-09-01T05:00:00.000Z',
       aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
       capacity: 180,
+      agencySeatsReleased: 150,
       agencyAllocated: 30,
       ownAllocated: 10,
       availableToRequest: 150,
       pricePerSeatIrr: '30000000',
-      definitionStatus: 'DRAFT',
+      specialOffer: false,
+      definitionStatus: 'PUBLISHED',
     };
     vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
@@ -61,6 +67,8 @@ describe('AgencySeatsPage', () => {
       status: 'SUBMITTED',
       recipientCount: 1,
       flightInstanceId: option.flightInstanceId,
+      cabin: option.cabin,
+      fareClassCode: option.fareClassCode,
       seats: 12,
       preferredWeekdays: [],
       termMonths: 3,
@@ -78,6 +86,8 @@ describe('AgencySeatsPage', () => {
 
     expect(request).toHaveBeenCalledWith({
       flightInstanceId: option.flightInstanceId,
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
       seats: 12,
       preferredWeekdays: [],
       termMonths: 3,
@@ -94,11 +104,15 @@ describe('AgencySeatsPage', () => {
       destCode: 'MHD',
       departureAt: '2026-09-02T05:00:00.000Z',
       aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
       capacity: 180,
+      agencySeatsReleased: 180,
       agencyAllocated: 0,
       ownAllocated: 0,
       availableToRequest: 180,
       pricePerSeatIrr: '30000000',
+      specialOffer: false,
       definitionStatus: 'PUBLISHED',
     };
     vi.spyOn(portalApi, 'fetchAllotments').mockRejectedValue(new Error('allotments unavailable'));
@@ -196,9 +210,11 @@ describe('AgencySeatsPage', () => {
     );
   });
 
-  it('can pick COMFORT cabin and submit a COMFORT seat sale', async () => {
+  it('locks a class-bound COMFORT allotment to COMFORT and submits its free seat', async () => {
     const user = userEvent.setup();
-    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([
+      { ...ROWS[0]!, cabin: 'COMFORT', fareClassCode: 'W' },
+    ]);
     vi.spyOn(publicApi, 'fetchSeatMap').mockResolvedValue({
       flightInstanceId: 'fi1',
       seats: [{ seatCode: '12A', row: 12, cabin: 'COMFORT', status: 'FREE' }],
@@ -223,7 +239,8 @@ describe('AgencySeatsPage', () => {
 
     await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
     await user.click(await screen.findByRole('button', { name: 'ثبت فروش' }));
-    await user.selectOptions(screen.getByLabelText('کلاس پروازی'), 'COMFORT');
+    expect(screen.getByLabelText('کلاس پروازی')).toHaveValue('COMFORT');
+    expect(screen.getByLabelText('کلاس پروازی')).toBeDisabled();
     await user.type(screen.getByLabelText('نام و نام خانوادگی مسافر'), 'نگار رضایی');
     await user.selectOptions(screen.getByLabelText('صندلی'), '12A');
     await user.click(screen.getByRole('button', { name: 'صدور قطعی بلیت' }));

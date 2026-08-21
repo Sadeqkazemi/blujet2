@@ -43,7 +43,7 @@ export default function FlightPriceCalendar({
     setState('loading');
     try {
       const data = await fetchPriceCalendar(origin, dest, selectedDate.slice(0, 10));
-      setDays(data);
+      setDays([...data].sort((a, b) => a.date.localeCompare(b.date)));
       setWindowStart(0);
       setState(data.length === 0 ? 'empty' : 'ready');
     } catch {
@@ -66,10 +66,11 @@ export default function FlightPriceCalendar({
       data-testid="price-calendar"
       dir={isRTL ? 'rtl' : 'ltr'}
       aria-label={copy.title}
+      className={compact ? 'mt-3 w-full' : 'mx-auto w-full px-3 pt-3 sm:px-[26px] sm:pt-4'}
       style={{
         maxWidth: compact ? '100%' : 1320,
-        margin: compact ? '12px 0 0' : '0 auto',
-        padding: compact ? 0 : '16px 26px 0',
+        margin: compact ? '12px 0 0' : undefined,
+        padding: compact ? 0 : undefined,
         boxSizing: 'border-box',
         width: '100%',
       }}
@@ -84,11 +85,6 @@ export default function FlightPriceCalendar({
           maxWidth: '100%',
         }}
       >
-        <div style={{ marginBottom: 13 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#0d2640' }}>{copy.title}</div>
-          <div style={{ fontSize: 12.5, color: '#8a96a6', marginTop: 2 }}>{copy.subtitle}</div>
-        </div>
-
         {state === 'loading' && (
           <div data-testid="price-calendar-loading" style={{ fontSize: 13, color: '#5a6678', padding: '10px 4px' }}>
             {copy.loading}
@@ -144,14 +140,13 @@ export default function FlightPriceCalendar({
             data-testid="price-calendar-strip"
             style={{
               display: 'flex',
-              alignItems: 'stretch',
-              gap: 9,
-              overflow: 'visible',
+              alignItems: 'center',
+              gap: 8,
+              overflowX: 'hidden',
+              overflowY: 'visible',
               paddingBottom: 2,
               paddingTop: 10,
               maxWidth: '100%',
-              WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'thin',
             }}
           >
             <button
@@ -159,7 +154,7 @@ export default function FlightPriceCalendar({
               aria-label={isRTL ? 'روزهای بعدی' : 'Next days'}
               disabled={windowStart + 6 >= days.length}
               onClick={() => setWindowStart((value) => Math.min(Math.max(0, days.length - 6), value + 1))}
-              style={{ width: 40, flex: 'none', borderRadius: 12, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart + 6 >= days.length ? .35 : 1 }}
+              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart + 6 >= days.length ? .35 : 1, fontSize: 21, lineHeight: 1 }}
             >
               ‹
             </button>
@@ -170,10 +165,18 @@ export default function FlightPriceCalendar({
               const parts = formatPriceCalendarDayParts(day.date, locale);
               const priceStr = formatPriceCalendarPrice(day.minPriceIrr, locale, copy.emptyDay);
               const border = selected ? '#1668c4' : '#e6eaf0';
-              const bg = selected ? '#f2f7fd' : '#fff';
-              const color = selected ? '#1668c4' : '#0d2640';
-              const subColor = selected ? '#1668c4' : '#5a6678';
-              const priceColor = empty ? '#8a96a6' : isCheapest ? '#1f8a5b' : selected ? '#0d2640' : '#3b4554';
+              const bg = selected ? '#1668c4' : '#fff';
+              const color = selected ? '#fff' : '#0d2640';
+              const subColor = selected ? '#fff' : '#5a6678';
+              const priceColor = empty
+                ? selected
+                  ? '#d9e8fb'
+                  : '#8a96a6'
+                : selected
+                  ? '#fff'
+                  : isCheapest
+                    ? '#1f8a5b'
+                    : '#3b4554';
 
               return (
                 <button
@@ -186,14 +189,15 @@ export default function FlightPriceCalendar({
                   aria-pressed={selected}
                   onClick={() => onSelectDate(day.date)}
                   style={{
-                    flex: '1 1 0',
-                    minWidth: 0,
-                    maxWidth: 160,
+                    flex: compact ? '1 0 104px' : '1 1 0',
+                    minWidth: compact ? 104 : 0,
+                    maxWidth: compact ? 128 : 'none',
+                    minHeight: compact ? 104 : 120,
                     cursor: 'pointer',
                     borderRadius: 12,
                     border: `1.5px solid ${border}`,
                     background: bg,
-                    padding: '11px 8px',
+                    padding: '14px 8px 12px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -230,6 +234,11 @@ export default function FlightPriceCalendar({
                     style={{ fontSize: 13, fontWeight: 800, color: priceColor, whiteSpace: 'nowrap' }}
                   >
                     {priceStr}
+                    {!empty && (
+                      <span style={{ marginInlineStart: 3, fontSize: 10, fontWeight: 700 }}>
+                        {copy.currency}
+                      </span>
+                    )}
                   </span>
                 </button>
               );
@@ -239,7 +248,7 @@ export default function FlightPriceCalendar({
               aria-label={isRTL ? 'روزهای قبلی' : 'Previous days'}
               disabled={windowStart === 0}
               onClick={() => setWindowStart((value) => Math.max(0, value - 1))}
-              style={{ width: 40, flex: 'none', borderRadius: 12, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart === 0 ? .35 : 1 }}
+              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart === 0 ? .35 : 1, fontSize: 21, lineHeight: 1 }}
             >
               ›
             </button>

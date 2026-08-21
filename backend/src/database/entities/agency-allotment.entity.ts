@@ -4,17 +4,23 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
 } from 'typeorm';
-import { AllotmentType } from '../enums';
+import { AllotmentType, CabinClass } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyProfile } from './agency-profile.entity';
 import { FlightInstance } from './flight-instance.entity';
 import { User } from './user.entity';
 
 @Entity('agency_allotments')
+@Index(
+  'agency_allotments_seatRequestId_flightInstanceId_key',
+  ['seatRequestId', 'flightInstanceId'],
+  { unique: true, where: '"seatRequestId" IS NOT NULL' },
+)
 export class AgencyAllotment {
   @PrimaryColumn({
     type: 'text',
@@ -49,6 +55,22 @@ export class AgencyAllotment {
     foreignKeyConstraintName: 'agency_allotments_flightInstanceId_fkey',
   })
   flightInstance!: FlightInstance;
+
+  /** Null only for legacy/manual allotments created before class-bound sales. */
+  @Column({
+    type: 'enum',
+    enum: CabinClass,
+    enumName: 'CabinClass',
+    nullable: true,
+  })
+  cabin!: CabinClass | null;
+
+  @Column({ type: 'text', nullable: true })
+  fareClassCode!: string | null;
+
+  /** Source request; null for manual commercial allotments. */
+  @Column({ type: 'text', nullable: true })
+  seatRequestId!: string | null;
 
   @Column({ type: 'int' })
   seatsAllocated!: number;

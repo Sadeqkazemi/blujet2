@@ -100,55 +100,57 @@ export default function AgencyPortalSidebar({
         </div>
       </div>
 
-      {AGENCY_NAV_ITEMS.map((item) => {
-        const active = activeKey === item.key;
-        const badge = item.showBadge && inboxCount > 0 ? localeDigits(inboxCount, locale) : null;
-        return (
-          <NavLink
-            key={item.key}
-            to={item.path}
-            end={item.key === 'dashboard'}
-            data-testid={`agency-nav-${item.key}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 9,
-              padding: '9px 11px',
-              borderRadius: 11,
-              cursor: 'pointer',
-              fontSize: 12.5,
-              fontWeight: active ? 800 : 600,
-              color: active ? '#1668c4' : '#5a6678',
-              background: active ? '#eef4fb' : 'transparent',
-              textDecoration: 'none',
-            }}
-          >
-            <span style={{ width: 20, height: 20, display: 'flex', flex: 'none', color: 'inherit' }}>
-              <AgencyNavIcon name={item.icon} />
-            </span>
-            <span style={{ flex: 1 }}>{item.label[locale]}</span>
-            {badge && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: '#fff',
-                  background: '#e8553a',
-                  minWidth: 19,
-                  height: 19,
-                  padding: '0 5px',
-                  borderRadius: 10,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {badge}
+      <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {AGENCY_NAV_ITEMS.map((item) => {
+          const active = activeKey === item.key;
+          const badge = item.showBadge && inboxCount > 0 ? localeDigits(inboxCount, locale) : null;
+          return (
+            <NavLink
+              key={item.key}
+              to={item.path}
+              end={item.key === 'dashboard'}
+              data-testid={`agency-nav-${item.key}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                padding: '9px 11px',
+                borderRadius: 11,
+                cursor: 'pointer',
+                fontSize: 12.5,
+                fontWeight: active ? 800 : 600,
+                color: active ? '#1668c4' : '#5a6678',
+                background: active ? '#eef4fb' : 'transparent',
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{ width: 20, height: 20, display: 'flex', flex: 'none', color: 'inherit' }}>
+                <AgencyNavIcon name={item.icon} />
               </span>
-            )}
-          </NavLink>
-        );
-      })}
+              <span style={{ flex: 1 }}>{item.label[locale]}</span>
+              {badge && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: '#fff',
+                    background: '#e8553a',
+                    minWidth: 19,
+                    height: 19,
+                    padding: '0 5px',
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {badge}
+                </span>
+              )}
+            </NavLink>
+          );
+        })}
+      </nav>
 
       <button
         type="button"
@@ -156,13 +158,18 @@ export default function AgencyPortalSidebar({
         onClick={onSignOut}
         style={{
           marginTop: 'auto',
+          marginRight: -11,
+          marginLeft: -11,
+          marginBottom: -15,
+          minHeight: 72,
+          flex: 'none',
           display: 'flex',
           alignItems: 'center',
-          gap: 7,
-          padding: '10px 11px',
+          gap: 8,
+          padding: '0 22px',
           borderTop: '1px solid #eef2f7',
           cursor: 'pointer',
-          color: '#e8553a',
+          color: '#e5484d',
           fontSize: 12,
           fontWeight: 700,
           background: 'transparent',
@@ -171,7 +178,7 @@ export default function AgencyPortalSidebar({
           borderTopStyle: 'solid',
           borderTopColor: '#eef2f7',
           fontFamily: 'inherit',
-          width: '100%',
+          width: 'calc(100% + 22px)',
         }}
       >
         <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>

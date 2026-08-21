@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { fetchNav, fetchEmployeeContext } from '../api/panels';
+import { fetchNav } from '../api/panels';
 import {
   fetchCartable,
   fetchCartableUnreadCount,
@@ -24,7 +24,7 @@ import { fetchAdminLoanApplications } from '../api/loans';
 import { fetchFinancialIntegrations } from '../api/finance-manager';
 import type { NotificationRow } from '../types/notifications';
 import { faDigits } from '../lib/fa-format';
-import type { EmployeeContext, PanelNavItem } from '../types/panels';
+import type { PanelNavItem } from '../types/panels';
 import type { LowSalesAlert } from '../types/reporting';
 import { isLowSalesRole } from '../types/panel-shell';
 import PanelNotificationBell, { type PanelNotificationItem } from './PanelNotificationBell';
@@ -63,13 +63,6 @@ const ROLE_BRAND_SUB: Record<string, string> = {
 
 type NavBadge = { count: number; className: string };
 
-function nameInitials(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '؟';
-  if (parts.length === 1) return parts[0]!.slice(0, 2);
-  return `${parts[0]!.slice(0, 1)}${parts[parts.length - 1]!.slice(0, 1)}`;
-}
-
 function notificationTarget(n: NotificationRow): string {
   const type = (n.entityType ?? '').toUpperCase();
   if (n.category === 'CARTABLE' || type.includes('CARTABLE')) return '/panel/cartable';
@@ -89,7 +82,6 @@ export default function PanelShell() {
   const [badges, setBadges] = useState<Record<string, NavBadge>>({});
   const [notifications, setNotifications] = useState<PanelNotificationItem[]>([]);
   const [lowSalesAlerts, setLowSalesAlerts] = useState<LowSalesAlert[]>([]);
-  const [employeeCtx, setEmployeeCtx] = useState<EmployeeContext | null>(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const autoAiRequestedRef = useRef(false);
@@ -113,16 +105,6 @@ export default function PanelShell() {
       .then(setNav)
       .catch(() => setNav([]));
   }, []);
-
-  useEffect(() => {
-    if (user?.role !== 'EMPLOYEE') {
-      setEmployeeCtx(null);
-      return;
-    }
-    fetchEmployeeContext()
-      .then(setEmployeeCtx)
-      .catch(() => setEmployeeCtx(null));
-  }, [user?.role]);
 
   useEffect(() => {
     if (!isLowSalesRole(user?.role)) {
@@ -492,31 +474,6 @@ export default function PanelShell() {
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'COMMERCIAL_MANAGER' ||
     user?.role === 'OPERATIONS_MANAGER';
-  /** Finance + Employee + Site Admin get avatar footer chrome. */
-  const avatarShell =
-    executiveShell || user?.role === 'FINANCE_MANAGER' || user?.role === 'EMPLOYEE' || user?.role === 'SITE_ADMIN';
-  const roleInitial =
-    user?.role === 'CEO'
-      ? 'مع'
-      : user?.role === 'BOARD_CHAIR'
-        ? 'ره'
-        : user?.role === 'SENIOR_MANAGER'
-          ? 'ما'
-          : user?.role === 'FINANCE_MANAGER'
-            ? 'مم'
-            : user?.role === 'COMMERCIAL_MANAGER'
-              ? 'مب'
-              : user?.role === 'OPERATIONS_MANAGER'
-                ? 'مع'
-              : user?.role === 'SITE_ADMIN'
-                ? 'اس'
-                : user?.role === 'EMPLOYEE' && user.fullName
-                  ? nameInitials(user.fullName)
-                  : roleLabel.slice(0, 1);
-  const employeeFooterSub =
-    user?.role === 'EMPLOYEE'
-      ? [employeeCtx?.deptLabelFa, employeeCtx?.rank].filter(Boolean).join(' · ') || roleLabel
-      : null;
   const onDashboard = /^\/panel\/?$/.test(location.pathname);
   const showExecNotifChrome = executiveShell && isLowSalesRole(user?.role) && !onDashboard;
   const notifAlerts = lowSalesAlerts.slice(1);
@@ -582,54 +539,31 @@ export default function PanelShell() {
           })}
         </nav>
 
-        {avatarShell ? (
-          <div className="mt-auto border-t border-panel-border p-4">
-            <div className="flex items-center gap-2.5">
-              <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#9333ea] text-[11px] font-extrabold text-white">
-                {roleInitial}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-bold text-white">
-                  {user?.role === 'EMPLOYEE' ? (user.fullName ?? roleLabel) : roleLabel}
-                </div>
-                {user?.role === 'EMPLOYEE' ? (
-                  <div className="truncate text-[10px] text-[#6b7b94]">{employeeFooterSub}</div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setLogoutConfirmOpen(true)}
-                    className={`text-[10.5px] transition ${user?.role === 'SITE_ADMIN' ? 'font-bold text-[#f87171] hover:text-[#fca5a5]' : 'text-[#9fb0c7] hover:text-white'}`}
-                  >
-                    خروج از پنل
-                  </button>
-                )}
-              </div>
-              {user?.role === 'EMPLOYEE' && (
-                <button
-                  type="button"
-                  onClick={() => setLogoutConfirmOpen(true)}
-                  title="خروج"
-                  aria-label="خروج از پنل"
-                  className="flex-none text-[#6b7b94] transition hover:text-white"
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <path d="M16 17l5-5-5-5M21 12H9" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="mt-auto border-t border-panel-border pt-3">
-            <button
-              onClick={() => setLogoutConfirmOpen(true)}
-              className={`w-full rounded-[11px] border py-2 text-xs transition ${user?.role === 'SITE_ADMIN' ? 'border-red-400/20 text-[#f87171] hover:bg-red-400/5' : 'border-panel-border text-panel-muted hover:bg-white/5'}`}
+        <div className="-mx-[11px] -mb-[15px] mt-auto flex-none border-t border-panel-border">
+          <button
+            type="button"
+            data-testid="panel-logout"
+            onClick={() => setLogoutConfirmOpen(true)}
+            className="flex min-h-[72px] w-full items-center gap-2 px-[22px] text-right text-xs font-bold text-[#f87171] transition hover:bg-red-400/5 hover:text-[#fca5a5]"
+          >
+            <svg
+              width="19"
+              height="19"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
             >
-              خروج از پنل
-            </button>
-          </div>
-        )}
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+            <span>خروج از حساب</span>
+          </button>
+        </div>
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
@@ -656,7 +590,7 @@ export default function PanelShell() {
       </main>
       <ConfirmActionDialog
         open={logoutConfirmOpen}
-        title="خروج از پنل"
+        title="خروج از حساب"
         message="آیا مطمئن هستید که می‌خواهید از پنل مدیریت خارج شوید؟"
         confirmLabel="بله، خارج شو"
         cancelLabel="انصراف"

@@ -6,7 +6,7 @@ export interface Airport {
   tz: string;
 }
 
-export type CabinClass = 'ECONOMY' | 'COMFORT' | 'BUSINESS';
+export type CabinClass = 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
 
 export interface SearchCabinOption {
   cabin: CabinClass;

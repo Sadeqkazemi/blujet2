@@ -14,6 +14,7 @@ import { AgencySeatCommitment } from '../../database/entities/agency-seat-commit
 import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
 import { AgencyPortalController } from './agency-portal.controller';
 import { AgencyPortalService } from './agency-portal.service';
 import { AuditModule } from '../audit/audit.module';
@@ -40,6 +41,7 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
       CharterCommitment,
       AgencySeatRequest,
       AgencySeatRequestFlight,
+      FareRule,
     ]),
     AuditModule,
     CartableModule,

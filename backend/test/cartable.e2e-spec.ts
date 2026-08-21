@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
-import { DataSource } from 'typeorm';
+import { DataSource, In, Not } from 'typeorm';
 import { CartableTask } from '../src/database/entities/cartable-task.entity';
 import { User } from '../src/database/entities/user.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
@@ -13,6 +13,7 @@ import { AgencyMembershipRequest } from '../src/database/entities/agency-members
 import { Notification } from '../src/database/entities/notification.entity';
 import { loginAs } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
+import { EXEC_ROLES } from '../src/common/exec-roles';
 
 describe('Cartable + referrals + messages (e2e)', () => {
   let app: INestApplication<App>;
@@ -315,18 +316,26 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(dup.status).toBe(409);
 
     // The chair received a cartable task and approves it.
+    const chair = await loginAs(app, 'chair');
+    const chairId = await userId('chair');
     const chairTask = await dataSource
       .getRepository(CartableTask)
       .findOneByOrFail({
         sourceType: 'CHAIR_PERMISSION',
         sourceId: created.body.data.id,
+        assigneeId: chairId,
       });
-    const chair = await loginAs(app, 'chair');
     const approve = await request(app.getHttpServer())
       .patch(`/cartable/${chairTask.id}/approve`)
       .set('Authorization', `Bearer ${chair.accessToken}`)
       .send({ note: 'مجوز صادر شد' });
     expect(approve.status).toBe(200);
+    const siblingTasks = await dataSource.getRepository(CartableTask).findBy({
+      sourceType: 'CHAIR_PERMISSION',
+      sourceId: created.body.data.id,
+    });
+    expect(siblingTasks.length).toBeGreaterThan(0);
+    expect(siblingTasks.every((task) => task.status === 'APPROVED')).toBe(true);
 
     const status = await request(app.getHttpServer())
       .get('/cartable/chair-permission')
@@ -726,14 +735,18 @@ describe('Cartable + referrals + messages (e2e)', () => {
 
   // ── Manager messages ─────────────────────────────────────────────────
 
-  it('a message to FINANCE delivers exactly one cartable task to the finance manager', async () => {
+  it('a message to FINANCE delivers one cartable task to every active finance manager', async () => {
     const ceo = await loginAs(app, 'ceo');
+    const expectedRecipients = await dataSource.getRepository(User).countBy({
+      role: 'FINANCE_MANAGER',
+      isActive: true,
+    });
     const res = await request(app.getHttpServer())
       .post('/manager-messages')
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ toDept: 'FINANCE', subject: 'موضوع تستی', body: 'متن تستی' });
     expect(res.status).toBe(201);
-    expect(res.body.data.deliveredCount).toBe(1);
+    expect(res.body.data.deliveredCount).toBe(expectedRecipients);
 
     const financeId = await userId('finance');
     const delivered = await dataSource.getRepository(CartableTask).findOneBy({
@@ -745,14 +758,22 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(delivered!.title).toBe('موضوع تستی');
   });
 
-  it('ALL_MANAGERS fans out to the other 4 exec roles (sender excluded); SUPPORT flags PARTIAL_DELIVERY', async () => {
+  it('ALL_MANAGERS fans out to every active exec account except the sender; SUPPORT flags PARTIAL_DELIVERY', async () => {
     const ceo = await loginAs(app, 'ceo');
+    const ceoId = await userId('ceo');
+    const expectedRecipients = await dataSource.getRepository(User).count({
+      where: {
+        role: In([...EXEC_ROLES]),
+        isActive: true,
+        id: Not(ceoId),
+      },
+    });
     const broadcast = await request(app.getHttpServer())
       .post('/manager-messages')
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ toDept: 'ALL_MANAGERS', subject: 'اعلان عمومی', body: 'متن' });
     expect(broadcast.status).toBe(201);
-    expect(broadcast.body.data.deliveredCount).toBe(4);
+    expect(broadcast.body.data.deliveredCount).toBe(expectedRecipients);
 
     const support = await request(app.getHttpServer())
       .post('/manager-messages')

@@ -113,6 +113,8 @@ export interface AgencyAllotmentRow {
   route: string;
   departureAt: string;
   aircraftType: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST' | null;
+  fareClassCode: string | null;
   seatsAllocated: number;
   seatsUsed: number;
   type: 'SOFT' | 'HARD';
@@ -128,11 +130,15 @@ export interface AgencySeatRequestOption {
   destCode: string;
   departureAt: string;
   aircraftType: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  fareClassCode: string;
   capacity: number;
+  agencySeatsReleased: number;
   agencyAllocated: number;
   ownAllocated: number;
   availableToRequest: number;
   pricePerSeatIrr: string | null;
+  specialOffer: boolean;
   definitionStatus: 'DRAFT' | 'PENDING_REVISION' | 'PUBLISHED' | 'REJECTED';
 }
 
@@ -141,6 +147,8 @@ export interface AgencySeatRequestResult {
   status: 'SUBMITTED';
   recipientCount: number;
   flightInstanceId: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  fareClassCode: string;
   seats: number;
   preferredWeekdays?: number[];
   termMonths?: 0 | 1 | 3 | 6 | 12;
@@ -152,6 +160,8 @@ export interface AgencySeatRequestHistoryRow {
   status: 'PENDING' | 'PENDING_FINANCE' | 'APPROVED' | 'REJECTED';
   route: string | null;
   aircraftType: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST' | null;
+  fareClassCode: string | null;
   seats: number;
   termMonths: number | null;
   unitPriceIrr: string;

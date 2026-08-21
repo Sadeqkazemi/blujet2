@@ -3563,9 +3563,8 @@ contracts and retires the production mock adapters.
   derived only from the authenticated agency JWT.
 - [x] Verified 30 focused frontend tests, 39 backend e2e tests, both production
   builds, frontend lint, targeted backend lint, and `git diff --check`.
-- [ ] Local browser visual smoke is pending because the in-app browser blocked
-  every localhost bridge even though both local servers responded; component
-  navigation coverage passed. See
+- [x] Local browser visual smoke was completed through the reachable local
+  network bridge; component navigation coverage also passed. See
   `docs/features/agency-portal-design-sync.md`.
 
 # Commercial Manager screenshot gap sync (2026-08-21)
@@ -3595,4 +3594,30 @@ contracts and retires the production mock adapters.
 - [x] Verified 45 focused frontend tests, both production builds, focused lint,
   local results-page browser smoke, and `git diff --check`. See
   `docs/features/reference-ui-gap-corrections.md`.
+
+# Class-bound agency inventory and workflow hardening (2026-08-21)
+
+- [x] Agency releases and purchases are bound to an exact flight occurrence,
+  cabin and fare class. Cash/credit activation is atomic, idempotent, and
+  cannot exceed the commercial release or race a release reduction.
+- [x] Aircraft cabins, including FIRST, are the source of physical capacity;
+  commercial controls only the sellable fare/channel quotas. Sold-out flights
+  remain active until departure, when lifecycle automation moves them to
+  DEPARTED/FLOWN.
+- [x] Agency inventory is presented as one collapsed card per flight/class.
+  The six-card price calendar matches the desktop reference and is deliberately
+  omitted from responsive/mobile results, per the final product decision.
+- [x] Chair-permission cartable tasks fan out to every active chair while the
+  first atomic decision closes all sibling tasks. Manager messages continue to
+  fan out to every active recipient account.
+- [x] Verified both production builds, 54 focused frontend tests, 5 lifecycle
+  unit tests, 98 backend E2E tests, responsive local browser smoke, migrations,
+  and `git diff --check`.
+
+# Local Vazirmatn font (2026-08-21)
+
+- [x] Bundled the supplied Vazirmatn v33.003 variable WOFF2 font locally and
+  made it the shared sans-serif font for the public site and all panels.
+- [x] Removed the redundant npm Vazirmatn package so production rendering does
+  not depend on loading the Persian font from a package-generated asset.
 

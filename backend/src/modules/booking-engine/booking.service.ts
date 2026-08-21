@@ -25,6 +25,7 @@ import { PaymentReconciliation } from '../../database/entities/payment-reconcili
 import { PayIdempotencyRecord } from '../../database/entities/pay-idempotency-record.entity';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AuditService } from '../audit/audit.service';
@@ -743,6 +744,12 @@ export class BookingService {
       });
     }
     assertSellableForSale(instance);
+    if (allotment.cabin && allotment.cabin !== dto.cabin) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'این سهمیه فقط برای کلاس پروازی تخصیص‌یافته قابل استفاده است.',
+      });
+    }
     validatePassengerManifest(dto.passengers, instance.departureAt);
     if (
       (instance.saleStartsAt && instance.saleStartsAt > now) ||
@@ -806,11 +813,19 @@ export class BookingService {
       }
     }
 
-    const fareClass = await resolveFareClass(
-      this.bookingRepo.manager,
-      instance.id,
-      dto.cabin,
-    );
+    const fareClass = allotment.fareClassCode
+      ? await this.bookingRepo.manager.findOne(FareRule, {
+          where: {
+            flightInstanceId: instance.id,
+            cabin: dto.cabin,
+            classCode: allotment.fareClassCode,
+          },
+        })
+      : await resolveFareClass(
+          this.bookingRepo.manager,
+          instance.id,
+          dto.cabin,
+        );
     const unitPriceIrr =
       allotment.contractPriceIrr ??
       (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
@@ -856,6 +871,7 @@ export class BookingService {
         });
         if (
           !lockedAllotment ||
+          (lockedAllotment.cabin && lockedAllotment.cabin !== dto.cabin) ||
           (lockedAllotment.type === 'SOFT' &&
             !!lockedAllotment.releaseAt &&
             lockedAllotment.releaseAt <= new Date())
