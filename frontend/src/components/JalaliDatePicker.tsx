@@ -70,6 +70,7 @@ interface JalaliDatePickerProps {
     dest: string;
     locale: StoredLocale;
   };
+  disabled?: boolean;
 }
 
 function CalendarPortal({ children }: { children: React.ReactNode }) {
@@ -92,6 +93,7 @@ export default function JalaliDatePicker({
   embedded = false,
   locale: localeProp,
   priceCalendar,
+  disabled = false,
 }: JalaliDatePickerProps) {
   const isPriceCalendar = Boolean(priceCalendar);
   const locale = localeProp ?? priceCalendar?.locale ?? "fa";
@@ -109,7 +111,9 @@ export default function JalaliDatePicker({
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesError, setPricesError] = useState(false);
   const [viewMonth, setViewMonth] = useState(() =>
-    value ? dayjs(value).calendar(calendarSystem) : dayjs().calendar(calendarSystem),
+    value
+      ? dayjs(value).calendar(calendarSystem)
+      : dayjs().calendar(calendarSystem),
   );
   const [popupPos, setPopupPos] = useState<{
     top?: number;
@@ -178,9 +182,11 @@ export default function JalaliDatePicker({
   useEffect(() => {
     if (!open || !priceCalendar) return;
 
-    const visibleCells = buildMonthCells(viewMonth, minDate ?? null, locale).filter(
-      (cell): cell is Cell => cell !== null,
-    );
+    const visibleCells = buildMonthCells(
+      viewMonth,
+      minDate ?? null,
+      locale,
+    ).filter((cell): cell is Cell => cell !== null);
     const cacheKey = `${priceCalendar.origin}-${priceCalendar.dest}-${monthKey}`;
     const cached = priceCacheRef.current.get(cacheKey);
     if (cached) {
@@ -235,16 +241,17 @@ export default function JalaliDatePicker({
       ? value.slice(0, 10)
       : null;
 
-  const displayValue = value
-    ? formatLocaleDate(value, locale)
-    : placeholder;
+  const displayValue = value ? formatLocaleDate(value, locale) : placeholder;
 
   const weekdaySub =
     subLabel ??
     (value
       ? localeWeekdayLong(dayjs(value).calendar(calendarSystem), locale) +
         " " +
-        localeDigits(String(dayjs(value).calendar(calendarSystem).year()), locale)
+        localeDigits(
+          String(dayjs(value).calendar(calendarSystem).year()),
+          locale,
+        )
       : label);
 
   const dark = theme === "dark";
@@ -266,13 +273,20 @@ export default function JalaliDatePicker({
   const priceCalendarMargin = 12;
   const viewportWidth = visibleViewportWidth;
   const viewportHeight =
-    mobileViewport?.visibleHeight ?? (typeof window === "undefined" ? 0 : window.innerHeight);
-  const pricePopupWidth = Math.min(840, Math.max(0, viewportWidth - priceCalendarMargin * 2));
+    mobileViewport?.visibleHeight ??
+    (typeof window === "undefined" ? 0 : window.innerHeight);
+  const pricePopupWidth = Math.min(
+    840,
+    Math.max(0, viewportWidth - priceCalendarMargin * 2),
+  );
   const pricePopupLeft =
     (mobileViewport?.offsetLeft ?? 0) +
     Math.max(priceCalendarMargin, (viewportWidth - pricePopupWidth) / 2);
   const pricePopupTop = (mobileViewport?.offsetTop ?? 0) + priceCalendarMargin;
-  const pricePopupMaxHeight = Math.max(0, viewportHeight - priceCalendarMargin * 2);
+  const pricePopupMaxHeight = Math.max(
+    0,
+    viewportHeight - priceCalendarMargin * 2,
+  );
   const isModalCalendar = isPriceCalendar || isResponsiveCalendar;
   const responsiveSheetGap = Math.min(
     64,
@@ -280,7 +294,10 @@ export default function JalaliDatePicker({
   );
   const responsivePopupWidth = viewportWidth;
   const responsivePopupLeft = mobileViewport?.offsetLeft ?? 0;
-  const responsiveAvailableHeight = Math.max(0, viewportHeight - responsiveSheetGap);
+  const responsiveAvailableHeight = Math.max(
+    0,
+    viewportHeight - responsiveSheetGap,
+  );
   const responsivePopupHeight = Math.min(
     responsiveAvailableHeight,
     isPriceCalendar ? 620 : 470,
@@ -296,13 +313,16 @@ export default function JalaliDatePicker({
     >
       <div
         data-testid={testId}
+        aria-disabled={disabled || undefined}
         onClick={() => {
+          if (disabled) return;
           setDraftIso(value ? value.slice(0, 10) : null);
           if (value) setViewMonth(dayjs(value).calendar(calendarSystem));
           setOpen((v) => !v);
         }}
         style={{
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.6 : 1,
           padding: embedded
             ? 0
             : compact
@@ -315,7 +335,13 @@ export default function JalaliDatePicker({
           alignItems: inlineTrigger ? "center" : undefined,
           justifyContent: embedded || singleLine ? "space-between" : "center",
           gap: compact ? 6 : undefined,
-          height: embedded ? "auto" : singleLine ? "100%" : compact ? 38 : "100%",
+          height: embedded
+            ? "auto"
+            : singleLine
+              ? "100%"
+              : compact
+                ? 38
+                : "100%",
           width: embedded ? "100%" : undefined,
           boxSizing: "border-box",
         }}
@@ -432,366 +458,398 @@ export default function JalaliDatePicker({
             />
           )}
           <div
-          ref={popupRef}
-          data-testid={testId ? `${testId}-popup` : undefined}
-          role={isModalCalendar ? "dialog" : undefined}
-          aria-modal={isModalCalendar ? true : undefined}
-          style={{
-            position: isModalCalendar ? "fixed" : "absolute",
-            top: isResponsiveCalendar
-              ? responsivePopupTop
-              : priceCalendar
-                ? pricePopupTop
-                : popupPos?.top,
-            bottom: isModalCalendar ? undefined : popupPos?.bottom,
-            left: isResponsiveCalendar
-              ? responsivePopupLeft
-              : priceCalendar
-                ? pricePopupLeft
-                : (popupPos?.left ?? 0),
-            visibility: dropdownReady ? "visible" : "hidden",
-            width: isResponsiveCalendar
-              ? responsivePopupWidth
-              : priceCalendar
-                ? pricePopupWidth
-                : 300,
-            height: isResponsiveCalendar ? responsivePopupHeight : undefined,
-            maxWidth: isResponsiveCalendar ? "100%" : priceCalendar ? 840 : "calc(100vw - 24px)",
-            maxHeight: isResponsiveCalendar
-              ? responsivePopupHeight
-              : isPriceCalendar
-                ? pricePopupMaxHeight
-                : undefined,
-            overflowY: isModalCalendar ? "auto" : undefined,
-            overscrollBehavior: isModalCalendar ? "contain" : undefined,
-            boxSizing: "border-box",
-            background: popupBg,
-            border: `1px solid ${popupBorder}`,
-            borderRadius: isResponsiveCalendar ? "22px 22px 0 0" : 18,
-            boxShadow: dark
-              ? "0 24px 60px -16px rgba(0,0,0,.6)"
-              : "0 24px 56px -14px rgba(13,38,102,.34)",
-            padding: isResponsiveCalendar
-              ? "8px 20px 18px"
-              : priceCalendar
-                ? "18px 16px 14px"
-                : "18px 20px",
-            zIndex: isModalCalendar ? 1200 : 200,
-            color: dark ? "#e7ecf3" : undefined,
-          }}
-        >
-          {isResponsiveCalendar && (
-            <>
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 40,
-                  height: 4,
-                  borderRadius: 999,
-                  background: "#cfd5de",
-                  margin: "2px auto 14px",
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  direction: "ltr",
-                  borderBottom: `1px solid ${popupBorder}`,
-                  paddingBottom: 12,
-                  marginBottom: 14,
-                }}
-              >
-                <button
-                  type="button"
-                  aria-label={locale === "en" ? "Close" : locale === "ar" ? "إغلاق" : "بستن"}
-                  data-testid={testId ? `${testId}-mobile-close` : undefined}
-                  onClick={() => setOpen(false)}
-                  style={{
-                    border: 0,
-                    background: "transparent",
-                    color: mutedColor,
-                    fontFamily: "inherit",
-                    fontSize: 22,
-                    lineHeight: 1,
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
-                <strong
-                  dir={isRTL ? "rtl" : "ltr"}
-                  style={{ color: dark ? "#e7ecf3" : "#0d2640", fontSize: 14 }}
-                >
-                  {label}
-                </strong>
-              </div>
-            </>
-          )}
-          <div
+            ref={popupRef}
+            data-testid={testId ? `${testId}-popup` : undefined}
+            role={isModalCalendar ? "dialog" : undefined}
+            aria-modal={isModalCalendar ? true : undefined}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              marginBottom: 14,
+              position: isModalCalendar ? "fixed" : "absolute",
+              top: isResponsiveCalendar
+                ? responsivePopupTop
+                : priceCalendar
+                  ? pricePopupTop
+                  : popupPos?.top,
+              bottom: isModalCalendar ? undefined : popupPos?.bottom,
+              left: isResponsiveCalendar
+                ? responsivePopupLeft
+                : priceCalendar
+                  ? pricePopupLeft
+                  : (popupPos?.left ?? 0),
+              visibility: dropdownReady ? "visible" : "hidden",
+              width: isResponsiveCalendar
+                ? responsivePopupWidth
+                : priceCalendar
+                  ? pricePopupWidth
+                  : 300,
+              height: isResponsiveCalendar ? responsivePopupHeight : undefined,
+              maxWidth: isResponsiveCalendar
+                ? "100%"
+                : priceCalendar
+                  ? 840
+                  : "calc(100vw - 24px)",
+              maxHeight: isResponsiveCalendar
+                ? responsivePopupHeight
+                : isPriceCalendar
+                  ? pricePopupMaxHeight
+                  : undefined,
+              overflowY: isModalCalendar ? "auto" : undefined,
+              overscrollBehavior: isModalCalendar ? "contain" : undefined,
+              boxSizing: "border-box",
+              background: popupBg,
+              border: `1px solid ${popupBorder}`,
+              borderRadius: isResponsiveCalendar ? "22px 22px 0 0" : 18,
+              boxShadow: dark
+                ? "0 24px 60px -16px rgba(0,0,0,.6)"
+                : "0 24px 56px -14px rgba(13,38,102,.34)",
+              padding: isResponsiveCalendar
+                ? "8px 20px 18px"
+                : priceCalendar
+                  ? "18px 16px 14px"
+                  : "18px 20px",
+              zIndex: isModalCalendar ? 1200 : 200,
+              color: dark ? "#e7ecf3" : undefined,
             }}
           >
-            {priceCalendar && (
+            {isResponsiveCalendar && (
+              <>
+                <div
+                  aria-hidden="true"
+                  style={{
+                    width: 40,
+                    height: 4,
+                    borderRadius: 999,
+                    background: "#cfd5de",
+                    margin: "2px auto 14px",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    direction: "ltr",
+                    borderBottom: `1px solid ${popupBorder}`,
+                    paddingBottom: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <button
+                    type="button"
+                    aria-label={
+                      locale === "en"
+                        ? "Close"
+                        : locale === "ar"
+                          ? "إغلاق"
+                          : "بستن"
+                    }
+                    data-testid={testId ? `${testId}-mobile-close` : undefined}
+                    onClick={() => setOpen(false)}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: mutedColor,
+                      fontFamily: "inherit",
+                      fontSize: 22,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ×
+                  </button>
+                  <strong
+                    dir={isRTL ? "rtl" : "ltr"}
+                    style={{
+                      color: dark ? "#e7ecf3" : "#0d2640",
+                      fontSize: 14,
+                    }}
+                  >
+                    {label}
+                  </strong>
+                </div>
+              </>
+            )}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 14,
+              }}
+            >
+              {priceCalendar && (
+                <span
+                  style={{
+                    marginInlineStart: "auto",
+                    padding: "7px 15px",
+                    border: `1.5px solid ${popupBorder}`,
+                    borderRadius: 22,
+                    color: mutedColor,
+                    fontSize: "11.5px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {locale === "en"
+                    ? "Gregorian calendar"
+                    : locale === "ar"
+                      ? "التقويم الميلادي"
+                      : "تقویم شمسی"}
+                </span>
+              )}
               <span
+                data-testid={testId ? `${testId}-today` : undefined}
+                onClick={() => {
+                  const today = dayjs().calendar(calendarSystem);
+                  const iso = toIsoDateOnly(today);
+                  if (minIso && iso < minIso.slice(0, 10)) return;
+                  setViewMonth(today);
+                  if (priceCalendar) {
+                    setDraftIso(iso);
+                  } else {
+                    onChange(isoDateAtNoon(iso));
+                    setOpen(false);
+                  }
+                }}
                 style={{
-                  marginInlineStart: "auto",
                   padding: "7px 15px",
-                  border: `1.5px solid ${popupBorder}`,
+                  border: "1.5px solid #1668c4",
                   borderRadius: 22,
-                  color: mutedColor,
+                  color: "#1668c4",
                   fontSize: "11.5px",
                   fontWeight: 700,
+                  cursor: "pointer",
                 }}
               >
-                {locale === "en" ? "Gregorian calendar" : locale === "ar" ? "التقويم الميلادي" : "تقویم شمسی"}
+                {locale === "en"
+                  ? "Today"
+                  : locale === "ar"
+                    ? "اليوم"
+                    : "تاریخ امروز"}
               </span>
-            )}
-            <span
-              data-testid={testId ? `${testId}-today` : undefined}
-              onClick={() => {
-                const today = dayjs().calendar(calendarSystem);
-                const iso = toIsoDateOnly(today);
-                if (minIso && iso < minIso.slice(0, 10)) return;
-                setViewMonth(today);
-                if (priceCalendar) {
-                  setDraftIso(iso);
-                } else {
-                  onChange(isoDateAtNoon(iso));
-                  setOpen(false);
-                }
-              }}
-              style={{
-                padding: "7px 15px",
-                border: "1.5px solid #1668c4",
-                borderRadius: 22,
-                color: "#1668c4",
-                fontSize: "11.5px",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {locale === "en" ? "Today" : locale === "ar" ? "اليوم" : "تاریخ امروز"}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              direction: "ltr",
-              marginBottom: 12,
-            }}
-          >
-            <span
-              onClick={() => setViewMonth(viewMonth.subtract(1, "month"))}
-              style={{
-                width: 36,
-                height: 36,
-                border: `1.5px solid ${dark ? "#2a3550" : "#e6eaf0"}`,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#1668c4",
-                fontSize: "14.5px",
-                cursor: "pointer",
-              }}
-            >
-              ‹
-            </span>
-            <div
-              data-testid={testId ? `${testId}-month-label` : undefined}
-              style={{
-                textAlign: "center",
-                fontSize: "13.5px",
-                fontWeight: 800,
-                color: dark ? "#e7ecf3" : "#0d2640",
-              }}
-            >
-              {localeMonthYear(viewMonth, locale)}
             </div>
-            <span
-              data-testid={testId ? `${testId}-next-month` : undefined}
-              onClick={() => setViewMonth(viewMonth.add(1, "month"))}
-              style={{
-                width: 36,
-                height: 36,
-                border: `1.5px solid ${dark ? "#2a3550" : "#e6eaf0"}`,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#1668c4",
-                fontSize: "14.5px",
-                cursor: "pointer",
-              }}
-            >
-              ›
-            </span>
-          </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7,1fr)",
-              gap: 2,
-              marginBottom: 6,
-            }}
-          >
-            {localeWeekdays[locale].map((w) => (
-              <span
-                key={w}
-                style={{
-                  textAlign: "center",
-                  fontSize: 10,
-                  color: dark ? "#6b7b94" : "#9aa4b2",
-                  fontWeight: 700,
-                }}
-              >
-                {w}
-              </span>
-            ))}
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(7,1fr)",
-              gap: 2,
-            }}
-          >
-            {cells.map((c, i) => {
-              if (!c) return <span key={`blank-${i}`} />;
-              const isSelected = selectedIsoDay === c.iso;
-              const price = prices[c.iso];
-              const hasPrice = price != null && !isPriceCalendarEmpty(price);
-              return (
-                <span
-                  key={c.iso}
-                  data-testid={testId ? `${testId}-day-${c.date}` : undefined}
-                  onClick={() => {
-                    if (c.disabled) return;
-                    if (priceCalendar) {
-                      setDraftIso(c.iso);
-                    } else {
-                      onChange(isoDateAtNoon(c.iso));
-                      setOpen(false);
-                    }
-                  }}
-                  style={{
-                    minHeight: priceCalendar ? 44 : 36,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "11.5px",
-                    fontWeight: isSelected ? 800 : 500,
-                    color: c.disabled
-                      ? dark
-                        ? "#3a4558"
-                        : "#ccd3dd"
-                      : isSelected
-                        ? "#fff"
-                        : dark
-                          ? "#e7ecf3"
-                          : "#16202e",
-                    background: isSelected
-                      ? "#3f6fc6"
-                      : priceCalendar
-                        ? dark
-                          ? "#172236"
-                          : "#fff"
-                        : "transparent",
-                    border: priceCalendar
-                      ? `1px solid ${isSelected ? "#3f6fc6" : popupBorder}`
-                      : undefined,
-                    borderRadius: 10,
-                    cursor: c.disabled ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {localeDigits(c.date, locale)}
-                  {priceCalendar && hasPrice && (
-                    <small
-                      data-testid={testId ? `${testId}-price-${c.iso}` : undefined}
-                      title={formatPriceCalendarPrice(
-                        price,
-                        priceCalendar.locale,
-                        priceCalendarCopy(priceCalendar.locale).emptyDay,
-                      )}
-                      style={{
-                        marginTop: 3,
-                        maxWidth: "100%",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        fontSize: 8,
-                        lineHeight: 1.2,
-                        color: isSelected ? "#fff" : "#1f8a5b",
-                        direction: "ltr",
-                      }}
-                    >
-                      {formatPriceCalendarPrice(
-                        price,
-                        priceCalendar.locale,
-                        priceCalendarCopy(priceCalendar.locale).emptyDay,
-                      )}
-                    </small>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-          {priceCalendar && (
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                gap: 12,
-                borderTop: `1px solid ${popupBorder}`,
-                marginTop: 14,
-                paddingTop: 12,
+                direction: "ltr",
+                marginBottom: 12,
               }}
             >
-              <span style={{ color: pricesError ? "#c2410c" : mutedColor, fontSize: 11 }}>
-                {pricesLoading
-                  ? priceCalendarCopy(priceCalendar.locale).loading
-                  : pricesError
-                    ? priceCalendarCopy(priceCalendar.locale).error
-                    : draftIso
-                      ? formatLocaleDate(isoDateAtNoon(draftIso), locale)
-                      : ""}
-              </span>
-              <button
-                type="button"
-                data-testid={testId ? `${testId}-confirm` : undefined}
-                disabled={!draftIso}
-                onClick={() => {
-                  if (!draftIso) return;
-                  onChange(isoDateAtNoon(draftIso));
-                  setOpen(false);
-                }}
+              <span
+                onClick={() => setViewMonth(viewMonth.subtract(1, "month"))}
                 style={{
-                  border: 0,
-                  borderRadius: 10,
-                  background: draftIso ? "#3f6fc6" : "#ccd3dd",
-                  color: "#fff",
-                  padding: "10px 24px",
-                  fontFamily: "inherit",
-                  fontWeight: 800,
-                  cursor: draftIso ? "pointer" : "not-allowed",
+                  width: 36,
+                  height: 36,
+                  border: `1.5px solid ${dark ? "#2a3550" : "#e6eaf0"}`,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#1668c4",
+                  fontSize: "14.5px",
+                  cursor: "pointer",
                 }}
               >
-                {priceCalendar.locale === "en" ? "Confirm" : priceCalendar.locale === "ar" ? "تأكيد" : "تأیید"}
-              </button>
+                ‹
+              </span>
+              <div
+                data-testid={testId ? `${testId}-month-label` : undefined}
+                style={{
+                  textAlign: "center",
+                  fontSize: "13.5px",
+                  fontWeight: 800,
+                  color: dark ? "#e7ecf3" : "#0d2640",
+                }}
+              >
+                {localeMonthYear(viewMonth, locale)}
+              </div>
+              <span
+                data-testid={testId ? `${testId}-next-month` : undefined}
+                onClick={() => setViewMonth(viewMonth.add(1, "month"))}
+                style={{
+                  width: 36,
+                  height: 36,
+                  border: `1.5px solid ${dark ? "#2a3550" : "#e6eaf0"}`,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#1668c4",
+                  fontSize: "14.5px",
+                  cursor: "pointer",
+                }}
+              >
+                ›
+              </span>
             </div>
-          )}
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7,1fr)",
+                gap: 2,
+                marginBottom: 6,
+              }}
+            >
+              {localeWeekdays[locale].map((w) => (
+                <span
+                  key={w}
+                  style={{
+                    textAlign: "center",
+                    fontSize: 10,
+                    color: dark ? "#6b7b94" : "#9aa4b2",
+                    fontWeight: 700,
+                  }}
+                >
+                  {w}
+                </span>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7,1fr)",
+                gap: 2,
+              }}
+            >
+              {cells.map((c, i) => {
+                if (!c) return <span key={`blank-${i}`} />;
+                const isSelected = selectedIsoDay === c.iso;
+                const price = prices[c.iso];
+                const hasPrice = price != null && !isPriceCalendarEmpty(price);
+                return (
+                  <span
+                    key={c.iso}
+                    data-testid={testId ? `${testId}-day-${c.date}` : undefined}
+                    onClick={() => {
+                      if (c.disabled) return;
+                      if (priceCalendar) {
+                        setDraftIso(c.iso);
+                      } else {
+                        onChange(isoDateAtNoon(c.iso));
+                        setOpen(false);
+                      }
+                    }}
+                    style={{
+                      minHeight: priceCalendar ? 44 : 36,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "11.5px",
+                      fontWeight: isSelected ? 800 : 500,
+                      color: c.disabled
+                        ? dark
+                          ? "#3a4558"
+                          : "#ccd3dd"
+                        : isSelected
+                          ? "#fff"
+                          : dark
+                            ? "#e7ecf3"
+                            : "#16202e",
+                      background: isSelected
+                        ? "#3f6fc6"
+                        : priceCalendar
+                          ? dark
+                            ? "#172236"
+                            : "#fff"
+                          : "transparent",
+                      border: priceCalendar
+                        ? `1px solid ${isSelected ? "#3f6fc6" : popupBorder}`
+                        : undefined,
+                      borderRadius: 10,
+                      cursor: c.disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {localeDigits(c.date, locale)}
+                    {priceCalendar && hasPrice && (
+                      <small
+                        data-testid={
+                          testId ? `${testId}-price-${c.iso}` : undefined
+                        }
+                        title={formatPriceCalendarPrice(
+                          price,
+                          priceCalendar.locale,
+                          priceCalendarCopy(priceCalendar.locale).emptyDay,
+                        )}
+                        style={{
+                          marginTop: 3,
+                          maxWidth: "100%",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          fontSize: 8,
+                          lineHeight: 1.2,
+                          color: isSelected ? "#fff" : "#1f8a5b",
+                          direction: "ltr",
+                        }}
+                      >
+                        {formatPriceCalendarPrice(
+                          price,
+                          priceCalendar.locale,
+                          priceCalendarCopy(priceCalendar.locale).emptyDay,
+                        )}
+                      </small>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+            {priceCalendar && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  borderTop: `1px solid ${popupBorder}`,
+                  marginTop: 14,
+                  paddingTop: 12,
+                }}
+              >
+                <span
+                  style={{
+                    color: pricesError ? "#c2410c" : mutedColor,
+                    fontSize: 11,
+                  }}
+                >
+                  {pricesLoading
+                    ? priceCalendarCopy(priceCalendar.locale).loading
+                    : pricesError
+                      ? priceCalendarCopy(priceCalendar.locale).error
+                      : draftIso
+                        ? formatLocaleDate(isoDateAtNoon(draftIso), locale)
+                        : ""}
+                </span>
+                <button
+                  type="button"
+                  data-testid={testId ? `${testId}-confirm` : undefined}
+                  disabled={!draftIso}
+                  onClick={() => {
+                    if (!draftIso) return;
+                    onChange(isoDateAtNoon(draftIso));
+                    setOpen(false);
+                  }}
+                  style={{
+                    border: 0,
+                    borderRadius: 10,
+                    background: draftIso ? "#3f6fc6" : "#ccd3dd",
+                    color: "#fff",
+                    padding: "10px 24px",
+                    fontFamily: "inherit",
+                    fontWeight: 800,
+                    cursor: draftIso ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {priceCalendar.locale === "en"
+                    ? "Confirm"
+                    : priceCalendar.locale === "ar"
+                      ? "تأكيد"
+                      : "تأیید"}
+                </button>
+              </div>
+            )}
           </div>
         </CalendarPortal>
       )}
