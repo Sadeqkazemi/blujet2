@@ -19,6 +19,19 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Atomic scheduled-flight completion and Add Flight redesign
+  (2026-08-22)** — the commercial Add Flight flow now resolves and completes
+  one materialized schedule occurrence instead of creating a duplicate
+  free-form flight. Route, departure, aircraft and physical cabin capacity are
+  inherited/read-only; fare and channel capacity is validated per cabin; the
+  UI is a four-step flow; and definition, charge/fare rules, pricing proposal
+  and `PENDING_OPERATIONS` transition commit through one locked transaction.
+  Backend E2E covers rollback, stale version, unknown occurrence, forbidden
+  role and physical-capacity rewrite; the existing operations/CEO/public and
+  agency seat-allocation journeys (21 E2E assertions), focused frontend tests
+  and both builds are green. Checklist:
+  `docs/features/atomic-scheduled-flight-completion.md`.
+
 - [x] **Senior Manager panel gaps closed (2026-08-21)** — restored
   `گزارش مسافران` and the approved 14-tab navigation order; enabled seat
   lock and PNR writes for `SENIOR_MANAGER` (no longer view-only); covered the

@@ -33,6 +33,7 @@ import Pagination from "../../components/Pagination";
 import { usePagination } from "../../hooks/usePagination";
 import FareRulesSection from "../../components/FareRulesSection";
 import CommercialFareClassControls from "./components/CommercialFareClassControls";
+import CommercialFlightDetailContent from "./components/CommercialFlightDetailContent";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
 import PricingPage from "../pricing/PricingPage";
 import FlightCitiesTab from "./FlightCitiesTab";
@@ -1782,16 +1783,34 @@ export default function FlightsPage() {
         <Modal
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
-          maxWidthClass="max-w-4xl"
+          maxWidthClass="max-w-2xl"
         >
-          <div className="mb-4 flex w-max gap-1 rounded-xl border border-panel-border bg-panel-canvas p-1">
-            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-lg px-4 py-2 text-xs font-extrabold ${detailTab === "details" ? "bg-accent text-white" : "text-panel-muted"}`}>
+          <div className="mb-4 flex items-center justify-between border-b border-[#27334a] pb-3 text-[10px] text-[#9fb0c7]">
+            <span>{detail.flightNo} · {detail.aircraftType}</span>
+            <span className="font-num">{formatJalaliDateTime(detail.departureAt)}</span>
+          </div>
+          <div className="mb-4 flex gap-1 border-b border-[#27334a]">
+            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-t-lg px-4 py-2 text-xs font-extrabold ${detailTab === "details" ? "border-b-2 border-[#4f8cff] text-white" : "text-panel-muted"}`}>
               جزئیات پرواز
             </button>
-            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-lg px-4 py-2 text-xs font-extrabold ${detailTab === "seats" ? "bg-accent text-white" : "text-panel-muted"}`}>
+            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-t-lg px-4 py-2 text-xs font-extrabold ${detailTab === "seats" ? "border-b-2 border-[#4f8cff] text-white" : "text-panel-muted"}`}>
               نقشه صندلی
             </button>
           </div>
+          {detailTab === "details" && (user?.role === "COMMERCIAL_MANAGER" || user?.role === "SENIOR_MANAGER") && (
+            <CommercialFlightDetailContent
+              detail={detail}
+              canManage={user?.role === "COMMERCIAL_MANAGER" && canManageFlights}
+              onNotice={setNotice}
+              onError={setError}
+              onChanged={async () => {
+                await load();
+                setDetail(await fetchFlightDetail(detail.id));
+              }}
+              onConfirm={() => setDetail(null)}
+            />
+          )}
+          {!(user?.role === "COMMERCIAL_MANAGER" || user?.role === "SENIOR_MANAGER") && (
           <div className={detailTab === "details" ? "block" : "hidden"}>
           <div className="mb-3 grid grid-cols-3 gap-2 text-[11px]">
             <div className="rounded-lg bg-panel-canvas p-2.5">
@@ -2148,6 +2167,7 @@ export default function FlightsPage() {
             onError={setError}
           />
           </div>
+          )}
           {detailTab === "seats" && (
             <MdSeatMapModal
               embedded

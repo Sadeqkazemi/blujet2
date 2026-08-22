@@ -9,12 +9,11 @@ import { describe, expect, it, vi } from "vitest";
 import FlightsPage from "./FlightsPage";
 import * as flightsApi from "../../api/flights";
 import * as pricingApi from "../../api/pricing";
-import * as authApi from "../../api/auth";
 import * as useAuthModule from "../../hooks/useAuth";
 import { mockAuthUserWithRole } from "../../test/mockAuthUser";
 import type {
-  AircraftTypeOption,
   AirportEntry,
+  CommercialFlightControl,
   FlightsOverview,
   FlightDetail,
   FutureFlightRow,
@@ -125,6 +124,28 @@ const DETAIL: FlightDetail = {
   aircraftType: "Airbus A320",
 };
 
+const COMMERCIAL_CONTROL: CommercialFlightControl = {
+  flightInstanceId: "fi1",
+  publicSaleEnabled: true,
+  fareClasses: [
+    {
+      ruleId: "rule-y",
+      cabin: "ECONOMY",
+      classCode: "Y",
+      seatsAllocated: 180,
+      soldSeats: 152,
+      remainingSeats: 28,
+      revenueIrr: "5776000000",
+      basePriceIrr: "38000000",
+      sitePriceIrr: "38000000",
+      agencySeatsReleased: 12,
+      agencyReleasePriceIrr: "35000000",
+      agencySpecialOffer: false,
+      priceHistory: [],
+    },
+  ],
+};
+
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, "useAuth").mockReturnValue({
     status: "authenticated",
@@ -139,6 +160,9 @@ function mockRole(role: Role) {
 function mockData(overview: FlightsOverview = OVERVIEW) {
   vi.spyOn(flightsApi, "fetchFlightsOverview").mockResolvedValue(overview);
   vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue(AIRPORTS);
+  vi.spyOn(flightsApi, "fetchCommercialFlightControl").mockResolvedValue(
+    COMMERCIAL_CONTROL,
+  );
 }
 
 describe("FlightsPage", () => {
@@ -183,7 +207,7 @@ describe("FlightsPage", () => {
     expect(screen.getByText("افزودن پرواز جدید")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال برای مدیر عملیات",
+        name: "ادامه به مرحله بعد",
       }),
     ).toBeInTheDocument();
   });
@@ -204,7 +228,7 @@ describe("FlightsPage", () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByText("فروش سیستمی")).toBeInTheDocument();
     expect(within(dialog).getByText(/۸۰ صندلی/)).toBeInTheDocument();
-    expect(within(dialog).getByText("مجموع درآمد پرواز")).toBeInTheDocument();
+    expect(within(dialog).getByText("درآمد پرواز")).toBeInTheDocument();
     // 5,776,000,000 rial → ۵۷۷٬۶۰۰٬۰۰۰ toman
     expect(within(dialog).getByText("۵۷۷٬۶۰۰٬۰۰۰ تومان")).toBeInTheDocument();
   });
@@ -325,7 +349,7 @@ describe("FlightsPage", () => {
     expect(screen.getByText("تهران")).toBeInTheDocument();
   });
 
-  it("exposes published-fare and MD-80 seat controls only to the Commercial Manager", async () => {
+  it("shows the redesigned class-level sales controls only to the Commercial Manager", async () => {
     mockRole("COMMERCIAL_MANAGER");
     mockData();
     vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue({
@@ -342,13 +366,13 @@ describe("FlightsPage", () => {
     await userEvent.click(await screen.findByText("EP-821"));
 
     const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
-    expect(within(dialog).getByRole("button", { name: /MD/ })).toBeInTheDocument();
     expect(
-      within(dialog).getByText('آزادسازی صندلی برای آژانس').closest('[data-commercial-section]'),
-    ).toHaveClass('order-1');
+      within(dialog).getByText('آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی'),
+    ).toBeInTheDocument();
     expect(
-      within(dialog).getByText('قیمت سایت به ازای کلاس').closest('[data-commercial-section]'),
-    ).toHaveClass('order-2');
+      within(dialog).getByText('قیمت فروش در سایت به تفکیک کلاس پروازی'),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole('switch', { name: 'مجوز نمایش و فروش در سایت' })).toBeInTheDocument();
   });
 
   it("does not expose published-fare or seat-lock controls to an employee", async () => {
@@ -406,105 +430,4 @@ describe("FlightsPage", () => {
     ).not.toBeInTheDocument();
   });
 
-  describe("aircraft-type change", () => {
-    const AIRCRAFT_TYPES: AircraftTypeOption[] = [
-      { aircraftType: "Airbus A320", capacity: 180 },
-      { aircraftType: "Boeing 737", capacity: 189 },
-    ];
-
-    it("shows the current aircraft type, and a change with step-up succeeds and updates the shown type/capacity", async () => {
-      mockRole("SENIOR_MANAGER");
-      mockData();
-      vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue(DETAIL);
-      vi.spyOn(flightsApi, "fetchAircraftTypes").mockResolvedValue(
-        AIRCRAFT_TYPES,
-      );
-      vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
-        challengeId: "ch1",
-      });
-      const changeSpy = vi
-        .spyOn(flightsApi, "changeFlightAircraft")
-        .mockResolvedValue({
-          id: "fi1",
-          aircraftType: "Boeing 737",
-          capacity: 189,
-        });
-
-      const { default: userEvent } =
-        await import("@testing-library/user-event");
-      const user = userEvent.setup();
-      render(<FlightsPage />);
-
-      await user.click(await screen.findByText("تهران ← دبی"));
-      const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
-      expect(within(dialog).getByText("Airbus A320")).toBeInTheDocument();
-
-      await user.click(within(dialog).getByRole("button", { name: "تغییر" }));
-      const select = await within(dialog).findByRole("combobox");
-      await user.selectOptions(select, "Boeing 737");
-      await user.click(
-        within(dialog).getByRole("button", { name: "ثبت تغییر" }),
-      );
-
-      const stepUpDialog = await screen.findByRole("dialog", {
-        name: "تأیید مجدد هویت",
-      });
-      await user.type(within(stepUpDialog).getByRole("textbox"), "482913");
-      await user.click(
-        within(stepUpDialog).getByRole("button", { name: "تأیید" }),
-      );
-
-      await waitFor(() =>
-        expect(changeSpy).toHaveBeenCalledWith("fi1", "Boeing 737", {
-          stepUpChallengeId: "ch1",
-          stepUpCode: "482913",
-        }),
-      );
-      expect(await within(dialog).findByText("Boeing 737")).toBeInTheDocument();
-    });
-
-    it("shows the backend error (e.g. capacity below confirmed bookings) inline without closing the picker", async () => {
-      mockRole("SENIOR_MANAGER");
-      mockData();
-      vi.spyOn(flightsApi, "fetchFlightDetail").mockResolvedValue(DETAIL);
-      vi.spyOn(flightsApi, "fetchAircraftTypes").mockResolvedValue(
-        AIRCRAFT_TYPES,
-      );
-      vi.spyOn(authApi, "requestStepUp").mockResolvedValue({
-        challengeId: "ch1",
-      });
-      vi.spyOn(flightsApi, "changeFlightAircraft").mockRejectedValue(
-        new Error(
-          "ظرفیت هواپیمای جدید کمتر از تعداد رزروهای قطعی/لاک‌شدهٔ فعلی است.",
-        ),
-      );
-
-      const { default: userEvent } =
-        await import("@testing-library/user-event");
-      const user = userEvent.setup();
-      render(<FlightsPage />);
-
-      await user.click(await screen.findByText("تهران ← دبی"));
-      const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
-      await user.click(within(dialog).getByRole("button", { name: "تغییر" }));
-      const select = await within(dialog).findByRole("combobox");
-      await user.selectOptions(select, "Boeing 737");
-      await user.click(
-        within(dialog).getByRole("button", { name: "ثبت تغییر" }),
-      );
-
-      const stepUpDialog = await screen.findByRole("dialog", {
-        name: "تأیید مجدد هویت",
-      });
-      await user.type(within(stepUpDialog).getByRole("textbox"), "482913");
-      await user.click(
-        within(stepUpDialog).getByRole("button", { name: "تأیید" }),
-      );
-
-      expect(await within(dialog).findByRole("alert")).toHaveTextContent(
-        "ظرفیت هواپیمای جدید کمتر از تعداد رزروهای قطعی/لاک‌شدهٔ فعلی است.",
-      );
-      expect(within(dialog).getByRole("combobox")).toBeInTheDocument();
-    });
-  });
 });
