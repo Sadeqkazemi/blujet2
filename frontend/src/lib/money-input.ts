@@ -1,16 +1,20 @@
 import {
   faDigits,
+  arDigits,
   latinDigits,
   parseTomanToRial,
   parseTomanToRialString,
 } from "./fa-format";
+import type { DisplayLocale } from "./fa-format";
 
-/** Format raw user input as Persian-digit تومان with ٬ separators (no float math). */
-export function formatTomanGrouped(raw: string): string {
+/** Format raw user input with locale digits/separators (no float math). */
+export function formatTomanGrouped(raw: string, locale: DisplayLocale = "fa"): string {
   const digits = latinDigits(raw).replace(/[^\d]/g, "");
   if (!digits) return "";
-  const withSep = digits.replace(/\B(?=(\d{3})+(?!\d))/g, "٬");
-  return faDigits(withSep);
+  const separator = locale === "en" ? "," : "٬";
+  const withSep = digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+  if (locale === "en") return withSep;
+  return locale === "ar" ? arDigits(withSep) : faDigits(withSep);
 }
 
 export function tomanDigitsOnly(grouped: string): string {

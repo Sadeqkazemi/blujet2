@@ -9,6 +9,7 @@ import { localeMoney, parseTomanToRialString } from '../../lib/fa-format';
 import { tomanAmountInWords } from '../../lib/amount-in-words';
 import { formatLocaleDateTime } from '../../lib/locale-format';
 import type { LoanApplication, LoanDisplayStatus } from '../../types/loans';
+import MoneyInput from '../../components/MoneyInput';
 
 const COPY: Record<StoredLocale, {
   title: string; subtitle: string; amount: string; submit: string; history: string;
@@ -112,12 +113,15 @@ export default function AccountLoansTab() {
         <form onSubmit={submit} className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="flex-1 text-xs font-bold text-[#3f546b]">
             {t.amount}
-            <input
-              data-testid="loan-amount-input"
-              inputMode="numeric"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              className="mt-2 h-12 w-full rounded-xl border border-[#dce5f1] px-4 font-num outline-none focus:border-[#1668c4]"
+            <MoneyInput
+              id="loan-amount-input"
+              testId="loan-amount-input"
+              theme="light"
+              locale={locale}
+              valueToman={amount}
+              onChangeToman={setAmount}
+              placeholder={locale === 'fa' ? '۰' : '0'}
+              className="mt-2"
             />
             {tomanAmountInWords(amount, locale) && (
               <div

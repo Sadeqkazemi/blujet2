@@ -35,11 +35,12 @@ export default function MoneyInput({
   'aria-label': ariaLabel,
   testId,
   theme = 'dark',
+  locale = 'fa',
 }: MoneyInputProps) {
   const ref = useRef<HTMLInputElement>(null);
 
   function applyRaw(raw: string, caretDigits: number) {
-    const next = formatTomanGrouped(raw);
+    const next = formatTomanGrouped(raw, locale);
     onChangeToman(next);
     requestAnimationFrame(() => {
       const el = ref.current;
@@ -95,7 +96,7 @@ export default function MoneyInput({
           data-testid={testId ? `${testId}-unit` : 'money-input-unit'}
           className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] font-bold ${theme === 'light' ? 'text-[#8a96a6]' : 'text-[#6b7b94]'}`}
         >
-          تومان
+          {locale === 'en' ? 'Toman' : 'تومان'}
         </span>
       </div>
     </div>

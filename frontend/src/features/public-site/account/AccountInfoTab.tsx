@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { formatLocaleDate } from '../../../lib/locale-format';
+import JalaliDatePicker from '../../../components/JalaliDatePicker';
+import { formatLocaleDate, parseLocaleDateToIso } from '../../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { UserProfile } from '../../../types/public-site';
 
@@ -144,6 +145,15 @@ export default function AccountInfoTab({
   const fieldsCols = isMobile ? '1fr' : 'repeat(2, 1fr)';
 
   const fieldValue = (value: string | null | undefined) => value?.trim() || t.notCompleted;
+  const birthDateIso = (() => {
+    const raw = profileForm.birthDate.trim();
+    if (!raw) return null;
+    try {
+      return parseLocaleDateToIso(raw, locale);
+    } catch {
+      return null;
+    }
+  })();
 
   const profileFields = [
     {
@@ -233,15 +243,28 @@ export default function AccountInfoTab({
               <label htmlFor="profile-birthDate" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
                 {t.birthDateLabel}
               </label>
-              <input
-                id="profile-birthDate"
-                dir="ltr"
-                inputMode="numeric"
-                placeholder={t.birthDatePlaceholder}
-                value={profileForm.birthDate}
-                onChange={(e) => onProfileFormChange({ ...profileForm, birthDate: e.target.value })}
-                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-              />
+              <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  id="profile-birthDate"
+                  dir="ltr"
+                  inputMode="numeric"
+                  placeholder={t.birthDatePlaceholder}
+                  value={profileForm.birthDate}
+                  onChange={(e) => onProfileFormChange({ ...profileForm, birthDate: e.target.value })}
+                  style={{ flex: '1 1 190px', minWidth: 0, boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                />
+                <div style={{ flex: '0 0 132px', height: 42, boxSizing: 'border-box', border: '1.5px solid #e3e9f1', borderRadius: 10, background: '#f8fafc', overflow: 'hidden' }}>
+                  <JalaliDatePicker
+                    label={t.birthDateLabel}
+                    value={birthDateIso}
+                    locale={locale}
+                    compact
+                    testId="profile-birthDate-calendar"
+                    placeholder={locale === 'fa' ? 'تقویم شمسی' : locale === 'ar' ? 'التقويم الميلادي' : 'Calendar'}
+                    onChange={(iso) => onProfileFormChange({ ...profileForm, birthDate: formatLocaleDate(iso, locale) })}
+                  />
+                </div>
+              </div>
             </div>
             <div>
               <label htmlFor="profile-passportNo" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
