@@ -1147,25 +1147,14 @@ export default function AccountPage() {
             <form onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>{t.topupAmountLabel}</label>
-                {locale === 'fa' ? (
-                  <MoneyInput
-                    theme="light"
-                    testId="wallet-topup-amount"
-                    valueToman={topupAmount}
-                    onChangeToman={setTopupAmount}
-                    placeholder={t.topupPlaceholder}
-                  />
-                ) : (
-                  <input
-                    data-testid="wallet-topup-amount"
-                    dir="ltr"
-                    inputMode="numeric"
-                    value={topupAmount}
-                    onChange={(e) => setTopupAmount(e.target.value)}
-                    placeholder={t.topupPlaceholder}
-                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-                  />
-                )}
+                <MoneyInput
+                  theme="light"
+                  locale={locale}
+                  testId="wallet-topup-amount"
+                  valueToman={topupAmount}
+                  onChangeToman={setTopupAmount}
+                  placeholder={t.topupPlaceholder}
+                />
                 {tomanAmountInWords(topupAmount, locale) && (
                   <div
                     data-testid="wallet-topup-amount-words"

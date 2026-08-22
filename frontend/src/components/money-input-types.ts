@@ -9,4 +9,6 @@ export interface MoneyInputProps {
   'aria-label'?: string;
   testId?: string;
   theme?: 'dark' | 'light';
+  /** Controls display digits/separators; the wire value remains Latin digits. */
+  locale?: 'fa' | 'en' | 'ar';
 }
