@@ -5,14 +5,15 @@ import {
 } from './profile-completion';
 
 describe('profile completion', () => {
-  it('uses the same five equally weighted fields', () => {
+  it('uses the same six equally weighted fields including the encrypted address', () => {
     expect(assessProfileCompletion({ fullName: 'Ali' })).toEqual({
-      completionPct: 20,
+      completionPct: 100 / 6,
       profileIncomplete: true,
       missingProfileFields: [
         'nationalId',
         'birthDate',
         'passportNo',
+        'address',
         'verifiedEmail',
       ],
     });
@@ -22,6 +23,7 @@ describe('profile completion', () => {
         nationalIdEnc: 'enc',
         birthDate: new Date(),
         passportNoEnc: 'enc',
+        addressEnc: 'enc',
         emailVerifiedAt: new Date(),
       }),
     ).toEqual({
@@ -36,6 +38,7 @@ describe('profile completion', () => {
     expect(sql).toContain('u.nationalIdEnc IS NULL');
     expect(sql).toContain('u.birthDate IS NULL');
     expect(sql).toContain('u.passportNoEnc IS NULL');
+    expect(sql).toContain('u.addressEnc IS NULL');
     expect(sql).toContain('u.emailVerifiedAt IS NULL');
     expect(maskIdentityValue('0012345678')).toBe('******5678');
   });

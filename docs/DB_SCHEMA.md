@@ -1237,12 +1237,13 @@ step anywhere in the project.
   nationalIdHash   String?
   passportNoEnc    String?
   birthDate        DateTime?
+  addressEnc       String?
   emailVerifiedAt  DateTime?
   ```
   (`fullName` and `email` already exist on `User`.)
 - **Profile completion** is computed server-side, never stored — a
   simple weighted check over which of {fullName, nationalId, birthDate,
-  passportNo, emailVerifiedAt} are present, matching the design's
+  passportNo, address, emailVerifiedAt} are present, matching the design's
   percentage bar and its "complete passport + verify email" hint text.
 - **Email verification**: reuses the existing OTP/2FA delivery
   machinery — a short-lived code sent to the address, confirmed via a
@@ -2570,11 +2571,12 @@ material.
 
 ### Customer completion
 
-No new customer columns. `profileIncomplete`, `completionPct`, and missing
-fields are derived from the existing User fields `fullName`, `nationalIdEnc`,
-`birthDate`, `passportNoEnc`, and `emailVerifiedAt`. One shared backend helper
-is the source of truth; the database is never updated with a duplicate cached
-percentage.
+`profileIncomplete`, `completionPct`, and missing fields are derived from the
+User fields `fullName`, `nationalIdEnc`, `birthDate`, `passportNoEnc`,
+`addressEnc`, and `emailVerifiedAt`. `addressEnc` is encrypted at rest and was
+added by migration `1788691200000-CustomerAddressAndFixedAncillaries`. One
+shared backend helper is the source of truth; the database is never updated
+with a duplicate cached percentage.
 
 ### Dual agency approval
 
@@ -2769,6 +2771,17 @@ than relying on any cascade.
   `1787212800000-V4LoanWalletCreditLedger`,
   `1787299200000-V4LoanInitiationLifecycle`.
 
+### Atomic completion invariant (no migration)
+
+The commercial Add Flight screen completes an existing
+`flight_instances.scheduleTemplateId` occurrence. Its physical
+`capacity`, `cabinCapacities`, aircraft definition, route and departure are
+authoritative schedule/aircraft snapshots. The completion transaction may
+replace `fare_rules` and update the single `fare_pricing_proposals` row, but it
+must not create a second instance or allow the client to enlarge physical
+capacity. Definition, fare rules, proposal and transition to
+`PENDING_OPERATIONS` commit or roll back together.
+
 ## Passenger fare snapshots (2026-08-10)
 
 `passengers` stores the immutable purchase-time classification and fare inputs:
@@ -2868,6 +2881,19 @@ Migration `1787731200000-CommercialSeatRequestsAncillaries`:
 `POST /agency-portal/seat-requests` writes these tables; `cartable_tasks`
 remain notifications (`sourceType=AGENCY_REQUEST`, `sourceId` = request id).
 Cross-agency invoices still use `agency_invoices` only.
+
+## Customer address and fixed checkout services (2026-08-21)
+
+- `users.addressEnc text NULL` stores the residence address encrypted with the
+  same AES-256-GCM PII helper as national ID and passport. It is decrypted only
+  for the owning customer's profile/privacy export and is cleared by account
+  deletion.
+- Profile completeness now derives from six fields: full name, national ID,
+  birth date, passport, address, and verified email.
+- `travel_extra_settings.code IN ('SEAT_SELECTION','PET')` and the matching
+  `ancillary_services` rows are migration-repaired to active/purchasable state.
+  Service guards prevent deletion or disabling while still allowing audited
+  price changes.
 
 ## Site-admin rules persistence (2026-08-20)
 

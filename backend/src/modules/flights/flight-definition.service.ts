@@ -11,12 +11,15 @@ import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Airport } from '../../database/entities/airport.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { Booking } from '../../database/entities/booking.entity';
+import { AuditLog } from '../../database/entities/audit-log.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { FlightChargeRule } from '../../database/entities/flight-charge-rule.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Route } from '../../database/entities/route.entity';
 import { FarePricingProposal } from '../../database/entities/fare-pricing-proposal.entity';
 import {
+  BookingChannel,
   CabinClass,
   FlightDefinitionStatus,
   PricingProposalStatus,
@@ -33,6 +36,7 @@ import {
 import { normalizeChargeRuleInputs } from './charge-rule-validation';
 import type {
   ChargeRuleDto,
+  CompleteScheduledFlightDto,
   CreateFlightDefinitionDto,
   UpdateFlightDefinitionDto,
 } from './dto/flight-definition.dto';
@@ -443,6 +447,249 @@ export class FlightDefinitionService {
   async getDefinition(id: string) {
     const instance = await this.loadInstanceOrThrow(id);
     return this.toDefinitionDetail(instance);
+  }
+
+  /**
+   * Completes a DRAFT occurrence already materialized from a seasonal
+   * schedule. The physical definition stays authoritative on the occurrence;
+   * only commercial controls are accepted from the caller. All writes and the
+   * workflow transition commit together, so a retry can never observe a
+   * half-configured flight.
+   */
+  async completeScheduledAndSubmit(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: CompleteScheduledFlightDto,
+  ) {
+    await this.dataSource.transaction(async (manager) => {
+      const instance = await manager.findOne(FlightInstance, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!instance) {
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پرواز یافت نشد.',
+        });
+      }
+      if (!instance.scheduleTemplateId) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'این عملیات فقط برای رخداد ساخته‌شده از مسیر پروازی مجاز است.',
+        });
+      }
+      const isSubmittable =
+        instance.definitionStatus === FlightDefinitionStatus.DRAFT ||
+        instance.definitionStatus ===
+          FlightDefinitionStatus.OPERATIONS_REJECTED ||
+        instance.definitionStatus === FlightDefinitionStatus.REJECTED;
+      if (!isSubmittable) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این پرواز در وضعیت فعلی قابل تکمیل و ارسال نیست.',
+        });
+      }
+      if (
+        dto.expectedVersion != null &&
+        dto.expectedVersion !== instance.version
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'نسخه پرواز تغییر کرده است. صفحه را تازه کنید و دوباره تلاش کنید.',
+        });
+      }
+      if (instance.departureAt <= new Date()) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'رخداد گذشته قابل تکمیل و ارسال نیست.',
+        });
+      }
+
+      const cabinCapacities = serializeCabinCapacities(
+        instance.cabinCapacities,
+      );
+      const physicalTotal = cabinCapacities.reduce(
+        (sum, row) => sum + row.seats,
+        0,
+      );
+      if (physicalTotal <= 0 || physicalTotal !== instance.capacity) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'ظرفیت فیزیکی رخداد با نقشه کابین سازگار نیست؛ ابتدا مسیر پروازی را اصلاح کنید.',
+        });
+      }
+
+      const flight = await manager.findOneByOrFail(Flight, {
+        id: instance.flightId,
+      });
+      const aircraftType =
+        instance.aircraftTypeOverride?.trim() || flight.aircraftType;
+      const seatMap = await manager.findOneBy(AircraftSeatMap, {
+        aircraftType,
+      });
+      if (!seatMap) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'نقشه صندلی هواپیمای این رخداد یافت نشد.',
+        });
+      }
+      this.validateCabinCapacitiesAgainstSeatMap(seatMap, cabinCapacities);
+
+      const charterSeats = dto.charterSeats ?? 0;
+      if (charterSeats >= physicalTotal) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'تعهد چارتری باید کمتر از ظرفیت فیزیکی پرواز باشد.',
+        });
+      }
+
+      const seen = new Set<string>();
+      const allocatedByCabin = new Map<CabinClass, number>();
+      for (const fare of dto.fareRules) {
+        const key = `${fare.cabin}:${fare.classCode}`;
+        if (seen.has(key)) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `کلاس نرخی ${fare.classCode} برای کابین ${fare.cabin} تکراری است.`,
+          });
+        }
+        seen.add(key);
+        if (
+          fare.validFrom &&
+          fare.validUntil &&
+          new Date(fare.validUntil) <= new Date(fare.validFrom)
+        ) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'پایان بازه اعتبار کلاس نرخی باید بعد از شروع آن باشد.',
+          });
+        }
+        allocatedByCabin.set(
+          fare.cabin,
+          (allocatedByCabin.get(fare.cabin) ?? 0) + fare.seatsAllocated,
+        );
+      }
+      for (const [cabin, allocated] of allocatedByCabin) {
+        const physical =
+          cabinCapacities.find((row) => row.cabin === cabin)?.seats ?? 0;
+        if (allocated > physical) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `ظرفیت کلاس‌های نرخی ${cabin} (${allocated}) از ظرفیت فیزیکی کابین (${physical}) بیشتر است.`,
+          });
+        }
+      }
+
+      const sold = await manager.count(Booking, {
+        where: {
+          flightInstanceId: id,
+          status: In([...SOLD_STATUSES]),
+        },
+      });
+      if (sold > 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'پرواز دارای فروش قطعی است و کلاس‌های نرخی آن با این عملیات قابل جایگزینی نیست.',
+        });
+      }
+
+      const chargeInputs = this.validateChargeRules(dto.chargeRules);
+      await this.replaceChargeRules(manager, id, chargeInputs, false);
+      await manager.delete(FareRule, { flightInstanceId: id });
+      await manager.save(
+        dto.fareRules.map((fare) =>
+          manager.create(FareRule, {
+            flightInstanceId: id,
+            cabin: fare.cabin,
+            classCode: fare.classCode,
+            priceIrr: fare.priceIrr,
+            sitePriceIrr: null,
+            seatsAllocated: fare.seatsAllocated,
+            agencySeatsReleased: 0,
+            agencyReleasePriceIrr: null,
+            agencySpecialOffer: false,
+            taxIrr: fare.taxIrr ?? 0n,
+            refundable: fare.refundable ?? true,
+            changeable: fare.changeable ?? true,
+            baggageAllowanceKg: fare.baggageAllowanceKg ?? null,
+            validFrom: fare.validFrom ? new Date(fare.validFrom) : null,
+            validUntil: fare.validUntil ? new Date(fare.validUntil) : null,
+            allowedChannels:
+              fare.allowedChannels ??
+              ([BookingChannel.SYSTEM] as BookingChannel[]),
+          }),
+        ),
+      );
+
+      let proposal = await manager
+        .getRepository(FarePricingProposal)
+        .createQueryBuilder('proposal')
+        .where('proposal.flightInstanceId = :id', { id })
+        .getOne();
+      if (!proposal) {
+        proposal = manager.create(FarePricingProposal, {
+          flightInstanceId: id,
+          proposedById: actor.id,
+          createdAt: new Date(),
+        });
+      }
+      proposal.basePriceIrr = dto.basePriceIrr;
+      proposal.competitorPriceIrr = dto.competitorPriceIrr ?? null;
+      proposal.proposedPriceIrr = dto.pricingProposal.proposedPriceIrr;
+      proposal.legalRateIrr = dto.pricingProposal.legalRateIrr ?? null;
+      proposal.commercialNote =
+        dto.pricingProposal.commercialNote?.trim() || null;
+      proposal.operationsNote =
+        dto.pricingProposal.operationsNote?.trim() || null;
+      proposal.ceoNote = dto.pricingProposal.ceoNote?.trim() || null;
+      proposal.note = null;
+      proposal.proposedById = actor.id;
+      proposal.status = PricingProposalStatus.PENDING;
+      proposal.registeredPriceIrr = null;
+      proposal.approvedById = null;
+      proposal.approvedAt = null;
+      proposal.rejectionReason = null;
+      proposal.rejectedById = null;
+      proposal.rejectedAt = null;
+      proposal.aiSuggestion = null;
+      proposal.updatedAt = new Date();
+      await manager.save(proposal);
+
+      const fromStatus = instance.definitionStatus;
+      instance.basePriceIrr = dto.basePriceIrr;
+      instance.competitorPriceIrr = dto.competitorPriceIrr ?? null;
+      instance.charterSeats = charterSeats;
+      instance.definitionStatus = FlightDefinitionStatus.PENDING_OPERATIONS;
+      instance.publicSaleEnabled = false;
+      instance.rejectionReason = null;
+      instance.version += 1;
+      await manager.save(instance);
+
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'SYSTEM',
+          action: 'تکمیل اتمیک رخداد برنامه پروازی',
+          detail: `رخداد ${flight.flightNo} تکمیل و برای بررسی مدیر عملیات ارسال شد.`,
+          entityType: 'FlightInstance',
+          entityId: id,
+          metadata: {
+            fromStatus,
+            toStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
+            version: instance.version,
+            fareRuleCount: dto.fareRules.length,
+            physicalCapacity: physicalTotal,
+          },
+        }),
+      );
+    });
+
+    return this.getDefinition(id);
   }
 
   async createDefinition(
@@ -1015,6 +1262,10 @@ export class FlightDefinitionService {
     instance.approvedSnapshot = snapshot;
     instance.pendingRevisionSnapshot = null;
     instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
+    // First CEO approval is the final publication gate. Keep revision
+    // approvals from overriding a later manual commercial pause, but make a
+    // newly approved flight immediately discoverable by the public search.
+    instance.publicSaleEnabled = true;
     instance.rejectionReason = null;
     instance.publishedAt = new Date();
     instance.publishedByUserId = publishedByUserId ?? null;

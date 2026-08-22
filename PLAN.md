@@ -19,6 +19,19 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Atomic scheduled-flight completion and Add Flight redesign
+  (2026-08-22)** — the commercial Add Flight flow now resolves and completes
+  one materialized schedule occurrence instead of creating a duplicate
+  free-form flight. Route, departure, aircraft and physical cabin capacity are
+  inherited/read-only; fare and channel capacity is validated per cabin; the
+  UI is a four-step flow; and definition, charge/fare rules, pricing proposal
+  and `PENDING_OPERATIONS` transition commit through one locked transaction.
+  Backend E2E covers rollback, stale version, unknown occurrence, forbidden
+  role and physical-capacity rewrite; the existing operations/CEO/public and
+  agency seat-allocation journeys (21 E2E assertions), focused frontend tests
+  and both builds are green. Checklist:
+  `docs/features/atomic-scheduled-flight-completion.md`.
+
 - [x] **Senior Manager panel gaps closed (2026-08-21)** — restored
   `گزارش مسافران` and the approved 14-tab navigation order; enabled seat
   lock and PNR writes for `SENIOR_MANAGER` (no longer view-only); covered the
@@ -3620,4 +3633,19 @@ contracts and retires the production mock adapters.
   made it the shared sans-serif font for the public site and all panels.
 - [x] Removed the redundant npm Vazirmatn package so production rendering does
   not depend on loading the Persian font from a package-generated asset.
+
+# Public checkout and account polish (2026-08-21)
+
+- [x] Kept seat selection and pet travel as permanent checkout services; the
+  seat map is collapsed by default and opens only after fee acceptance or at
+  least 15,000 loyalty points.
+- [x] Added encrypted customer address editing alongside birth date and made
+  the six-field profile-completion calculation server-owned.
+- [x] Stabilized Persian wallet amount entry, rebuilt the responsive card/IBAN
+  form, and made the desktop calendar open below its field while the compact
+  responsive bottom sheet keeps the page scrollable.
+- [x] Completed the agency-panel services menu with the same seat, baggage,
+  refund, pet, and wheelchair links used by the public-site header.
+- [x] Added migration, API/schema documentation, and focused frontend/backend
+  regression coverage. See `docs/features/public-checkout-profile-polish.md`.
 

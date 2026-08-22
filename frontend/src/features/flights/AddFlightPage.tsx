@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  completeScheduledFlight,
   createCommitment,
   createFareRule,
-  createFlight,
   deleteCommitment,
   fetchAircraftTypes,
   fetchAllotmentsSummary,
   fetchAirports,
   fetchCommitments,
+  fetchFareRules,
   fetchFlightDefinition,
   resolveScheduleTemplate,
   submitFlightToOperations,
+  updateFareRule,
   updateFlightDefinition,
 } from "../../api/flights";
 import {
@@ -69,6 +71,7 @@ import AgencyCommitmentsEditor, {
   draftToCreatePayload,
   type AgencyCommitmentDraft,
 } from "./components/AgencyCommitmentsEditor";
+import AddFlightWizardNav from "./components/AddFlightWizardNav";
 
 type Channel = "SYSTEM" | "CHARTER" | "AGENCY";
 
@@ -215,7 +218,9 @@ export default function AddFlightPage({
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [aircraftTypes, setAircraftTypes] = useState<AircraftTypeOption[]>([]);
   const [loadingDefinition, setLoadingDefinition] = useState(isEdit);
-  const [operationsFeedback, setOperationsFeedback] = useState<string | null>(null);
+  const [operationsFeedback, setOperationsFeedback] = useState<string | null>(
+    null,
+  );
 
   const [flightNo, setFlightNo] = useState("");
   const [originCode, setOriginCode] = useState("");
@@ -232,12 +237,18 @@ export default function AddFlightPage({
   const [charter, setCharter] = useState("");
   const [resolvedTemplate, setResolvedTemplate] =
     useState<ResolvedScheduleTemplate | null>(null);
-  const [agencySummary, setAgencySummary] =
-    useState<AllotmentSummary | null>(null);
+  const [resolvedOccurrenceVersion, setResolvedOccurrenceVersion] = useState<
+    number | null
+  >(null);
+  const [agencySummary, setAgencySummary] = useState<AllotmentSummary | null>(
+    null,
+  );
   const [agencyCommitments, setAgencyCommitments] = useState<
     AgencyCommitmentDraft[]
   >([]);
-  const [initialCommitmentIds, setInitialCommitmentIds] = useState<string[]>([]);
+  const [initialCommitmentIds, setInitialCommitmentIds] = useState<string[]>(
+    [],
+  );
   const [routeResolving, setRouteResolving] = useState(false);
   const [chargeRules, setChargeRules] = useState<DraftChargeRule[]>([]);
 
@@ -260,6 +271,7 @@ export default function AddFlightPage({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
 
   const todayIso = useMemo(() => isoDateAtNoon(toIsoDateOnly(dayjs())), []);
 
@@ -286,10 +298,7 @@ export default function AddFlightPage({
     () =>
       agencyCommitments
         .filter((row) => row.status !== "CANCELLED")
-        .reduce(
-          (sum, row) => sum + (Number(latinDigits(row.seats)) || 0),
-          0,
-        ),
+        .reduce((sum, row) => sum + (Number(latinDigits(row.seats)) || 0), 0),
     [agencyCommitments],
   );
   const charterCommittedSeats = Number(latinDigits(charter)) || 0;
@@ -297,6 +306,12 @@ export default function AddFlightPage({
     0,
     capacity - charterCommittedSeats - agencyCommittedSeats,
   );
+  const inheritedOccurrenceLocked =
+    !isEdit &&
+    Boolean(
+      resolvedTemplate?.nextFlightInstanceId &&
+      resolvedOccurrenceVersion != null,
+    );
   const agencyCommittedRevenueIrr = agencySummary?.agencyRevenueIrr ?? "0";
 
   const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
@@ -308,7 +323,10 @@ export default function AddFlightPage({
     ((fareAdultToman * 1_000n) / 10_000n).toString(),
   );
   const childFareToman = formatTomanGrouped(
-    ((fareAdultToman * (fareIsCharterOnly ? 10_000n : 5_000n)) / 10_000n).toString(),
+    (
+      (fareAdultToman * (fareIsCharterOnly ? 10_000n : 5_000n)) /
+      10_000n
+    ).toString(),
   );
 
   const cabinCapacityError = useMemo(() => {
@@ -392,7 +410,8 @@ export default function AddFlightPage({
         return Promise.all([
           fetchAllotmentsSummary(flightId).catch(() => null),
           fetchCommitments(flightId).catch(() => []),
-        ]).then(([summary, rows]) => {
+          fetchFareRules(flightId).catch(() => []),
+        ]).then(([summary, rows, fareRules]) => {
           setAgencySummary(summary);
           const agencyRows = rows
             .filter((row) => row.type === "AGENCY")
@@ -402,6 +421,23 @@ export default function AddFlightPage({
             agencyRows.flatMap((row) =>
               row.commitmentId ? [row.commitmentId] : [],
             ),
+          );
+          setFares(
+            fareRules.map((rule) => ({
+              tempId: rule.id,
+              cabin: rule.cabin,
+              cabinLabel: cabinLabel(rule.cabin),
+              classCode: rule.classCode,
+              priceIrr: Number(rule.priceIrr),
+              taxIrr: Number(rule.taxIrr),
+              seatsAllocated: rule.seatsAllocated,
+              baggageAllowanceKg: rule.baggageAllowanceKg ?? 0,
+              refundable: rule.refundable,
+              changeable: rule.changeable,
+              validFrom: rule.validFrom ?? "",
+              validUntil: rule.validUntil ?? "",
+              allowedChannels: [...rule.allowedChannels],
+            })),
           );
         });
       })
@@ -421,6 +457,7 @@ export default function AddFlightPage({
     if (isEdit || !isValidFlightNo(flightNo)) {
       if (!isEdit) {
         setResolvedTemplate(null);
+        setResolvedOccurrenceVersion(null);
         setAgencySummary(null);
       }
       return;
@@ -440,6 +477,16 @@ export default function AddFlightPage({
           setDurationHours(duration.hours);
           setDurationMins(duration.minutes);
           if (template.aircraftCode) setAircraft(template.aircraftCode);
+          if (template.agencyPriceIrr) {
+            setBaseToman(
+              formatTomanGrouped(irrToTomanInput(template.agencyPriceIrr)),
+            );
+          }
+          if (template.legalCeilingIrr) {
+            setLegalToman(
+              formatTomanGrouped(irrToTomanInput(template.legalCeilingIrr)),
+            );
+          }
           if (template.cabinCapacities.length > 0) {
             setCabinRows(
               template.cabinCapacities.map((row, index) => ({
@@ -455,17 +502,25 @@ export default function AddFlightPage({
             setTime(departure.format("HH:mm"));
           }
           if (template.nextFlightInstanceId) {
-            const summary = await fetchAllotmentsSummary(
-              template.nextFlightInstanceId,
-            ).catch(() => null);
-            if (!cancelled) setAgencySummary(summary);
+            const [summary, definition] = await Promise.all([
+              fetchAllotmentsSummary(template.nextFlightInstanceId).catch(
+                () => null,
+              ),
+              fetchFlightDefinition(template.nextFlightInstanceId),
+            ]);
+            if (!cancelled) {
+              setAgencySummary(summary);
+              setResolvedOccurrenceVersion(definition.version);
+            }
           } else {
             setAgencySummary(null);
+            setResolvedOccurrenceVersion(null);
           }
         })
         .catch((cause) => {
           if (cancelled) return;
           setResolvedTemplate(null);
+          setResolvedOccurrenceVersion(null);
           setAgencySummary(null);
           if (!(cause instanceof ApiRequestError) || cause.status !== 404) {
             setError(
@@ -604,9 +659,21 @@ export default function AddFlightPage({
     );
     const allocatedSum =
       others.reduce((a, b) => a + b.seatsAllocated, 0) + seats;
-    if (capacity && allocatedSum > capacity) {
+    const selectedCabinCapacity =
+      Number(
+        latinDigits(
+          cabinRows.find((row) => row.cabin === fareForm.cabin)?.seats ?? "0",
+        ),
+      ) || 0;
+    if (selectedCabinCapacity <= 0) {
       setFareError(
-        `مجموع ظرفیت کلاس‌های کابین از تعداد صندلی موجود (${faDigits(capacity)}) بیشتر است`,
+        `کابین ${cabinLabel(fareForm.cabin)} در هواپیمای این رخداد ظرفیت فعال ندارد`,
+      );
+      return;
+    }
+    if (allocatedSum > selectedCabinCapacity) {
+      setFareError(
+        `مجموع ظرفیت کلاس‌های ${cabinLabel(fareForm.cabin)} از ظرفیت فیزیکی همان کابین (${faDigits(selectedCabinCapacity)}) بیشتر است`,
       );
       return;
     }
@@ -669,6 +736,20 @@ export default function AddFlightPage({
       setError("شماره پرواز معتبر نیست (مثال: XY1234)");
       return;
     }
+    if (!isEdit && routeResolving) {
+      setError("در حال دریافت رخداد مسیر پروازی؛ چند لحظه صبر کنید.");
+      return;
+    }
+    if (
+      !isEdit &&
+      (!resolvedTemplate?.nextFlightInstanceId ||
+        resolvedOccurrenceVersion == null)
+    ) {
+      setError(
+        "ابتدا شماره یک مسیر پروازی فعال را وارد کنید؛ افزودن پرواز فقط با تکمیل رخداد زمان‌بندی‌شده انجام می‌شود.",
+      );
+      return;
+    }
     if (
       !originCode ||
       !destCode ||
@@ -703,6 +784,12 @@ export default function AddFlightPage({
       setError("مجموع تعهد چارتری و تعهدات آژانس از ظرفیت پرواز بیشتر است.");
       return;
     }
+    if (fares.length === 0) {
+      setError(
+        "پیش از ارسال برای مدیر عملیات، حداقل یک کلاس نرخی و ظرفیت فروش آن را تعریف کنید.",
+      );
+      return;
+    }
 
     const departureAt = buildDepartureIso(dateIso, time);
     if (!departureAt) {
@@ -732,11 +819,90 @@ export default function AddFlightPage({
       competitorPriceIrr: compIrr ?? undefined,
     };
 
-    let createdFlightId: string | null = null;
     setSaving(true);
     try {
-      if (isEdit && flightId) {
-        const updated = await updateFlightDefinition(flightId, payload);
+      if (!isEdit) {
+        const targetFlightId = resolvedTemplate!.nextFlightInstanceId!;
+        const legalIrr = moneyInputToRialString(legalToman);
+        await completeScheduledFlight(targetFlightId, {
+          expectedVersion: resolvedOccurrenceVersion!,
+          basePriceIrr: baseIrr!,
+          competitorPriceIrr: compIrr ?? undefined,
+          charterSeats,
+          chargeRules: draftRulesToApi(chargeRules),
+          fareRules: fares.map((fare) => ({
+            cabin: fare.cabin,
+            classCode: fare.classCode,
+            priceIrr: String(fare.priceIrr),
+            seatsAllocated: fare.seatsAllocated,
+            taxIrr: String(fare.taxIrr),
+            refundable: fare.refundable,
+            changeable: fare.changeable,
+            baggageAllowanceKg: fare.baggageAllowanceKg || undefined,
+            allowedChannels: fare.allowedChannels.length
+              ? fare.allowedChannels
+              : undefined,
+            validFrom: fare.validFrom || undefined,
+            validUntil: fare.validUntil || undefined,
+          })),
+          pricingProposal: {
+            proposedPriceIrr: proposedIrr,
+            legalRateIrr: legalIrr ?? undefined,
+            ceoNote: ceoNote.trim() || undefined,
+            operationsNote: operationsNote.trim() || undefined,
+            commercialNote: commercialNote.trim() || undefined,
+          },
+        });
+        const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
+        onSuccess(
+          `رخداد زمان‌بندی‌شده در یک عملیات تکمیل و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
+        );
+        return;
+      }
+
+      if (flightId) {
+        const targetFlightId = flightId;
+        const updated = await updateFlightDefinition(targetFlightId, payload);
+
+        const existingFareRules = await fetchFareRules(targetFlightId).catch(
+          () => [],
+        );
+        for (const f of fares) {
+          const farePayload: CreateFareRulePayload = {
+            cabin: f.cabin,
+            classCode: f.classCode,
+            priceIrr: f.priceIrr,
+            seatsAllocated: f.seatsAllocated,
+            taxIrr: f.taxIrr,
+            refundable: f.refundable,
+            changeable: f.changeable,
+            baggageAllowanceKg: f.baggageAllowanceKg || undefined,
+            allowedChannels: f.allowedChannels.length
+              ? f.allowedChannels
+              : undefined,
+            validFrom: f.validFrom || undefined,
+            validUntil: f.validUntil || undefined,
+          };
+          const existingFare = existingFareRules.find(
+            (rule) => rule.cabin === f.cabin && rule.classCode === f.classCode,
+          );
+          if (existingFare) {
+            await updateFareRule(targetFlightId, existingFare.id, {
+              priceIrr: farePayload.priceIrr,
+              seatsAllocated: farePayload.seatsAllocated,
+              taxIrr: farePayload.taxIrr,
+              refundable: farePayload.refundable,
+              changeable: farePayload.changeable,
+              baggageAllowanceKg: farePayload.baggageAllowanceKg,
+              allowedChannels: farePayload.allowedChannels,
+              validFrom: farePayload.validFrom,
+              validUntil: farePayload.validUntil,
+            });
+          } else {
+            await createFareRule(targetFlightId, farePayload);
+          }
+        }
+
         const retainedCommitmentIds = new Set(
           agencyCommitments.flatMap((row) =>
             row.commitmentId ? [row.commitmentId] : [],
@@ -744,78 +910,36 @@ export default function AddFlightPage({
         );
         for (const commitmentId of initialCommitmentIds) {
           if (!retainedCommitmentIds.has(commitmentId)) {
-            await deleteCommitment(flightId, commitmentId);
+            await deleteCommitment(targetFlightId, commitmentId);
           }
         }
         for (const commitment of agencyCommitments) {
           if (!commitment.commitmentId) {
             await createCommitment(
-              flightId,
+              targetFlightId,
               draftToCreatePayload(commitment),
             );
           }
         }
         const legalIrr = moneyInputToRialString(legalToman);
-        await upsertProposal(flightId, {
+        await upsertProposal(targetFlightId, {
           proposedPriceIrr: proposedIrr,
           legalRateIrr: legalIrr ?? undefined,
           ceoNote: ceoNote.trim() || undefined,
           operationsNote: operationsNote.trim() || undefined,
           commercialNote: commercialNote.trim() || undefined,
         });
-        await submitFlightToOperations(flightId, updated.version);
+        await submitFlightToOperations(targetFlightId, updated.version);
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
         onSuccess(
-          updated.pendingRevision || updated.approvalStatus === "PENDING_REVISION"
+          updated.pendingRevision ||
+            updated.approvalStatus === "PENDING_REVISION"
             ? "تغییرات برای بررسی مجدد مدیر عملیات ارسال شد."
             : `مشخصات پرواز برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
         );
         return;
       }
-
-      const created = await createFlight(payload);
-      createdFlightId = created.id;
-
-      for (const f of fares) {
-        const farePayload: CreateFareRulePayload = {
-          cabin: f.cabin,
-          classCode: f.classCode,
-          priceIrr: f.priceIrr,
-          seatsAllocated: f.seatsAllocated,
-          taxIrr: f.taxIrr,
-          refundable: f.refundable,
-          changeable: f.changeable,
-          baggageAllowanceKg: f.baggageAllowanceKg || undefined,
-          allowedChannels: f.allowedChannels.length
-            ? f.allowedChannels
-            : undefined,
-          validFrom: f.validFrom || undefined,
-          validUntil: f.validUntil || undefined,
-        };
-        await createFareRule(created.id, farePayload);
-      }
-
-      for (const commitment of agencyCommitments) {
-        await createCommitment(
-          created.id,
-          draftToCreatePayload(commitment),
-        );
-      }
-
-      const legalIrr = moneyInputToRialString(legalToman);
-      await upsertProposal(created.id, {
-        proposedPriceIrr: proposedIrr,
-        legalRateIrr: legalIrr ?? undefined,
-        ceoNote: ceoNote.trim() || undefined,
-        operationsNote: operationsNote.trim() || undefined,
-        commercialNote: commercialNote.trim() || undefined,
-      });
-      await submitFlightToOperations(created.id, created.version);
-
-      const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
-      onSuccess(
-        `پرواز جدید ثبت و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
-      );
+      setError("شناسه پرواز برای ویرایش موجود نیست.");
     } catch (e) {
       const message =
         e instanceof ApiRequestError
@@ -823,13 +947,7 @@ export default function AddFlightPage({
           : e instanceof Error
             ? e.message
             : "خطا در ثبت پرواز.";
-      if (createdFlightId) {
-        onSuccess(
-          `⚠️ پرواز ایجاد شد، اما تکمیل اطلاعات آن ناموفق بود: ${message} رکورد ذخیره شده و از فهرست پروازها قابل ویرایش است.`,
-        );
-      } else {
-        setError(message);
-      }
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -843,6 +961,31 @@ export default function AddFlightPage({
     : saving
       ? "در حال ثبت…"
       : "ثبت پرواز و ارسال برای مدیر عملیات";
+
+  function goToNextStep() {
+    setError(null);
+    if (wizardStep === 0) {
+      if (
+        !isValidFlightNo(flightNo) ||
+        !resolvedTemplate?.nextFlightInstanceId ||
+        resolvedOccurrenceVersion == null
+      ) {
+        setError(
+          "برای ادامه، شماره یک مسیر پروازی فعال را وارد و منتظر تکمیل خودکار مشخصات بمانید.",
+        );
+        return;
+      }
+    }
+    if (wizardStep === 1 && fares.length === 0) {
+      setError("حداقل یک کلاس نرخی و ظرفیت فروش آن را تعریف کنید.");
+      return;
+    }
+    if (wizardStep === 2 && charterCommittedSeats >= capacity) {
+      setError("تعهد چارتری باید کمتر از ظرفیت فیزیکی پرواز باشد.");
+      return;
+    }
+    setWizardStep((step) => Math.min(3, step + 1));
+  }
 
   return (
     <div
@@ -874,7 +1017,7 @@ export default function AddFlightPage({
               <p className="mt-[3px] text-xs text-[#6b7b94]">
                 {isEdit
                   ? "مشخصات پرواز را ویرایش کنید؛ تغییرات ابتدا برای بررسی مدیر عملیات ارسال می‌شود."
-                  : "اطلاعات پرواز را وارد کنید؛ پس از تأیید مدیر عملیات، پرونده برای مدیر عامل ارسال می‌شود."}
+                  : "شماره یک مسیر پروازی فعال را وارد کنید؛ مشخصات فیزیکی همان رخداد تکمیل می‌شود و سپس نرخ و ظرفیت فروش را تعیین می‌کنید."}
               </p>
             </div>
           </div>
@@ -895,12 +1038,24 @@ export default function AddFlightPage({
           <>
             {operationsFeedback && (
               <div className="mb-4 rounded-xl border border-[#f8717155] bg-[#f8717114] p-4 text-sm leading-7 text-[#fca5a5]">
-                <strong className="block text-xs text-[#f87171]">نظر مدیر عملیات برای اصلاح</strong>
+                <strong className="block text-xs text-[#f87171]">
+                  نظر مدیر عملیات برای اصلاح
+                </strong>
                 {operationsFeedback}
               </div>
             )}
+            {!isEdit && (
+              <AddFlightWizardNav
+                activeStep={wizardStep}
+                onStep={(step) => {
+                  if (step <= wizardStep) setWizardStep(step);
+                }}
+              />
+            )}
             {/* مشخصات پرواز */}
-            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+            <section
+              className={`${!isEdit && wizardStep !== 0 ? "hidden" : ""} mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]`}
+            >
               <div className="mb-4 flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
                 <h2 className="m-0 text-[14.5px] font-extrabold text-white">
@@ -910,18 +1065,29 @@ export default function AddFlightPage({
               <div className="grid grid-cols-1 gap-[13px] md:grid-cols-3">
                 <FlightNumberInput
                   value={flightNo}
-                  onChange={setFlightNo}
+                  onChange={(value) => {
+                    setFlightNo(value);
+                    if (
+                      resolvedTemplate &&
+                      value !== resolvedTemplate.flightNoBase
+                    ) {
+                      setResolvedTemplate(null);
+                      setResolvedOccurrenceVersion(null);
+                      setAgencySummary(null);
+                    }
+                  }}
                   showError={showValidation}
                 />
                 <div className="relative">
                   <span className={labelClass}>مبدأ *</span>
                   <button
                     type="button"
+                    disabled={inheritedOccurrenceLocked}
                     onClick={() => {
                       setCityOpen(cityOpen === "origin" ? null : "origin");
                       setCityQuery("");
                     }}
-                    className={`${inputClass} flex items-center justify-between ${originCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
+                    className={`${inputClass} flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60 ${originCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
                   >
                     <span>{originLabel()}</span>
                     <svg
@@ -952,11 +1118,12 @@ export default function AddFlightPage({
                   <span className={labelClass}>مقصد *</span>
                   <button
                     type="button"
+                    disabled={inheritedOccurrenceLocked}
                     onClick={() => {
                       setCityOpen(cityOpen === "dest" ? null : "dest");
                       setCityQuery("");
                     }}
-                    className={`${inputClass} flex items-center justify-between ${destCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
+                    className={`${inputClass} flex items-center justify-between disabled:cursor-not-allowed disabled:opacity-60 ${destCode ? "text-[#e7ecf3]" : "text-[#6b7b94]"}`}
                   >
                     <span>{destLabel()}</span>
                     <svg
@@ -995,6 +1162,7 @@ export default function AddFlightPage({
                       minDate={dateMin}
                       testId="af-date"
                       placeholder="انتخاب تاریخ"
+                      disabled={inheritedOccurrenceLocked}
                     />
                   </div>
                 </div>
@@ -1005,6 +1173,7 @@ export default function AddFlightPage({
                   onChange={setTime}
                   testId="af-time"
                   placeholder="HH:mm"
+                  disabled={inheritedOccurrenceLocked}
                 />
                 <DurationFields
                   hours={durationHours}
@@ -1012,6 +1181,7 @@ export default function AddFlightPage({
                   onHours={setDurationHours}
                   onMinutes={setDurationMins}
                   showError={showValidation}
+                  disabled={inheritedOccurrenceLocked}
                 />
                 <div>
                   <label className={labelClass} htmlFor="af-arrival">
@@ -1035,8 +1205,11 @@ export default function AddFlightPage({
                     id="af-aircraft"
                     data-testid="af-aircraft"
                     value={aircraft}
-                    onChange={(e) => void applyAircraftDefinition(e.target.value)}
-                    className={`${inputClass} cursor-pointer font-num`}
+                    disabled={inheritedOccurrenceLocked}
+                    onChange={(e) =>
+                      void applyAircraftDefinition(e.target.value)
+                    }
+                    className={`${inputClass} cursor-pointer font-num disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     {(aircraftTypes.length
                       ? aircraftTypes.map((a) => a.aircraftType)
@@ -1048,64 +1221,127 @@ export default function AddFlightPage({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className={labelClass} htmlFor="af-charter">
-                    تعهد چارتری (صندلی)
-                  </label>
-                  <input
-                    id="af-charter"
-                    dir="ltr"
-                    inputMode="numeric"
-                    placeholder="مثلاً ۶۰"
-                    value={charter}
-                    onChange={(e) =>
-                      setCharter(
-                        latinDigits(e.target.value)
-                          .replace(/\D/g, "")
-                          .slice(0, 4),
-                      )
-                    }
-                    className={`${inputClass} text-left font-num`}
-                  />
-                </div>
+                {isEdit && (
+                  <div>
+                    <label className={labelClass} htmlFor="af-charter">
+                      تعهد چارتری (صندلی)
+                    </label>
+                    <input
+                      id="af-charter"
+                      dir="ltr"
+                      inputMode="numeric"
+                      placeholder="مثلاً ۶۰"
+                      value={charter}
+                      onChange={(e) =>
+                        setCharter(
+                          latinDigits(e.target.value)
+                            .replace(/\D/g, "")
+                            .slice(0, 4),
+                        )
+                      }
+                      className={`${inputClass} text-left font-num`}
+                    />
+                  </div>
+                )}
               </div>
               <div className="mt-4 border-t border-[#28344c] pt-4">
                 <CabinCapacityEditor
                   rows={cabinRows}
                   onChange={setCabinRows}
                   error={cabinCapacityError}
+                  readOnly={inheritedOccurrenceLocked}
                 />
               </div>
               {resolvedTemplate && !isEdit && (
-                <p className="mt-3 rounded-xl border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-[11px] text-blue-200">
-                  اطلاعات مسیر از تعریف فعال شماره پرواز خوانده شد؛ همه فیلدها
-                  همچنان قابل ویرایش هستند.
-                </p>
+                <div
+                  className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/10 p-3 text-blue-100"
+                  data-testid="resolved-schedule-summary"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-xs">
+                      مسیر زمان‌بندی‌شده پیدا شد و اطلاعات خودکار تکمیل شد
+                    </strong>
+                    <span className="rounded-full bg-blue-300/15 px-2.5 py-1 text-[10px] text-blue-200">
+                      تکمیل همان رخداد؛ بدون ساخت پرواز تکراری
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px] text-blue-200 sm:grid-cols-4">
+                    <span>
+                      شماره: <b className="font-num text-white">{flightNo}</b>
+                    </span>
+                    <span>
+                      هواپیما: <b className="font-num text-white">{aircraft}</b>
+                    </span>
+                    <span>
+                      ظرفیت:{" "}
+                      <b className="font-num text-white">
+                        {faDigits(capacity)} صندلی
+                      </b>
+                    </span>
+                    <span>
+                      تاریخ و ساعت:{" "}
+                      <b className="font-num text-white">
+                        {dateIso
+                          ? faDigits(
+                              dayjs(dateIso)
+                                .calendar("jalali")
+                                .format("YYYY/MM/DD"),
+                            )
+                          : "—"}{" "}
+                        · {faDigits(time || "—")}
+                      </b>
+                    </span>
+                  </div>
+                </div>
               )}
-              <div className="mt-4">
-                <AgencyAllotmentsSummaryCard
-                  summary={agencySummary}
-                  loading={routeResolving}
-                />
-              </div>
-              <div className="mt-4">
-                <AgencyCommitmentsEditor
-                  capacity={capacity}
-                  charterSeats={charterCommittedSeats}
-                  value={agencyCommitments}
-                  onChange={setAgencyCommitments}
-                />
-              </div>
+              <details className="mt-4 rounded-xl border border-[#28344c] bg-[#0f1726] p-3">
+                <summary className="cursor-pointer text-xs font-bold text-[#c7d4e8]">
+                  وضعیت فعلی تخصیص آژانس‌ها
+                </summary>
+                <div className="mt-4">
+                  <AgencyAllotmentsSummaryCard
+                    summary={agencySummary}
+                    loading={routeResolving}
+                  />
+                </div>
+                {isEdit ? (
+                  <div className="mt-4">
+                    <AgencyCommitmentsEditor
+                      capacity={capacity}
+                      charterSeats={charterCommittedSeats}
+                      value={agencyCommitments}
+                      onChange={setAgencyCommitments}
+                    />
+                  </div>
+                ) : (
+                  <p className="mb-0 mt-3 text-[11px] leading-6 text-[#8ea0b8]">
+                    تخصیص صندلی به آژانس مشخص، بعد از تأیید و انتشار پرواز و از
+                    جریان مستقل آژانس‌ها انجام می‌شود؛ این مرحله فقط وضعیت فعلی
+                    را نمایش می‌دهد.
+                  </p>
+                )}
+              </details>
             </section>
 
-            <ChargeRulesEditor
-              rules={chargeRules}
-              onChange={setChargeRules}
-              basePriceIrr={basePriceIrr}
-            />
+            <details
+              className={`${!isEdit && wizardStep !== 0 ? "hidden" : ""} mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[16px]`}
+            >
+              <summary className="cursor-pointer text-[13px] font-extrabold text-[#c7d4e8]">
+                قوانین هزینه و جریمه (تنظیمات تکمیلی)
+              </summary>
+              <div className="mt-4">
+                <ChargeRulesEditor
+                  rules={chargeRules}
+                  onChange={setChargeRules}
+                  basePriceIrr={basePriceIrr}
+                />
+              </div>
+            </details>
 
             {/* کلاس‌های نرخی */}
-            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+            <section
+              className={`${!isEdit && wizardStep !== 1 ? "hidden" : ""} mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]`}
+            >
               <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#60a5fa]" />
@@ -1464,8 +1700,79 @@ export default function AddFlightPage({
               </div>
             </section>
 
+            {!isEdit && wizardStep === 2 && (
+              <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+                <div className="mb-4">
+                  <h2 className="m-0 text-[14.5px] font-extrabold text-white">
+                    ظرفیت و کانال فروش آژانس
+                  </h2>
+                  <p className="mt-2 text-[11px] leading-6 text-[#8ea0b8]">
+                    ظرفیت فیزیکی از هواپیما خوانده شده است. در این مرحله فقط سهم
+                    فروش کانال‌ها را مرور کنید؛ تخصیص صندلی به آژانس مشخص پس از
+                    تأیید پرواز و از بخش آژانس‌ها انجام می‌شود.
+                  </p>
+                </div>
+                <AgencyAllotmentsSummaryCard
+                  summary={agencySummary}
+                  loading={routeResolving}
+                />
+                <div className="mt-4 rounded-xl border border-[#28344c] bg-[#0f1726] p-4">
+                  <label className={labelClass} htmlFor="af-charter">
+                    ظرفیت فروش چارتری (صندلی)
+                  </label>
+                  <input
+                    id="af-charter"
+                    dir="ltr"
+                    inputMode="numeric"
+                    placeholder="مثلاً ۶۰"
+                    value={charter}
+                    onChange={(e) =>
+                      setCharter(
+                        latinDigits(e.target.value)
+                          .replace(/\D/g, "")
+                          .slice(0, 4),
+                      )
+                    }
+                    className={`${inputClass} text-left font-num`}
+                  />
+                  <p className="mb-0 mt-2 text-[10.5px] leading-5 text-[#8ea0b8]">
+                    این عدد سهم کانال چارتری است و ظرفیت فیزیکی هواپیما را تغییر
+                    نمی‌دهد.
+                  </p>
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-[#28344c] bg-[#0f1726] p-4">
+                    <span className="text-[10.5px] text-[#8ea0b8]">
+                      ظرفیت فیزیکی
+                    </span>
+                    <strong className="mt-2 block font-num text-lg text-white">
+                      {faDigits(capacity)} صندلی
+                    </strong>
+                  </div>
+                  <div className="rounded-xl border border-[#28344c] bg-[#0f1726] p-4">
+                    <span className="text-[10.5px] text-[#8ea0b8]">
+                      تعهد چارتری
+                    </span>
+                    <strong className="mt-2 block font-num text-lg text-[#c4b5fd]">
+                      {faDigits(charterCommittedSeats)} صندلی
+                    </strong>
+                  </div>
+                  <div className="rounded-xl border border-[#1f5a4a] bg-[rgba(16,185,129,.06)] p-4">
+                    <span className="text-[10.5px] text-[#8ea0b8]">
+                      قابل فروش مستقیم
+                    </span>
+                    <strong className="mt-2 block font-num text-lg text-[#34d399]">
+                      {faDigits(publicSaleSeats)} صندلی
+                    </strong>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* قیمت‌گذاری */}
-            <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">
+            <section
+              className={`${!isEdit && wizardStep !== 3 ? "hidden" : ""} mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]`}
+            >
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-[#a78bfa]" />
@@ -1501,10 +1808,16 @@ export default function AddFlightPage({
                     صندلی فروخته‌شده به آژانس‌ها
                   </div>
                   <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-                    <strong className="font-num text-xl text-[#c4b5fd]" data-testid="pricing-agency-seats">
+                    <strong
+                      className="font-num text-xl text-[#c4b5fd]"
+                      data-testid="pricing-agency-seats"
+                    >
                       {faDigits(agencyCommittedSeats)} صندلی
                     </strong>
-                    <span className="font-num text-xs font-bold text-[#e7ecf3]" data-testid="pricing-agency-revenue">
+                    <span
+                      className="font-num text-xs font-bold text-[#e7ecf3]"
+                      data-testid="pricing-agency-revenue"
+                    >
                       {faMoney(agencyCommittedRevenueIrr)} تومان
                     </span>
                   </div>
@@ -1513,7 +1826,10 @@ export default function AddFlightPage({
                   <div className="text-[11px] font-bold text-[#9fb0c7]">
                     ظرفیت آزاد قابل فروش در سامانه
                   </div>
-                  <strong className="mt-2 block font-num text-xl text-[#34d399]" data-testid="pricing-public-seats">
+                  <strong
+                    className="mt-2 block font-num text-xl text-[#34d399]"
+                    data-testid="pricing-public-seats"
+                  >
                     {faDigits(publicSaleSeats)} صندلی
                   </strong>
                 </div>
@@ -1642,24 +1958,43 @@ export default function AddFlightPage({
             )}
 
             <div className="flex gap-[11px]">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void onSubmit()}
-                className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#3b82f6] text-[13.5px] font-extrabold text-white disabled:opacity-60"
-              >
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
+              {!isEdit && wizardStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWizardStep((step) => Math.max(0, step - 1))}
+                  className="flex h-12 items-center justify-center rounded-xl border border-[#28344c] bg-[#18223a] px-5 text-[13px] font-bold text-[#c7d4e8]"
                 >
-                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
-                </svg>
-                {submitLabel}
-              </button>
+                  مرحله قبل
+                </button>
+              )}
+              {!isEdit && wizardStep < 3 ? (
+                <button
+                  type="button"
+                  onClick={goToNextStep}
+                  className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#3b82f6] text-[13.5px] font-extrabold text-white"
+                >
+                  ادامه به مرحله بعد
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void onSubmit()}
+                  className="flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#3b82f6] text-[13.5px] font-extrabold text-white disabled:opacity-60"
+                >
+                  <svg
+                    width="17"
+                    height="17"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+                  </svg>
+                  {submitLabel}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onClose}
