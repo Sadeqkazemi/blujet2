@@ -2,8 +2,10 @@ import { Link } from 'react-router-dom';
 import { useCareersEnabled } from '../../hooks/useCareersEnabled';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { usePublicAppLinks, usePublicSupportContact } from '../../hooks/usePublicSiteSettings';
 import { useSocialLinks } from '../../hooks/useSocialLinks';
 import { useT } from '../../lib/i18n';
+import { latinDigits } from '../../lib/fa-format';
 import { SocialIcon } from './SocialIcon';
 
 const CONTACT: Record<StoredLocale, { phone: string; email: string }> = {
@@ -26,18 +28,19 @@ function BrandMark() {
 }
 
 function DownloadButtons({ compact = false }: { compact?: boolean }) {
+  const appLinks = usePublicAppLinks();
   const buttonClass = compact
     ? 'flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-3 text-[11px] font-black text-white'
     : 'flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-4 text-xs font-black text-white transition hover:bg-white/[.12]';
   return (
     <div className={`mt-5 flex flex-wrap gap-2 ${compact ? 'justify-center' : 'justify-start'}`} dir="ltr">
-      <a data-testid="footer-app-store" className={buttonClass} href="#" aria-label="App Store">
+      <a data-testid="footer-app-store" className={buttonClass} href={appLinks.app_store || '#'} aria-label="App Store">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M17.05 12.5c-.03-2.36 1.93-3.5 2.02-3.55-1.1-1.6-2.8-1.82-3.4-1.85-1.44-.15-2.83.85-3.56.85-.74 0-1.87-.83-3.08-.8-1.58.02-3.05.92-3.86 2.34-1.66 2.88-.42 7.13 1.2 9.46.79 1.13 1.72 2.4 2.95 2.36 1.18-.05 1.63-.76 3.06-.76 1.42 0 1.83.76 3.08.73 1.28-.02 2.08-1.15 2.86-2.29.9-1.3 1.27-2.57 1.29-2.64-.03-.01-2.47-.95-2.5-3.76M14.65 4.87c.66-.8 1.1-1.9.98-3.02-.95.04-2.1.63-2.78 1.43-.61.7-1.15 1.85-1 2.93 1.06.08 2.14-.53 2.8-1.34" />
         </svg>
         App Store
       </a>
-      <a data-testid="footer-google-play" className={buttonClass} href="#" aria-label="Google Play">
+      <a data-testid="footer-google-play" className={buttonClass} href={appLinks.google_play || '#'} aria-label="Google Play">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <path d="M3.6 2.3c-.35.2-.6.6-.6 1.1v17.2c0 .5.25.9.6 1.1l9.6-9.7L3.6 2.3zm12.5 8.7 2.5-1.4c.7-.4.7-1.4 0-1.8l-2.6-1.5-2.7 2.8 2.8 2.9zm-2.9-2 2.7-2.8L5.1 1.7l8.1 7.3zm0 2.1-8.1 8.2 10.9-6.3-2.8-1.9z" />
         </svg>
@@ -49,26 +52,34 @@ function DownloadButtons({ compact = false }: { compact?: boolean }) {
 
 function ContactRows({ compact = false }: { compact?: boolean }) {
   const { locale } = useLocale();
+  const contact = usePublicSupportContact();
   const labels = CONTACT[locale];
   const rowClass = compact ? 'justify-center' : 'justify-start';
+  // Support contact values are persisted in the locale-independent settings
+  // API and may contain Persian/Arabic numerals. Keep the Persian UI's
+  // configured representation, while normalizing English display and the
+  // tel: target to Latin digits so the footer never leaks a second numeral
+  // representation into an English page.
+  const displayPhone = locale === 'en' ? latinDigits(contact.phone) : contact.phone;
+  const phoneHref = `tel:${latinDigits(contact.phone).replace(/[^+\d]/g, '')}`;
   return (
     <div className={`mt-5 flex flex-col gap-3 ${compact ? 'items-center' : 'items-start'}`}>
-      <a href="tel:+982144694471" aria-label={labels.phone} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
+      <a href={phoneHref} aria-label={labels.phone} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[.07] text-white">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.5 2.1L8.1 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.8 2.1Z" />
           </svg>
         </span>
-        <span dir="ltr" className="font-num text-sm font-bold">021-44694471</span>
+        <span dir="ltr" className="font-num text-sm font-bold">{displayPhone}</span>
       </a>
-      <a href="mailto:info@blujet.com" aria-label={labels.email} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
+      <a href={`mailto:${contact.email}`} aria-label={labels.email} className={`flex items-center gap-3 text-[#f3f7fb] no-underline ${rowClass}`}>
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[.07] text-white">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <rect x="3" y="5" width="18" height="14" rx="2" />
             <path d="m3 7 9 6 9-6" />
           </svg>
         </span>
-        <span dir="ltr" className="text-sm font-bold">info@blujet.com</span>
+        <span dir="ltr" className="text-sm font-bold">{contact.email}</span>
       </a>
     </div>
   );

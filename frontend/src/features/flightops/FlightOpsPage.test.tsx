@@ -93,6 +93,32 @@ describe('FlightOpsPage', () => {
     expect(screen.getByText('مسافری برای این پرواز ثبت نشده است.')).toBeInTheDocument();
   });
 
+  it('offers a manual نیرا retry when automatic submission failed after closing sales', async () => {
+    const closedWithoutNira: FlightopsList = {
+      ...LIST,
+      rows: [{ ...LIST.rows[0], niraSubmittedAt: null }],
+      kpis: { ...LIST.kpis, total: 1, open: 0, closed: 1 },
+    };
+    vi.spyOn(flightopsApi, 'fetchFlightops').mockResolvedValue(closedWithoutNira);
+    vi.spyOn(flightopsApi, 'fetchFlightopsDetail').mockResolvedValue({
+      ...closedWithoutNira.rows[0],
+      occupancyPct: 2,
+      manifest: [],
+    });
+    const submitSpy = vi.spyOn(flightopsApi, 'submitFlightopsToNira').mockResolvedValue({
+      id: 'fi-1',
+      niraSubmittedAt: '2026-07-31T21:45:00.000Z',
+    });
+
+    render(<FlightOpsPage />);
+    await screen.findByText('EP-821');
+    await userEvent.click(screen.getByTestId('fo-row-fi-1'));
+
+    expect(await screen.findByTestId('fo-nira-submit')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('fo-nira-submit'));
+    expect(submitSpy).toHaveBeenCalledWith('fi-1');
+  });
+
   it('paginates the flight list at 10 rows per page', async () => {
     const many: FlightopsList = {
       kpis: { total: 12, open: 12, closed: 0, soldTotal: 0 },

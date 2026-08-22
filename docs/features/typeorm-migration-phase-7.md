@@ -20,7 +20,7 @@ risk-sensitive enough to warrant its own dedicated phase.
    price/status itself.
 2. **`flightops`** — `FlightopsService` (166 lines): the نیرا ops board —
    per-instance sold/free counts (manual grouped `COUNT(*)`, no
-   `loadRelationCountAndMap`), lazy 5h-before-departure manifest
+   `loadRelationCountAndMap`), lazy 4h-before-departure manifest
    submission with a conditional-update double-submit guard, and the
    flight detail/manifest view.
 3. **`webservice-pricing`** — `WebservicePricingService` (69 lines):
