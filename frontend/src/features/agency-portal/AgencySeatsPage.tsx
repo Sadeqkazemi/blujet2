@@ -194,7 +194,7 @@ export default function AgencySeatsPage() {
     requestGroup?.options.find(
       (row) => optionKey(row) === requestFlightId,
     ) ?? requestGroup?.options[0] ?? null;
-  const availableRouteCount = requestOptions?.length ?? 0;
+  const availableRouteCount = routeGroups.length;
   const requestOccurrences = useMemo(() => {
     if (!requestFlight || !requestGroup) return [];
     const start = new Date(requestFlight.departureAt);
@@ -392,6 +392,10 @@ export default function AgencySeatsPage() {
           {visibleFlightOptions.map((row) => {
             const key = optionKey(row);
             const isSelected = requestFlightId === key;
+            const isReleased =
+              row.agencySeatsReleased > 0 &&
+              row.availableToRequest > 0 &&
+              row.pricePerSeatIrr != null;
             const groupAllotments = (rows ?? []).filter(
               (allotment) =>
                 allotment.flightInstanceId === row.flightInstanceId &&
@@ -430,13 +434,23 @@ export default function AgencySeatsPage() {
                 </div>
                 <div>
                   <span className="block text-[10px] text-[#7d8ba0]">{locale === 'fa' ? 'قیمت هر صندلی' : locale === 'ar' ? 'سعر المقعد' : 'Price per seat'}</span>
-                  <b className="mt-1 block text-sm text-[#23895f]">{localeMoney(row.pricePerSeatIrr ?? '0', locale)}</b>
+                  <b className={`mt-1 block text-sm ${isReleased ? 'text-[#23895f]' : 'text-[#c87322]'}`}>
+                    {isReleased
+                      ? localeMoney(row.pricePerSeatIrr!, locale)
+                      : locale === 'fa'
+                        ? 'در انتظار تخصیص بازرگانی'
+                        : locale === 'ar'
+                          ? 'بانتظار تخصيص الإدارة التجارية'
+                          : 'Awaiting commercial release'}
+                  </b>
                 </div>
                 <span aria-hidden="true" className={`text-[#1668c4] transition ${isSelected ? 'rotate-180' : ''}`}>⌄</span>
               </button>
               {isSelected && <div data-testid={`agency-request-flight-${row.flightInstanceId}-expanded`}>
               <div className="mx-4 mb-3 rounded-xl bg-[#eef6ff] px-4 py-2 text-[11px] font-bold text-[#47637f]">
-                سهمیه آزادشده توسط بازرگانی: {localeDigits(row.agencySeatsReleased, locale)} صندلی · قابل درخواست: {localeDigits(row.availableToRequest, locale)}
+                {isReleased
+                  ? <>سهمیه آزادشده توسط بازرگانی: {localeDigits(row.agencySeatsReleased, locale)} صندلی · قابل درخواست: {localeDigits(row.availableToRequest, locale)}</>
+                  : 'مسیر فعال است؛ مدیر بازرگانی هنوز ظرفیت و نرخ فروش آژانسی این کلاس را آزاد نکرده است.'}
               </div>
               <div className="grid grid-cols-3 border-y border-[#edf1f6] bg-[#fafbfd]">
                 {[

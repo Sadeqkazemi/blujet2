@@ -8,9 +8,11 @@ import {
   fetchAllotmentsSummary,
   fetchAirports,
   fetchCommitments,
+  fetchFareRules,
   fetchFlightDefinition,
   resolveScheduleTemplate,
   submitFlightToOperations,
+  updateFareRule,
   updateFlightDefinition,
 } from "../../api/flights";
 import {
@@ -392,7 +394,8 @@ export default function AddFlightPage({
         return Promise.all([
           fetchAllotmentsSummary(flightId).catch(() => null),
           fetchCommitments(flightId).catch(() => []),
-        ]).then(([summary, rows]) => {
+          fetchFareRules(flightId).catch(() => []),
+        ]).then(([summary, rows, fareRules]) => {
           setAgencySummary(summary);
           const agencyRows = rows
             .filter((row) => row.type === "AGENCY")
@@ -402,6 +405,23 @@ export default function AddFlightPage({
             agencyRows.flatMap((row) =>
               row.commitmentId ? [row.commitmentId] : [],
             ),
+          );
+          setFares(
+            fareRules.map((rule) => ({
+              tempId: rule.id,
+              cabin: rule.cabin,
+              cabinLabel: cabinLabel(rule.cabin),
+              classCode: rule.classCode,
+              priceIrr: Number(rule.priceIrr),
+              taxIrr: Number(rule.taxIrr),
+              seatsAllocated: rule.seatsAllocated,
+              baggageAllowanceKg: rule.baggageAllowanceKg ?? 0,
+              refundable: rule.refundable,
+              changeable: rule.changeable,
+              validFrom: rule.validFrom ?? "",
+              validUntil: rule.validUntil ?? "",
+              allowedChannels: [...rule.allowedChannels],
+            })),
           );
         });
       })
@@ -703,6 +723,12 @@ export default function AddFlightPage({
       setError("مجموع تعهد چارتری و تعهدات آژانس از ظرفیت پرواز بیشتر است.");
       return;
     }
+    if (fares.length === 0) {
+      setError(
+        "پیش از ارسال برای مدیر عملیات، حداقل یک کلاس نرخی و ظرفیت فروش آن را تعریف کنید.",
+      );
+      return;
+    }
 
     const departureAt = buildDepartureIso(dateIso, time);
     if (!departureAt) {
@@ -735,8 +761,63 @@ export default function AddFlightPage({
     let createdFlightId: string | null = null;
     setSaving(true);
     try {
-      if (isEdit && flightId) {
-        const updated = await updateFlightDefinition(flightId, payload);
+      const resolvedFlightId =
+        !isEdit && resolvedTemplate?.nextFlightInstanceId
+          ? resolvedTemplate.nextFlightInstanceId
+          : null;
+      const targetFlightId = isEdit ? flightId! : resolvedFlightId;
+
+      // A schedule template already creates its future occurrences as DRAFT
+      // instances. Entering its flight number must complete that same row,
+      // otherwise a duplicate instance is created and the agency/public
+      // catalogue keeps pointing at the unfinished DRAFT occurrence.
+      if (targetFlightId) {
+        const updated = await updateFlightDefinition(targetFlightId, payload);
+
+        const existingFareRules = await fetchFareRules(targetFlightId).catch(
+          () => [],
+        );
+        for (const f of fares) {
+          const farePayload: CreateFareRulePayload = {
+            cabin: f.cabin,
+            classCode: f.classCode,
+            priceIrr: f.priceIrr,
+            seatsAllocated: f.seatsAllocated,
+            taxIrr: f.taxIrr,
+            refundable: f.refundable,
+            changeable: f.changeable,
+            baggageAllowanceKg: f.baggageAllowanceKg || undefined,
+            allowedChannels: f.allowedChannels.length
+              ? f.allowedChannels
+              : undefined,
+            validFrom: f.validFrom || undefined,
+            validUntil: f.validUntil || undefined,
+          };
+          const existingFare = existingFareRules.find(
+            (rule) =>
+              rule.cabin === f.cabin && rule.classCode === f.classCode,
+          );
+          if (existingFare) {
+            await updateFareRule(
+              targetFlightId,
+              existingFare.id,
+              {
+                priceIrr: farePayload.priceIrr,
+                seatsAllocated: farePayload.seatsAllocated,
+                taxIrr: farePayload.taxIrr,
+                refundable: farePayload.refundable,
+                changeable: farePayload.changeable,
+                baggageAllowanceKg: farePayload.baggageAllowanceKg,
+                allowedChannels: farePayload.allowedChannels,
+                validFrom: farePayload.validFrom,
+                validUntil: farePayload.validUntil,
+              },
+            );
+          } else {
+            await createFareRule(targetFlightId, farePayload);
+          }
+        }
+
         const retainedCommitmentIds = new Set(
           agencyCommitments.flatMap((row) =>
             row.commitmentId ? [row.commitmentId] : [],
@@ -744,31 +825,33 @@ export default function AddFlightPage({
         );
         for (const commitmentId of initialCommitmentIds) {
           if (!retainedCommitmentIds.has(commitmentId)) {
-            await deleteCommitment(flightId, commitmentId);
+            await deleteCommitment(targetFlightId, commitmentId);
           }
         }
         for (const commitment of agencyCommitments) {
           if (!commitment.commitmentId) {
             await createCommitment(
-              flightId,
+              targetFlightId,
               draftToCreatePayload(commitment),
             );
           }
         }
         const legalIrr = moneyInputToRialString(legalToman);
-        await upsertProposal(flightId, {
+        await upsertProposal(targetFlightId, {
           proposedPriceIrr: proposedIrr,
           legalRateIrr: legalIrr ?? undefined,
           ceoNote: ceoNote.trim() || undefined,
           operationsNote: operationsNote.trim() || undefined,
           commercialNote: commercialNote.trim() || undefined,
         });
-        await submitFlightToOperations(flightId, updated.version);
+        await submitFlightToOperations(targetFlightId, updated.version);
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
         onSuccess(
-          updated.pendingRevision || updated.approvalStatus === "PENDING_REVISION"
-            ? "تغییرات برای بررسی مجدد مدیر عملیات ارسال شد."
-            : `مشخصات پرواز برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
+          isEdit
+            ? updated.pendingRevision || updated.approvalStatus === "PENDING_REVISION"
+              ? "تغییرات برای بررسی مجدد مدیر عملیات ارسال شد."
+              : `مشخصات پرواز برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`
+            : `رخداد زمان‌بندی‌شده تکمیل و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
         );
         return;
       }
@@ -1077,32 +1160,54 @@ export default function AddFlightPage({
                 />
               </div>
               {resolvedTemplate && !isEdit && (
-                <p className="mt-3 rounded-xl border border-blue-400/20 bg-blue-400/10 px-3 py-2 text-[11px] text-blue-200">
-                  اطلاعات مسیر از تعریف فعال شماره پرواز خوانده شد؛ همه فیلدها
-                  همچنان قابل ویرایش هستند.
-                </p>
+                <div className="mt-3 rounded-xl border border-blue-400/25 bg-blue-400/10 p-3 text-blue-100" data-testid="resolved-schedule-summary">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-xs">مسیر زمان‌بندی‌شده پیدا شد و اطلاعات خودکار تکمیل شد</strong>
+                    <span className="rounded-full bg-blue-300/15 px-2.5 py-1 text-[10px] text-blue-200">
+                      تکمیل همان رخداد؛ بدون ساخت پرواز تکراری
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px] text-blue-200 sm:grid-cols-4">
+                    <span>شماره: <b className="font-num text-white">{flightNo}</b></span>
+                    <span>هواپیما: <b className="font-num text-white">{aircraft}</b></span>
+                    <span>ظرفیت: <b className="font-num text-white">{faDigits(capacity)} صندلی</b></span>
+                    <span>تاریخ و ساعت: <b className="font-num text-white">{dateIso ? faDigits(dayjs(dateIso).calendar("jalali").format("YYYY/MM/DD")) : "—"} · {faDigits(time || "—")}</b></span>
+                  </div>
+                </div>
               )}
-              <div className="mt-4">
-                <AgencyAllotmentsSummaryCard
-                  summary={agencySummary}
-                  loading={routeResolving}
-                />
-              </div>
-              <div className="mt-4">
-                <AgencyCommitmentsEditor
-                  capacity={capacity}
-                  charterSeats={charterCommittedSeats}
-                  value={agencyCommitments}
-                  onChange={setAgencyCommitments}
-                />
-              </div>
+              <details className="mt-4 rounded-xl border border-[#28344c] bg-[#0f1726] p-3">
+                <summary className="cursor-pointer text-xs font-bold text-[#c7d4e8]">
+                  تعهدات و ظرفیت آژانس‌ها (تنظیمات تکمیلی)
+                </summary>
+                <div className="mt-4">
+                  <AgencyAllotmentsSummaryCard
+                    summary={agencySummary}
+                    loading={routeResolving}
+                  />
+                </div>
+                <div className="mt-4">
+                  <AgencyCommitmentsEditor
+                    capacity={capacity}
+                    charterSeats={charterCommittedSeats}
+                    value={agencyCommitments}
+                    onChange={setAgencyCommitments}
+                  />
+                </div>
+              </details>
             </section>
 
-            <ChargeRulesEditor
-              rules={chargeRules}
-              onChange={setChargeRules}
-              basePriceIrr={basePriceIrr}
-            />
+            <details className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[16px]">
+              <summary className="cursor-pointer text-[13px] font-extrabold text-[#c7d4e8]">
+                قوانین هزینه و جریمه (تنظیمات تکمیلی)
+              </summary>
+              <div className="mt-4">
+                <ChargeRulesEditor
+                  rules={chargeRules}
+                  onChange={setChargeRules}
+                  basePriceIrr={basePriceIrr}
+                />
+              </div>
+            </details>
 
             {/* کلاس‌های نرخی */}
             <section className="mb-[15px] rounded-2xl border border-[#1f2a3d] bg-[#141d2e] px-[19px] py-[18px]">

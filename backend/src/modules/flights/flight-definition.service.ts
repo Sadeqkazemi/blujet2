@@ -1015,6 +1015,10 @@ export class FlightDefinitionService {
     instance.approvedSnapshot = snapshot;
     instance.pendingRevisionSnapshot = null;
     instance.definitionStatus = FlightDefinitionStatus.PUBLISHED;
+    // First CEO approval is the final publication gate. Keep revision
+    // approvals from overriding a later manual commercial pause, but make a
+    // newly approved flight immediately discoverable by the public search.
+    instance.publicSaleEnabled = true;
     instance.rejectionReason = null;
     instance.publishedAt = new Date();
     instance.publishedByUserId = publishedByUserId ?? null;
