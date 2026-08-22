@@ -97,4 +97,27 @@ describe("JalaliDatePicker dark panel", () => {
     );
     expect(screen.getByTestId("localized-date")).toHaveTextContent("٢٠٢٦/٠٨/١١");
   });
+
+  it("keeps the page scrollable while a regular desktop calendar opens below its field", async () => {
+    const user = userEvent.setup();
+    render(
+      <JalaliDatePicker
+        locale="fa"
+        label="تاریخ"
+        value={null}
+        onChange={() => undefined}
+        testId="fixed-calendar"
+      />,
+    );
+
+    await user.click(screen.getByTestId("fixed-calendar"));
+    expect(document.body.style.overflow).not.toBe("hidden");
+    expect(document.documentElement.style.overflow).not.toBe("hidden");
+    expect(screen.getByTestId("fixed-calendar-popup")).toHaveStyle({
+      position: "absolute",
+    });
+    const monthControls = screen.getByTestId("fixed-calendar-month-label").parentElement;
+    expect(monthControls?.firstElementChild).toHaveTextContent("‹");
+    expect(monthControls?.lastElementChild).toHaveTextContent("›");
+  });
 });

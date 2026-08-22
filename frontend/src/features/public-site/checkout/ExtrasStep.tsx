@@ -205,6 +205,7 @@ export default function ExtrasStep({
   businessLocked,
   bookedCabin,
   aircraftType,
+  clubBalance,
 }: {
   locale: StoredLocale;
   extras: ExtraServiceState[];
@@ -217,10 +218,15 @@ export default function ExtrasStep({
   businessLocked: boolean;
   bookedCabin: CabinClass;
   aircraftType: string;
+  clubBalance: number;
 }) {
   const t = CHECKOUT_COPY[locale];
   const isMobile = useIsMobile();
-  const [seatOpen, setSeatOpen] = useState(true);
+  const [seatOpen, setSeatOpen] = useState(false);
+  const seatSelectionExtra = extras.find((extra) => extra.code === 'SEAT_SELECTION');
+  const loyaltySeatAccess = clubBalance >= 15_000;
+  const paidSeatAccess = Boolean(seatSelectionExtra?.selected);
+  const seatAccessGranted = loyaltySeatAccess || paidSeatAccess;
   const aircraft = aircraftType.trim() || 'MD-80';
   const rawSeats = seats ?? [];
   const useMd80 = shouldUseMd80SeatMap(aircraft, rawSeats);
@@ -239,6 +245,30 @@ export default function ExtrasStep({
       : [];
   const sold = displaySeats.filter((s) => s.status === 'TAKEN').length;
   const cap = displaySeats.length || (useMd80 ? 140 : 0);
+
+  const toggleExtra = (extra: ExtraServiceState) => {
+    onToggleExtra(extra.id);
+    if (extra.code === 'SEAT_SELECTION') setSeatOpen(!extra.selected);
+  };
+
+  const seatAccessCopy =
+    locale === 'en'
+      ? {
+          locked: 'Seat selection is available after paying its fee or with at least 15,000 club points.',
+          pay: 'Accept seat-selection fee',
+          loyalty: 'Unlocked with club points',
+        }
+      : locale === 'ar'
+        ? {
+            locked: 'يتاح اختيار المقعد بعد دفع الرسوم أو بامتلاك ١٥٬٠٠٠ نقطة نادي على الأقل.',
+            pay: 'قبول رسوم اختيار المقعد',
+            loyalty: 'مفتوح بنقاط النادي',
+          }
+        : {
+            locked: 'برای باز کردن نقشه، هزینه انتخاب صندلی را بپذیرید یا حداقل ۱۵٬۰۰۰ امتیاز باشگاه داشته باشید.',
+            pay: 'پذیرش هزینه انتخاب صندلی',
+            loyalty: 'بازشده با امتیاز باشگاه',
+          };
 
   return (
     <section
@@ -271,7 +301,7 @@ export default function ExtrasStep({
             >
               <button
                 type="button"
-                onClick={() => onToggleExtra(sv.id)}
+                onClick={() => toggleExtra(sv)}
                 data-testid={`checkout-extra-${sv.id}-toggle`}
                 className="flex min-w-0 flex-1 items-center gap-[11px] text-start"
               >
@@ -313,7 +343,7 @@ export default function ExtrasStep({
                   <button
                     type="button"
                     aria-label={title}
-                    onClick={() => onToggleExtra(sv.id)}
+                    onClick={() => toggleExtra(sv)}
                     className={`relative inline-block h-5 w-[34px] rounded-xl transition-colors ${sv.selected ? 'bg-[#1668c4]' : 'bg-[#d7dee8]'}`}
                   >
                     <span
@@ -335,7 +365,11 @@ export default function ExtrasStep({
       <div className="border-t border-[#f0f2f6] pt-[15px]">
         <button
           type="button"
-          onClick={() => setSeatOpen((v) => !v)}
+          onClick={() => {
+            if (seatAccessGranted) setSeatOpen((value) => !value);
+          }}
+          aria-expanded={seatOpen}
+          aria-disabled={!seatAccessGranted}
           className="mb-2.5 flex w-full items-center justify-between gap-2 text-start"
           data-testid="checkout-seat-toggle"
         >
@@ -344,6 +378,11 @@ export default function ExtrasStep({
               {t.seatMapCaption(useMd80 ? 'MD-80' : aircraft)}
             </div>
             {businessLocked && <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>}
+            {loyaltySeatAccess && (
+              <div className="mt-1 text-[10.5px] font-bold text-[#258b6a]" data-testid="checkout-seat-loyalty-access">
+                {seatAccessCopy.loyalty}
+              </div>
+            )}
           </div>
           <span
             className="flex-none text-sm text-[#8a96a6] transition-transform"
@@ -353,7 +392,26 @@ export default function ExtrasStep({
           </span>
         </button>
 
-        {seatOpen && (
+        {!seatAccessGranted && (
+          <div
+            className="mb-3 rounded-xl border border-[#ead8ab] bg-[#fffaf0] px-3.5 py-3"
+            data-testid="checkout-seat-access-gate"
+          >
+            <p className="m-0 text-[11px] leading-6 text-[#73591f]">{seatAccessCopy.locked}</p>
+            {seatSelectionExtra && (
+              <button
+                type="button"
+                onClick={() => toggleExtra(seatSelectionExtra)}
+                className="mt-2 rounded-lg bg-[#1668c4] px-3.5 py-2 text-[11px] font-extrabold text-white"
+                data-testid="checkout-seat-accept-fee"
+              >
+                {seatAccessCopy.pay} — {localeMoney(extraTotalIrr(seatSelectionExtra, passengerCount).toString(), locale)} {t.toman}
+              </button>
+            )}
+          </div>
+        )}
+
+        {seatOpen && seatAccessGranted && (
           <>
             <div className="mb-2.5 flex gap-[11px] text-[10.5px] text-[#5a6678]">
               <span className="flex items-center gap-1">

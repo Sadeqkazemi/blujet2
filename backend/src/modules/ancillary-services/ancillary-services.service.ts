@@ -52,6 +52,19 @@ export class AncillaryServicesService implements OnModuleInit {
         }),
       );
     }
+    // Product policy: these two checkout rules are permanent built-ins.
+    // Repair older databases where PET was seeded disabled and keep their
+    // travel-extra mirrors purchasable.
+    for (const key of ['seat-selection', 'pet']) {
+      const fixed = await this.repo.findOneBy({ key });
+      if (!fixed) continue;
+      let saved = fixed;
+      if (!fixed.enabled) {
+        fixed.enabled = true;
+        saved = await this.repo.save(fixed);
+      }
+      await this.syncTravelExtra(saved);
+    }
   }
 
   async listManager() {
@@ -72,12 +85,14 @@ export class AncillaryServicesService implements OnModuleInit {
       where: { enabled: true, category: AncillaryServiceCategory.OTHER },
       order: { isCustom: 'ASC', key: 'ASC' },
     });
-    return rows.map((row) => ({
-      key: row.key,
-      titleFa: row.titleFa,
-      descriptionFa: row.descriptionFa,
-      priceIrr: row.priceIrr.toString(),
-    }));
+    return rows
+      .filter((row) => row.key !== 'pet')
+      .map((row) => ({
+        key: row.key,
+        titleFa: row.titleFa,
+        descriptionFa: row.descriptionFa,
+        priceIrr: row.priceIrr.toString(),
+      }));
   }
 
   async setPrice(actor: AuthenticatedUser, key: string, priceIrr: Irr) {
@@ -106,6 +121,12 @@ export class AncillaryServicesService implements OnModuleInit {
 
   async setEnabled(actor: AuthenticatedUser, key: string, enabled: boolean) {
     const row = await this.getOrThrow(key);
+    if (!enabled && (key === 'seat-selection' || key === 'pet')) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'قانون انتخاب صندلی و حمل حیوان خانگی همیشه فعال است.',
+      });
+    }
     const previous = row.enabled;
     row.enabled = enabled;
     row.updatedById = actor.id;

@@ -57,6 +57,7 @@ import AccountPrivacyPanel from './account/AccountPrivacyPanel';
 import type { TabKey } from './account/account-types';
 import { isAccountTabKey } from './account/account-nav-items';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import MoneyInput from '../../components/MoneyInput';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -542,6 +543,7 @@ export default function AccountPage() {
     nationalId: '',
     birthDate: '',
     passportNo: '',
+    address: '',
   });
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
@@ -609,6 +611,7 @@ export default function AccountPage() {
           nationalId: p.nationalId ?? '',
           birthDate: p.birthDate ? formatLocaleDate(p.birthDate, locale) : '',
           passportNo: p.passportNo ?? '',
+          address: p.address ?? '',
         });
       })
       .catch(() => setProfile(null));
@@ -633,10 +636,19 @@ export default function AccountPage() {
     setProfileNotice(null);
     setProfileSaving(true);
     try {
+      const birthDate = profileForm.birthDate.trim()
+        ? parseLocaleDateToIso(profileForm.birthDate, locale)?.slice(0, 10)
+        : undefined;
+      if (profileForm.birthDate.trim() && !birthDate) {
+        setProfileError(locale === 'en' ? 'Invalid date of birth.' : 'تاریخ تولد نامعتبر است.');
+        return;
+      }
       const updated = await updateMyProfile({
         fullName: profileForm.fullName || undefined,
         nationalId: profileForm.nationalId || undefined,
+        birthDate,
         passportNo: profileForm.passportNo || undefined,
+        address: profileForm.address.trim() || undefined,
       });
       setProfile(updated);
       setProfileNotice(t.saveSuccess);
@@ -1135,14 +1147,25 @@ export default function AccountPage() {
             <form onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>{t.topupAmountLabel}</label>
-                <input
-                  data-testid="wallet-topup-amount"
-                  dir="ltr"
-                  value={topupAmount}
-                  onChange={(e) => setTopupAmount(e.target.value)}
-                  placeholder={t.topupPlaceholder}
-                  style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
-                />
+                {locale === 'fa' ? (
+                  <MoneyInput
+                    theme="light"
+                    testId="wallet-topup-amount"
+                    valueToman={topupAmount}
+                    onChangeToman={setTopupAmount}
+                    placeholder={t.topupPlaceholder}
+                  />
+                ) : (
+                  <input
+                    data-testid="wallet-topup-amount"
+                    dir="ltr"
+                    inputMode="numeric"
+                    value={topupAmount}
+                    onChange={(e) => setTopupAmount(e.target.value)}
+                    placeholder={t.topupPlaceholder}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+                  />
+                )}
                 {tomanAmountInWords(topupAmount, locale) && (
                   <div
                     data-testid="wallet-topup-amount-words"

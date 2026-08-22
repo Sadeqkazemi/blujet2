@@ -314,6 +314,27 @@ export interface CreateFlightDefinitionPayload {
 
 export interface UpdateFlightDefinitionPayload extends CreateFlightDefinitionPayload {}
 
+export interface CompleteScheduledFlightPayload {
+  expectedVersion?: number;
+  basePriceIrr: string;
+  competitorPriceIrr?: string;
+  charterSeats?: number;
+  chargeRules?: Omit<ChargeRule, "id">[];
+  fareRules: Array<
+    Omit<CreateFareRulePayload, "priceIrr" | "taxIrr"> & {
+      priceIrr: string;
+      taxIrr?: string;
+    }
+  >;
+  pricingProposal: {
+    proposedPriceIrr: string;
+    legalRateIrr?: string;
+    ceoNote?: string;
+    operationsNote?: string;
+    commercialNote?: string;
+  };
+}
+
 export interface FlightDefinitionDetail extends FlightRow {
   aircraftType: string;
   durationMinutes: number;

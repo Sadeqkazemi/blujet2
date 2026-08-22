@@ -307,11 +307,12 @@ export interface UserProfile {
   nationalId: string | null;
   birthDate: string | null;
   passportNo: string | null;
+  address: string | null;
   email: string | null;
   emailVerifiedAt: string | null;
   completionPct: number;
   profileIncomplete: boolean;
   missingProfileFields: (
-    'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'verifiedEmail'
+    'fullName' | 'nationalId' | 'birthDate' | 'passportNo' | 'address' | 'verifiedEmail'
   )[];
 }

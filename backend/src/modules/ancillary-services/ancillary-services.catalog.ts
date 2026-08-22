@@ -94,7 +94,8 @@ export const ANCILLARY_BUILT_IN_SERVICES: readonly AncillaryBuiltInSeed[] = [
     titleFa: 'حمل حیوان خانگی',
     descriptionFa: 'حمل حیوان خانگی در کابین یا انبار',
     priceIrr: 2_500_000n,
-    enabled: false,
+    enabled: true,
+    travelExtra: { code: 'PET', billingUnit: 'PER_BOOKING' },
   },
   {
     key: 'wheelchair',

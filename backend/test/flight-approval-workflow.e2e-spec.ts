@@ -168,7 +168,7 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
     expect(after.definitionStatus).toBe('PENDING_CEO');
   });
 
-  it('6) CEO register → PUBLISHED; commercial visibility makes it searchable', async () => {
+  it('6) CEO register → PUBLISHED and immediately searchable', async () => {
     const { accessToken: comm } = await loginAs(app, 'comm');
     const draft = await createDraft(comm);
     const date = String(draft.departureAt).slice(0, 10);
@@ -193,23 +193,9 @@ describe('Flight approval workflow (ops → CEO → PUBLISHED) (e2e)', () => {
       .where('fi.id = :id', { id: draft.id })
       .getOneOrFail();
     expect(live.definitionStatus).toBe(FlightDefinitionStatus.PUBLISHED);
+    expect(live.publicSaleEnabled).toBe(true);
     expect(live.publishedAt).not.toBeNull();
     expect(live.publishedByUserId).toBeTruthy();
-
-    const hiddenSearch = await request(app.getHttpServer())
-      .get('/search/flights')
-      .query({ origin: 'THR', dest: 'MHD', date });
-    expect(
-      (hiddenSearch.body.data as { flightInstanceId: string }[]).some(
-        (r) => r.flightInstanceId === draft.id,
-      ),
-    ).toBe(false);
-
-    const visible = await request(app.getHttpServer())
-      .patch(`/flights/${draft.id}/sales-visibility`)
-      .set('Authorization', `Bearer ${comm}`)
-      .send({ enabled: true });
-    expect(visible.status).toBe(200);
 
     const search = await request(app.getHttpServer())
       .get('/search/flights')

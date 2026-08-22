@@ -10,6 +10,7 @@ import { ApiRequestError } from "../../api/envelope";
 
 describe("AddFlightPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([
       { id: "a1", code: "THR", cityFa: "تهران", tz: "Asia/Tehran" },
       { id: "a2", code: "DXB", cityFa: "دبی", tz: "Asia/Dubai" },
@@ -21,6 +22,11 @@ describe("AddFlightPage", () => {
     vi.spyOn(flightsApi, "resolveScheduleTemplate").mockRejectedValue(
       new ApiRequestError("NOT_FOUND", "not found", 404),
     );
+    vi.spyOn(flightsApi, "fetchFlightDefinition").mockResolvedValue({
+      id: "scheduled-instance-1",
+      version: 1,
+      approvalStatus: "DRAFT",
+    } as never);
     vi.spyOn(flightsApi, "fetchAllotmentsSummary").mockResolvedValue({
       flightInstanceId: "fi-none",
       totalCapacity: 180,
@@ -32,6 +38,14 @@ describe("AddFlightPage", () => {
       agencies: [],
     });
     vi.spyOn(flightsApi, "fetchCommitments").mockResolvedValue([]);
+    vi.spyOn(flightsApi, "fetchFareRules").mockResolvedValue([]);
+    vi.spyOn(flightsApi, "createFareRule").mockResolvedValue({} as never);
+    vi.spyOn(flightsApi, "updateFareRule").mockResolvedValue({} as never);
+    vi.spyOn(flightsApi, "completeScheduledFlight").mockResolvedValue({
+      id: "scheduled-instance-1",
+      version: 2,
+      approvalStatus: "PENDING_OPERATIONS",
+    } as never);
     vi.spyOn(flightsApi, "fetchCommitmentsSummary").mockResolvedValue({
       cabins: [],
       totalCapacity: 0,
@@ -40,7 +54,9 @@ describe("AddFlightPage", () => {
       sold: 0,
       availableOnline: 0,
     });
-    vi.spyOn(flightsApi, "submitFlightToOperations").mockResolvedValue({} as never);
+    vi.spyOn(flightsApi, "submitFlightToOperations").mockResolvedValue(
+      {} as never,
+    );
     vi.spyOn(agenciesApi, "fetchAgencies").mockResolvedValue({
       agencies: [],
       kpis: {
@@ -52,110 +68,37 @@ describe("AddFlightPage", () => {
     });
   });
 
-  it("renders the design sections and empty fare state", async () => {
+  it("renders the four-step create flow without the previous crowded form", async () => {
     render(<AddFlightPage onClose={vi.fn()} onSuccess={vi.fn()} />);
     expect(await screen.findByTestId("add-flight-page")).toBeInTheDocument();
     expect(screen.getByText("افزودن پرواز جدید")).toBeInTheDocument();
+    expect(screen.getByTestId("add-flight-wizard")).toBeInTheDocument();
     expect(screen.getByText("مشخصات پرواز")).toBeInTheDocument();
-    expect(screen.getByText("کلاس‌های نرخی پرواز")).toBeInTheDocument();
-    expect(screen.getByText("قیمت‌گذاری")).toBeInTheDocument();
     expect(screen.getByTestId("charge-rules-section")).toBeInTheDocument();
     expect(screen.getByTestId("cabin-capacity-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("commercial-pricing-capacity-summary")).toBeInTheDocument();
-    expect(screen.getByTestId("pricing-agency-seats")).toBeInTheDocument();
-    expect(screen.getByTestId("pricing-agency-revenue")).toBeInTheDocument();
-    expect(screen.getByTestId("pricing-public-seats")).toBeInTheDocument();
-    expect(
-      screen.getByText("هنوز کلاس نرخی برای این پرواز تعریف نشده است."),
-    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال برای مدیر عملیات",
+        name: "ادامه به مرحله بعد",
       }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "پیشنهاد قیمت هوش مصنوعی" }),
     ).toBeInTheDocument();
   });
 
-  it("submits create + proposal to the operations path", async () => {
-    const onSuccess = vi.fn();
-    vi.spyOn(flightsApi, "createFlight").mockResolvedValue({
-      id: "inst-1",
-      flightNo: "XY1234",
-      originCode: "THR",
-      destCode: "DXB",
-      departureAt: new Date(Date.now() + 86400000).toISOString(),
-      capacity: 180,
-      charterSeats: 40,
-      sold: 0,
-      basePriceIrr: "68000000",
-      derivedStatus: "ACTIVE",
-      version: 1,
-    } as never);
-    vi.spyOn(pricingApi, "upsertProposal").mockResolvedValue({} as never);
-
-    render(<AddFlightPage onClose={vi.fn()} onSuccess={onSuccess} />);
-    await screen.findByTestId("add-flight-page");
+  it("does not create an ad-hoc duplicate when the flight number has no active route", async () => {
+    render(<AddFlightPage onClose={vi.fn()} onSuccess={vi.fn()} />);
     const user = userEvent.setup();
-
-    await user.type(screen.getByTestId("flight-no-input"), "XY1234");
-    await user.click(screen.getByText("انتخاب شهر مبدأ"));
-    await user.click(await screen.findByText("تهران"));
-    await user.click(screen.getByText("انتخاب شهر مقصد"));
-    await user.click(await screen.findByText("دبی"));
-
-    await user.click(screen.getByTestId("af-date"));
-    await user.click(screen.getByTestId("af-date-today"));
-
-    await user.click(screen.getByTestId("af-time-trigger"));
-    await user.selectOptions(screen.getByTestId("af-time-hour"), "8");
-    await user.selectOptions(screen.getByTestId("af-time-minute"), "30");
-    await user.click(screen.getByTestId("af-time-done"));
-
-    await user.selectOptions(screen.getByTestId("duration-hours"), "2");
-    await user.selectOptions(screen.getByTestId("duration-minutes"), "15");
-    expect(screen.getByTestId("af-arrival")).toHaveValue("۱۰:۴۵");
-
-    const cabinSeatInput = screen.getByLabelText(/تعداد صندلی اکونومی/);
-    await user.clear(cabinSeatInput);
-    await user.type(cabinSeatInput, "180");
-
-    await user.type(screen.getByTestId("af-base-money"), "6800000");
-    await user.type(screen.getByTestId("af-proposed-money"), "7200000");
-    await user.type(screen.getByLabelText(/تعهد چارتری/), "40");
-
+    await user.type(await screen.findByTestId("flight-no-input"), "XY1234");
+    await waitFor(() =>
+      expect(flightsApi.resolveScheduleTemplate).toHaveBeenCalled(),
+    );
     await user.click(
       screen.getByRole("button", {
-        name: "ثبت پرواز و ارسال برای مدیر عملیات",
+        name: "ادامه به مرحله بعد",
       }),
     );
-
-    await waitFor(() =>
-      expect(flightsApi.createFlight).toHaveBeenCalledWith(
-        expect.objectContaining({
-          originCode: "THR",
-          destCode: "DXB",
-          flightNo: "XY1234",
-          capacity: 180,
-          charterSeats: 40,
-          durationMinutes: 135,
-          aircraftType: "Airbus A320",
-          cabinCapacities: [{ cabin: "ECONOMY", seats: 180 }],
-        }),
-      ),
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "شماره یک مسیر پروازی فعال را وارد",
     );
-    await waitFor(() =>
-      expect(pricingApi.upsertProposal).toHaveBeenCalledWith(
-        "inst-1",
-        expect.objectContaining({ proposedPriceIrr: "72000000" }),
-      ),
-    );
-    expect(flightsApi.submitFlightToOperations).toHaveBeenCalledWith(
-      "inst-1",
-      1,
-    );
-    expect(onSuccess).toHaveBeenCalled();
+    expect(flightsApi.completeScheduledFlight).not.toHaveBeenCalled();
   });
 
   it("loads cabin capacities when an aircraft type is selected", async () => {
@@ -276,6 +219,23 @@ describe("AddFlightPage", () => {
       version: 3,
     });
     vi.spyOn(pricingApi, "upsertProposal").mockResolvedValue({} as never);
+    vi.mocked(flightsApi.fetchFareRules).mockResolvedValue([
+      {
+        id: "fare-y",
+        flightInstanceId: "inst-edit",
+        cabin: "ECONOMY",
+        classCode: "Y",
+        priceIrr: 72000000,
+        seatsAllocated: 160,
+        taxIrr: 0,
+        refundable: true,
+        changeable: true,
+        baggageAllowanceKg: 20,
+        validFrom: null,
+        validUntil: null,
+        allowedChannels: ["SYSTEM", "AGENCY"],
+      },
+    ]);
 
     render(
       <AddFlightPage
@@ -306,5 +266,116 @@ describe("AddFlightPage", () => {
       "inst-edit",
       3,
     );
+  });
+
+  it("completes the resolved scheduled occurrence instead of creating a duplicate", async () => {
+    const onSuccess = vi.fn();
+    vi.mocked(flightsApi.resolveScheduleTemplate).mockResolvedValue({
+      id: "template-1",
+      originAirportId: "a1",
+      destinationAirportId: "a2",
+      flightNoBase: "XY1234",
+      aircraftDefinitionId: "aircraft-1",
+      departureTime: "08:30",
+      durationMinutes: 135,
+      startDate: "2026-08-22",
+      endDate: "2026-09-22",
+      weekdays: [6],
+      agencyPriceIrr: "68000000",
+      legalCeilingIrr: "80000000",
+      originCode: "THR",
+      destCode: "DXB",
+      aircraftCode: "Airbus A320",
+      cabinCapacities: [{ cabin: "ECONOMY", seats: 180 }],
+      capacity: 180,
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deactivatedAt: null,
+      nextFlightInstanceId: "scheduled-instance-1",
+      nextDepartureAt: new Date(Date.now() + 86_400_000).toISOString(),
+    });
+    vi.spyOn(flightsApi, "updateFlightDefinition").mockResolvedValue(
+      {} as never,
+    );
+    vi.spyOn(flightsApi, "createFlight").mockResolvedValue({} as never);
+    vi.spyOn(flightsApi, "createFareRule").mockResolvedValue({} as never);
+    vi.spyOn(pricingApi, "upsertProposal").mockResolvedValue({} as never);
+
+    render(<AddFlightPage onClose={vi.fn()} onSuccess={onSuccess} />);
+    const user = userEvent.setup();
+    await user.type(await screen.findByTestId("flight-no-input"), "XY1234");
+    expect(
+      await screen.findByTestId("resolved-schedule-summary"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("af-aircraft")).toHaveValue("Airbus A320");
+    expect(screen.getByLabelText(/تعداد صندلی اکونومی/)).toHaveValue("180");
+    await waitFor(() =>
+      expect(screen.getByTestId("af-aircraft")).toBeDisabled(),
+    );
+    expect(screen.getByTestId("af-date")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByTestId("af-time-trigger")).toBeDisabled();
+    expect(screen.getByTestId("duration-hours")).toBeDisabled();
+    expect(screen.getByTestId("duration-minutes")).toBeDisabled();
+    expect(screen.getByLabelText(/تعداد صندلی اکونومی/)).toHaveAttribute(
+      "readonly",
+    );
+    expect(screen.queryByText("افزودن تعهد آژانس")).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
+    );
+    await user.click(screen.getByRole("button", { name: "افزودن کلاس نرخی" }));
+    await user.type(
+      screen
+        .getByText("کد کلاس (مثلاً Y)")
+        .parentElement!.querySelector("input")!,
+      "Y",
+    );
+    await user.type(screen.getByTestId("fare-price-money"), "7200000");
+    await user.type(
+      screen
+        .getByText("ظرفیت اختصاصی (صندلی)")
+        .parentElement!.querySelector("input")!,
+      "180",
+    );
+    await user.click(screen.getByRole("button", { name: "ثبت کلاس نرخی" }));
+    await user.click(
+      screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
+    );
+    await user.type(screen.getByTestId("af-proposed-money"), "7200000");
+    await user.click(
+      screen.getByRole("button", {
+        name: "ثبت پرواز و ارسال برای مدیر عملیات",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(flightsApi.completeScheduledFlight).toHaveBeenCalledWith(
+        "scheduled-instance-1",
+        expect.objectContaining({
+          expectedVersion: 1,
+          basePriceIrr: "68000000",
+          fareRules: [
+            expect.objectContaining({
+              classCode: "Y",
+              seatsAllocated: 180,
+              priceIrr: "72000000",
+            }),
+          ],
+        }),
+      ),
+    );
+    expect(flightsApi.createFlight).not.toHaveBeenCalled();
+    expect(flightsApi.updateFlightDefinition).not.toHaveBeenCalled();
+    expect(flightsApi.createFareRule).not.toHaveBeenCalled();
+    expect(pricingApi.upsertProposal).not.toHaveBeenCalled();
+    expect(flightsApi.submitFlightToOperations).not.toHaveBeenCalled();
   });
 });

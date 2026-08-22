@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,8 @@ import type {
   CreateTravelCostDto,
   UpdateTravelCostDto,
 } from './dto/travel-cost.dtos';
+
+const FIXED_CHECKOUT_EXTRA_CODES = new Set(['SEAT_SELECTION', 'PET']);
 
 @Injectable()
 export class TravelCostsService {
@@ -86,6 +89,19 @@ export class TravelCostsService {
   async update(actor: AuthenticatedUser, id: string, dto: UpdateTravelCostDto) {
     const row = await this.repo.findOneBy({ id });
     if (!row) this.notFound();
+    if (
+      FIXED_CHECKOUT_EXTRA_CODES.has(row.code) &&
+      (dto.active === false || dto.purchaseEnabled === false)
+    ) {
+      this.fixedCheckoutExtra();
+    }
+    if (
+      FIXED_CHECKOUT_EXTRA_CODES.has(row.code) &&
+      dto.code !== undefined &&
+      dto.code !== row.code
+    ) {
+      this.fixedCheckoutExtra();
+    }
     if (dto.code && dto.code !== row.code) {
       const duplicate = await this.repo.findOneBy({ code: dto.code });
       if (duplicate) {
@@ -116,6 +132,7 @@ export class TravelCostsService {
   async remove(actor: AuthenticatedUser, id: string) {
     const row = await this.repo.findOneBy({ id });
     if (!row) this.notFound();
+    if (FIXED_CHECKOUT_EXTRA_CODES.has(row.code)) this.fixedCheckoutExtra();
     await this.repo.remove(row);
     await this.audit.record({
       actorId: actor.id,
@@ -134,6 +151,13 @@ export class TravelCostsService {
     throw new NotFoundException({
       code: ErrorCode.NOT_FOUND,
       message: 'هزینه سفر یافت نشد.',
+    });
+  }
+
+  private fixedCheckoutExtra(): never {
+    throw new BadRequestException({
+      code: ErrorCode.VALIDATION_FAILED,
+      message: 'خدمت انتخاب صندلی و حمل حیوان خانگی ثابت است و قابل حذف یا غیرفعال‌سازی نیست.',
     });
   }
 

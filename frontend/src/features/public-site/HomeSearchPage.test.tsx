@@ -239,11 +239,14 @@ describe('HomeSearchPage', () => {
     expect(popup).toHaveAttribute('role', 'dialog');
     expect(popup).toHaveStyle({
       position: 'fixed',
-      top: '32px',
-      left: '24px',
-      width: '366px',
-      maxHeight: '616px',
+      top: '71px',
+      left: '12px',
+      width: '390px',
+      height: '589px',
+      maxHeight: '589px',
+      borderRadius: '22px 22px 0 0',
     });
+    expect(screen.getByTestId('home-date-mobile-close')).toBeInTheDocument();
     expect(screen.getByTestId('home-date-day-1')).toHaveStyle({ minHeight: '44px' });
   });
 

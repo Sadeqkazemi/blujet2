@@ -4,6 +4,7 @@ import type {
   AirportEntry,
   AllotmentRow,
   CommercialFlightControl,
+  CompleteScheduledFlightPayload,
   CreateFareRulePayload,
   CreateFlightDefinitionPayload,
   FareRuleRow,
@@ -113,6 +114,19 @@ export function patchCommercialPanelSettings(
   return apiPatch<import("../types/flights").FlightCommercialFields>(
     `/flights/${instanceId}/commercial-settings`,
     payload,
+  );
+}
+
+export function completeScheduledFlight(
+  id: string,
+  payload: CompleteScheduledFlightPayload,
+) {
+  return apiRequest<FlightDefinitionDetail>(
+    `/flights/${id}/complete-and-submit`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
   );
 }
 

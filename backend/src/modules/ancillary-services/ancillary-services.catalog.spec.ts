@@ -23,5 +23,8 @@ describe('ancillary catalog', () => {
     ).toBe(ANCILLARY_BUILT_IN_SERVICES.length);
     expect(seats[0]?.titleFa).toBe('صندلی عادی');
     expect(ANCILLARY_KEY_BY_TRAVEL_EXTRA.get('EXTRA_BAGGAGE')).toBe('baggage');
+    expect(ANCILLARY_KEY_BY_TRAVEL_EXTRA.get('SEAT_SELECTION')).toBe('seat-selection');
+    expect(ANCILLARY_KEY_BY_TRAVEL_EXTRA.get('PET')).toBe('pet');
+    expect(ANCILLARY_BUILT_IN_SERVICES.find((row) => row.key === 'pet')?.enabled).toBe(true);
   });
 });

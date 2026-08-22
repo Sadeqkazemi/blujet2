@@ -43,6 +43,18 @@ function testExtras(): ExtraServiceState[] {
       selected: false,
       quantity: 1,
     },
+    {
+      id: 'extra-seat',
+      code: 'SEAT_SELECTION',
+      titleFa: 'انتخاب صندلی',
+      titleEn: 'Seat selection',
+      titleAr: null,
+      descriptionFa: 'انتخاب صندلی پیش از پرواز',
+      billingUnit: 'PER_PASSENGER',
+      priceIrr: '1500000',
+      selected: false,
+      quantity: 1,
+    },
   ];
 }
 
@@ -73,6 +85,7 @@ describe('ExtrasStep — design parity', () => {
         businessLocked
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
+        clubBalance={0}
       />,
     );
 
@@ -83,7 +96,8 @@ describe('ExtrasStep — design parity', () => {
     expect(screen.getByTestId('checkout-extra-extra-cip')).toHaveTextContent('۹۰۰٬۰۰۰');
   });
 
-  it('renders the MD-80 aircraft seat chart from the PDF layout', () => {
+  it('renders the MD-80 aircraft seat chart from the PDF layout after opening it', async () => {
+    const user = userEvent.setup();
     render(
       <ExtrasStep
         locale="fa"
@@ -97,8 +111,11 @@ describe('ExtrasStep — design parity', () => {
         businessLocked
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
+        clubBalance={15_000}
       />,
     );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
 
     const map = screen.getByTestId('checkout-seat-map');
     expect(map).toHaveAttribute('data-aircraft', 'MD-80');
@@ -117,7 +134,8 @@ describe('ExtrasStep — design parity', () => {
     expect(screen.queryByTestId('checkout-seat-28A')).not.toBeInTheDocument();
   });
 
-  it('uses MD-80 PDF chart when API still returns legacy A320 lettering', () => {
+  it('uses MD-80 PDF chart when API still returns legacy A320 lettering', async () => {
+    const user = userEvent.setup();
     const legacyA320: SeatMapCell[] = [
       { seatCode: '3A', row: 3, cabin: 'BUSINESS', status: 'FREE' },
       { seatCode: '3B', row: 3, cabin: 'BUSINESS', status: 'FREE' },
@@ -142,15 +160,19 @@ describe('ExtrasStep — design parity', () => {
         businessLocked={false}
         bookedCabin="ECONOMY"
         aircraftType="Airbus A320"
+        clubBalance={15_000}
       />,
     );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
 
     expect(screen.getByTestId('checkout-seat-map')).toHaveAttribute('data-aircraft', 'MD-80');
     expect(screen.getByTestId('checkout-seat-7D')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-7C')).not.toBeInTheDocument();
   });
 
-  it('still shows all MD-80 seats when the API seat list is empty', () => {
+  it('still shows all MD-80 seats when the API seat list is empty', async () => {
+    const user = userEvent.setup();
     render(
       <ExtrasStep
         locale="fa"
@@ -164,8 +186,11 @@ describe('ExtrasStep — design parity', () => {
         businessLocked={false}
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
+        clubBalance={15_000}
       />,
     );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
 
     expect(screen.getByTestId('checkout-seat-map')).toHaveAttribute('data-capacity', '140');
     expect(screen.getByTestId('checkout-seat-7A')).toBeInTheDocument();
@@ -189,6 +214,7 @@ describe('ExtrasStep — design parity', () => {
         businessLocked={false}
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
+        clubBalance={0}
       />,
     );
 
@@ -212,12 +238,67 @@ describe('ExtrasStep — design parity', () => {
         businessLocked={false}
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
+        clubBalance={15_000}
       />,
     );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
 
     expect(screen.getByTestId('checkout-seat-3A')).toBeDisabled();
     expect(screen.getByTestId('checkout-seat-7A')).toBeDisabled();
     await user.click(screen.getByTestId('checkout-seat-12A'));
     expect(onToggleSeat).toHaveBeenCalledWith('12A');
+  });
+
+  it('keeps the seat map closed until a low-point customer accepts the fee', async () => {
+    const user = userEvent.setup();
+    const onToggleExtra = vi.fn();
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={testExtras()}
+        onToggleExtra={onToggleExtra}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={0}
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-seat-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
+    expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('checkout-seat-accept-fee'));
+    expect(onToggleExtra).toHaveBeenCalledWith('extra-seat');
+  });
+
+  it('lets a high-point customer open the seat map without selecting the paid extra', async () => {
+    const user = userEvent.setup();
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={testExtras()}
+        onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={15_000}
+      />,
+    );
+
+    expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
+    expect(screen.getByTestId('checkout-seat-map')).toBeInTheDocument();
   });
 });

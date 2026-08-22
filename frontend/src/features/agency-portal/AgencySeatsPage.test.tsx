@@ -124,6 +124,42 @@ describe('AgencySeatsPage', () => {
     expect(screen.getByTestId('agency-request-origin')).not.toBeDisabled();
   });
 
+  it('keeps a published route visible while commercial allocation is still zero', async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi-awaiting-release',
+      flightNo: 'BJ-320',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: '2026-09-03T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
+      capacity: 180,
+      agencySeatsReleased: 0,
+      agencyAllocated: 0,
+      ownAllocated: 0,
+      availableToRequest: 0,
+      pricePerSeatIrr: null,
+      specialOffer: false,
+      definitionStatus: 'PUBLISHED',
+    };
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+
+    render(<AgencySeatsPage />);
+
+    await user.selectOptions(await screen.findByTestId('agency-request-origin'), 'THR');
+    await user.selectOptions(screen.getByTestId('agency-request-destination'), 'MHD');
+    await user.click(screen.getByTestId('agency-request-route-fi-awaiting-release'));
+
+    expect(screen.getByText('در انتظار تخصیص بازرگانی')).toBeInTheDocument();
+    expect(
+      screen.getByText(/هنوز ظرفیت و نرخ فروش آژانسی این کلاس را آزاد نکرده/),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('agency-submit-seat-request')).toBeDisabled();
+  });
+
   it('renders real per-flight allotment cards with allocated/sold/remaining counts', async () => {
     const user = userEvent.setup();
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);

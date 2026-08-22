@@ -48,6 +48,7 @@ export class ProfileService {
       nationalId: user.nationalIdEnc ? decryptPii(user.nationalIdEnc) : null,
       birthDate: user.birthDate,
       passportNo: user.passportNoEnc ? decryptPii(user.passportNoEnc) : null,
+      address: user.addressEnc ? decryptPii(user.addressEnc) : null,
       email: user.email,
       emailVerifiedAt: user.emailVerifiedAt,
       ...completion,
@@ -68,6 +69,7 @@ export class ProfileService {
       nationalIdEnc?: string;
       nationalIdHash?: string;
       passportNoEnc?: string;
+      addressEnc?: string;
     } = {};
 
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
@@ -84,6 +86,9 @@ export class ProfileService {
     }
     if (dto.passportNo !== undefined) {
       data.passportNoEnc = encryptPii(dto.passportNo);
+    }
+    if (dto.address !== undefined) {
+      data.addressEnc = encryptPii(dto.address.trim());
     }
 
     await this.userRepo.update(

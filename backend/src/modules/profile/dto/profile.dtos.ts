@@ -29,6 +29,15 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(4)
   passportNo?: string;
+
+  @ApiPropertyOptional({
+    example: 'تهران، خیابان ولیعصر، کوچه بهار، پلاک ۱۲',
+    description: 'آدرس محل سکونت؛ به‌صورت رمزگذاری‌شده نگهداری می‌شود',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(5)
+  address?: string;
 }
 
 export class VerifyEmailDto {

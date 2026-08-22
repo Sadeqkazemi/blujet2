@@ -2,9 +2,6 @@ import { useRef, type ChangeEvent, type ClipboardEvent } from 'react';
 import { formatTomanGrouped } from '../lib/money-input';
 import type { MoneyInputProps } from './money-input-types';
 
-const inputClass =
-  'w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] py-0 text-[13px] text-[#e7ecf3] outline-none';
-
 function digitCountBefore(value: string, caret: number): number {
   let count = 0;
   const limit = Math.min(caret, value.length);
@@ -37,6 +34,7 @@ export default function MoneyInput({
   className,
   'aria-label': ariaLabel,
   testId,
+  theme = 'dark',
 }: MoneyInputProps) {
   const ref = useRef<HTMLInputElement>(null);
 
@@ -87,11 +85,15 @@ export default function MoneyInput({
           value={valueToman}
           onChange={onChange}
           onPaste={onPaste}
-          className={`${inputClass} pl-3 pr-[3.25rem] text-left font-num`}
+          className={`h-11 w-full box-border rounded-[10px] border py-0 pl-3 pr-[3.25rem] text-left text-[13px] font-num outline-none ${
+            theme === 'light'
+              ? 'border-[#e3e9f1] bg-white text-[#16202e] focus:border-[#1668c4]'
+              : 'border-[#28344c] bg-[#0f1726] text-[#e7ecf3]'
+          }`}
         />
         <span
           data-testid={testId ? `${testId}-unit` : 'money-input-unit'}
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] font-bold text-[#6b7b94]"
+          className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 whitespace-nowrap text-[11px] font-bold ${theme === 'light' ? 'text-[#8a96a6]' : 'text-[#6b7b94]'}`}
         >
           تومان
         </span>

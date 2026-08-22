@@ -3,6 +3,7 @@ export const PROFILE_COMPLETION_FIELDS = [
   'nationalId',
   'birthDate',
   'passportNo',
+  'address',
   'verifiedEmail',
 ] as const;
 
@@ -13,6 +14,7 @@ interface ProfileCompletionSource {
   nationalIdEnc?: string | null;
   birthDate?: Date | string | null;
   passportNoEnc?: string | null;
+  addressEnc?: string | null;
   emailVerifiedAt?: Date | string | null;
 }
 
@@ -22,6 +24,7 @@ export function assessProfileCompletion(source: ProfileCompletionSource) {
     nationalId: Boolean(source.nationalIdEnc),
     birthDate: Boolean(source.birthDate),
     passportNo: Boolean(source.passportNoEnc),
+    address: Boolean(source.addressEnc),
     verifiedEmail: Boolean(source.emailVerifiedAt),
   };
   const missingProfileFields = PROFILE_COMPLETION_FIELDS.filter(
@@ -43,6 +46,7 @@ export function profileIncompleteSql(alias: string): string {
     ${alias}.nationalIdEnc IS NULL OR
     ${alias}.birthDate IS NULL OR
     ${alias}.passportNoEnc IS NULL OR
+    ${alias}.addressEnc IS NULL OR
     ${alias}.emailVerifiedAt IS NULL
   )`;
 }

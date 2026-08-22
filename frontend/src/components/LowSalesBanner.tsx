@@ -46,7 +46,7 @@ export default function LowSalesBanner({
               : 'text-xs font-extrabold text-[#b45309]'
           }
         >
-          هشدار فروش ضعیف — کمتر از ۷۲ ساعت تا پرواز
+          هشدار فروش ضعیف — در بازه ۷ روز مانده به پرواز
         </div>
         <div className={dark ? 'text-[11.5px] text-[#cdd7e5]' : 'mt-0.5 text-[11.5px] text-text-2'}>
           پرواز <span className="ltr font-num inline-block">{alert.flightNo}</span> {alert.originCode} ←{' '}

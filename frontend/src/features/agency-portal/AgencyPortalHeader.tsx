@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import {
+  ServiceMenuIcon,
+  type ServiceMenuIconKind,
+} from '../../components/public/service-menu-icon';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
@@ -49,6 +53,7 @@ interface Props {
 
 export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, licenseNo, remainingIrr, onSignOut }: Props) {
   const { user } = useAuth();
+  const location = useLocation();
   const { locale, setLocale } = useLocale();
   const t = useT();
   const at = STR[locale];
@@ -57,6 +62,8 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [servicesMenuOpen, setServicesMenuOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
 
   const displayName = agencyName || user?.fullName || '—';
   const initials = agencyInitials(displayName);
@@ -70,6 +77,14 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
     { to: '/club', label: t('navLoyalty') },
     { to: '/support', label: t('navSupport') },
   ];
+  const serviceLinks: { to: string; label: string; icon: ServiceMenuIconKind }[] = [
+    { to: '/services/seat-selection', label: t('svcSeatLabel'), icon: 'seat' },
+    { to: '/services/extra-baggage', label: t('svcBaggageLabel'), icon: 'baggage' },
+    { to: '/services/refund-info', label: t('svcRefundLabel'), icon: 'refund' },
+    { to: '/services/pet-travel', label: t('svcPetLabel'), icon: 'pet' },
+    { to: '/services/wheelchair', label: t('svcWheelchairLabel'), icon: 'wheelchair' },
+  ];
+  const servicesActive = location.pathname.startsWith('/services/');
 
   const langDropdown = (
     <>
@@ -268,7 +283,88 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
 
             {!isMobile && (
               <nav style={{ display: 'flex', gap: 30, fontSize: 15.5, color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                {navLinks.map((link) => (
+                {navLinks.slice(0, 2).map((link) => (
+                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: '#3b4554' }}>
+                    {link.label}
+                  </Link>
+                ))}
+                <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    data-testid="agency-services-menu-toggle"
+                    aria-expanded={servicesMenuOpen}
+                    onClick={() => setServicesMenuOpen((value) => !value)}
+                    style={{
+                      border: 0,
+                      background: 'transparent',
+                      color: servicesActive ? '#1668c4' : '#3b4554',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      height: '100%',
+                      borderBottom: servicesActive ? '3px solid #1668c4' : '3px solid transparent',
+                      fontFamily: 'inherit',
+                      fontSize: 'inherit',
+                      fontWeight: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t('navServices')}
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: servicesMenuOpen ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }}>
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
+                  </button>
+                  {servicesMenuOpen && (
+                    <>
+                      <div onClick={() => setServicesMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
+                      <div
+                        data-testid="agency-services-menu"
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          [isRTL ? 'right' : 'left']: 0,
+                          marginTop: 10,
+                          width: 230,
+                          background: '#fff',
+                          border: '1px solid #eef1f5',
+                          borderRadius: 14,
+                          boxShadow: '0 18px 40px -14px rgba(13,38,102,.25)',
+                          padding: 10,
+                          zIndex: 60,
+                        }}
+                      >
+                        {serviceLinks.map((item) => {
+                          const active = location.pathname === item.to;
+                          return (
+                            <Link
+                              key={item.to}
+                              to={item.to}
+                              onClick={() => setServicesMenuOpen(false)}
+                              style={{
+                                textDecoration: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: 10,
+                                padding: '9px 10px',
+                                borderRadius: 10,
+                                fontSize: 12.5,
+                                fontWeight: active ? 700 : 600,
+                                color: active ? '#1668c4' : '#16202e',
+                              }}
+                            >
+                              <span>{item.label}</span>
+                              <span style={{ width: 36, height: 36, borderRadius: '50%', background: '#f2f4f7', color: '#3b4554', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                                <ServiceMenuIcon kind={item.icon} />
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {navLinks.slice(2).map((link) => (
                   <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: '#3b4554' }}>
                     {link.label}
                   </Link>
@@ -435,7 +531,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             </span>
           </div>
           <div style={{ padding: '4px 24px 0', display: 'flex', flexDirection: 'column' }}>
-            {navLinks.map((link, i) => (
+            {navLinks.slice(0, 2).map((link, i) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -447,6 +543,89 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                   fontSize: 17,
                   fontWeight: 700,
                   borderTop: i > 0 ? '1px solid #eef1f5' : undefined,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {link.label}
+                <ChevronIcon isRTL={isRTL} />
+              </Link>
+            ))}
+            <div style={{ borderTop: '1px solid #eef1f5' }}>
+              <button
+                type="button"
+                data-testid="agency-mobile-services-toggle"
+                aria-expanded={mobileServicesOpen}
+                onClick={() => setMobileServicesOpen((value) => !value)}
+                style={{
+                  width: '100%',
+                  padding: '20px 0',
+                  border: 0,
+                  background: 'transparent',
+                  color: servicesActive ? '#1668c4' : '#16202e',
+                  fontFamily: 'inherit',
+                  fontSize: 17,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{t('navServices')}</span>
+                <span style={{ display: 'flex', color: '#9aa4b2', transform: mobileServicesOpen ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </button>
+              {mobileServicesOpen && (
+                <div data-testid="agency-mobile-services-panel" style={{ paddingBottom: 8 }}>
+                  {serviceLinks.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        setMobileServicesOpen(false);
+                      }}
+                      style={{
+                        padding: '12px 0 12px 4px',
+                        textDecoration: 'none',
+                        color: location.pathname === item.to ? '#1668c4' : '#16202e',
+                        fontSize: 15,
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ width: 34, height: 34, borderRadius: '50%', background: '#f2f4f7', color: '#3b4554', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                          <ServiceMenuIcon kind={item.icon} />
+                        </span>
+                        {item.label}
+                      </span>
+                      <ChevronIcon isRTL={isRTL} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            {navLinks.slice(2).map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                onClick={() => setMobileMenuOpen(false)}
+                style={{
+                  padding: '20px 0',
+                  textDecoration: 'none',
+                  color: '#16202e',
+                  fontSize: 17,
+                  fontWeight: 700,
+                  borderTop: '1px solid #eef1f5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',

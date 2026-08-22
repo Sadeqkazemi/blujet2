@@ -21,10 +21,12 @@ export default function CabinCapacityEditor({
   rows,
   onChange,
   error,
+  readOnly = false,
 }: {
   rows: CabinCapacityRow[];
   onChange: (rows: CabinCapacityRow[]) => void;
   error?: string | null;
+  readOnly?: boolean;
 }) {
   const used = new Set(rows.map((r) => r.cabin));
   const total = sumCabinSeats(
@@ -61,7 +63,7 @@ export default function CabinCapacityEditor({
         <button
           type="button"
           onClick={addRow}
-          disabled={used.size >= CABIN_OPTIONS.length}
+          disabled={readOnly || used.size >= CABIN_OPTIONS.length}
           className="rounded-[9px] bg-[#3b82f6] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50"
         >
           افزودن کابین
@@ -92,10 +94,11 @@ export default function CabinCapacityEditor({
                 </label>
                 <select
                   value={row.cabin}
+                  disabled={readOnly}
                   onChange={(e) =>
                     update(row.key, { cabin: e.target.value as CabinKind })
                   }
-                  className={selectClass}
+                  className={`${selectClass} disabled:cursor-not-allowed disabled:opacity-60`}
                   aria-label={`نوع کابین ${cabinLabel(row.cabin)}`}
                 >
                   {available.map((c) => (
@@ -113,6 +116,7 @@ export default function CabinCapacityEditor({
                   dir="ltr"
                   inputMode="numeric"
                   value={row.seats}
+                  readOnly={readOnly}
                   onChange={(e) =>
                     update(row.key, {
                       seats: latinDigits(e.target.value)
@@ -120,14 +124,14 @@ export default function CabinCapacityEditor({
                         .slice(0, 4),
                     })
                   }
-                  className={`${inputClass} text-left font-num`}
+                  className={`${inputClass} text-left font-num read-only:cursor-not-allowed read-only:opacity-60`}
                   aria-label={`تعداد صندلی ${cabinLabel(row.cabin)}`}
                 />
               </div>
               <button
                 type="button"
                 onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
-                disabled={rows.length <= 1}
+                disabled={readOnly || rows.length <= 1}
                 className="h-11 rounded-[9px] bg-[rgba(248,113,113,.12)] px-3 text-[11px] font-bold text-[#f87171] disabled:opacity-40"
               >
                 حذف

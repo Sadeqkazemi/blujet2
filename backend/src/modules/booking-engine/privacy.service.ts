@@ -97,6 +97,10 @@ export class PrivacyService {
         phone: user.phone,
         fullName: user.fullName,
         email: user.email,
+        nationalId: user.nationalIdEnc ? decryptPii(user.nationalIdEnc) : null,
+        passportNo: user.passportNoEnc ? decryptPii(user.passportNoEnc) : null,
+        birthDate: user.birthDate,
+        address: user.addressEnc ? decryptPii(user.addressEnc) : null,
         createdAt: user.createdAt,
       },
       bookings: bookings.map((b) => ({
@@ -186,6 +190,11 @@ export class PrivacyService {
           phone: null,
           email: null,
           fullName: 'کاربر حذف‌شده',
+          nationalIdEnc: null,
+          nationalIdHash: null,
+          passportNoEnc: null,
+          birthDate: null,
+          addressEnc: null,
           updatedAt: new Date(),
         },
       );
