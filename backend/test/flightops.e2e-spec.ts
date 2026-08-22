@@ -21,6 +21,7 @@ import {
 import { loginAs } from './helpers/login.helper';
 
 class SpyNiraProvider implements NiraProvider {
+  success = true;
   calls: {
     flightNo: string;
     departureAt: Date;
@@ -33,7 +34,7 @@ class SpyNiraProvider implements NiraProvider {
     passengers: NiraManifestPassenger[],
   ) {
     this.calls.push({ flightNo, departureAt, passengers });
-    return Promise.resolve({ success: true });
+    return Promise.resolve({ success: this.success });
   }
 }
 
@@ -162,8 +163,8 @@ describe('Flightops (e2e)', () => {
 
   // ── List: KPIs + auto-close + نیرا materialization ────────────────────
 
-  it('closes and submits to نیرا automatically once within 5h of departure', async () => {
-    const instance = await createInstance(3); // within the 5h window
+  it('closes and submits to نیرا automatically once within 4h of departure', async () => {
+    const instance = await createInstance(3); // within the 4h window
     await addSoldPassenger(instance.id, {
       fullName: 'سارا احمدی',
       nationalId: '0019876543',
@@ -228,6 +229,31 @@ describe('Flightops (e2e)', () => {
       .set('Authorization', auth(accessToken));
     expect(second.body.data.niraSubmittedAt).toBe(firstTimestamp);
     expect(spyNira.calls).toHaveLength(1);
+  });
+
+  it('keeps failed automatic submission retryable and exposes a SITE_ADMIN manual retry', async () => {
+    const instance = await createInstance(2);
+    spyNira.success = false;
+    const { accessToken } = await loginAs(app, 'site.admin');
+
+    const automatic = await request(app.getHttpServer())
+      .get(`/flightops/${instance.id}`)
+      .set('Authorization', auth(accessToken));
+    expect(automatic.status).toBe(200);
+    expect(automatic.body.data.niraSubmittedAt).toBeNull();
+    expect(spyNira.calls).toHaveLength(1);
+
+    const failedRetry = await request(app.getHttpServer())
+      .post(`/flightops/${instance.id}/nira-submit`)
+      .set('Authorization', auth(accessToken));
+    expect(failedRetry.status).toBe(502);
+
+    spyNira.success = true;
+    const successfulRetry = await request(app.getHttpServer())
+      .post(`/flightops/${instance.id}/nira-submit`)
+      .set('Authorization', auth(accessToken));
+    expect(successfulRetry.status).toBe(201);
+    expect(successfulRetry.body.data.niraSubmittedAt).toBeTruthy();
   });
 
   it('GET /flightops: real KPIs reconciling with rows, SCHEDULED-only, soonest-first', async () => {

@@ -106,15 +106,47 @@ export default function AdminLoansPage() {
       <p className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs leading-6 text-amber-200">تصمیم تأیید یا رد توسط بانک انجام می‌شود؛ ادمین سایت فقط وضعیت همگام‌شده را مشاهده می‌کند.</p>
 
       {detail && (
-        <Modal title="جزئیات درخواست وام" onClose={() => setDetail(null)}>
-          <div className="space-y-3 text-xs text-panel-muted">
-            <p>مشتری: <b className="text-panel-ink">{customerLabel(detail)}</b></p>
-            <p>شماره تماس: <span dir="ltr" className="font-num text-panel-ink">{detail.customer?.phone ?? '—'}</span></p>
-            <p>مبلغ: <b className="font-num text-panel-ink">{faMoney(detail.requestedAmountIrr)} تومان</b></p>
-            <p>وضعیت بانک: <b className="text-panel-ink">{STATUS[detail.displayStatus]?.label ?? detail.displayStatus}</b></p>
-            <p>شناسه بانک: <span dir="ltr" className="font-num text-panel-ink">{detail.bankReferenceId ?? '—'}</span></p>
-            <p>آخرین همگام‌سازی: <span className="text-panel-ink">{detail.lastSyncedAt ? formatJalaliDateTime(detail.lastSyncedAt) : '—'}</span></p>
-            {detail.statusSummary && <pre dir="ltr" className="max-h-48 overflow-auto rounded-lg bg-black/20 p-3 text-[11px] text-panel-ink">{JSON.stringify(detail.statusSummary, null, 2)}</pre>}
+        <Modal title={customerLabel(detail)} onClose={() => setDetail(null)} maxWidthClass="max-w-xl">
+          <div className="space-y-4" data-testid="admin-loan-detail">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[#273755] bg-[#1a2944] p-4">
+              <div>
+                <h4 className="m-0 text-sm font-black text-white">{customerLabel(detail)}</h4>
+                <p className="font-num mt-1 text-[11px] text-[#91a1bb]" dir="ltr">{detail.id}</p>
+              </div>
+              <span className={`rounded-full px-3 py-1.5 text-[10px] font-bold ${(STATUS[detail.displayStatus] ?? STATUS.unknown).className}`}>
+                {(STATUS[detail.displayStatus] ?? STATUS.unknown).label}
+              </span>
+            </div>
+
+            <div className="rounded-xl border border-[#273755] bg-[#101a2b] p-4 text-xs leading-6 text-[#b7c3d6]">
+              وضعیت این درخواست از بانک همگام می‌شود و تصمیم تأیید یا رد در اختیار ادمین سایت نیست.
+            </div>
+
+            <section>
+              <h4 className="mb-2 text-xs font-black text-white">اطلاعات درخواست و اعتبارسنجی</h4>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="rounded-xl bg-[#101a2b] p-3">
+                  <p className="m-0 text-[10px] text-[#8494ad]">شماره تماس مشتری</p>
+                  <p dir="ltr" className="font-num mt-1 m-0 text-xs text-white">{detail.customer?.phone ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-[#101a2b] p-3">
+                  <p className="m-0 text-[10px] text-[#8494ad]">مبلغ درخواست</p>
+                  <p className="font-num mt-1 m-0 text-xs font-bold text-emerald-300">{faMoney(detail.requestedAmountIrr)} تومان</p>
+                </div>
+                <div className="rounded-xl bg-[#101a2b] p-3">
+                  <p className="m-0 text-[10px] text-[#8494ad]">شناسه بانک</p>
+                  <p dir="ltr" className="font-num mt-1 m-0 text-xs text-white">{detail.bankReferenceId ?? '—'}</p>
+                </div>
+                <div className="rounded-xl bg-[#101a2b] p-3">
+                  <p className="m-0 text-[10px] text-[#8494ad]">آخرین به‌روزرسانی</p>
+                  <p className="mt-1 m-0 text-xs text-white">{detail.lastSyncedAt ? formatJalaliDateTime(detail.lastSyncedAt) : '—'}</p>
+                </div>
+              </div>
+            </section>
+
+            <p className="m-0 rounded-lg border border-[#273755] bg-[#1a2944] p-3 text-[11px] text-[#b7c3d6]">
+              شناسه ثبت درخواست: <span dir="ltr" className="font-num text-white">{detail.id}</span>
+            </p>
           </div>
         </Modal>
       )}

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { FlightopsService } from './flightops.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -35,5 +35,12 @@ export class FlightopsController {
   })
   async detail(@Param('id') id: string) {
     return { success: true, data: await this.flightops.detail(id) };
+  }
+
+  @Post(':id/nira-submit')
+  @Roles('SITE_ADMIN')
+  @ApiOperation({ summary: 'ارسال دستی فهرست مسافران پرواز به سامانه نیرا' })
+  async submitToNira(@Param('id') id: string) {
+    return { success: true, data: await this.flightops.submitToNira(id) };
   }
 }

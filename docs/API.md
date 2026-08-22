@@ -1645,9 +1645,9 @@ stat boxes — those stay dropped; that's customer-facing gate/baggage/delay
 data with no backing model anywhere, a different, still-unbuilt concept
 from this one). Read verbatim from `پنل ادمین سایت.dc.html`'s flightops
 sc-if blocks: **not** gate/baggage/delay tracking — the design's own copy
-is "فروش هر پرواز ۵ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و
+is "فروش هر پرواز ۴ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و
 لیست کامل مسافران به‌صورت اتومات در سامانه نیرا بارگذاری می‌گردد" (sale
-auto-closes 5h before departure; the full passenger list auto-uploads to
+auto-closes 4h before departure; the full passenger list auto-uploads to
 سامانه نیرا, Iran's civil aviation manifest system). The CEO design
 sidebar has no `flightops` entry — API access is
 `SITE_ADMIN` / `FINANCE_MANAGER` / `COMMERCIAL_MANAGER` (SITE_ADMIN nav
@@ -1657,7 +1657,7 @@ exposes the tab).
   `COMMERCIAL_MANAGER`) — KPI counts (کل پروازها / باز / بسته‌شده-در‌نیرا /
   مجموع مسافران) + row list, scoped to `SCHEDULED` instances only, ordered
   by soonest departure. Each read lazily materializes any instance that
-  has crossed the 5h-before-departure threshold (see below) — same
+  has crossed the 4h-before-departure threshold (see below) — same
   "no cron job" pattern as `materializeDepartedInstances`/
   `materializeExpiry` elsewhere in this codebase.
 - `GET /flightops/:id` (same roles) — sold/free/capacity/occupancy +
@@ -1668,7 +1668,7 @@ exposes the tab).
   submit, so it's excluded rather than shown with a fabricated "pending"
   state.
 - **Sale-close derivation**: `isSaleAutoClosed(departureAt)` — pure,
-  `departureAt − now ≤ 5h`. This is a NEW, fixed 5-hour rule, distinct
+  `departureAt − now ≤ 4h`. This is a NEW, fixed 4-hour rule, distinct
   from the existing, unrelated, per-instance-configurable
   `saleStartsAt`/`saleEndsAt` window (Phase 13) — the two are independent
   and this phase does not touch the latter.
@@ -1676,16 +1676,16 @@ exposes the tab).
   nira/`) with a `MockNiraProvider` (dev/test — logs the manifest and
   always succeeds, never fabricates a failure rate, same convention as
   `MockSmsProvider`), wrapped by `NiraService` (mirrors `SmsService`).
-  Once an instance crosses the 5h threshold, the next `flightops` read
+  Once an instance crosses the 4h threshold, the next `flightops` read
   submits the real manifest and persists `FlightInstance.niraSubmittedAt`
   via a conditional `updateMany` (idempotency guard — a second read never
   re-submits or moves the timestamp).
 - **Explicit scope narrowing (documented, not an oversight)**: this phase
-  does NOT make the 5h auto-close a booking-creation restriction. The
+  does NOT make the 4h auto-close a booking-creation restriction. The
   design itself has no manual "close" action and no visible link between
   this admin report and the booking flow — it is a reporting/manifest-
   submission surface. `POST /booking` (Phase 13) is unchanged; a seat can
-  still be booked within 5h of departure exactly as before. If a future
+  still be booked within 4h of departure exactly as before. If a future
   requirement needs the close to actually block sales, that's a distinct,
   larger change (touches the booking-engine's hot path and its full
   existing test suite) and should be its own phase, not bundled here. No

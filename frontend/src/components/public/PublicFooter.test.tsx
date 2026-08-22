@@ -6,6 +6,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as useCareersEnabledModule from '../../hooks/useCareersEnabled';
 import * as useSocialLinksModule from '../../hooks/useSocialLinks';
+import * as usePublicSiteSettingsModule from '../../hooks/usePublicSiteSettings';
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale, setLocale: vi.fn() });
@@ -23,6 +24,11 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.spyOn(useCareersEnabledModule, 'useCareersEnabled').mockReturnValue(false);
   vi.spyOn(useSocialLinksModule, 'useSocialLinks').mockReturnValue([]);
+  vi.spyOn(usePublicSiteSettingsModule, 'usePublicAppLinks').mockReturnValue({});
+  vi.spyOn(usePublicSiteSettingsModule, 'usePublicSupportContact').mockReturnValue({
+    phone: '021-44694471',
+    email: 'info@blujet.com',
+  });
 });
 
 function renderFooter() {
@@ -69,6 +75,23 @@ describe('PublicFooter — desktop', () => {
     expect(tools).toHaveAttribute('dir', 'ltr');
     expect(tools).toContainElement(screen.getByTestId('footer-app-store'));
     expect(tools).toContainElement(screen.getByTestId('footer-trust-badges'));
+  });
+
+  it('uses app links and support contact supplied by site settings', () => {
+    mockLocale('fa');
+    vi.spyOn(usePublicSiteSettingsModule, 'usePublicAppLinks').mockReturnValue({
+      app_store: 'https://apps.example/app-store',
+      google_play: 'https://apps.example/google-play',
+    });
+    vi.spyOn(usePublicSiteSettingsModule, 'usePublicSupportContact').mockReturnValue({
+      phone: '021-12345678',
+      email: 'support@example.com',
+    });
+    renderFooter();
+    expect(screen.getByTestId('footer-app-store')).toHaveAttribute('href', 'https://apps.example/app-store');
+    expect(screen.getByTestId('footer-google-play')).toHaveAttribute('href', 'https://apps.example/google-play');
+    expect(screen.getByText('021-12345678')).toBeInTheDocument();
+    expect(screen.getByText('support@example.com')).toBeInTheDocument();
   });
 
   it('renders enabled social links supplied by site settings', () => {

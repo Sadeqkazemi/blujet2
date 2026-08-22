@@ -8,13 +8,13 @@ dropped; this is a distinct capability, see docs/API.md's Phase 24 note).
 Scope, read verbatim from `پنل ادمین سایت.dc.html`'s flightops list/detail
 sc-if blocks and its `roleDefs` (only `super`/`siteAdmin`/`finance`/
 `commercial` include `flightops` — CEO, SITE_ADMIN, FINANCE_MANAGER,
-COMMERCIAL_MANAGER): sale on each flight auto-closes 5 hours before
+COMMERCIAL_MANAGER): sale on each flight auto-closes 4 hours before
 departure, and the full passenger manifest auto-uploads to سامانه نیرا
 (Iran's civil aviation manifest system) at that same moment. Clicking a
 flight shows its passenger list and when it was submitted.
 
 Out of scope for this phase (documented, not an oversight): enforcing the
-5-hour close as a booking-creation restriction (the design has no manual
+4-hour close as a booking-creation restriction (the design has no manual
 "close" action either — this is a reporting/manifest-submission surface,
 not a new booking rule); a real نیرا HTTP integration (behind a mock
 provider, same as every other external system in this codebase); CSV/
@@ -24,10 +24,10 @@ specified in the design).
 ## Acceptance checklist
 
 ### Backend — sale-close derivation + نیرا submission
-- [x] `isSaleAutoClosed(departureAt)` pure helper: true iff `departureAt − now ≤ 5h`, false otherwise, boundary-exact at exactly 5h
+- [x] `isSaleAutoClosed(departureAt)` pure helper: true iff `departureAt − now ≤ 4h`, false otherwise, boundary-exact at exactly 4h
       — `backend/src/modules/flightops/sale-close.util.spec.ts`
-- [x] Lazy materialization: reading the list or a detail for a `SCHEDULED` instance past its 5h threshold with `niraSubmittedAt` still null calls `NiraProvider.submit(...)` with the real passenger manifest and persists `niraSubmittedAt`; instances not yet past the threshold are left untouched
-      — `backend/test/flightops.e2e-spec.ts` › "closes and submits to نیرا automatically once within 5h of departure"
+- [x] Lazy materialization: reading the list or a detail for a `SCHEDULED` instance past its 4h threshold with `niraSubmittedAt` still null calls `NiraProvider.submit(...)` with the real passenger manifest and persists `niraSubmittedAt`; instances not yet past the threshold are left untouched
+      — `backend/test/flightops.e2e-spec.ts` › "closes and submits to نیرا automatically once within 4h of departure"
 - [x] Idempotent: reading the same instance twice after closure does not call the provider a second time or move `niraSubmittedAt`
       — `backend/test/flightops.e2e-spec.ts` › "submitting twice is a no-op — provider called once, timestamp unchanged"
 - [x] `NiraProvider` is a swappable interface (`MockNiraProvider` in dev/test, matching the `SmsProvider`/`PaymentGateway` pattern) — never called directly outside `NiraService`

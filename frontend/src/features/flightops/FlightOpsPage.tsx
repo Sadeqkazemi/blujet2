@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchFlightops, fetchFlightopsDetail } from '../../api/flightops';
+import { fetchFlightops, fetchFlightopsDetail, submitFlightopsToNira } from '../../api/flightops';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { airportCityName } from '../../lib/airport-cities';
@@ -7,7 +7,7 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
 import type { FlightopsDetail, FlightopsList, FlightopsRow } from '../../types/flightops';
 
-const AUTO_CLOSE_HOURS = 5;
+const AUTO_CLOSE_HOURS = 4;
 
 const STATUS_STYLE = {
   open: { label: 'باز', className: 'bg-[rgba(52,211,153,.14)] text-[#34d399]' },
@@ -18,7 +18,7 @@ function routeLabel(originCode: string, destCode: string): string {
   return `${airportCityName(originCode, 'fa')} ← ${airportCityName(destCode, 'fa')}`;
 }
 
-/** Hours remaining until sale auto-closes (5h before departure); null if already due. */
+/** Hours remaining until sale auto-closes (4h before departure); null if already due. */
 function hoursUntilAutoClose(departureAt: string, now = Date.now()): number | null {
   const closeAt = new Date(departureAt).getTime() - AUTO_CLOSE_HOURS * 3_600_000;
   const ms = closeAt - now;
@@ -27,7 +27,7 @@ function hoursUntilAutoClose(departureAt: string, now = Date.now()): number | nu
 }
 
 function NiraCell({ row }: { row: FlightopsRow }) {
-  if (row.closed || row.niraSubmittedAt) {
+  if (row.niraSubmittedAt) {
     return (
       <div className="flex flex-col gap-0.5">
         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#34d399]">
@@ -41,6 +41,14 @@ function NiraCell({ row }: { row: FlightopsRow }) {
             {formatJalaliDateTime(row.niraSubmittedAt)}
           </span>
         )}
+      </div>
+    );
+  }
+  if (row.closed) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[11px] font-bold text-[#f87171]">ارسال به نیرا ناموفق</span>
+        <span className="text-[10px] text-[#6b7b94]">نیازمند ارسال دستی</span>
       </div>
     );
   }
@@ -63,6 +71,8 @@ export default function FlightOpsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<FlightopsDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [niraSubmitting, setNiraSubmitting] = useState(false);
+  const [niraSubmitError, setNiraSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchFlightops()
@@ -77,10 +87,28 @@ export default function FlightOpsPage() {
     }
     setDetail(null);
     setDetailError(null);
+    setNiraSubmitError(null);
     fetchFlightopsDetail(selectedId)
       .then(setDetail)
       .catch(() => setDetailError('خطا در دریافت جزئیات پرواز.'));
   }, [selectedId]);
+
+  async function handleNiraSubmit() {
+    if (!selectedId || niraSubmitting) return;
+    setNiraSubmitting(true);
+    setNiraSubmitError(null);
+    try {
+      await submitFlightopsToNira(selectedId);
+      const refreshed = await fetchFlightopsDetail(selectedId);
+      setDetail(refreshed);
+      const listRefreshed = await fetchFlightops();
+      setList(listRefreshed);
+    } catch {
+      setNiraSubmitError('ارسال دستی به سامانه نیرا ناموفق بود. اتصال سامانه را بررسی و دوباره تلاش کنید.');
+    } finally {
+      setNiraSubmitting(false);
+    }
+  }
 
   const rowsPager = usePagination(list?.rows ?? []);
   const manifestPager = usePagination(detail?.manifest ?? []);
@@ -158,6 +186,22 @@ export default function FlightOpsPage() {
                   <span className="font-bold text-[#34d399]">لیست مسافران در سامانه نیرا ثبت شد</span>
                   <span className="font-num text-[#6b7b94]">{formatJalaliDateTime(detail.niraSubmittedAt)}</span>
                 </div>
+              ) : detail.closed ? (
+                <div
+                  data-testid="fo-nira-pending"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-[rgba(248,113,113,.1)] p-3 text-xs font-bold text-[#f87171]"
+                >
+                  <span>ارسال خودکار ناموفق بود؛ ارسال دستی را انجام دهید.</span>
+                  <button
+                    type="button"
+                    data-testid="fo-nira-submit"
+                    onClick={handleNiraSubmit}
+                    disabled={niraSubmitting}
+                    className="rounded-[8px] border-0 bg-[#7c3aed] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+                  >
+                    {niraSubmitting ? 'در حال ارسال…' : 'ارسال به نیرا'}
+                  </button>
+                </div>
               ) : (
                 <div
                   data-testid="fo-nira-pending"
@@ -166,6 +210,7 @@ export default function FlightOpsPage() {
                   در انتظار بسته‌شدن فروش
                 </div>
               )}
+              {niraSubmitError && <p className="mt-2 text-xs text-[#f87171]">{niraSubmitError}</p>}
             </div>
 
             <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-5">
@@ -237,7 +282,7 @@ export default function FlightOpsPage() {
           </svg>
         </span>
         <p className="m-0 text-[12px] leading-6 text-[#9fb0c7]">
-          فروش هر پرواز ۵ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و لیست کامل مسافران
+          فروش هر پرواز ۴ ساعت مانده به زمان پرواز به‌صورت خودکار بسته می‌شود و لیست کامل مسافران
           به‌صورت اتومات در سامانه نیرا بارگذاری می‌گردد. با کلیک روی هر پرواز جزئیات و لیست مسافران
           نمایش داده می‌شود.
         </p>
