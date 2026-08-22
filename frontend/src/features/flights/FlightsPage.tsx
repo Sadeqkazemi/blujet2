@@ -1783,10 +1783,13 @@ export default function FlightsPage() {
         <Modal
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
-          maxWidthClass="max-w-2xl"
+          maxWidthClass="max-w-[660px]"
         >
           <div className="mb-4 flex items-center justify-between border-b border-[#27334a] pb-3 text-[10px] text-[#9fb0c7]">
-            <span>{detail.flightNo} · {detail.aircraftType}</span>
+            <span className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#1b355a] text-sm text-[#80b7ff]" aria-hidden="true">✈</span>
+              <span>{detail.flightNo} · {detail.aircraftType}</span>
+            </span>
             <span className="font-num">{formatJalaliDateTime(detail.departureAt)}</span>
           </div>
           <div className="mb-4 flex gap-1 border-b border-[#27334a]">
