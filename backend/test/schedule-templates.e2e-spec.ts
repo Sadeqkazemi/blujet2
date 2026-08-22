@@ -15,6 +15,8 @@ import { CharterCommitment } from '../src/database/entities/charter-commitment.e
 import { AgencySeatCommitment } from '../src/database/entities/agency-seat-commitment.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { User } from '../src/database/entities/user.entity';
+import { FareRule } from '../src/database/entities/fare-rule.entity';
+import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
 import { loginAs } from './helpers/login.helper';
 
 describe('Seasonal schedule templates (e2e)', () => {
@@ -137,6 +139,141 @@ describe('Seasonal schedule templates (e2e)', () => {
       .where('fi.scheduleTemplateId = :id', { id: created.body.data.id })
       .getCount();
     expect(instances).toBe(preview.body.data.occurrenceCount);
+  });
+
+  it('completes one materialized occurrence atomically and rolls back invalid fare rules', async () => {
+    const { accessToken } = await loginAs(app, 'comm');
+    const { accessToken: financeToken } = await loginAs(app, 'finance');
+    const { origin, dest, aircraft } = await airportsAndAircraft();
+    const stamp = Date.now() + 7;
+    const slot = uniqueSlot(stamp);
+    const created = await request(app.getHttpServer())
+      .post('/flights/schedule-templates')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        originAirportId: origin.id,
+        destinationAirportId: dest.id,
+        flightNoBase: `AT${String(stamp % 10000).padStart(4, '0')}`,
+        aircraftDefinitionId: aircraft.id,
+        departureTime: slot.departureTime,
+        durationMinutes: 95,
+        startDate: slot.startDate,
+        endDate: slot.endDate,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        agencyPriceIrr: '38000000',
+        legalCeilingIrr: '42000000',
+        idempotencyKey: `atomic-${stamp}`,
+      });
+    if (created.status !== 201) {
+      throw new Error(
+        `schedule create failed: ${JSON.stringify(created.body)}`,
+      );
+    }
+
+    const occurrences = await dataSource.getRepository(FlightInstance).find({
+      where: { scheduleTemplateId: created.body.data.id },
+      order: { departureAt: 'ASC' },
+    });
+    expect(occurrences.length).toBeGreaterThan(1);
+    const [validOccurrence, rollbackOccurrence] = occurrences;
+    const cabinRows = validOccurrence.cabinCapacities as Array<{
+      cabin: 'FIRST' | 'BUSINESS' | 'COMFORT' | 'ECONOMY';
+      seats: number;
+    }>;
+    const cabin = cabinRows.find((row) => row.seats > 0)!;
+    const command = {
+      expectedVersion: validOccurrence.version,
+      basePriceIrr: '38000000',
+      competitorPriceIrr: '40000000',
+      charterSeats: 0,
+      chargeRules: [],
+      fareRules: [
+        {
+          cabin: cabin.cabin,
+          classCode: 'Y',
+          priceIrr: '39000000',
+          seatsAllocated: cabin.seats,
+          taxIrr: '0',
+          refundable: true,
+          changeable: true,
+          allowedChannels: ['SYSTEM', 'AGENCY'],
+        },
+      ],
+      pricingProposal: {
+        proposedPriceIrr: '39000000',
+        legalRateIrr: '42000000',
+        commercialNote: 'ثبت اتمیک برنامه پروازی',
+      },
+    };
+
+    const completed = await request(app.getHttpServer())
+      .put(`/flights/${validOccurrence.id}/complete-and-submit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(command);
+    expect(completed.status).toBe(200);
+    expect(completed.body.data.definitionStatus).toBe('PENDING_OPERATIONS');
+    expect(completed.body.data.version).toBe(validOccurrence.version + 1);
+    expect(
+      await dataSource.getRepository(FareRule).count({
+        where: { flightInstanceId: validOccurrence.id },
+      }),
+    ).toBe(1);
+    expect(
+      await dataSource.getRepository(FarePricingProposal).findOneBy({
+        flightInstanceId: validOccurrence.id,
+      }),
+    ).toMatchObject({ proposedPriceIrr: 39_000_000n });
+
+    const forbidden = await request(app.getHttpServer())
+      .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)
+      .set('Authorization', `Bearer ${financeToken}`)
+      .send({ ...command, expectedVersion: rollbackOccurrence.version });
+    expect(forbidden.status).toBe(403);
+
+    const unknown = await request(app.getHttpServer())
+      .put('/flights/00000000-0000-4000-8000-000000000000/complete-and-submit')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send(command);
+    expect(unknown.status).toBe(404);
+
+    const stale = await request(app.getHttpServer())
+      .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...command,
+        expectedVersion: rollbackOccurrence.version + 1,
+      });
+    expect(stale.status).toBe(409);
+
+    const physicalRewrite = await request(app.getHttpServer())
+      .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...command,
+        expectedVersion: rollbackOccurrence.version,
+        capacity: rollbackOccurrence.capacity + 100,
+      });
+    expect(physicalRewrite.status).toBe(400);
+
+    const invalid = await request(app.getHttpServer())
+      .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        ...command,
+        expectedVersion: rollbackOccurrence.version,
+        fareRules: [command.fareRules[0], command.fareRules[0]],
+      });
+    expect(invalid.status).toBe(400);
+    expect(
+      await dataSource.getRepository(FareRule).count({
+        where: { flightInstanceId: rollbackOccurrence.id },
+      }),
+    ).toBe(0);
+    const afterRollback = await dataSource
+      .getRepository(FlightInstance)
+      .findOneByOrFail({ id: rollbackOccurrence.id });
+    expect(afterRollback.definitionStatus).toBe('DRAFT');
+    expect(afterRollback.version).toBe(rollbackOccurrence.version);
   });
 
   it('concurrent creates do not leave incomplete or duplicate schedules', async () => {

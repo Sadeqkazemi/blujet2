@@ -2771,6 +2771,17 @@ than relying on any cascade.
   `1787212800000-V4LoanWalletCreditLedger`,
   `1787299200000-V4LoanInitiationLifecycle`.
 
+### Atomic completion invariant (no migration)
+
+The commercial Add Flight screen completes an existing
+`flight_instances.scheduleTemplateId` occurrence. Its physical
+`capacity`, `cabinCapacities`, aircraft definition, route and departure are
+authoritative schedule/aircraft snapshots. The completion transaction may
+replace `fare_rules` and update the single `fare_pricing_proposals` row, but it
+must not create a second instance or allow the client to enlarge physical
+capacity. Definition, fare rules, proposal and transition to
+`PENDING_OPERATIONS` commit or roll back together.
+
 ## Passenger fare snapshots (2026-08-10)
 
 `passengers` stores the immutable purchase-time classification and fare inputs:

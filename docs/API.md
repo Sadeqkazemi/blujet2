@@ -434,6 +434,17 @@ stays untouched on the same page).
   — moves `DRAFT|OPERATIONS_REJECTED|REJECTED|PENDING_REVISION` →
   `PENDING_OPERATIONS`. Body `{ expectedVersion? }`. 409 on illegal state /
   version mismatch.
+- PUT `/flights/:id/complete-and-submit` — Commercial/Senior/Employee+`fl_manage`
+  — completes an existing occurrence materialized by a schedule template and
+  submits it to operations in one transaction. Body contains
+  `{ expectedVersion?, basePriceIrr, competitorPriceIrr?, charterSeats?, chargeRules?, fareRules[], pricingProposal }`. Route,
+  departure, aircraft and physical cabin capacities are checked against the
+  locked occurrence/aircraft definition; the client may define fare-class and
+  channel capacity but cannot rewrite physical capacity. Success returns the
+  complete definition in `PENDING_OPERATIONS`. Any error rolls back definition,
+  charges, fares, proposal and status together. This is the canonical Add
+  Flight command; `POST /flights` remains a compatibility endpoint and is not
+  used by the commercial Add Flight UI.
 - GET `/flights/operations-queue` — `OPERATIONS_MANAGER` (+ Senior) —
   list instances awaiting ops (`status` defaults `PENDING_OPERATIONS`).
 - GET `/flights/operations-overview` — `OPERATIONS_MANAGER` (+ Senior) —

@@ -35,6 +35,7 @@ import { UpsertAircraftDto } from './dto/aircraft.dto';
 import { CommitmentsService } from './commitments.service';
 import { CreateCommitmentDto } from './dto/commitment.dto';
 import {
+  CompleteScheduledFlightDto,
   CreateFlightDefinitionDto,
   UpdateFlightDefinitionDto,
 } from './dto/flight-definition.dto';
@@ -656,6 +657,26 @@ export class FlightsController {
       actor,
       id,
       dto.expectedVersion,
+    );
+    return { success: true, data };
+  }
+
+  @Put(':id/complete-and-submit')
+  @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('fl_manage')
+  @ApiOperation({
+    summary:
+      'تکمیل اتمیک رخداد ساخته‌شده از مسیر پروازی و ارسال به مدیر عملیات',
+  })
+  async completeScheduledAndSubmit(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: CompleteScheduledFlightDto,
+  ) {
+    const data = await this.definitions.completeScheduledAndSubmit(
+      actor,
+      id,
+      dto,
     );
     return { success: true, data };
   }

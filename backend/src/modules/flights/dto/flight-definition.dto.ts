@@ -22,6 +22,7 @@ import {
 } from '../../../common/dto/irr.decorator';
 import type { Irr } from '../../../common/money';
 import {
+  BookingChannel,
   CabinClass,
   ChargeCalculationMode,
   ChargeKind,
@@ -29,6 +30,7 @@ import {
 import { normalizeFlightNo } from '../flight-definition.util';
 
 const CABIN_CLASSES = Object.values(CabinClass);
+const BOOKING_CHANNELS = Object.values(BookingChannel);
 
 export class CabinCapacityDto {
   @ApiProperty({ enum: CABIN_CLASSES })
@@ -219,3 +221,151 @@ export class CreateFlightDefinitionDto {
 }
 
 export class UpdateFlightDefinitionDto extends CreateFlightDefinitionDto {}
+
+export class CompleteScheduledFareRuleDto {
+  @ApiProperty({ enum: CABIN_CLASSES })
+  @IsIn(CABIN_CLASSES)
+  cabin!: CabinClass;
+
+  @ApiProperty({ example: 'Y' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsString()
+  @Matches(/^[A-Z0-9]{1,8}$/)
+  classCode!: string;
+
+  @ApiProperty({ type: String, example: '39000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  priceIrr!: Irr;
+
+  @ApiProperty({ example: 120 })
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  seatsAllocated!: number;
+
+  @ApiPropertyOptional({ type: String, example: '0' })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  taxIrr?: Irr;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  refundable?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  changeable?: boolean;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(200)
+  baggageAllowanceKg?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  validFrom?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsISO8601()
+  validUntil?: string;
+
+  @ApiPropertyOptional({ enum: BOOKING_CHANNELS, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsIn(BOOKING_CHANNELS, { each: true })
+  allowedChannels?: BookingChannel[];
+}
+
+export class CompleteScheduledPricingProposalDto {
+  @ApiProperty({ type: String, example: '39000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  proposedPriceIrr!: Irr;
+
+  @ApiPropertyOptional({ type: String, example: '42000000' })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  legalRateIrr?: Irr;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  commercialNote?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  operationsNote?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  ceoNote?: string;
+}
+
+/**
+ * Canonical command for completing an occurrence materialized by a seasonal
+ * schedule. Physical route/date/aircraft/capacity are deliberately absent:
+ * they are inherited from the occurrence and cannot be overridden here.
+ */
+export class CompleteScheduledFlightDto {
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedVersion?: number;
+
+  @ApiProperty({ type: String, example: '38000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  basePriceIrr!: Irr;
+
+  @ApiPropertyOptional({ type: String, example: '40000000' })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  competitorPriceIrr?: Irr;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  charterSeats?: number;
+
+  @ApiPropertyOptional({ type: [ChargeRuleDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChargeRuleDto)
+  chargeRules?: ChargeRuleDto[];
+
+  @ApiProperty({ type: [CompleteScheduledFareRuleDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CompleteScheduledFareRuleDto)
+  fareRules!: CompleteScheduledFareRuleDto[];
+
+  @ApiProperty({ type: CompleteScheduledPricingProposalDto })
+  @ValidateNested()
+  @Type(() => CompleteScheduledPricingProposalDto)
+  pricingProposal!: CompleteScheduledPricingProposalDto;
+}
