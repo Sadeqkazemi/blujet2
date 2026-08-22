@@ -619,8 +619,6 @@ export class AgencyPortalService {
       this.fareRuleRepo
         .createQueryBuilder('rule')
         .where('rule."flightInstanceId" IN (:...instanceIds)', { instanceIds })
-        .andWhere('rule."agencySeatsReleased" > 0')
-        .andWhere('rule."agencyReleasePriceIrr" IS NOT NULL')
         .orderBy('rule.cabin', 'ASC')
         .addOrderBy('rule."classCode"', 'ASC')
         .getMany(),

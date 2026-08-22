@@ -537,7 +537,12 @@ export default function FlightsPage() {
   const futurePager = usePagination(visibleFuture);
   const weakActiveFlights = useMemo(
     () =>
-      (data?.active ?? []).filter((row) => row.salesHealth?.isWeak === true),
+      (data?.active ?? []).filter(
+        (row) =>
+          row.salesHealth?.isWeak === true &&
+          row.salesHealth.hoursToDeparture >= 0 &&
+          row.salesHealth.hoursToDeparture <= 7 * 24,
+      ),
     [data?.active],
   );
 
@@ -794,10 +799,23 @@ export default function FlightsPage() {
                 </div>
               </div>
               {isCommercial && weakActiveFlights.length > 0 && (
-                <div className="grid grid-cols-1 gap-3 border-b border-panel-border bg-[#f59e0b0b] p-4 lg:grid-cols-2" data-testid="weak-sales-ai-list">
+                <div className="space-y-3 border-b border-panel-border bg-[#f59e0b0b] p-4" data-testid="weak-sales-ai-list">
                   {weakActiveFlights.map((flight) => (
                     <article key={flight.id} className="rounded-xl border border-[#f59e0b55] bg-[#171d29] p-4">
-                      <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-extrabold text-[#fbbf24]">هشدار خودکار فروش ضعیف</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{flight.flightNo} · {flight.originCode} ← {flight.destCode}</div></div><span className="font-num rounded-full bg-[#f59e0b1f] px-2 py-1 text-[10px] text-[#fbbf24]">فروش {faDigits(flight.sold)} از {faDigits(flight.capacity)}</span></div>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-extrabold text-[#fbbf24]">هشدار خودکار فروش ضعیف</div>
+                          <div className="ltr font-num mt-1 text-[11px] text-panel-muted">{flight.flightNo} · {flight.originCode} ← {flight.destCode}</div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="font-num rounded-full bg-[#f59e0b1f] px-2.5 py-1 text-[10px] text-[#fbbf24]">
+                            {flight.salesHealth!.hoursToDeparture <= 24
+                              ? `${faDigits(Math.ceil(flight.salesHealth!.hoursToDeparture))} ساعت تا پرواز`
+                              : `${faDigits(Math.ceil(flight.salesHealth!.hoursToDeparture / 24))} روز تا پرواز`}
+                          </span>
+                          <span className="font-num rounded-full bg-[#f59e0b1f] px-2.5 py-1 text-[10px] text-[#fbbf24]">فروش {faDigits(flight.sold)} از {faDigits(flight.capacity)}</span>
+                        </div>
+                      </div>
                       {flight.aiSuggestion ? <div className="mt-3 rounded-lg bg-black/15 p-3"><div className="text-[10px] text-panel-muted">پیشنهاد رقابتی هوش مصنوعی</div><div className="font-num mt-1 text-base font-black text-[#34d399]">{faMoney(flight.aiSuggestion.priceIrr)} تومان</div><p className="mt-1 text-[10.5px] leading-5 text-[#aebbd0]">{flight.aiSuggestion.reason}</p></div> : <p className="mt-3 text-[10.5px] text-panel-muted">پیشنهاد قیمت در حال آماده‌سازی است؛ نرخ فعلی خودکار تغییر نمی‌کند.</p>}
                       <button type="button" onClick={() => void openDetail(flight.id)} className="mt-3 text-[11px] font-bold text-accent">{canManageFlights ? 'مشاهده و مدیریت پرواز' : 'مشاهده پرواز'} ←</button>
                     </article>
