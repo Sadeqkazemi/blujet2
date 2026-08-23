@@ -34,7 +34,6 @@ import PublicPageShell from '../../components/public/PublicPageShell';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import ResultsAiRadar from './results/ResultsAiRadar';
-import ResultsBuyModal from './results/ResultsBuyModal';
 import ResultsEditSearchModal from './results/ResultsEditSearchModal';
 import ResultsFlightCard from './results/ResultsFlightCard';
 import { RESULTS_COPY } from './results/results-copy';
@@ -55,8 +54,6 @@ const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
 const ROUNDTRIP_OUTBOUND_KEY = 'blujet_roundtrip_outbound';
 
 type OutboundLeg = NonNullable<CheckoutDraft['outboundLeg']>;
-type BuyModalState = { flight: SearchFlightResult; cabin: CabinClass };
-
 type RealLockResult =
   | { kind: 'success'; lock: PriceLock }
   | { kind: 'not-gold' }
@@ -120,7 +117,6 @@ export default function ResultsPage() {
   >('idle');
   const [advisory, setAdvisory] = useState<SearchAdvisoryResult | null>(null);
   const [aiVisible, setAiVisible] = useState(true);
-  const [buyModal, setBuyModal] = useState<BuyModalState | null>(null);
   const [selectedOutbound, setSelectedOutbound] = useState<OutboundLeg | null>(null);
 
   useEffect(() => {
@@ -409,14 +405,6 @@ export default function ResultsPage() {
       sessionStorage.setItem(ROUNDTRIP_OUTBOUND_KEY, JSON.stringify(leg));
       setResults(null);
       setExpandedId(null);
-      return;
-    }
-    // Design (نتایج پرواز → تکمیل خرید): buy always goes to passenger form.
-    // Seat map is checkout extras — never before pax, and never for guests
-    // as a results-page gate. Logged-in desktop users may still open the
-    // optional seat modal; guests go straight to checkout.
-    if (!isMobile && status === 'authenticated') {
-      setBuyModal({ flight: r, cabin: c });
       return;
     }
     proceedToCheckout(r, c);
@@ -1120,23 +1108,6 @@ export default function ResultsPage() {
         onApply={applyEditSearch}
       />
 
-      {buyModal && (
-        <ResultsBuyModal
-          open
-          locale={locale}
-          copy={copy}
-          flight={buyModal.flight}
-          cabin={buyModal.cabin}
-          passengerMix={passengerMix}
-          cityName={cityName}
-          onClose={() => setBuyModal(null)}
-          onContinue={(selectedSeats) => {
-            const { flight, cabin } = buyModal;
-            setBuyModal(null);
-            proceedToCheckout(flight, cabin, selectedSeats);
-          }}
-        />
-      )}
 
       {realLockResult && (
         <div

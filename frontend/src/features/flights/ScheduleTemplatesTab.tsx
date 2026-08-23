@@ -56,6 +56,33 @@ const INITIAL = {
 const INPUT_CLASS =
   "mt-2 h-11 w-full rounded-lg border border-panel-border bg-panel-surface px-3 text-sm text-panel-ink outline-none focus:border-accent";
 
+type ScheduleField =
+  | "originAirportId"
+  | "destinationAirportId"
+  | "flightNoBase"
+  | "aircraftDefinitionId"
+  | "departureTime"
+  | "durationMinutes"
+  | "startDate"
+  | "endDate"
+  | "weekdays"
+  | "agencyPriceToman"
+  | "legalCeilingToman";
+
+const FIELD_LABELS: Record<ScheduleField, string> = {
+  originAirportId: "مبدأ",
+  destinationAirportId: "مقصد",
+  flightNoBase: "شماره پرواز",
+  aircraftDefinitionId: "نوع هواپیما",
+  departureTime: "ساعت پرواز",
+  durationMinutes: "مدت پرواز",
+  startDate: "تاریخ شروع",
+  endDate: "تاریخ پایان",
+  weekdays: "روزهای پرواز",
+  agencyPriceToman: "قیمت آژانس",
+  legalCeilingToman: "قیمت قانونی",
+};
+
 export default function ScheduleTemplatesTab() {
   const [airports, setAirports] = useState<AirportEntry[]>([]);
   const [aircraft, setAircraft] = useState<AircraftDefinitionListItem[]>([]);
@@ -66,6 +93,9 @@ export default function ScheduleTemplatesTab() {
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [invalidFields, setInvalidFields] = useState<Set<ScheduleField>>(
+    new Set(),
+  );
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -155,19 +185,97 @@ export default function ScheduleTemplatesTab() {
     }
   }, [payloadKey, previewedPayloadKey]);
 
+  function updateForm<K extends keyof typeof INITIAL>(
+    field: K,
+    value: (typeof INITIAL)[K],
+  ) {
+    setForm((current) => ({ ...current, [field]: value }));
+    if (field in FIELD_LABELS) {
+      setInvalidFields((current) => {
+        const next = new Set(current);
+        next.delete(field as ScheduleField);
+        return next;
+      });
+    }
+    setError(null);
+  }
+
+  function fieldClass(field: ScheduleField) {
+    return `${INPUT_CLASS} ${invalidFields.has(field) ? "border-red-500 ring-1 ring-red-500/30" : ""}`;
+  }
+
+  function validateFields(): ScheduleField[] {
+    const invalid: ScheduleField[] = [];
+    if (!form.originAirportId) invalid.push("originAirportId");
+    if (!form.destinationAirportId) invalid.push("destinationAirportId");
+    if (!form.flightNoBase.trim()) invalid.push("flightNoBase");
+    if (!form.aircraftDefinitionId) invalid.push("aircraftDefinitionId");
+    if (!form.departureTime) invalid.push("departureTime");
+    if (!form.durationMinutes || Number(form.durationMinutes) <= 0) {
+      invalid.push("durationMinutes");
+    }
+    if (!form.startDate) invalid.push("startDate");
+    if (!form.endDate) invalid.push("endDate");
+    if (form.startDate && form.endDate && form.startDate > form.endDate) {
+      invalid.push("startDate", "endDate");
+    }
+    if (form.weekdays.length === 0) invalid.push("weekdays");
+    if (!parseTomanToRialString(form.agencyPriceToman)) {
+      invalid.push("agencyPriceToman");
+    }
+    if (!parseTomanToRialString(form.legalCeilingToman)) {
+      invalid.push("legalCeilingToman");
+    }
+    return [...new Set(invalid)];
+  }
+
+  function showValidationError(fields: ScheduleField[]) {
+    setInvalidFields(new Set(fields));
+    setError(
+      fields.length
+        ? `فیلدهای ناقص یا نامعتبر: ${fields
+            .map((field) => FIELD_LABELS[field])
+            .join("، ")}.`
+        : null,
+    );
+  }
+
+  function markApiError(cause: unknown, fallback: string) {
+    const message = cause instanceof Error ? cause.message : fallback;
+    const fields: ScheduleField[] = [];
+    if (/شماره پرواز|پرواز.*یونیک|پرواز.*مسیر دیگری/.test(message)) {
+      fields.push("flightNoBase");
+    }
+    if (/مبدأ و مقصد|فرودگاه/.test(message)) {
+      fields.push("originAirportId", "destinationAirportId");
+    }
+    if (/هواپیما/.test(message)) fields.push("aircraftDefinitionId");
+    if (/قیمت آژانس/.test(message)) fields.push("agencyPriceToman");
+    if (/سقف قانونی/.test(message)) fields.push("legalCeilingToman");
+    if (/بازه تاریخ|تاریخ/.test(message)) fields.push("startDate", "endDate");
+    if (/روزهای هفته|هیچ تاریخی/.test(message)) fields.push("weekdays");
+    if (fields.length) setInvalidFields(new Set(fields));
+    setError(message);
+  }
+
   function toggleWeekday(day: number) {
     setPreview(null);
-    setForm((current) => ({
-      ...current,
-      weekdays: current.weekdays.includes(day)
-        ? current.weekdays.filter((x) => x !== day)
-        : [...current.weekdays, day],
-    }));
+    updateForm(
+      "weekdays",
+      form.weekdays.includes(day)
+        ? form.weekdays.filter((x) => x !== day)
+        : [...form.weekdays, day],
+    );
   }
 
   async function runPreview() {
+    const invalid = validateFields();
+    if (invalid.length) {
+      showValidationError(invalid);
+      return;
+    }
     if (!payload) {
-      setError("همه فیلدهای ضروری مسیر، بازه، روزها و قیمت را کامل کنید.");
+      showValidationError(validateFields());
       return;
     }
     setBusy(true);
@@ -186,9 +294,7 @@ export default function ScheduleTemplatesTab() {
         0,
       );
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "پیش‌نمایش مسیر ایجاد نشد.",
-      );
+      markApiError(cause, "پیش‌نمایش مسیر ایجاد نشد.");
     } finally {
       setBusy(false);
     }
@@ -196,6 +302,11 @@ export default function ScheduleTemplatesTab() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const invalid = validateFields();
+    if (invalid.length) {
+      showValidationError(invalid);
+      return;
+    }
     if (!payload || !previewIsCurrent) {
       setError("ابتدا برای اطلاعات فعلی پیش‌نمایش معتبر بگیرید.");
       return;
@@ -208,15 +319,14 @@ export default function ScheduleTemplatesTab() {
         idempotencyKey: createRequestKey(),
       });
       setForm(INITIAL);
+      setInvalidFields(new Set());
       setPreview(null);
       setPreviewedPayloadKey(null);
       setNotice("مسیر فصلی و پروازهای متناظر با موفقیت ایجاد شدند.");
       setFormOpen(false);
       await load();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "ایجاد مسیر انجام نشد.",
-      );
+      markApiError(cause, "ایجاد مسیر انجام نشد.");
     } finally {
       setBusy(false);
     }
@@ -318,10 +428,9 @@ export default function ScheduleTemplatesTab() {
             مبدأ *
             <select
               value={form.originAirportId}
-              onChange={(e) =>
-                setForm({ ...form, originAirportId: e.target.value })
-              }
-              className={INPUT_CLASS}
+              onChange={(e) => updateForm("originAirportId", e.target.value)}
+              className={fieldClass("originAirportId")}
+              aria-invalid={invalidFields.has("originAirportId")}
             >
               <option value="">انتخاب مبدأ</option>
               {airports.map((a) => (
@@ -335,10 +444,9 @@ export default function ScheduleTemplatesTab() {
             مقصد *
             <select
               value={form.destinationAirportId}
-              onChange={(e) =>
-                setForm({ ...form, destinationAirportId: e.target.value })
-              }
-              className={INPUT_CLASS}
+              onChange={(e) => updateForm("destinationAirportId", e.target.value)}
+              className={fieldClass("destinationAirportId")}
+              aria-invalid={invalidFields.has("destinationAirportId")}
             >
               <option value="">انتخاب مقصد</option>
               {airports.map((a) => (
@@ -353,21 +461,19 @@ export default function ScheduleTemplatesTab() {
             <input
               dir="ltr"
               value={form.flightNoBase}
-              onChange={(e) =>
-                setForm({ ...form, flightNoBase: e.target.value })
-              }
+              onChange={(e) => updateForm("flightNoBase", e.target.value)}
               placeholder="XY1234"
-              className={INPUT_CLASS}
+              className={fieldClass("flightNoBase")}
+              aria-invalid={invalidFields.has("flightNoBase")}
             />
           </label>
           <label className="text-xs font-bold text-panel-muted">
             نوع هواپیما *
             <select
               value={form.aircraftDefinitionId}
-              onChange={(e) =>
-                setForm({ ...form, aircraftDefinitionId: e.target.value })
-              }
-              className={INPUT_CLASS}
+              onChange={(e) => updateForm("aircraftDefinitionId", e.target.value)}
+              className={fieldClass("aircraftDefinitionId")}
+              aria-invalid={invalidFields.has("aircraftDefinitionId")}
             >
               <option value="">انتخاب هواپیما</option>
               {aircraft.map((a) => (
@@ -393,10 +499,9 @@ export default function ScheduleTemplatesTab() {
             <input
               type="time"
               value={form.departureTime}
-              onChange={(e) =>
-                setForm({ ...form, departureTime: e.target.value })
-              }
-              className={INPUT_CLASS}
+              onChange={(e) => updateForm("departureTime", e.target.value)}
+              className={fieldClass("departureTime")}
+              aria-invalid={invalidFields.has("departureTime")}
             />
           </label>
           <label className="text-xs font-bold text-panel-muted">
@@ -404,14 +509,13 @@ export default function ScheduleTemplatesTab() {
             <input
               inputMode="numeric"
               value={form.durationMinutes}
-              onChange={(e) =>
-                setForm({ ...form, durationMinutes: e.target.value })
-              }
-              className={INPUT_CLASS}
+              onChange={(e) => updateForm("durationMinutes", e.target.value)}
+              className={fieldClass("durationMinutes")}
+              aria-invalid={invalidFields.has("durationMinutes")}
             />
           </label>
           <div
-            className="rounded-xl border border-panel-border bg-panel-surface-2 p-3"
+            className={`rounded-xl border bg-panel-surface-2 p-3 ${invalidFields.has("startDate") ? "border-red-500 ring-1 ring-red-500/30" : "border-panel-border"}`}
             data-testid="schedule-start-date-field"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -427,13 +531,13 @@ export default function ScheduleTemplatesTab() {
             <JalaliDatePicker
               label="شروع بازه"
               value={form.startDate}
-              onChange={(v) => setForm({ ...form, startDate: v })}
+              onChange={(v) => updateForm("startDate", v)}
               theme="dark"
               singleLine
             />
           </div>
           <div
-            className="rounded-xl border border-panel-border bg-panel-surface-2 p-3"
+            className={`rounded-xl border bg-panel-surface-2 p-3 ${invalidFields.has("endDate") ? "border-red-500 ring-1 ring-red-500/30" : "border-panel-border"}`}
             data-testid="schedule-end-date-field"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -450,7 +554,7 @@ export default function ScheduleTemplatesTab() {
               label="پایان بازه"
               value={form.endDate}
               minDate={form.startDate ?? undefined}
-              onChange={(v) => setForm({ ...form, endDate: v })}
+              onChange={(v) => updateForm("endDate", v)}
               theme="dark"
               singleLine
             />
@@ -459,7 +563,7 @@ export default function ScheduleTemplatesTab() {
             <div className="mb-2 text-xs font-bold text-panel-muted">
               روزهای پرواز
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className={`flex flex-wrap gap-2 rounded-lg border p-2 ${invalidFields.has("weekdays") ? "border-red-500 ring-1 ring-red-500/30" : "border-transparent"}`}>
               {WEEKDAYS.map(([day, label]) => (
                 <button
                   key={day}
@@ -480,12 +584,10 @@ export default function ScheduleTemplatesTab() {
               dir="rtl"
               value={form.agencyPriceToman}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  agencyPriceToman: normalizeTomanInput(e.target.value),
-                })
+                updateForm("agencyPriceToman", normalizeTomanInput(e.target.value))
               }
-              className={INPUT_CLASS}
+              className={fieldClass("agencyPriceToman")}
+              aria-invalid={invalidFields.has("agencyPriceToman")}
             />
             <span
               aria-live="polite"
@@ -502,12 +604,10 @@ export default function ScheduleTemplatesTab() {
               dir="rtl"
               value={form.legalCeilingToman}
               onChange={(e) =>
-                setForm({
-                  ...form,
-                  legalCeilingToman: normalizeTomanInput(e.target.value),
-                })
+                updateForm("legalCeilingToman", normalizeTomanInput(e.target.value))
               }
-              className={INPUT_CLASS}
+              className={fieldClass("legalCeilingToman")}
+              aria-invalid={invalidFields.has("legalCeilingToman")}
             />
             <span
               aria-live="polite"
@@ -539,6 +639,7 @@ export default function ScheduleTemplatesTab() {
                 setPreview(null);
                 setPreviewedPayloadKey(null);
                 setError(null);
+                setInvalidFields(new Set());
               }}
               className="rounded-lg border border-panel-border px-4 py-3 text-xs font-black text-panel-muted"
             >

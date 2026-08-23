@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { fetchCredit, fetchInbox, fetchProfile } from '../../api/agency-portal';
@@ -9,6 +9,7 @@ import AgencyPortalSidebar from './AgencyPortalSidebar';
 import { AGENCY_PAGE_META, agencyNavKeyFromPath } from './agency-nav-config';
 import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 import AgencyComposeMessageModal from './AgencyComposeMessageModal';
+import { usePanelInactivityLogout } from '../../hooks/usePanelInactivityLogout';
 
 const STR: Record<StoredLocale, { newMessage: string; logoutTitle: string; logoutMessage: string; logoutConfirm: string; logoutCancel: string; logoutBusy: string }> = {
   fa: { newMessage: 'پیام جدید', logoutTitle: 'خروج از حساب', logoutMessage: 'آیا مطمئن هستید که می‌خواهید از پنل آژانس خارج شوید؟', logoutConfirm: 'بله، خارج شو', logoutCancel: 'انصراف', logoutBusy: 'در حال خروج…' },
@@ -34,7 +35,21 @@ export default function AgencyPortalShell() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const inactivityLogoutStartedRef = useRef(false);
   const showPageMeta = ['dashboard', 'seats', 'webservice', 'apidocs', 'profile'].includes(activeKey);
+
+  const onInactivityTimeout = useCallback(() => {
+    if (inactivityLogoutStartedRef.current) return;
+    inactivityLogoutStartedRef.current = true;
+    void signOut().finally(() => {
+      navigate('/agency/login?reason=inactive', { replace: true });
+    });
+  }, [navigate, signOut]);
+
+  usePanelInactivityLogout({
+    enabled: Boolean(user),
+    onTimeout: onInactivityTimeout,
+  });
 
   useEffect(() => {
     fetchProfile()

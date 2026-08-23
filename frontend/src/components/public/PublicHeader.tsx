@@ -222,6 +222,7 @@ export default function PublicHeader() {
     try {
       await signOut();
       setLogoutConfirmOpen(false);
+      navigate('/', { replace: true });
     } finally {
       setLogoutBusy(false);
     }
@@ -660,13 +661,13 @@ export default function PublicHeader() {
           </span>
           {t('profileLabel')}
         </Link>
-        <Link to="/manage-booking" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
+        <Link to="/account?tab=trips" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
           <span style={{ color: '#5a6678', display: 'flex' }}>
             <MenuIconTrips />
           </span>
           {t('tripsLabel')}
         </Link>
-        <Link to="/manage-booking" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
+        <Link to="/account?tab=refunds" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
           <span style={{ color: '#5a6678', display: 'flex' }}>
             <MenuIconRefund />
           </span>
@@ -679,7 +680,8 @@ export default function PublicHeader() {
           {t('navLoyalty')}
         </Link>
         <div style={{ height: 1, background: '#eef1f5', margin: '5px 3px' }} />
-        <span
+        <button
+          type="button"
           data-testid="public-logout"
           onClick={requestSignOut}
           style={{
@@ -692,13 +694,17 @@ export default function PublicHeader() {
             color: '#e5484d',
             fontWeight: 600,
             cursor: 'pointer',
+            border: 'none',
+            background: 'transparent',
+            width: '100%',
+            textAlign: 'start',
           }}
         >
           <span style={{ display: 'inline-flex' }}>
             <MenuIconLogout />
           </span>
           {t('logoutLabel')}
-        </span>
+        </button>
       </div>
     </>
   );
@@ -1450,13 +1456,14 @@ export default function PublicHeader() {
               </span>
             )}
             {loggedIn && user && (
-              <span
+              <button
+                type="button"
                 data-testid="public-logout"
                 onClick={requestSignOut}
-                style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'transparent', width: '100%', textAlign: 'inherit' }}
               >
                 ↩ {t('logoutLabel')}
-              </span>
+              </button>
             )}
           </div>
         </div>
