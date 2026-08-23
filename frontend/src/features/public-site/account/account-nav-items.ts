@@ -169,7 +169,7 @@ export const MOBILE_PROFILE_ENTRY: Record<StoredLocale, string> = {
 };
 
 export const MOBILE_TRIPS_ENTRY: Record<StoredLocale, string> = {
-  fa: 'سفرها و مدیریت رزرو',
-  en: 'Trips & Booking Management',
-  ar: 'الرحلات وإدارة الحجز',
+  fa: 'سفرها و خریدها',
+  en: 'Trips & Purchases',
+  ar: 'الرحلات والمشتريات',
 };
