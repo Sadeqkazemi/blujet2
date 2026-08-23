@@ -185,7 +185,7 @@ describe('PublicHeader — logged-in user', () => {
     expect(await screen.findByTestId('public-user-wallet-balance')).toHaveTextContent('۲٬۴۵۰٬۰۰۰');
     expect(screen.getByText('موجودی کل کیف پول')).toBeInTheDocument();
     expect(screen.getByText('مشاهده پروفایل')).toHaveAttribute('href', '/account');
-    expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/manage-booking');
+    expect(screen.getAllByText('سفرها و خریدها')[0]).toHaveAttribute('href', '/account?tab=trips');
     expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/account?tab=refunds');
   });
 
@@ -354,7 +354,7 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.getByTestId('public-mobile-account-trips')).toHaveAttribute('href', '/account?tab=trips');
     expect(screen.getByText('مدیریت پروفایل')).toBeInTheDocument();
     expect(screen.getByText('اطلاعات حساب')).toBeInTheDocument();
-    expect(screen.getAllByText('سفرها و مدیریت رزرو').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('سفرها و خریدها').length).toBeGreaterThan(0);
     expect(screen.getByTestId('public-mobile-account-security')).toHaveAttribute('href', '/account?tab=security');
     expect(screen.queryByTestId('public-mobile-account-saved')).not.toBeInTheDocument();
   });

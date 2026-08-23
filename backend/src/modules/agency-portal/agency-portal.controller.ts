@@ -20,6 +20,7 @@ import {
 import type { Response } from 'express';
 import { AgencyPortalService } from './agency-portal.service';
 import {
+  AgencySeatInquiryDto,
   PostInboxMessageDto,
   RequestCreditIncreaseDto,
   RequestAgencySeatsDto,
@@ -161,6 +162,15 @@ export class AgencyPortalController {
   })
   async seatRequestOptions(@CurrentUser() actor: AuthenticatedUser) {
     return { success: true, data: await this.portal.seatRequestOptions(actor) };
+  }
+
+  @Post('seat-inquiry')
+  @ApiOperation({ summary: 'استعلام واقعی ظرفیت و تقاضای رزرو پرواز برای آژانس' })
+  async seatInquiry(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: AgencySeatInquiryDto,
+  ) {
+    return { success: true, data: await this.portal.seatInquiry(actor, dto) };
   }
 
   @Get('seat-requests')

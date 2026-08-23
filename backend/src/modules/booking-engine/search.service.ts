@@ -178,6 +178,51 @@ export class SearchService {
     return Math.max(0, capacity - takenInCabin - committed);
   }
 
+  /**
+   * Authoritative cabin availability for internal consumers such as the
+   * agency seat-inquiry flow.  Keep this on the reservation engine so every
+   * caller uses the same physical seat map, active bookings/locks and agency
+   * commitments as public search and booking creation.
+   */
+  async cabinAvailability(
+    instance: FlightInstance,
+    cabin: CabinClass,
+  ): Promise<{ capacity: number; seatsLeft: number } | null> {
+    const map = await this.seatMapRepo.findOneBy({
+      aircraftType: resolveAircraftType(instance),
+    });
+    if (!map) return null;
+
+    const seats = enumerateSeats(map);
+    const cabinSeats = seats.filter((seat) => seat.cabin === cabin);
+    if (cabinSeats.length === 0) return null;
+
+    const capacities = serializeCabinCapacities(instance.cabinCapacities);
+    const configured = capacities.find((row) => row.cabin === cabin)?.seats;
+    const capacity =
+      configured == null
+        ? cabinSeats.length
+        : Math.min(configured, cabinSeats.length);
+    if (capacity <= 0) return null;
+
+    const [taken, committed] = await Promise.all([
+      this.takenSeatCodes(instance.id),
+      sumActiveCommittedSeats(
+        this.flightInstanceRepo.manager,
+        instance.id,
+        cabin,
+      ),
+    ]);
+    const seatsLeft = this.seatsLeftForCabin(
+      instance,
+      cabin,
+      seats,
+      taken,
+      committed,
+    );
+    return seatsLeft === null ? null : { capacity, seatsLeft };
+  }
+
   private async searchUncached(origin: string, dest: string, date: string) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);

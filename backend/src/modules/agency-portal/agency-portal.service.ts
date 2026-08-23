@@ -26,6 +26,7 @@ import { CartableService } from '../cartable/cartable.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
+import { SearchService } from '../booking-engine/search.service';
 import { ErrorCode } from '../../common/errors';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
@@ -34,6 +35,7 @@ import { ZERO_IRR, addIrr, divRoundBigInt, toIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
+  AgencySeatInquiryDto,
   RequestWebserviceDto,
   UploadDocumentDto,
 } from './dto/agency-portal.dtos';
@@ -88,6 +90,7 @@ export class AgencyPortalService {
     private readonly agencies: AgenciesService,
     private readonly files: FilesService,
     private readonly webservicePricing: WebservicePricingService,
+    private readonly search: SearchService,
   ) {}
 
   private async getOwnProfileOrThrow(actor: AuthenticatedUser) {
@@ -690,6 +693,246 @@ export class AgencyPortalService {
         definitionStatus: instance.definitionStatus,
       };
     });
+  }
+
+  /**
+   * Returns a server-computed capacity/demand snapshot for an agency before
+   * it submits a seat request. All values come from current bookings,
+   * allotments, requests and the route's last-year sales history.
+   */
+  async seatInquiry(actor: AuthenticatedUser, dto: AgencySeatInquiryDto) {
+    if (!(await this.isUatSandboxAgencyActor(actor))) {
+      await this.getOwnProfileOrThrow(actor);
+    }
+
+    const now = new Date();
+    const instance = await this.flightInstanceRepo.findOne({
+      where: {
+        id: dto.flightInstanceId,
+        departureAt: MoreThanOrEqual(now),
+        status: FlightInstanceStatus.SCHEDULED,
+        definitionStatus: 'PUBLISHED',
+      },
+      relations: { flight: { route: true } },
+    });
+    const rule = instance
+      ? await this.fareRuleRepo.findOne({
+          where: {
+            flightInstanceId: instance.id,
+            cabin: dto.cabin,
+            classCode: dto.fareClassCode,
+          },
+        })
+      : null;
+    if (!instance || !rule) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'پرواز یا کلاس کرایه قابل استعلام یافت نشد.',
+      });
+    }
+
+    // The reservation engine is the only source of truth for free seats.
+    // It reads the aircraft map and subtracts active bookings, locks and
+    // commitments. Do not answer an inquiry from FareRule.seatsAllocated or
+    // re-derive availability here, otherwise the agency panel can promise a
+    // seat that the public booking engine has already consumed.
+    const availability = await this.search.cabinAvailability(
+      instance,
+      dto.cabin,
+    );
+    if (!availability) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'نقشه صندلی این کلاس برای استعلام موجود نیست.',
+      });
+    }
+
+    const [
+      soldSeats,
+      heldSeats,
+      agencySoldSeats,
+      allotmentRaw,
+      demandRaw,
+      historyRaw,
+      totalAgencies,
+    ] = await Promise.all([
+      this.passengerRepo
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .where('booking.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('booking.cabin = :cabin', { cabin: dto.cabin })
+        .andWhere('booking.fareClassCode = :fareClassCode', {
+          fareClassCode: dto.fareClassCode,
+        })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('passenger.occupiesSeat = true')
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .getCount(),
+      this.passengerRepo
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .where('booking.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('booking.cabin = :cabin', { cabin: dto.cabin })
+        .andWhere('booking.fareClassCode = :fareClassCode', {
+          fareClassCode: dto.fareClassCode,
+        })
+        .andWhere('booking.status = :status', { status: 'HELD' })
+        .andWhere('booking.holdExpiresAt > :now', { now })
+        .andWhere('passenger.occupiesSeat = true')
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .getCount(),
+      this.passengerRepo
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .where('booking.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('booking.cabin = :cabin', { cabin: dto.cabin })
+        .andWhere('booking.fareClassCode = :fareClassCode', {
+          fareClassCode: dto.fareClassCode,
+        })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('booking.agencyId IS NOT NULL')
+        .andWhere('passenger.occupiesSeat = true')
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .getCount(),
+      this.allotmentRepo
+        .createQueryBuilder('allotment')
+        .select('COALESCE(SUM(allotment.seatsAllocated), 0)', 'total')
+        .addSelect('COUNT(DISTINCT allotment.agencyId)', 'agencyCount')
+        .where('allotment.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('allotment.cabin = :cabin', { cabin: dto.cabin })
+        .andWhere('allotment.fareClassCode = :fareClassCode', {
+          fareClassCode: dto.fareClassCode,
+        })
+        .andWhere(
+          '(allotment.type = :hard OR allotment.releaseAt IS NULL OR allotment.releaseAt > :now)',
+          { hard: 'HARD', now },
+        )
+        .getRawOne<{ total: string; agencyCount: string }>(),
+      this.seatRequestFlightRepo
+        .createQueryBuilder('link')
+        .innerJoin('link.seatRequest', 'request')
+        .select('COALESCE(SUM(request.seats), 0)', 'seats')
+        .addSelect('COUNT(DISTINCT request.agencyId)', 'agencyCount')
+        .where('link.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('request.cabin = :cabin', { cabin: dto.cabin })
+        .andWhere('request.fareClassCode = :fareClassCode', {
+          fareClassCode: dto.fareClassCode,
+        })
+        .andWhere('request.status IN (:...statuses)', {
+          statuses: ['PENDING', 'PENDING_FINANCE', 'APPROVED'],
+        })
+        .getRawOne<{ seats: string; agencyCount: string }>(),
+      this.passengerRepo
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .innerJoin('booking.flightInstance', 'historyInstance')
+        .innerJoin('historyInstance.flight', 'historyFlight')
+        .select('COUNT(DISTINCT booking.id)', 'bookings')
+        .addSelect('COUNT(passenger.id)', 'seats')
+        .where('historyFlight.routeId = :routeId', {
+          routeId: instance.flight.routeId,
+        })
+        .andWhere('booking.agencyId IS NOT NULL')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('booking.createdAt >= :since', {
+          since: new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000),
+        })
+        .andWhere('passenger.occupiesSeat = true')
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .getRawOne<{ bookings: string; seats: string }>(),
+      this.profileRepo.count(),
+    ]);
+
+    const capacity = availability.capacity;
+    const sold = Number(soldSeats ?? 0);
+    const held = Number(heldSeats ?? 0);
+    const agencyAllocated = Number(allotmentRaw?.total ?? 0);
+    const agencySold = Number(agencySoldSeats ?? 0);
+    const reservedAgencySeats = Math.max(agencyAllocated - agencySold, 0);
+    // SearchService already subtracts active bookings, seat locks and
+    // commitments. Re-applying allotments here would double-count agency
+    // capacity and under-report the seats the reservation engine can sell.
+    const availableSeats = availability.seatsLeft;
+    const availableToRequest = Math.max(
+      Math.min(rule.agencySeatsReleased - agencyAllocated, availableSeats),
+      0,
+    );
+    const activeRequestSeats = Number(demandRaw?.seats ?? 0);
+    const agenciesWithDemand = Number(demandRaw?.agencyCount ?? 0);
+    const historicalAgencyBookings = Number(historyRaw?.bookings ?? 0);
+    const historicalAgencySeatsSold = Number(historyRaw?.seats ?? 0);
+    const demandRatio =
+      capacity > 0 ? (sold + held + activeRequestSeats) / capacity : 0;
+    const demandLevel =
+      demandRatio >= 0.8 ? 'HIGH' : demandRatio >= 0.5 ? 'MEDIUM' : 'LOW';
+    const month = instance.departureAt.getUTCMonth() + 1;
+    const day = instance.departureAt.getUTCDate();
+    const season =
+      month <= 3
+        ? 'بهار'
+        : month <= 6
+          ? 'تابستان'
+          : month <= 9
+            ? 'پاییز'
+            : 'زمستان';
+    const occasion =
+      (month === 3 && day >= 20) || (month === 4 && day <= 4)
+        ? 'بازه نوروز'
+        : month === 12 && day >= 20
+          ? 'پایان سال'
+          : null;
+    const recommendation =
+      demandLevel === 'HIGH'
+        ? 'تقاضای این کلاس بالا است؛ ظرفیت آزادشده فعلی را با احتیاط افزایش دهید.'
+        : demandLevel === 'MEDIUM'
+          ? 'تقاضا متوسط است؛ ظرفیت آزادشده را بر اساس فروش واقعی تنظیم کنید.'
+          : 'ظرفیت کافی است؛ برای این پرواز فعلاً آزادسازی بیشتری لازم نیست.';
+    const unitPrice = rule.agencyReleasePriceIrr ?? 0n;
+
+    return {
+      flightInstanceId: instance.id,
+      cabin: dto.cabin,
+      fareClassCode: dto.fareClassCode,
+      requestedSeats: dto.seats,
+      capacity,
+      soldSeats: sold,
+      heldSeats: held,
+      agencyAllocated,
+      agencySoldSeats: agencySold,
+      reservedAgencySeats,
+      availableSeats,
+      availableToRequest,
+      totalAgencies,
+      agenciesWithDemand,
+      historicalAgencyBookings,
+      historicalAgencySeatsSold,
+      season,
+      occasion,
+      demandLevel,
+      recommendation,
+      pricePerSeatIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
+      totalPriceIrr: (unitPrice * BigInt(dto.seats)).toString(),
+    };
   }
 
   async mySeatRequests(actor: AuthenticatedUser) {
