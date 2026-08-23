@@ -32,7 +32,7 @@ import {
   verifyEmail,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import { fetchMySupportTickets } from '../../api/support-tickets';
+import { fetchMySupportTickets, submitMySupportTicket } from '../../api/support-tickets';
 import { changeOwnPassword, setPassword } from '../../api/auth';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
 import { tomanAmountInWords } from '../../lib/amount-in-words';
@@ -216,6 +216,19 @@ const STR: Record<StoredLocale, {
   ticketsTrackingLabel: string;
   ticketsHistoryHeading: string;
   ticketsLoadError: string;
+  ticketsHeading: string;
+  ticketsSubtitle: string;
+  ticketsCreateButton: string;
+  ticketsCreateHeading: string;
+  ticketsSubjectLabel: string;
+  ticketsBodyLabel: string;
+  ticketsPhoneLabel: string;
+  ticketsSubmitButton: string;
+  ticketsCancelButton: string;
+  ticketsSubjectPlaceholder: string;
+  ticketsBodyPlaceholder: string;
+  ticketsPhonePlaceholder: string;
+  ticketsCreateSuccess: string;
   // security
   securityHeading: string;
   securitySub: string;
@@ -305,6 +318,19 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'کد پیگیری',
     ticketsHistoryHeading: 'رویدادها',
     ticketsLoadError: 'خطا در دریافت تیکت‌ها.',
+    ticketsHeading: 'پیام به پشتیبانی',
+    ticketsSubtitle: 'پیگیری گفتگوهای شما با تیم پشتیبانی',
+    ticketsCreateButton: 'تیکت جدید',
+    ticketsCreateHeading: 'ایجاد درخواست جدید',
+    ticketsSubjectLabel: 'موضوع',
+    ticketsBodyLabel: 'متن پیام',
+    ticketsPhoneLabel: 'شماره تماس',
+    ticketsSubmitButton: 'ارسال درخواست',
+    ticketsCancelButton: 'انصراف',
+    ticketsSubjectPlaceholder: 'موضوع درخواست را وارد کنید',
+    ticketsBodyPlaceholder: 'پیام خود را بنویسید…',
+    ticketsPhonePlaceholder: 'مثلاً ۰۹۱۲۱۲۳۴۵۶۷',
+    ticketsCreateSuccess: 'درخواست شما ثبت شد ✓',
     securityHeading: 'تغییر رمز عبور',
     securitySub: 'برای امنیت بیشتر، رمز عبور خود را دوره‌ای تغییر دهید. اگر فقط با OTP وارد می‌شوید، فیلد رمز فعلی را خالی بگذارید.',
     currentPasswordLabel: 'رمز عبور فعلی',
@@ -393,6 +419,19 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'Tracking code',
     ticketsHistoryHeading: 'Timeline',
     ticketsLoadError: 'Error loading tickets.',
+    ticketsHeading: 'Support messages',
+    ticketsSubtitle: 'Track your conversations with our support team',
+    ticketsCreateButton: 'New ticket',
+    ticketsCreateHeading: 'Create a new request',
+    ticketsSubjectLabel: 'Subject',
+    ticketsBodyLabel: 'Message',
+    ticketsPhoneLabel: 'Phone number',
+    ticketsSubmitButton: 'Send request',
+    ticketsCancelButton: 'Cancel',
+    ticketsSubjectPlaceholder: 'Enter the request subject',
+    ticketsBodyPlaceholder: 'Write your message…',
+    ticketsPhonePlaceholder: 'e.g. +989121234567',
+    ticketsCreateSuccess: 'Your request was submitted ✓',
     securityHeading: 'Change Password',
     securitySub: 'Change your password periodically for extra security. If you only sign in with OTP, leave the current password field empty.',
     currentPasswordLabel: 'Current password',
@@ -481,6 +520,19 @@ const STR: Record<StoredLocale, {
     ticketsTrackingLabel: 'رمز التتبع',
     ticketsHistoryHeading: 'الأحداث',
     ticketsLoadError: 'خطأ في تحميل التذاكر.',
+    ticketsHeading: 'رسالة إلى الدعم',
+    ticketsSubtitle: 'متابعة محادثاتك مع فريق الدعم',
+    ticketsCreateButton: 'تذكرة جديدة',
+    ticketsCreateHeading: 'إنشاء طلب جديد',
+    ticketsSubjectLabel: 'الموضوع',
+    ticketsBodyLabel: 'نص الرسالة',
+    ticketsPhoneLabel: 'رقم الهاتف',
+    ticketsSubmitButton: 'إرسال الطلب',
+    ticketsCancelButton: 'إلغاء',
+    ticketsSubjectPlaceholder: 'أدخل موضوع الطلب',
+    ticketsBodyPlaceholder: 'اكتب رسالتك…',
+    ticketsPhonePlaceholder: 'مثال: ٠٩١٢١٢٣٤٥٦٧',
+    ticketsCreateSuccess: 'تم تسجيل طلبك ✓',
     securityHeading: 'تغيير كلمة المرور',
     securitySub: 'غيّر كلمة مرورك بشكل دوري لمزيد من الأمان. إذا كنت تدخل فقط برمز OTP، اترك حقل كلمة المرور الحالية فارغاً.',
     currentPasswordLabel: 'كلمة المرور الحالية',
@@ -560,6 +612,13 @@ export default function AccountPage() {
   const [tickets, setTickets] = useState<MySupportTicketRow[] | null>(null);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [expandedTicketId, setExpandedTicketId] = useState<string | null>(null);
+  const [ticketComposerOpen, setTicketComposerOpen] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketBody, setTicketBody] = useState('');
+  const [ticketPhone, setTicketPhone] = useState('');
+  const [ticketSubmitBusy, setTicketSubmitBusy] = useState(false);
+  const [ticketSubmitError, setTicketSubmitError] = useState<string | null>(null);
+  const [ticketNotice, setTicketNotice] = useState<string | null>(null);
   const [pwCur, setPwCur] = useState('');
   const [pwNew, setPwNew] = useState('');
   const [pwConfirm, setPwConfirm] = useState('');
@@ -738,6 +797,36 @@ export default function AccountPage() {
       setError(err instanceof ApiRequestError ? err.message : t.topupErrorFallback);
     } finally {
       setTopupBusy(false);
+    }
+  }
+
+  async function onSubmitTicket(e: React.FormEvent) {
+    e.preventDefault();
+    setTicketSubmitError(null);
+    setTicketNotice(null);
+    if (ticketSubject.trim().length < 2 || ticketBody.trim().length < 2 || ticketPhone.trim().length < 8) {
+      setTicketSubmitError(locale === 'en' ? 'Enter a subject, message, and valid phone number.' : locale === 'ar' ? 'أدخل الموضوع والرسالة ورقم هاتف صحيح.' : 'موضوع، متن پیام و شماره تماس معتبر را وارد کنید.');
+      return;
+    }
+    setTicketSubmitBusy(true);
+    try {
+      await submitMySupportTicket({
+        requesterName: profile?.fullName || user?.fullName || t.defaultUserName,
+        requesterPhone: ticketPhone.trim(),
+        subject: ticketSubject.trim(),
+        body: ticketBody.trim(),
+      });
+      const refreshed = await fetchMySupportTickets();
+      setTickets(refreshed);
+      setTicketSubject('');
+      setTicketBody('');
+      setTicketPhone('');
+      setTicketComposerOpen(false);
+      setTicketNotice(t.ticketsCreateSuccess);
+    } catch (err) {
+      setTicketSubmitError(err instanceof ApiRequestError ? err.message : t.ticketsLoadError);
+    } finally {
+      setTicketSubmitBusy(false);
     }
   }
 
@@ -1138,13 +1227,31 @@ export default function AccountPage() {
 
         {tab === 'wallet' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', borderRadius: 18, padding: '22px 24px', color: '#fff' }}>
-              <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6 }}>{t.walletBalanceHeading}</div>
-              <div data-testid="wallet-balance" style={{ fontSize: 26, fontWeight: 900 }}>
-                {wallet ? localeMoney(wallet.balanceIrr, locale) : '—'} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.toman}</span>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
+              <div style={{ background: 'linear-gradient(120deg,#1668c4,#0d3b66)', borderRadius: 18, padding: '22px 24px', color: '#fff', minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 12, opacity: 0.85 }}>{t.walletBalanceHeading}</div>
+                <div data-testid="wallet-balance" style={{ fontSize: 26, fontWeight: 900 }}>
+                  {wallet ? localeMoney(wallet.balanceIrr, locale) : '—'} <span style={{ fontSize: 12, fontWeight: 400 }}>{t.toman}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('wallet-topup-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                  style={{ alignSelf: 'flex-start', border: 'none', borderRadius: 10, background: '#fff', color: '#0d3b66', padding: '8px 14px', fontSize: 11.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  + {locale === 'fa' ? 'افزایش موجودی' : locale === 'ar' ? 'زيادة الرصيد' : 'Add funds'}
+                </button>
+              </div>
+              <div style={{ background: 'linear-gradient(120deg,#d5ae32,#b58d1a)', borderRadius: 18, padding: '22px 24px', color: '#fff', minHeight: 132, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 12, opacity: 0.9 }}>{t.currentPointsLabel}</div>
+                <div style={{ fontSize: 26, fontWeight: 900 }}>{localeDigits(club?.balance ?? 0, locale)} <span style={{ fontSize: 12, fontWeight: 400 }}>{locale === 'fa' ? 'امتیاز' : locale === 'ar' ? 'نقطة' : 'points'}</span></div>
+                <Link to="/account?tab=club" style={{ alignSelf: 'flex-start', color: '#fff', fontSize: 11.5, fontWeight: 800, textDecoration: 'underline' }}>{t.viewClubLink}</Link>
               </div>
             </div>
-            <form onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '28px 20px', textAlign: 'center' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 800, color: '#0d2640' }}>{locale === 'fa' ? 'گردش امتیاز' : locale === 'ar' ? 'سجل النقاط' : 'Points history'}</h3>
+              <div style={{ color: '#8a96a6', fontSize: 13 }}>{locale === 'fa' ? 'تراکنشی برای نمایش ثبت نشده است.' : locale === 'ar' ? 'لا توجد معاملات لعرضها.' : 'No point transactions to display.'}</div>
+            </div>
+            <form id="wallet-topup-form" onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>
                 <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>{t.topupAmountLabel}</label>
                 <MoneyInput
@@ -1305,16 +1412,30 @@ export default function AccountPage() {
 
         {tab === 'tickets' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d' }}>{ticketsError}</p>}
-            <div style={{ marginBottom: 4 }}>
-              <Link to="/support" style={{ fontSize: 12.5, color: '#1668c4', fontWeight: 700, textDecoration: 'none' }}>
-                {t.ticketsNewLink} →
-              </Link>
+            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ margin: 0, color: '#0d2640', fontSize: 18, fontWeight: 900 }}>{t.ticketsHeading}</h2>
+                <p style={{ margin: '6px 0 0', color: '#8a96a6', fontSize: 12 }}>{t.ticketsSubtitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }}
+                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '10px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                + {t.ticketsCreateButton}
+              </button>
             </div>
+            {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0 }}>{ticketsError}</p>}
+            {ticketNotice && <p role="status" style={{ fontSize: 12, color: '#059669', fontWeight: 700, margin: 0 }}>{ticketNotice}</p>}
             {tickets === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
             {tickets?.length === 0 && (
-              <div style={{ background: '#fff', border: '1px dashed #e5e9f0', borderRadius: 16, padding: 40, textAlign: 'center', color: '#8a96a6', fontSize: 13 }}>
-                {t.ticketsEmptyText}
+              <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '48px 24px', textAlign: 'center' }}>
+                <div aria-hidden="true" style={{ width: 68, height: 68, borderRadius: 20, margin: '0 auto 16px', display: 'grid', placeItems: 'center', background: '#f1f5fb', color: '#9aa9bb', fontSize: 32 }}>✉</div>
+                <div style={{ color: '#0d2640', fontSize: 14, fontWeight: 800 }}>{t.ticketsEmptyText}</div>
+                <p style={{ color: '#8a96a6', fontSize: 12, lineHeight: 1.8, margin: '8px auto 18px', maxWidth: 420 }}>{t.ticketsSubtitle}</p>
+                <button type="button" onClick={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }} style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '10px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {t.ticketsCreateHeading}
+                </button>
               </div>
             )}
             {tickets?.map((tk) => {
@@ -1363,6 +1484,35 @@ export default function AccountPage() {
                 </div>
               );
             })}
+            {ticketComposerOpen && (
+              <div role="dialog" aria-modal="true" aria-label={t.ticketsCreateHeading} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(8, 21, 39, 0.58)', display: 'grid', placeItems: 'center', padding: 16 }}>
+                <form onSubmit={(e) => void onSubmitTicket(e)} style={{ width: 'min(100%, 560px)', maxHeight: 'min(760px, calc(100vh - 32px))', overflowY: 'auto', background: '#fff', borderRadius: 18, padding: 22, boxSizing: 'border-box', boxShadow: '0 24px 70px rgba(0,0,0,.25)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}>
+                    <h3 style={{ margin: 0, color: '#0d2640', fontSize: 16, fontWeight: 900 }}>{t.ticketsCreateHeading}</h3>
+                    <button type="button" aria-label={t.ticketsCancelButton} onClick={() => setTicketComposerOpen(false)} style={{ border: 'none', background: '#f1f4f8', color: '#5a6678', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', fontSize: 18 }}>×</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, color: '#5a6678', fontSize: 11.5, fontWeight: 700 }}>
+                      {t.ticketsSubjectLabel}
+                      <input value={ticketSubject} onChange={(e) => setTicketSubject(e.target.value)} placeholder={t.ticketsSubjectPlaceholder} required style={{ height: 44, border: '1px solid #dfe7f0', borderRadius: 11, padding: '0 12px', fontFamily: 'inherit', fontSize: 13, boxSizing: 'border-box' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, color: '#5a6678', fontSize: 11.5, fontWeight: 700 }}>
+                      {t.ticketsBodyLabel}
+                      <textarea value={ticketBody} onChange={(e) => setTicketBody(e.target.value)} placeholder={t.ticketsBodyPlaceholder} required rows={5} style={{ resize: 'vertical', minHeight: 120, border: '1px solid #dfe7f0', borderRadius: 11, padding: 12, fontFamily: 'inherit', fontSize: 13, boxSizing: 'border-box' }} />
+                    </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, color: '#5a6678', fontSize: 11.5, fontWeight: 700 }}>
+                      {t.ticketsPhoneLabel}
+                      <input dir="ltr" value={ticketPhone} onChange={(e) => setTicketPhone(e.target.value)} placeholder={t.ticketsPhonePlaceholder} required inputMode="tel" style={{ height: 44, border: '1px solid #dfe7f0', borderRadius: 11, padding: '0 12px', fontFamily: 'inherit', fontSize: 13, boxSizing: 'border-box' }} />
+                    </label>
+                    {ticketSubmitError && <p role="alert" style={{ color: '#e5484d', fontSize: 12, margin: 0 }}>{ticketSubmitError}</p>}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                      <button type="button" onClick={() => setTicketComposerOpen(false)} style={{ border: 'none', borderRadius: 10, background: '#f1f4f8', color: '#5a6678', padding: '10px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t.ticketsCancelButton}</button>
+                      <button type="submit" disabled={ticketSubmitBusy} style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '10px 18px', fontSize: 12, fontWeight: 800, cursor: ticketSubmitBusy ? 'wait' : 'pointer', fontFamily: 'inherit' }}>{ticketSubmitBusy ? t.loading : t.ticketsSubmitButton}</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         )}
 
