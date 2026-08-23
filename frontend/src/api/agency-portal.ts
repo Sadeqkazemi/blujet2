@@ -15,6 +15,7 @@ import type {
   AgencyProfile,
   AgencySalesReport,
   AgencySeatRequestOption,
+  AgencySeatInquiry,
   AgencySeatRequestHistoryRow,
   AgencySeatRequestResult,
   AgencyWebserviceRequest,
@@ -88,6 +89,15 @@ export function fetchAllotments() {
 
 export function fetchSeatRequestOptions() {
   return apiGet<AgencySeatRequestOption[]>('/agency-portal/seat-request-options');
+}
+
+export function inquireAgencySeats(dto: {
+  flightInstanceId: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  fareClassCode: string;
+  seats: number;
+}) {
+  return apiPost<AgencySeatInquiry>('/agency-portal/seat-inquiry', dto);
 }
 
 export function fetchMySeatRequests() {

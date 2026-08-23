@@ -71,6 +71,29 @@ export class RequestWebserviceDto {
   note?: string;
 }
 
+/** Server-side capacity and demand inquiry used before an agency seat request. */
+export class AgencySeatInquiryDto {
+  @ApiProperty({ example: 'flight-instance-id' })
+  @IsString()
+  @MinLength(1)
+  flightInstanceId: string;
+
+  @ApiProperty({ enum: ['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'] })
+  @IsIn(['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'])
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+
+  @ApiProperty({ example: 'Y' })
+  @IsString()
+  @MinLength(1)
+  fareClassCode: string;
+
+  @ApiProperty({ example: 20, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  seats: number;
+}
+
 export class RequestAgencySeatsDto {
   @ApiProperty({ example: 'flight-instance-id' })
   @IsString()

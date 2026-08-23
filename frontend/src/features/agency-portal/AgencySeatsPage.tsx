@@ -10,6 +10,7 @@ import {
   fetchAllotments,
   fetchMySeatRequests,
   fetchSeatRequestOptions,
+  inquireAgencySeats,
   requestAgencySeats,
 } from '../../api/agency-portal';
 import { fetchSeatMap } from '../../api/publicSite';
@@ -20,6 +21,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyAllotmentRow } from '../../types/agency-portal';
 import type { AgencySeatRequestOption } from '../../types/agency-portal';
 import type { AgencySeatRequestHistoryRow } from '../../types/agency-portal';
+import type { AgencySeatInquiry } from '../../types/agency-portal';
 import { airportCityLabel } from '../../lib/airport-cities';
 import type { CabinClass, SeatMapResult } from '../../types/public-site';
 
@@ -115,6 +117,9 @@ export default function AgencySeatsPage() {
   const [requestFlightId, setRequestFlightId] = useState('');
   const [requestedSeats, setRequestedSeats] = useState(1);
   const [seatInquiryState, setSeatInquiryState] = useState<'idle' | 'ready' | 'confirmed'>('idle');
+  const [seatInquiry, setSeatInquiry] = useState<AgencySeatInquiry | null>(null);
+  const [seatInquiryLoading, setSeatInquiryLoading] = useState(false);
+  const [seatInquiryError, setSeatInquiryError] = useState<string | null>(null);
   const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([]);
   const [termMonths, setTermMonths] = useState<0 | 1 | 3 | 6 | 12>(3);
   const [payMethod, setPayMethod] = useState<'INVOICE' | 'CREDIT'>('INVOICE');
@@ -220,9 +225,14 @@ export default function AgencySeatsPage() {
   const requestAvailable = requestOccurrences.length
     ? Math.min(...requestOccurrences.map((occurrence) => occurrence.availableToRequest))
     : 0;
+  const effectiveRequestAvailable = seatInquiry
+    ? Math.min(requestAvailable, seatInquiry.availableToRequest)
+    : requestAvailable;
   useEffect(() => {
     setSeatInquiryState('idle');
-  }, [requestFlightId, requestedSeats]);
+    setSeatInquiry(null);
+    setSeatInquiryError(null);
+  }, [requestFlightId, requestedSeats, requestAvailable]);
   const pendingRequests = requestHistory.filter((row) => row.status === 'PENDING' || row.status === 'PENDING_FINANCE');
   const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
   const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
@@ -251,10 +261,34 @@ export default function AgencySeatsPage() {
       );
       setRequestedSeats(1);
       setSeatInquiryState('idle');
+      setSeatInquiry(null);
+      setSeatInquiryError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.errorFallback);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handleSeatInquiry() {
+    if (!requestFlight || requestedSeats < 1 || requestedSeats > requestAvailable) return;
+    setSeatInquiryLoading(true);
+    setSeatInquiryError(null);
+    setSeatInquiryState('idle');
+    try {
+      const result = await inquireAgencySeats({
+        flightInstanceId: requestFlight.flightInstanceId,
+        cabin: requestFlight.cabin,
+        fareClassCode: requestFlight.fareClassCode,
+        seats: requestedSeats,
+      });
+      setSeatInquiry(result);
+      setSeatInquiryState('ready');
+    } catch (cause) {
+      setSeatInquiry(null);
+      setSeatInquiryError(cause instanceof Error ? cause.message : t.errorFallback);
+    } finally {
+      setSeatInquiryLoading(false);
     }
   }
 
@@ -505,39 +539,50 @@ export default function AgencySeatsPage() {
             <div className="mb-4 rounded-xl bg-[#f6f3ff] p-4 text-xs font-bold text-[#6547a8]">
               {locale === 'fa' ? 'پس از ثبت، وضعیت این مسیر در تب «پروازهای درخواست‌شده» نمایش داده می‌شود؛ کلیدهای فعال فقط در بخش وب‌سرویس در دسترس‌اند.' : locale === 'ar' ? 'بعد الإرسال تظهر حالة المسار في تبويب الرحلات المطلوبة، وتبقى المفاتيح في قسم خدمة الويب.' : 'After submission, the route status appears under requested flights; active keys remain in Web service.'}
             </div>
-            <div className="grid gap-3 md:grid-cols-[1fr_1.4fr]">
-              <label className="text-[11px] font-bold text-[#3f546b]">
+            <div className="grid items-stretch gap-3 md:grid-cols-[1fr_1.4fr]">
+              <label className="flex h-full flex-col text-[11px] font-bold text-[#3f546b]">
                 {locale === 'en' ? 'Seats needed' : locale === 'ar' ? 'عدد المقاعد المطلوبة' : 'تعداد صندلی مورد نیاز'}
                 <input
                   type="number"
                   min={1}
-                  max={requestAvailable}
+                  max={effectiveRequestAvailable}
                   value={requestedSeats}
                   onChange={(event) => {
                     setRequestedSeats(Math.max(1, Number(event.target.value) || 1));
                     setSeatInquiryState('idle');
                   }}
-                  className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
+                  className="mt-1 w-full flex-1 rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
                   data-testid="agency-request-seat-count"
                 />
               </label>
-              <div className="rounded-xl border border-[#d6e4f8] bg-white p-3 text-[11px] text-[#3f546b]">
+              <div className="flex h-full flex-col rounded-xl border border-[#d6e4f8] bg-white p-3 text-[11px] text-[#3f546b]">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold">{locale === 'en' ? 'Seat availability inquiry' : locale === 'ar' ? 'استعلام توفر المقاعد' : 'استعلام تعداد صندلی'}</span>
                   <button
                     type="button"
-                    disabled={requestAvailable < 1 || requestedSeats > requestAvailable}
-                    onClick={() => setSeatInquiryState('ready')}
+                    disabled={requestAvailable < 1 || requestedSeats > requestAvailable || seatInquiryLoading}
+                    onClick={() => void handleSeatInquiry()}
                     className="rounded-lg border border-[#1668c4] px-3 py-2 font-black text-[#1668c4] disabled:opacity-40"
                     data-testid="agency-seat-inquiry"
                   >
-                    {locale === 'en' ? 'Get inquiry' : locale === 'ar' ? 'استعلام' : 'پاسخ استعلام'}
+                    {seatInquiryLoading
+                      ? locale === 'en' ? 'Checking…' : locale === 'ar' ? 'جارٍ الاستعلام…' : 'در حال استعلام…'
+                      : locale === 'en' ? 'Get inquiry' : locale === 'ar' ? 'استعلام' : 'پاسخ استعلام'}
                   </button>
                 </div>
-                {seatInquiryState !== 'idle' && (
+                {seatInquiryError && <div className="mt-3 rounded-lg bg-[#fff4e9] p-3 text-[#b25e18]">{seatInquiryError}</div>}
+                {seatInquiry && seatInquiryState !== 'idle' && (
                   <div className="mt-3 rounded-lg bg-[#f6f3ff] p-3 text-[#6547a8]" data-testid="agency-seat-inquiry-result">
-                    <div>{locale === 'fa' ? `${localeDigits(requestedSeats, locale)} صندلی از ${localeDigits(requestAvailable, locale)} صندلی قابل درخواست` : `${requestedSeats} of ${requestAvailable} seats available`}</div>
-                    <div className="mt-1 font-black">{localeMoney((BigInt(requestFlight.pricePerSeatIrr ?? '0') * BigInt(requestedSeats)).toString(), locale)} {locale === 'fa' ? 'تومان' : 'Toman'}</div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div>{locale === 'fa' ? `${localeDigits(seatInquiry.requestedSeats, locale)} صندلی درخواستی` : `${seatInquiry.requestedSeats} requested seats`}</div>
+                      <div>{locale === 'fa' ? `${localeDigits(seatInquiry.availableToRequest, locale)} صندلی قابل درخواست` : `${seatInquiry.availableToRequest} available to request`}</div>
+                      <div>{locale === 'fa' ? `ظرفیت آزاد واقعی: ${localeDigits(seatInquiry.availableSeats, locale)}` : `Real available capacity: ${seatInquiry.availableSeats}`}</div>
+                      <div>{locale === 'fa' ? `فروش تاریخی آژانس: ${localeDigits(seatInquiry.historicalAgencySeatsSold, locale)} صندلی` : `Agency historical sales: ${seatInquiry.historicalAgencySeatsSold}`}</div>
+                      <div>{locale === 'fa' ? `تقاضای ${localeDigits(seatInquiry.agenciesWithDemand, locale)} آژانس از ${localeDigits(seatInquiry.totalAgencies, locale)}` : `${seatInquiry.agenciesWithDemand} of ${seatInquiry.totalAgencies} agencies requesting`}</div>
+                      <div>{locale === 'fa' ? `فصل: ${seatInquiry.season}${seatInquiry.occasion ? ` · ${seatInquiry.occasion}` : ''}` : `${seatInquiry.season}${seatInquiry.occasion ? ` · ${seatInquiry.occasion}` : ''}`}</div>
+                    </div>
+                    <div className="mt-2 font-black">{localeMoney(seatInquiry.totalPriceIrr, locale)} {locale === 'fa' ? 'تومان' : 'Toman'}</div>
+                    <div className="mt-2 rounded-lg bg-white/70 p-2">{seatInquiry.recommendation}</div>
                     {seatInquiryState === 'ready' && (
                       <button
                         type="button"
@@ -593,7 +638,7 @@ export default function AgencySeatsPage() {
             </div>
             <button
               type="button"
-              disabled={seatInquiryState !== 'confirmed' || busy || requestOccurrences.length === 0 || requestedSeats > requestAvailable || requestAvailable < 1}
+              disabled={seatInquiryState !== 'confirmed' || busy || requestOccurrences.length === 0 || requestedSeats > effectiveRequestAvailable || requestAvailable < 1}
               onClick={() => void submitSeatRequest()}
               className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white disabled:opacity-50"
               data-testid="agency-submit-seat-request"

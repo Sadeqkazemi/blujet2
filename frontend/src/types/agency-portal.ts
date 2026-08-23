@@ -142,6 +142,33 @@ export interface AgencySeatRequestOption {
   definitionStatus: 'DRAFT' | 'PENDING_REVISION' | 'PUBLISHED' | 'REJECTED';
 }
 
+export type AgencySeatInquiryDemandLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
+export interface AgencySeatInquiry {
+  flightInstanceId: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  fareClassCode: string;
+  requestedSeats: number;
+  capacity: number;
+  soldSeats: number;
+  heldSeats: number;
+  agencyAllocated: number;
+  agencySoldSeats: number;
+  reservedAgencySeats: number;
+  availableSeats: number;
+  availableToRequest: number;
+  totalAgencies: number;
+  agenciesWithDemand: number;
+  historicalAgencyBookings: number;
+  historicalAgencySeatsSold: number;
+  season: string;
+  occasion: string | null;
+  demandLevel: AgencySeatInquiryDemandLevel;
+  recommendation: string;
+  pricePerSeatIrr: string | null;
+  totalPriceIrr: string;
+}
+
 export interface AgencySeatRequestResult {
   id: string;
   status: 'SUBMITTED';

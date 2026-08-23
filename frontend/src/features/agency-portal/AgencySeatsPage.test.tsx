@@ -5,7 +5,7 @@ import AgencySeatsPage from './AgencySeatsPage';
 import * as portalApi from '../../api/agency-portal';
 import * as publicApi from '../../api/publicSite';
 import * as useLocaleModule from '../../hooks/useLocale';
-import type { AgencyAllotmentRow, AgencySeatRequestOption } from '../../types/agency-portal';
+import type { AgencyAllotmentRow, AgencySeatInquiry, AgencySeatRequestOption } from '../../types/agency-portal';
 
 const ROWS: AgencyAllotmentRow[] = [
   {
@@ -37,6 +37,30 @@ afterEach(() => {
 beforeEach(() => {
   vi.spyOn(portalApi, 'fetchSeatRequestOptions').mockResolvedValue([]);
   vi.spyOn(portalApi, 'fetchMySeatRequests').mockResolvedValue([]);
+  vi.spyOn(portalApi, 'inquireAgencySeats').mockImplementation(async (dto): Promise<AgencySeatInquiry> => ({
+    flightInstanceId: dto.flightInstanceId,
+    cabin: dto.cabin,
+    fareClassCode: dto.fareClassCode,
+    requestedSeats: dto.seats,
+    capacity: 180,
+    soldSeats: 20,
+    heldSeats: 2,
+    agencyAllocated: 30,
+    agencySoldSeats: 4,
+    reservedAgencySeats: 3,
+    availableSeats: 158,
+    availableToRequest: 150,
+    totalAgencies: 4,
+    agenciesWithDemand: 2,
+    historicalAgencyBookings: 5,
+    historicalAgencySeatsSold: 18,
+    season: 'تابستان',
+    occasion: null,
+    demandLevel: 'MEDIUM',
+    recommendation: 'ظرفیت برای این درخواست کافی است.',
+    pricePerSeatIrr: '30000000',
+    totalPriceIrr: String(dto.seats * 30000000),
+  }));
 });
 
 describe('AgencySeatsPage', () => {
@@ -83,7 +107,15 @@ describe('AgencySeatsPage', () => {
     await user.click(seats);
     await user.keyboard('{Control>}a{/Control}12');
     expect(screen.getByTestId('agency-submit-seat-request')).toBeDisabled();
+    const inquiry = vi.mocked(portalApi.inquireAgencySeats);
     await user.click(screen.getByTestId('agency-seat-inquiry'));
+    expect(inquiry).toHaveBeenCalledWith({
+      flightInstanceId: option.flightInstanceId,
+      cabin: option.cabin,
+      fareClassCode: option.fareClassCode,
+      seats: 12,
+    });
+    expect(await screen.findByTestId('agency-seat-inquiry-result')).toHaveTextContent('ظرفیت آزاد واقعی');
     await user.click(screen.getByTestId('agency-seat-inquiry-confirm'));
     await user.click(screen.getByTestId('agency-submit-seat-request'));
 

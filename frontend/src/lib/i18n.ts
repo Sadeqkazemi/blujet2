@@ -53,7 +53,7 @@ const DICT = {
     en: 'Complete your profile',
     ar: 'أكمل ملفك الشخصي',
   },
-  tripsLabel: { fa: 'سفرها و مدیریت رزرو', en: 'Trips & Booking Management', ar: 'الرحلات وإدارة الحجز' },
+  tripsLabel: { fa: 'سفرها و خریدها', en: 'Trips & Purchases', ar: 'الرحلات والمشتريات' },
   refundLabel: { fa: 'استرداد بلیط', en: 'Refund Ticket', ar: 'استرداد التذكرة' },
   pointsLabel: { fa: 'امتیاز باشگاه', en: 'Club Points', ar: 'نقاط النادي' },
   walletBalanceLabel: {

@@ -661,7 +661,7 @@ export default function PublicHeader() {
           </span>
           {t('profileLabel')}
         </Link>
-        <Link to="/manage-booking" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
+        <Link to="/account?tab=trips" onClick={() => setMenuOpen(false)} style={menuLinkStyle(compact)}>
           <span style={{ color: '#5a6678', display: 'flex' }}>
             <MenuIconTrips />
           </span>
