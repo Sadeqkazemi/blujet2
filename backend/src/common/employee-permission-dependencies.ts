@@ -9,9 +9,54 @@ export const EMPLOYEE_PERMISSION_DEPENDENCIES: Readonly<
   Record<string, readonly string[]>
 > = {
   fl_manage: ['fl_view'],
+  fl_active: ['fl_view'],
+  fl_add: ['fl_view'],
+  fl_assign: ['fl_view'],
+  fl_completed: ['fl_view'],
+  fl_cities: ['fl_view'],
+  fl_costs: ['fl_view'],
+  fl_history: ['fl_view'],
+  rt_create: ['rt_view'],
+  rt_manage: ['rt_view'],
+  ac_manage: ['ac_view'],
+  op_manage: ['op_view'],
+  sv_manage: ['sv_view'],
+  ws_manage: ['ws_view'],
+  cl_rules_manage: ['cl_rules_view'],
+  ag_partners: ['ag_list'],
+  ag_debtors: ['ag_list'],
+  cr_manage: ['cr_view'],
+  rp_exports: ['rp_finance'],
+  // IT employee capabilities are deliberately independent.  The old
+  // us_* -> us_manage chain made selecting one narrow action silently grant
+  // the broad users capability.  Read prerequisites remain explicit, while
+  // the legacy umbrella grants below are still accepted by the guard.
+  sv_config: ['sv_view'],
+  sc_sessions: ['sc_view'],
+  lg_export: ['lg_view'],
   ct_process: ['ct_list'],
   rf_details: ['rf_list'],
   rf_process: ['rf_list', 'rf_details'],
+};
+
+/**
+ * Legacy section-level grants that intentionally cover the detailed actions
+ * introduced later.  This is kept separate from selection dependencies so a
+ * new action never widens an employee's grant, while existing us_manage /
+ * sv_control / sc_manage assignments keep working after the split.
+ */
+export const EMPLOYEE_PERMISSION_BUNDLES: Readonly<
+  Record<string, readonly string[]>
+> = {
+  us_manage: [
+    'us_list',
+    'us_create',
+    'us_permissions',
+    'us_status',
+    'us_reset_password',
+  ],
+  sv_control: ['sv_view'],
+  sc_manage: ['sc_view'],
 };
 
 export function expandEmployeePermissionKeys(
@@ -39,6 +84,9 @@ export function grantsSatisfyingEmployeePermission(
 ): string[] {
   return [
     requiredKey,
+    ...Object.keys(EMPLOYEE_PERMISSION_BUNDLES).filter((grantKey) =>
+      EMPLOYEE_PERMISSION_BUNDLES[grantKey].includes(requiredKey),
+    ),
     ...Object.keys(EMPLOYEE_PERMISSION_DEPENDENCIES).filter((grantKey) =>
       expandEmployeePermissionKeys([grantKey]).includes(requiredKey),
     ),

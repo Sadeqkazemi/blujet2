@@ -56,7 +56,14 @@ export class AgenciesController {
   // below), which is only reachable by first loading this list — an
   // EMPLOYEE holding only one of those two keys would otherwise have a
   // granted-but-unreachable permission.
-  @RequiresPermission('ag_list', 'ag_info', 'ag_settle', 'fn_invoices')
+  @RequiresPermission(
+    'ag_list',
+    'ag_partners',
+    'ag_debtors',
+    'ag_info',
+    'ag_settle',
+    'fn_invoices',
+  )
   @ApiOperation({ summary: 'لیست آژانس‌ها + کارت‌های KPI' })
   async list(@Query() query: ListAgenciesQueryDto) {
     const data = await this.agencies.list(query);
@@ -146,7 +153,8 @@ export class AgenciesController {
   }
 
   @Get('invoices')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_invoices')
   @ApiOperation({
     summary:
       'فهرست تجمیعی فاکتورهای همه آژانس‌ها. ?status=UNPAID شامل OVERDUE داخلی است و OVERDUE هرگز VOIDED نیست.',
@@ -218,6 +226,8 @@ export class AgenciesController {
   }
 
   @Get(':id/credit')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cr_view')
   @ApiOperation({ summary: 'سقف/مصرف/باقیمانده اعتبار (مصرف همیشه مشتق‌شده)' })
   async getCredit(@Param('id') id: string) {
     const data = await this.agencies.getCredit(id);
@@ -225,6 +235,8 @@ export class AgenciesController {
   }
 
   @Patch(':id/credit')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cr_manage')
   @ApiOperation({ summary: 'تغییر سقف اعتبار' })
   async updateCredit(
     @CurrentUser() actor: AuthenticatedUser,
@@ -379,6 +391,8 @@ export class AgenciesController {
   }
 
   @Get(':id/credit-requests')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cr_view')
   @ApiOperation({ summary: 'لیست درخواست‌های افزایش اعتبار آژانس' })
   async listCreditRequests(@Param('id') id: string) {
     const data = await this.agencies.listCreditRequests(id);
@@ -386,6 +400,8 @@ export class AgenciesController {
   }
 
   @Patch(':id/credit-requests/:reqId/decide')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cr_manage')
   @ApiOperation({
     summary:
       'تأیید/رد درخواست افزایش اعتبار — تأیید سقف را واقعاً تغییر می‌دهد',

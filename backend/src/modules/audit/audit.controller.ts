@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Header, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuditService } from './audit.service';
 import { AuditLogQueryDto } from './dto/audit-log-query.dto';
@@ -46,6 +46,35 @@ export class AuditController {
   async systemLogs(@Query() query: AuditLogQueryDto) {
     const { items, total, page, limit } = await this.audit.systemLogs(query);
     return { success: true, data: items, meta: { total, page, limit } };
+  }
+
+  @Get('logs/export')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('lg_export')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="system-logs.csv"')
+  @ApiOperation({ summary: 'خروجی CSV لاگ‌های سامانه برای کاربر مجاز' })
+  async exportSystemLogs(@Query() query: AuditLogQueryDto) {
+    // Keep exports bounded to avoid an unbounded audit-table download while
+    // applying all supplied filters on the server.
+    const { items } = await this.audit.systemLogs({
+      ...query,
+      page: 1,
+      limit: 100,
+    });
+    const csvCell = (value: unknown) =>
+      `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [
+      ['زمان', 'کاربر', 'رویداد', 'واحد', 'سطح'],
+      ...items.map((item) => [
+        item.createdAt,
+        item.actorName,
+        `${item.action} — ${item.detail}`,
+        item.unit,
+        item.level,
+      ]),
+    ];
+    return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`;
   }
 
   @Get('logs/badge-count')

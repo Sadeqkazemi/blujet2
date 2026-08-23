@@ -22,13 +22,15 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 const CLUB_ROLES = ['CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER'] as const;
 
 @ApiTags('club')
 @Controller('club')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles(...CLUB_ROLES)
 export class ClubController {
   constructor(private readonly club: ClubService) {}
@@ -158,7 +160,8 @@ export class ClubController {
   // پنل مدیر بازرگانی.dc.html's "clubrules" tab — COMMERCIAL_MANAGER only
   // (CEO design sidebar has no clubrules entry).
   @Get('tier-rules')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cl_rules_view')
   @ApiOperation({ summary: 'قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
   async getTierRules() {
     const data = await this.club.getTierRules();
@@ -166,7 +169,8 @@ export class ClubController {
   }
 
   @Patch('tier-rules')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('cl_rules_manage')
   @ApiOperation({ summary: 'تغییر قوانین حد نصاب امتیاز سطوح باشگاه مشتریان' })
   async updateTierRules(
     @CurrentUser() actor: AuthenticatedUser,

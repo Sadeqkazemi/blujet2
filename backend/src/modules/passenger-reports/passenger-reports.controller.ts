@@ -24,8 +24,10 @@ export class PassengerSearchQueryDto {
 @Controller('passenger-reports')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 // SITE_ADMIN: پنل ادمین سایت.dc.html's "reports" tab ("گزارش مسافران").
-// EMPLOYEE: PERMISSION_CATALOG's rp_sales (commercial) / rp_finance
-// (finance) — same "reports" nav tab either way (see EMPLOYEE_SECTION_NAV).
+// EMPLOYEE: PERMISSION_CATALOG's rp_passengers (commercial), rp_sales
+// (commercial), or rp_finance (finance) — same "reports" nav tab either way
+// (see EMPLOYEE_SECTION_NAV). rp_passengers is the narrow report-specific
+// capability; the legacy dashboard grants remain accepted for compatibility.
 @Roles(
   'SENIOR_MANAGER',
   'FINANCE_MANAGER',
@@ -33,7 +35,7 @@ export class PassengerSearchQueryDto {
   'SITE_ADMIN',
   'EMPLOYEE',
 )
-@RequiresPermission('rp_sales', 'rp_finance')
+@RequiresPermission('rp_passengers', 'rp_sales', 'rp_finance')
 export class PassengerReportsController {
   constructor(private readonly reports: PassengerReportsService) {}
 

@@ -101,7 +101,8 @@ set and chart shape across every panel report.
 | Method | Path | Roles | Notes |
 |---|---|---|---|
 | GET | `/audit/manager-reports` | CEO (excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor), BOARD_CHAIR (sees all), SENIOR_MANAGER (sees all) | Query: `category?`, `actorRole?`, `q?` (search action/detail/actor name). Each row includes `actorName`. Role-specific exclusion filters are server-side per the confirmed per-panel behavior — never left to the frontend to hide rows. |
-| GET | `/audit/logs` | IT_MANAGER | `category=SYSTEM` + account-management entries — IT's "لاگ و رویدادها" tab. |
+| GET | `/audit/logs` | IT_MANAGER, EMPLOYEE | `category=SYSTEM` + account-management entries — IT's "لاگ و رویدادها" tab; EMPLOYEE requires `lg_view`. |
+| GET | `/audit/logs/export` | IT_MANAGER, EMPLOYEE | UTF-8 CSV export (up to 100 filtered rows); EMPLOYEE requires `lg_export`. |
 | POST | `/audit` | internal (called by other modules, not directly by clients) | Every write in every later-phase module calls this — not a public endpoint. |
 
 ---
@@ -197,22 +198,18 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 ## Phase 8 — Employee management (IT Manager)
 
-Scope confirmed against `PLAN.md`'s Phase 8 bullet — **accounts, permissions,
-services, security policy, logs, backups** — exactly 6 of the design's 9 IT
-tabs. The other 3 (سامانه رزرواسیون, دسترسی به پنل‌ها, تنظیمات سامانه)
-stay `implemented: false`: the first depends on Phase 9's `ReservationSystem`
-build-out, the other two are explicitly re-scoped to Phase 12 in `PLAN.md`
-("plus the UI for the two Phase-1 backends..." / "تنظیمات سامانه" listed
-there, not here) — not silently dropped, just not this phase's job. All
-endpoints below: `@Roles('IT_MANAGER')` + `AuditLog` on every write, per
-CLAUDE.md's RBAC/observability rules. See `docs/DB_SCHEMA.md` → Phase 8 for
-the data model and the design's `PERM_CATALOG` reproduction.
+Scope covers the eleven implemented IT tabs (accounts/permissions, security,
+services, web services, reservation, panel access, logs, survey, backups,
+settings and the technical dashboard). The IT role remains full-access within
+its panel; employee delegation is narrower and only reaches handlers carrying
+an operation-level `@RequiresPermission` key. See `docs/DB_SCHEMA.md` → Phase
+8 for the data model and the design's `PERM_CATALOG` reproduction.
 
 ### `backend/src/modules/it-manager/` — employees ("کاربران و دسترسی‌ها")
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/it/permissions` | The seeded catalog (dept → sections → perms), grouped exactly like `PERM_CATALOG` in `site-data.js` — feeds the create-employee form and the detail modal's "افزودن دسترسی" list. |
+| GET | `/it/permissions` | The seeded unit/action catalog (dept → sections → perms) for the IT create-employee form and detail modal. Commercial/sales cover agencies (partners/requests/debtors), routes, aircraft, flight operations, services, passenger reports, club rules and web services; finance covers agencies, credit/settlement, reports/exports and refunds. Legacy umbrella keys remain for backward compatibility. |
 | GET | `/it/employees` | Query: `dept?`, `q?` (name/username). List with `role` label, `dept`, `username`, `lastLoginAt`, `isActive`. |
 | POST | `/it/employees` | `{ fullName, username, phone (Iranian mobile), password (≥6), dept, customDeptLabel?, rank, referralScope, permissionKeys[] }` — creates `User(role=EMPLOYEE)`, normalizes the mobile to E.164, enables mandatory staff 2FA, hashes password (argon2), and grants the listed catalog permissions. A duplicate username or mobile returns 409. The design's `createStaffUser()` also always tags every new employee with `"dashboard"`/`"cartable"` — **not** carried over: neither corresponds to a real gate for `EMPLOYEE` in this backend (not a `REPORTING_ROLES`/`EXEC_ROLES` member), so faking the grant would be cosmetic only. `AuditLog(category=ACCOUNT)`. |
 | GET | `/it/employees/:id` | Detail: profile + last login + granted permissions + the catalog rows not yet granted ("available"). 404 for non-EMPLOYEE / non-existent ids. |
@@ -262,9 +259,9 @@ not implement it faster.
 
 ### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
 
-Both already exist from Phase 1 — `GET /audit/logs` and `GET /panels/access`
-(see Phase 1 section above). This phase only wires the IT panel's frontend
-tabs to them; no new backend endpoints.
+`GET /audit/logs` and `GET /panels/access` are reused by the IT panel. The
+additional `/audit/logs/export` handler uses the same server-side filters and
+is guarded by the dedicated `lg_export` capability.
 
 ---
 
@@ -1940,8 +1937,10 @@ second, more specific round of product sign-off beyond the initial "which
 backlog item" decision, narrowing each key to a small, explicitly-approved
 slice of its module rather than the raw IT_MANAGER endpoint list:
 
-- **`us_manage`** — `GET /it/employees` (list) and `GET /it/employees/:id`
-  (detail) are now reachable by `EMPLOYEE`, but always scoped server-side
+- **`us_manage`** — the legacy umbrella remains accepted as a bundle for
+  the operation-level `us_list` and `us_reset_password` grants. `GET
+  /it/employees` (list) and `GET /it/employees/:id` (detail) are now
+  reachable by `EMPLOYEE`, but always scoped server-side
   to the actor's **own dept** (`EmployeesService.deptScopeForEmployee`
   looks up the actor's `dept` fresh from the DB — `AuthenticatedUser`
   doesn't carry `dept`, same freshness pattern as
@@ -1955,13 +1954,16 @@ slice of its module rather than the raw IT_MANAGER endpoint list:
   `POST /it/employees` (create), `PATCH .../status` (suspend), and
   `PATCH .../permissions` (grant/revoke any catalog key — the actual
   privilege-escalation surface) stay strictly `IT_MANAGER`-only.
-- **`sv_control`** — only `GET /it/services` (view internal/external
-  service list + health) is reachable. Toggling an internal service
+- **`sv_control`** — the legacy umbrella is accepted for `sv_view`; only
+  `GET /it/services` (view internal/external service list + health), the
+  internal/external report reads, and SMS-log reads are reachable. Toggling an internal service
   (site-wide kill switch for e.g. payment/search/SMS/CDN),
   creating/updating/deleting an external service (including its
   encrypted API key), and the live connection test stay
-  `IT_MANAGER`-only.
-- **`sc_manage`** — only `GET /it/security/policy` (view the current
+  `IT_MANAGER`-only; `sv_control`/`sv_config` metadata remains attached to
+  the corresponding mutation handlers for future delegated grants.
+- **`sc_manage`** — the legacy umbrella is accepted for `sc_view`; only
+  `GET /it/security/policy` (view the current
   password/security policy) is reachable. `GET /it/security/sessions`
   is deliberately **excluded** — narrower than the scope originally
   proposed ("policy + own sessions"), because `SecurityService
@@ -1974,7 +1976,9 @@ slice of its module rather than the raw IT_MANAGER endpoint list:
   every active session site-wide, already step-up gated) stay
   `IT_MANAGER`-only.
 - **`lg_view`** — `GET /audit/logs` (`AuditService.systemLogs()`) is
-  reachable. Already narrower than the CEO's `system-events` endpoint —
+  reachable, and `lg_export` authorizes the bounded `GET /audit/logs/export`
+  CSV download (at most 100 filtered rows). Already narrower than the CEO's
+  `system-events` endpoint —
   scoped to `SYSTEM`/`ACCOUNT` categories only, not the financial/
   strategic audit trail `ceoSystemEvents()` exposes — so it was wired
   as-is with no additional narrowing needed.
@@ -1988,7 +1992,8 @@ controller), and `EmployeePermissionGuard` is added to the guard chain of
 `EmployeesController`/`ItServicesController`/`SecurityController`/
 `AuditController` (only a no-op pass-through for non-`EMPLOYEE` actors,
 so `IT_MANAGER`/`CEO` behavior is unchanged — proven by this phase's own
-"doesn't affect IT_MANAGER" test). No new endpoints, no DTO changes.
+"doesn't affect IT_MANAGER" test). The export endpoint reuses the existing
+`AuditLogQueryDto`; no DTO or database-schema changes are required.
 
 ## Phase 34 — کیف پول (top-up) + قفل قیمت هوشمند: retroactive docs + frontend closure
 
@@ -3805,4 +3810,27 @@ capabilities drive the IT UI and availability tester.
 | POST | `/it/webservices/clients` | `IT_MANAGER` | Issue key with optional environment/domain/capabilities/IP/rate/expiry. One ACTIVE/SUSPENDED key per agency+environment. |
 | PATCH | `/it/webservices/clients/:id` | `IT_MANAGER` | Status/rotate **or** policy fields (capabilities sync coarse scope). |
 | POST | `/it/webservices/clients/:id/test-availability` | `IT_MANAGER` | `{ flightNo }`. Requires `AVAILABILITY` capability; returns real seatsLeft for next SCHEDULED instance. |
+
+## Phase 32 — granular employee permissions wired to operational endpoints
+
+The action-level keys exposed by `GET /it/permissions` are now connected to
+the corresponding guarded handlers. `EmployeePermissionGuard` continues to
+apply only to users with role `EMPLOYEE`; manager roles retain their existing
+role-based access.
+
+- Commercial: route creation/management (`rt_*`), aircraft definitions
+  (`ac_*`), flight views and allocation (`fl_*`), operations read/submit
+  (`op_*`), travel costs (`fl_costs`), ancillary services (`sv_*`), webservice
+  pricing (`ws_*`), club tier rules (`cl_rules_*`) and sales reporting
+  (`rp_sales`).
+- Finance: credit and agency settlement (`cr_*`), finance reports and their
+  export (`rp_finance`, `rp_exports`), plus existing refund/invoice/cartable
+  permissions.
+- IT: users, services, security sessions/policy and audit-log export
+  (`us_*`, `sv_*`, `sc_*`, `lg_*`).
+
+Legacy section grants remain accepted as compatibility bundles. A new action
+grant does not imply an unrelated action; only the documented read
+prerequisite is expanded. No reservation seat-lock permission is added for
+`IT_MANAGER`.
 

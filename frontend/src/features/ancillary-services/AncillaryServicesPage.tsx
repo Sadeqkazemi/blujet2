@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { fetchEmployeeContext } from '../../api/panels';
+import type { EmployeeContext } from '../../types/panels';
 import ComingSoonPage from '../../components/ComingSoonPage';
 import {
   addCustomService,
@@ -13,6 +15,7 @@ import {
 } from '../../api/ancillary-services';
 import { faDigits, latinDigits, parseTomanToRial } from '../../lib/fa-format';
 import type { AncillaryServiceRow, SeatServiceRow } from '../../types/ancillary-services';
+import { expandPermissionSelection } from '../it-manager/employee-permission-dependencies';
 
 const inputClass =
   'font-num h-[38px] w-[140px] rounded-[9px] border border-[#28344c] bg-[#0f1623] px-[11px] text-left text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]';
@@ -51,6 +54,7 @@ function ServiceRow({
   onSave,
   onToggle,
   onDelete,
+  editable = true,
 }: {
   titleFa: string;
   descriptionFa: string;
@@ -59,6 +63,7 @@ function ServiceRow({
   onSave: (tomanInput: string) => void;
   onToggle: () => void;
   onDelete?: () => void;
+  editable?: boolean;
 }) {
   const [draft, setDraft] = useState(String(Math.floor(Number(priceIrr) / 10)));
 
@@ -85,17 +90,23 @@ function ServiceRow({
           className={inputClass}
         />
       </div>
-      <button
-        onClick={() => onSave(draft)}
-        className="flex-none rounded-lg bg-[#8a5cf6] px-3.5 py-2 text-[11px] font-bold text-white transition hover:brightness-110"
-      >
-        ثبت قیمت
-      </button>
-      <Toggle enabled={enabled} onToggle={onToggle} />
+      {editable ? (
+        <button
+          onClick={() => onSave(draft)}
+          className="flex-none rounded-lg bg-[#8a5cf6] px-3.5 py-2 text-[11px] font-bold text-white transition hover:brightness-110"
+        >
+          ثبت قیمت
+        </button>
+      ) : (
+        <span className="flex-none rounded-lg border border-[#28344c] px-3 py-2 text-[10.5px] font-bold text-[#6b7b94]">
+          فقط مشاهده
+        </span>
+      )}
+      {editable ? <Toggle enabled={enabled} onToggle={onToggle} /> : null}
       <span className="min-w-[52px] flex-none text-[10.5px] font-bold" style={{ color: enabled ? '#34d399' : '#6b7b94' }}>
         {enabled ? 'فعال' : 'غیرفعال'}
       </span>
-      {onDelete && (
+      {editable && onDelete && (
         <button
           onClick={onDelete}
           aria-label="حذف خدمت"
@@ -115,6 +126,8 @@ function ServiceRow({
  */
 export default function AncillaryServicesPage() {
   const { user } = useAuth();
+  const [employeeContext, setEmployeeContext] = useState<EmployeeContext | null>(null);
+  const [employeePermissionKeys, setEmployeePermissionKeys] = useState<Set<string>>(new Set());
   const [seatServices, setSeatServices] = useState<SeatServiceRow[]>([]);
   const [otherServices, setOtherServices] = useState<AncillaryServiceRow[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
@@ -125,11 +138,52 @@ export default function AncillaryServicesPage() {
   const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([fetchSeatServices(), fetchOtherServices()]).then(([seats, others]) => {
-      setSeatServices(seats);
-      setOtherServices(others);
-    });
-  }, []);
+    if (user?.role !== 'EMPLOYEE') {
+      setEmployeeContext(null);
+      setEmployeePermissionKeys(new Set());
+      return;
+    }
+
+    let cancelled = false;
+    fetchEmployeeContext()
+      .then((context) => {
+        if (!cancelled) {
+          setEmployeeContext(context);
+          setEmployeePermissionKeys(expandPermissionSelection(context.permissionKeys));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEmployeeContext(null);
+          setEmployeePermissionKeys(new Set());
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role]);
+
+  const isCommercialEmployee =
+    user?.role === 'EMPLOYEE' &&
+    (employeeContext?.dept === 'commercial' || employeeContext?.dept === 'sales');
+  const canView =
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    (isCommercialEmployee &&
+      (employeePermissionKeys.has('sv_view') || employeePermissionKeys.has('sv_manage')));
+  const canManage =
+    user?.role === 'COMMERCIAL_MANAGER' ||
+    (isCommercialEmployee && employeePermissionKeys.has('sv_manage'));
+
+  useEffect(() => {
+    if (!canView) return;
+    void Promise.all([fetchSeatServices(), fetchOtherServices()])
+      .then(([seats, others]) => {
+        setSeatServices(seats);
+        setOtherServices(others);
+      })
+      .catch(() => setNotice('دریافت خدمات جانبی انجام نشد.'));
+  }, [canView]);
 
   function flash(msg: string) {
     setNotice(msg);
@@ -178,9 +232,10 @@ export default function AncillaryServicesPage() {
     flash('خدمت جدید ثبت شد ✓');
   }
 
-  // This route is TabGate-wrapped; keep a client-side role check so a
-  // direct render in tests still shows the coming-soon placeholder.
-  if (user?.role !== 'COMMERCIAL_MANAGER') return <ComingSoonPage />;
+  // This route is TabGate-wrapped; keep a client-side permission check so a
+  // direct render cannot expose the commercial service surface to unrelated
+  // employees. The API guards remain authoritative for every mutation.
+  if (!canView) return <ComingSoonPage />;
 
   return (
     <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
@@ -207,6 +262,7 @@ export default function AncillaryServicesPage() {
             enabled={sv.enabled}
             onSave={(v) => void onSaveSeatPrice(sv.key, v)}
             onToggle={() => void onToggleSeat(sv.key)}
+            editable={canManage}
           />
         ))}
       </div>
@@ -217,15 +273,17 @@ export default function AncillaryServicesPage() {
             <h4 className="m-0 text-[13px] font-extrabold text-white">سایر خدمات جانبی</h4>
             <div className="mt-[3px] text-[11px] text-[#6b7b94]">قیمت و وضعیت هر خدمت را جداگانه مدیریت کنید.</div>
           </div>
-          <button
-            onClick={() => setAddOpen((v) => !v)}
-            className="flex flex-none items-center gap-1.5 rounded-[9px] bg-accent px-[13px] py-2 text-[11.5px] font-bold text-white transition hover:brightness-110"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            افزودن خدمت جدید
-          </button>
+          {canManage && (
+            <button
+              onClick={() => setAddOpen((v) => !v)}
+              className="flex flex-none items-center gap-1.5 rounded-[9px] bg-accent px-[13px] py-2 text-[11.5px] font-bold text-white transition hover:brightness-110"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              افزودن خدمت جدید
+            </button>
+          )}
         </div>
 
         {addOpen && (
@@ -298,6 +356,7 @@ export default function AncillaryServicesPage() {
             onSave={(v) => void onSaveOtherPrice(sv.key, v)}
             onToggle={() => void onToggleOther(sv.key)}
             onDelete={sv.isCustom ? () => void onDeleteOther(sv.key) : undefined}
+            editable={canManage}
           />
         ))}
       </div>

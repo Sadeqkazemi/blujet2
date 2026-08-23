@@ -31,7 +31,8 @@ class LogoutAllDto {
 export class SecurityController {
   constructor(private readonly security: SecurityService) {}
 
-  // Phase 31: EMPLOYEE holding sc_manage may only view the policy text —
+  // EMPLOYEE holding sc_manage (legacy umbrella) or sc_view may only view
+  // the policy text —
   // deliberately narrower than the original proposal's "and their own
   // active sessions," since /sessions has no per-actor scoping and would
   // otherwise expose every user's IP/device across the whole company.
@@ -39,13 +40,14 @@ export class SecurityController {
   // IT_MANAGER-only.
   @Get('policy')
   @Roles('IT_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('sc_manage')
+  @RequiresPermission('sc_view')
   @ApiOperation({ summary: 'سیاست رمز عبور و امنیت فعلی' })
   async getPolicy() {
     return { success: true, data: await this.security.getPolicy() };
   }
 
   @Patch('policy')
+  @RequiresPermission('sc_manage')
   @ApiOperation({ summary: 'به‌روزرسانی سیاست رمز عبور و امنیت' })
   async updatePolicy(
     @CurrentUser() actor: AuthenticatedUser,
@@ -58,12 +60,14 @@ export class SecurityController {
   }
 
   @Get('sessions')
+  @RequiresPermission('sc_sessions')
   @ApiOperation({ summary: 'نشست‌های فعال (کاربر، دستگاه، آی‌پی)' })
   async listSessions() {
     return { success: true, data: await this.security.listSessions() };
   }
 
   @Post('sessions/logout-all')
+  @RequiresPermission('sc_sessions')
   @ApiOperation({ summary: 'خروج اجباری همه نشست‌های فعال سایت' })
   async logoutAll(
     @CurrentUser() actor: AuthenticatedUser,

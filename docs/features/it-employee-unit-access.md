@@ -24,8 +24,11 @@ unmapped permission accidentally.
   position/unit, organizational rank, referral scope and grouped permissions.
 - Unit cards identify the owning manager panel and changing a unit clears
   permissions selected from the previous unit.
-- Every built-in catalog section maps to a real route in the owning manager
-  panel or to a documented employee route for the same capability.
+- The catalog names every real surface in the owning manager panel and the
+  action keys are wired to the corresponding controllers with
+  `EmployeePermissionGuard`/`@RequiresPermission`. Legacy umbrella grants
+  remain accepted for backwards compatibility, while a new action grant only
+  unlocks its own route (plus the documented read prerequisite).
 - The create API rejects unknown or cross-unit permission keys instead of
   silently dropping them.
 - After creation, `GET /panels/nav` is computed from the employee's live grants.

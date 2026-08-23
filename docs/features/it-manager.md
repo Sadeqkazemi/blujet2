@@ -1,11 +1,12 @@
-# Feature: IT Manager panel — accounts, permissions, services, security, logs, backups (Phase 8)
+# Feature: IT Manager panel — accounts, permissions, services, security, logs, backups (Phase 8+)
 
 Covers `docs/API.md` → "Phase 8" and `docs/DB_SCHEMA.md` → "Phase 8".
-Scope is the 6 tabs `PLAN.md`'s Phase 8 bullet names: کاربران و دسترسی‌ها
-(accounts+permissions), رمزها و امنیت, سرویس‌های سایت, لاگ و رویدادها
-(reuses Phase 1's `/audit/logs`), پشتیبان‌گیری, و داشبورد فنی. سامانه
-رزرواسیون (Phase 9), دسترسی به پنل‌ها و تنظیمات سامانه (both Phase 12) are
-explicitly out of scope — left `implemented: false` in `panel-nav.config.ts`.
+Scope includes the eleven implemented IT tabs: داشبورد فنی، کاربران و
+دسترسی‌ها، رمزها و امنیت، سرویس‌های سایت، وب‌سرویس‌ها و API، سامانه
+رزرواسیون، دسترسی به پنل‌ها، لاگ و رویدادها، نظرسنجی مسافران، پشتیبان‌گیری و
+تنظیمات سامانه. Employee delegation is intentionally narrower: only the
+operation-level catalog keys that have an endpoint `@RequiresPermission`
+guard are delegable; IT_MANAGER itself retains the full role-scoped panel.
 
 ## Acceptance checklist
 
@@ -15,7 +16,9 @@ tests, 51 total); E2E by `frontend/e2e/it-manager-journey.spec.ts` (4
 journeys) + the updated `staff-login-journey.spec.ts` itadmin case.
 
 ### Permission catalog & employees
-- [x] `GET /it/permissions` returns the 3-dept/12-key catalog verbatim from `PERM_CATALOG`; non-IT role → 403 — `'GET /it/permissions returns the catalog; non-IT role gets 403'`
+- [x] `GET /it/permissions` returns the unit/action catalog for commercial,
+  finance and IT (sales reuses commercial); legacy umbrella keys remain for
+  compatibility; non-IT role → 403 — `'GET /it/permissions returns the catalog; non-IT role gets 403'`
 - [x] `GET /it/employees` lists only `role=EMPLOYEE` rows, `dept=`/`q=` filters work — exercised via `createEmployee` helper + list assertions across tests
 - [x] `POST /it/employees`: creates an operational staff account with normalized unique mobile + mandatory 2FA, argon2 hash and selected permissions (design's implicit `dashboard`/`cartable` tags intentionally not carried over — see docs/API.md note); duplicate username/mobile → 409, invalid mobile or password &lt;6 chars → 400, audited (ACCOUNT) — covered by `it-manager.e2e-spec.ts`
 - [x] `GET /it/employees/:id` returns granted + available permissions; non-IT role → 403 — `'GET/PATCH /it/employees/:id and non-IT role gets 403 everywhere'`

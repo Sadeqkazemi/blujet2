@@ -307,11 +307,13 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   `lastLoginAt` (set on every successful `staffLogin` verify, also backs the
   employees list' "آخرین ورود" column).
 - `Permission { id, dept, sectionKey, sectionLabelFa, key, labelFa }` —
-  seeded **verbatim** from `design-reference/site-data.js`'s `PERM_CATALOG`
-  (commercial: agencies/flights/pricing/reports; finance:
-  refund/agencies/finance/reports; IT: users/services/security/logs — 12
-  permission rows total). Custom depts get no catalog rows until product
-  defines one — not fabricated.
+  seeded from the unit/action catalog used by IT's employee form. Commercial
+  (and its sales sub-unit) covers agencies, routes, aircraft, flight actions,
+  operations, services, reports, club rules and web services; finance covers
+  agencies, credit/settlement, reports/exports and refunds; IT covers users,
+  services, security and logs. Legacy umbrella keys remain for existing
+  employees. Custom depts get no catalog rows until product defines one — not
+  fabricated. Endpoint-level mapping for the new action keys is phase two.
 - `EmployeePermission { employeeId→User, permissionId→Permission, grantedById? }`
   — replaces the mock's plain `permissions: string[]` with a real FK-checked
   grant; `@@unique([employeeId, permissionId])` makes toggling idempotent.
