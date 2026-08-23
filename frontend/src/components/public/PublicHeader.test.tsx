@@ -185,7 +185,7 @@ describe('PublicHeader — logged-in user', () => {
     expect(await screen.findByTestId('public-user-wallet-balance')).toHaveTextContent('۲٬۴۵۰٬۰۰۰');
     expect(screen.getByText('موجودی کل کیف پول')).toBeInTheDocument();
     expect(screen.getByText('مشاهده پروفایل')).toHaveAttribute('href', '/account');
-    expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/account?tab=trips');
+    expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/manage-booking');
     expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/account?tab=refunds');
   });
 
