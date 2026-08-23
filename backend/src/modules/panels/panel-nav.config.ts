@@ -215,11 +215,11 @@ export const EMPLOYEE_SECTION_NAV: Record<
   },
   routes: {
     labelFa: 'مسیرهای پروازی',
-    wiredKeys: ['rt_view', 'rt_create', 'rt_manage'],
+    wiredKeys: ['fl_manage', 'rt_view', 'rt_create', 'rt_manage'],
   },
   aircraft: {
     labelFa: 'تعریف هواپیما',
-    wiredKeys: ['ac_view', 'ac_manage'],
+    wiredKeys: ['fl_manage', 'ac_view', 'ac_manage'],
   },
   pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {

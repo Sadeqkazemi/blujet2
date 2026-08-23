@@ -153,7 +153,7 @@ export class AgenciesController {
   }
 
   @Get('invoices')
-  @Roles('COMMERCIAL_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
   @RequiresPermission('fn_invoices')
   @ApiOperation({
     summary:
@@ -235,7 +235,7 @@ export class AgenciesController {
   }
 
   @Patch(':id/credit')
-  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @Roles('SENIOR_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
   @RequiresPermission('cr_manage')
   @ApiOperation({ summary: 'تغییر سقف اعتبار' })
   async updateCredit(
