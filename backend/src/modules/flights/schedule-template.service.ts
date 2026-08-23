@@ -206,7 +206,6 @@ export class ScheduleTemplateService {
   private async findConflicts(
     manager: EntityManager,
     flightNo: string,
-    aircraftDefinitionId: string,
     departures: Date[],
   ) {
     if (departures.length === 0) return [];
@@ -218,10 +217,7 @@ export class ScheduleTemplateService {
         scheduled: FlightInstanceStatus.SCHEDULED,
       })
       .andWhere('fi.departureAt IN (:...deps)', { deps: departures })
-      .andWhere(
-        '(f.flightNo = :flightNo OR fi.aircraftDefinitionId = :aircraftId)',
-        { flightNo, aircraftId: aircraftDefinitionId },
-      )
+      .andWhere('f.flightNo = :flightNo', { flightNo })
       .getMany();
     return rows.map((r) => ({
       flightInstanceId: r.id,
@@ -233,7 +229,7 @@ export class ScheduleTemplateService {
 
   /** Independent advisory lock keypair for a resource kind. */
   private advisoryLockPair(
-    kind: 'flightNo' | 'aircraft',
+    kind: 'flightNo',
     value: string,
   ): [number, number] {
     const digest = createHash('sha256')
@@ -242,30 +238,13 @@ export class ScheduleTemplateService {
     return [digest.readInt32BE(0), digest.readInt32BE(4)];
   }
 
-  /**
-   * Acquire flightNo + aircraft locks in deterministic order to avoid deadlock
-   * when concurrent creates share one resource but not the other.
-   */
+  /** Serialize creates for the only unique scheduling resource: flight number. */
   private async acquireScheduleLocks(
     manager: EntityManager,
     flightNoBase: string,
-    aircraftDefinitionId: string,
   ) {
-    const flightLock = this.advisoryLockPair('flightNo', flightNoBase);
-    const aircraftLock = this.advisoryLockPair(
-      'aircraft',
-      aircraftDefinitionId,
-    );
-    const ordered = [flightLock, aircraftLock].sort((a, b) =>
-      a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1],
-    );
-    const seen = new Set<string>();
-    for (const [k1, k2] of ordered) {
-      const key = `${k1}:${k2}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [k1, k2]);
-    }
+    const [k1, k2] = this.advisoryLockPair('flightNo', flightNoBase);
+    await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [k1, k2]);
   }
 
   async create(actor: AuthenticatedUser, dto: CreateScheduleTemplateDto) {
@@ -294,7 +273,6 @@ export class ScheduleTemplateService {
       await this.acquireScheduleLocks(
         manager,
         dto.flightNoBase,
-        dto.aircraftDefinitionId,
       );
 
       const raced = await manager.findOne(FlightScheduleTemplate, {
@@ -313,13 +291,12 @@ export class ScheduleTemplateService {
       const conflicts = await this.findConflicts(
         manager,
         dto.flightNoBase,
-        dto.aircraftDefinitionId,
         ctx.occurrences.map((o) => o.departureAt),
       );
       if (conflicts.length > 0) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
-          message: `تداخل زمان/هواپیما/شماره پرواز با پرواز موجود (${conflicts.length} مورد).`,
+          message: `شماره پرواز «${dto.flightNoBase}» در ${conflicts.length} تاریخ قبلاً برنامه‌ریزی شده است؛ شماره پرواز باید یکتا باشد.`,
         });
       }
 

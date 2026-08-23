@@ -449,7 +449,7 @@ describe('Seasonal schedule templates (e2e)', () => {
     expect(refreshedFree.status).toBe('CANCELLED');
   });
 
-  it('concurrent same aircraft + different flightNo does not deadlock', async () => {
+  it('concurrent same aircraft + different flightNo creates both unique routes', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const { origin, dest, aircraft } = await airportsAndAircraft();
     const stamp = Date.now() + 71;
@@ -484,8 +484,8 @@ describe('Seasonal schedule templates (e2e)', () => {
           idempotencyKey: `fb-${stamp}`,
         }),
     ]);
-    const statuses = [a.status, b.status].sort();
-    expect(statuses).toEqual([201, 409]);
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
   });
 
   it('concurrent same flightNo + different aircraft does not deadlock', async () => {
