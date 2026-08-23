@@ -82,6 +82,9 @@ describe('AgencySeatsPage', () => {
     const seats = screen.getByTestId('agency-request-seat-count');
     await user.click(seats);
     await user.keyboard('{Control>}a{/Control}12');
+    expect(screen.getByTestId('agency-submit-seat-request')).toBeDisabled();
+    await user.click(screen.getByTestId('agency-seat-inquiry'));
+    await user.click(screen.getByTestId('agency-seat-inquiry-confirm'));
     await user.click(screen.getByTestId('agency-submit-seat-request'));
 
     expect(request).toHaveBeenCalledWith({

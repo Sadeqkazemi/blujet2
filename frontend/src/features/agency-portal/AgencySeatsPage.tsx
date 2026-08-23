@@ -114,6 +114,7 @@ export default function AgencySeatsPage() {
   const [destCode, setDestCode] = useState('');
   const [requestFlightId, setRequestFlightId] = useState('');
   const [requestedSeats, setRequestedSeats] = useState(1);
+  const [seatInquiryState, setSeatInquiryState] = useState<'idle' | 'ready' | 'confirmed'>('idle');
   const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([]);
   const [termMonths, setTermMonths] = useState<0 | 1 | 3 | 6 | 12>(3);
   const [payMethod, setPayMethod] = useState<'INVOICE' | 'CREDIT'>('INVOICE');
@@ -219,6 +220,9 @@ export default function AgencySeatsPage() {
   const requestAvailable = requestOccurrences.length
     ? Math.min(...requestOccurrences.map((occurrence) => occurrence.availableToRequest))
     : 0;
+  useEffect(() => {
+    setSeatInquiryState('idle');
+  }, [requestFlightId, requestedSeats]);
   const pendingRequests = requestHistory.filter((row) => row.status === 'PENDING' || row.status === 'PENDING_FINANCE');
   const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
   const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
@@ -246,6 +250,7 @@ export default function AgencySeatsPage() {
             : 'درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.',
       );
       setRequestedSeats(1);
+      setSeatInquiryState('idle');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.errorFallback);
     } finally {
@@ -508,11 +513,47 @@ export default function AgencySeatsPage() {
                   min={1}
                   max={requestAvailable}
                   value={requestedSeats}
-                  onChange={(event) => setRequestedSeats(Math.max(1, Number(event.target.value) || 1))}
+                  onChange={(event) => {
+                    setRequestedSeats(Math.max(1, Number(event.target.value) || 1));
+                    setSeatInquiryState('idle');
+                  }}
                   className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
                   data-testid="agency-request-seat-count"
                 />
               </label>
+              <div className="rounded-xl border border-[#d6e4f8] bg-white p-3 text-[11px] text-[#3f546b]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-bold">{locale === 'en' ? 'Seat availability inquiry' : locale === 'ar' ? 'استعلام توفر المقاعد' : 'استعلام تعداد صندلی'}</span>
+                  <button
+                    type="button"
+                    disabled={requestAvailable < 1 || requestedSeats > requestAvailable}
+                    onClick={() => setSeatInquiryState('ready')}
+                    className="rounded-lg border border-[#1668c4] px-3 py-2 font-black text-[#1668c4] disabled:opacity-40"
+                    data-testid="agency-seat-inquiry"
+                  >
+                    {locale === 'en' ? 'Get inquiry' : locale === 'ar' ? 'استعلام' : 'پاسخ استعلام'}
+                  </button>
+                </div>
+                {seatInquiryState !== 'idle' && (
+                  <div className="mt-3 rounded-lg bg-[#f6f3ff] p-3 text-[#6547a8]" data-testid="agency-seat-inquiry-result">
+                    <div>{locale === 'fa' ? `${localeDigits(requestedSeats, locale)} صندلی از ${localeDigits(requestAvailable, locale)} صندلی قابل درخواست` : `${requestedSeats} of ${requestAvailable} seats available`}</div>
+                    <div className="mt-1 font-black">{localeMoney((BigInt(requestFlight.pricePerSeatIrr ?? '0') * BigInt(requestedSeats)).toString(), locale)} {locale === 'fa' ? 'تومان' : 'Toman'}</div>
+                    {seatInquiryState === 'ready' && (
+                      <button
+                        type="button"
+                        onClick={() => setSeatInquiryState('confirmed')}
+                        className="mt-3 w-full rounded-lg bg-[#1668c4] px-3 py-2 font-black text-white"
+                        data-testid="agency-seat-inquiry-confirm"
+                      >
+                        {locale === 'en' ? 'Confirm seat count' : locale === 'ar' ? 'تأكيد عدد المقاعد' : 'تأیید تعداد صندلی'}
+                      </button>
+                    )}
+                    {seatInquiryState === 'confirmed' && <div className="mt-2 font-bold text-[#23895f]">{locale === 'en' ? 'Confirmed; complete the allocation details.' : locale === 'ar' ? 'تم التأكيد؛ أكمل تفاصيل التخصيص.' : 'تعداد صندلی تأیید شد؛ جزئیات تخصیص را تکمیل کنید.'}</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+            <fieldset disabled={seatInquiryState !== 'confirmed'} className="mt-4 space-y-4 disabled:opacity-50">
               <fieldset className="text-[11px] font-bold text-[#3f546b]">
                 <legend>{locale === 'en' ? 'Preferred days' : locale === 'ar' ? 'الأيام المفضلة' : 'روزهای ترجیحی'}</legend>
                 <div className="mt-1 flex flex-wrap gap-2">
@@ -522,8 +563,7 @@ export default function AgencySeatsPage() {
                   })}
                 </div>
               </fieldset>
-            </div>
-            <fieldset className="mt-4 text-[11px] font-bold text-[#3f546b]">
+            <fieldset className="text-[11px] font-bold text-[#3f546b]">
               <legend>{locale === 'en' ? 'Purchase term' : locale === 'ar' ? 'مدة الشراء' : 'دوره خرید'}</legend>
               <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
                 {([[0, 'هفتگی'], [1, 'ماهانه'], [3, 'سه‌ماهه'], [6, 'شش‌ماهه'], [12, 'یک‌ساله']] as const).map(([months, label]) => (
@@ -531,35 +571,36 @@ export default function AgencySeatsPage() {
                 ))}
               </div>
             </fieldset>
-            <div className="mt-4">
+            <div>
               <div className="mb-2 text-[11px] font-bold text-[#3f546b]">{locale === 'fa' ? 'تاریخ شروع خرید' : locale === 'ar' ? 'تاريخ بدء الشراء' : 'Purchase start date'}</div>
               <div className="rounded-xl border border-[#d6e4f8] bg-white px-4 py-3 text-sm font-bold text-[#0d2640]">{formatLocaleDateTime(requestFlight.departureAt, locale)}</div>
             </div>
-            <div className="mt-3 rounded-xl bg-[#eef6ff] px-4 py-3 text-[11px] font-bold text-[#47637f]">
+            <div className="rounded-xl bg-[#eef6ff] px-4 py-3 text-[11px] font-bold text-[#47637f]">
               {locale === 'fa'
                 ? `${localeDigits(requestOccurrences.length, locale)} پرواز در بازه و روزهای انتخابی رزرو می‌شود.`
                 : `${requestOccurrences.length} matching flights will be included.`}
             </div>
-            <div className="mt-4 rounded-xl border border-[#e8eef6] bg-white p-4">
+            <div className="rounded-xl border border-[#e8eef6] bg-white p-4">
               <div className="mb-3 text-[11px] font-bold text-[#7d8ba0]">{locale === 'fa' ? 'روش پرداخت' : locale === 'ar' ? 'طريقة الدفع' : 'Payment method'}</div>
               <div className="grid grid-cols-2 gap-2">
                 <button type="button" data-testid="agency-request-pay-invoice" onClick={() => setPayMethod('INVOICE')} className={`rounded-xl border px-3 py-3 text-xs font-black ${payMethod === 'INVOICE' ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8]'}`}>{locale === 'fa' ? 'نقدی / صدور فاکتور' : 'Invoice'}</button>
                 <button type="button" data-testid="agency-request-pay-credit" onClick={() => setPayMethod('CREDIT')} className={`rounded-xl border px-3 py-3 text-xs font-black ${payMethod === 'CREDIT' ? 'border-[#1668c4] bg-[#eef5ff] text-[#1668c4]' : 'border-[#d6e4f8]'}`}>{locale === 'fa' ? 'اعتباری (درخواست اعتبار)' : 'Credit'}</button>
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-[#e8eef6] bg-[#f8fafc] p-4 text-xs text-[#687587]">
+            <div className="flex items-center justify-between rounded-xl border border-[#e8eef6] bg-[#f8fafc] p-4 text-xs text-[#687587]">
               <span>{locale === 'fa' ? `${localeMoney(requestFlight.pricePerSeatIrr ?? '0', locale)} × ${localeDigits(requestedSeats, locale)} صندلی × ${localeDigits(requestOccurrences.length, locale)} پرواز` : `${requestedSeats} seats × ${requestOccurrences.length} flights`}</span>
               <b className="text-base text-[#0d2640]">{localeMoney((BigInt(requestFlight.pricePerSeatIrr ?? '0') * BigInt(requestedSeats) * BigInt(requestOccurrences.length)).toString(), locale)}</b>
             </div>
             <button
               type="button"
-              disabled={busy || requestOccurrences.length === 0 || requestedSeats > requestAvailable || requestAvailable < 1}
+              disabled={seatInquiryState !== 'confirmed' || busy || requestOccurrences.length === 0 || requestedSeats > requestAvailable || requestAvailable < 1}
               onClick={() => void submitSeatRequest()}
               className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white disabled:opacity-50"
               data-testid="agency-submit-seat-request"
             >
               {locale === 'en' ? 'Send request to commercial manager' : locale === 'ar' ? 'إرسال الطلب إلى المدير التجاري' : 'ارسال درخواست به مدیر بازرگانی'}
             </button>
+            </fieldset>
           </div>
         )}
 

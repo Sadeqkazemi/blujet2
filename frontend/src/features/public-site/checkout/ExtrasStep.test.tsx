@@ -1,9 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SeatMapCell } from '../../../types/public-site';
 import ExtrasStep from './ExtrasStep';
 import type { ExtraServiceState } from './checkout-types';
+import * as settingsApi from '../../../api/settings';
+
+beforeEach(() => {
+  vi.spyOn(settingsApi, 'fetchPublicSiteRules').mockResolvedValue({
+    categories: [
+      { id: 'pets', title: 'قوانین حیوان خانگی', text: 'قوانین تست حیوان' },
+    ],
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 function testExtras(): ExtraServiceState[] {
   return [
@@ -52,6 +65,18 @@ function testExtras(): ExtraServiceState[] {
       descriptionFa: 'انتخاب صندلی پیش از پرواز',
       billingUnit: 'PER_PASSENGER',
       priceIrr: '1500000',
+      selected: false,
+      quantity: 1,
+    },
+    {
+      id: 'extra-pet',
+      code: 'PET',
+      titleFa: 'حمل حیوان خانگی',
+      titleEn: 'Pet travel',
+      titleAr: null,
+      descriptionFa: 'حمل حیوان با قفس مناسب',
+      billingUnit: 'PER_BOOKING',
+      priceIrr: '2500000',
       selected: false,
       quantity: 1,
     },
@@ -220,6 +245,36 @@ describe('ExtrasStep — design parity', () => {
 
     await user.click(screen.getByTestId('checkout-extra-extra-insurance-toggle'));
     expect(onToggle).toHaveBeenCalledWith('extra-insurance');
+  });
+
+  it('requires accepting pet rules before adding the pet service', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={testExtras()}
+        onToggleExtra={onToggle}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={0}
+      />,
+    );
+
+    await user.click(screen.getByTestId('checkout-extra-extra-pet-toggle'));
+    expect(screen.getByTestId('checkout-pet-rules')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pet-accept')).toBeDisabled();
+    expect(onToggle).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId('checkout-pet-rules-accept'));
+    await user.click(screen.getByTestId('checkout-pet-accept'));
+    expect(onToggle).toHaveBeenCalledWith('extra-pet');
   });
 
   it('only allows selecting seats in the booked cabin', async () => {
