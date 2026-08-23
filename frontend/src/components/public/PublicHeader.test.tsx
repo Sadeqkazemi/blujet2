@@ -186,7 +186,7 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.getByText('موجودی کل کیف پول')).toBeInTheDocument();
     expect(screen.getByText('مشاهده پروفایل')).toHaveAttribute('href', '/account');
     expect(screen.getAllByText('سفرها و مدیریت رزرو')[0]).toHaveAttribute('href', '/manage-booking');
-    expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/manage-booking');
+    expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/account?tab=refunds');
   });
 
   it('shows English notifications and wallet balance when locale is en', async () => {
