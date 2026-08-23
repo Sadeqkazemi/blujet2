@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { fetchPublicSiteRules } from '../../../api/settings';
 import { useIsMobile } from '../../../hooks/useIsMobile';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { localeMoney } from '../../../lib/fa-format';
@@ -223,7 +224,11 @@ export default function ExtrasStep({
   const t = CHECKOUT_COPY[locale];
   const isMobile = useIsMobile();
   const [seatOpen, setSeatOpen] = useState(false);
+  const [petRulesOpen, setPetRulesOpen] = useState(false);
+  const [petRulesAccepted, setPetRulesAccepted] = useState(false);
+  const [petRulesText, setPetRulesText] = useState('');
   const seatSelectionExtra = extras.find((extra) => extra.code === 'SEAT_SELECTION');
+  const petExtra = extras.find((extra) => extra.code === 'PET');
   const loyaltySeatAccess = clubBalance >= 15_000;
   const paidSeatAccess = Boolean(seatSelectionExtra?.selected);
   const seatAccessGranted = loyaltySeatAccess || paidSeatAccess;
@@ -246,7 +251,27 @@ export default function ExtrasStep({
   const sold = displaySeats.filter((s) => s.status === 'TAKEN').length;
   const cap = displaySeats.length || (useMd80 ? 140 : 0);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchPublicSiteRules(locale)
+      .then((rules) => {
+        if (!cancelled) {
+          setPetRulesText(rules.categories.find((category) => category.id === 'pets')?.text ?? '');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPetRulesText('حمل حیوان خانگی فقط با قفس مناسب و مدارک سلامت معتبر امکان‌پذیر است.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
   const toggleExtra = (extra: ExtraServiceState) => {
+    if (extra.code === 'PET' && !extra.selected && !petRulesAccepted) {
+      setPetRulesOpen(true);
+      return;
+    }
     onToggleExtra(extra.id);
     if (extra.code === 'SEAT_SELECTION') setSeatOpen(!extra.selected);
   };
@@ -361,6 +386,45 @@ export default function ExtrasStep({
           </p>
         )}
       </div>
+
+      {petExtra && petRulesOpen && !petExtra.selected && (
+        <div
+          className="mb-4 rounded-xl border border-[#ead8ab] bg-[#fffaf0] px-4 py-3"
+          data-testid="checkout-pet-rules"
+        >
+          <div className="text-[12px] font-extrabold text-[#73591f]">
+            {locale === 'en' ? 'Pet travel rules' : locale === 'ar' ? 'قواعد نقل الحيوانات الأليفة' : 'قوانین حمل حیوان خانگی'}
+          </div>
+          <p className="mt-2 whitespace-pre-line text-[11px] leading-6 text-[#73591f]">
+            {petRulesText || (locale === 'en'
+              ? 'Pets must travel in a suitable carrier with valid health documents.'
+              : locale === 'ar'
+                ? 'يجب نقل الحيوانات في حاملة مناسبة مع وثائق صحية سارية.'
+                : 'حمل حیوان خانگی فقط با قفس مناسب و مدارک سلامت معتبر امکان‌پذیر است.')}
+          </p>
+          <label className="mt-2 flex items-center gap-2 text-[11px] font-bold text-[#73591f]">
+            <input
+              type="checkbox"
+              checked={petRulesAccepted}
+              onChange={(event) => setPetRulesAccepted(event.target.checked)}
+              data-testid="checkout-pet-rules-accept"
+            />
+            {locale === 'en' ? 'I accept the pet travel rules' : locale === 'ar' ? 'أوافق على قواعد نقل الحيوانات' : 'قوانین حمل حیوان خانگی را می‌پذیرم'}
+          </label>
+          <button
+            type="button"
+            disabled={!petRulesAccepted}
+            onClick={() => {
+              setPetRulesOpen(false);
+              onToggleExtra(petExtra.id);
+            }}
+            className="mt-3 w-full rounded-lg bg-[#1668c4] px-3 py-2 text-[11px] font-extrabold text-white disabled:opacity-50"
+            data-testid="checkout-pet-accept"
+          >
+            {locale === 'en' ? 'Confirm and add pet service' : locale === 'ar' ? 'تأكيد وإضافة خدمة الحيوان' : 'تأیید و افزودن خدمت حمل حیوان'}
+          </button>
+        </div>
+      )}
 
       <div className="border-t border-[#f0f2f6] pt-[15px]">
         <button
