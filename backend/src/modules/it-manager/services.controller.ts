@@ -32,18 +32,21 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 export class ItServicesController {
   constructor(private readonly services: ItServicesService) {}
 
-  // Phase 31: EMPLOYEE holding sv_control gets read-only visibility only —
+  // EMPLOYEE holding sv_control (legacy umbrella) or sv_view gets read-only
+  // visibility only —
   // toggling/creating/deleting/testing services (site-wide kill switches
   // and provider credentials) stays IT_MANAGER-only.
   @Get()
   @Roles('IT_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('sv_control')
+  @RequiresPermission('sv_view')
   @ApiOperation({ summary: 'فهرست سرویس‌های داخلی و خارجی' })
   async list() {
     return { success: true, data: await this.services.list() };
   }
 
   @Get('internal/:key/report')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('sv_view')
   async internalReport(
     @Param('key') key: string,
     @Query('page') page?: string,
@@ -60,6 +63,8 @@ export class ItServicesController {
   }
 
   @Get('external/:id/report')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('sv_view')
   async externalReport(
     @Param('id') id: string,
     @Query('page') page?: string,
@@ -72,6 +77,7 @@ export class ItServicesController {
   }
 
   @Patch('internal/:key')
+  @RequiresPermission('sv_control')
   @ApiOperation({ summary: 'روشن/خاموش کردن سرویس داخلی' })
   async toggleInternal(
     @CurrentUser() actor: AuthenticatedUser,
@@ -85,6 +91,7 @@ export class ItServicesController {
   }
 
   @Post('external')
+  @RequiresPermission('sv_config')
   @ApiOperation({ summary: 'تعریف سرویس خارجی جدید' })
   async createExternal(
     @CurrentUser() actor: AuthenticatedUser,
@@ -97,6 +104,7 @@ export class ItServicesController {
   }
 
   @Patch('external/:id')
+  @RequiresPermission('sv_config')
   @ApiOperation({ summary: 'به‌روزرسانی سرویس خارجی' })
   async updateExternal(
     @CurrentUser() actor: AuthenticatedUser,
@@ -110,6 +118,7 @@ export class ItServicesController {
   }
 
   @Delete('external/:id')
+  @RequiresPermission('sv_config')
   @ApiOperation({ summary: 'حذف سرویس خارجی' })
   async removeExternal(
     @CurrentUser() actor: AuthenticatedUser,
@@ -122,6 +131,7 @@ export class ItServicesController {
   }
 
   @Post('external/:id/test')
+  @RequiresPermission('sv_config')
   @ApiOperation({ summary: 'تست اتصال واقعی سرویس خارجی' })
   async testExternal(
     @CurrentUser() actor: AuthenticatedUser,
@@ -134,6 +144,8 @@ export class ItServicesController {
   }
 
   @Get('sms-log')
+  @Roles('IT_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('sv_view')
   @ApiOperation({
     summary: 'سامانه پیامک — وضعیت، شمارنده امروز و آخرین ارسال‌ها',
   })

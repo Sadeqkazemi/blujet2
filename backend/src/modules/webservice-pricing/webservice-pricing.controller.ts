@@ -3,6 +3,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
@@ -11,12 +13,18 @@ import { UpdateWebservicePricingDto } from './dto/update-webservice-pricing.dto'
 
 @ApiTags('webservice-pricing')
 @Controller('webservice/pricing')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(
+  JwtAuthGuard,
+  RolesGuard,
+  PanelAccessGuard,
+  EmployeePermissionGuard,
+)
 export class WebservicePricingController {
   constructor(private readonly pricing: WebservicePricingService) {}
 
   @Get()
-  @Roles('COMMERCIAL_MANAGER', 'CEO', 'SENIOR_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'CEO', 'SENIOR_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('ws_view')
   @ApiOperation({ summary: 'قیمت پلن‌های وب‌سرویس B2B (ریال)' })
   async getPricing() {
     const prices = await this.pricing.getPlanPrices();
@@ -24,7 +32,8 @@ export class WebservicePricingController {
   }
 
   @Patch()
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('ws_manage')
   @ApiOperation({
     summary: 'به‌روزرسانی قیمت پلن‌های ۱/۳/۱۲ ماهه — فقط مدیر بازرگانی',
   })

@@ -39,14 +39,14 @@ export class EmployeesController {
     return { success: true, data: await this.employees.catalog() };
   }
 
-  // Phase 31: EMPLOYEE holding us_manage reaches list/detail/reset-password
-  // only — always scoped server-side to their own dept (never another
+  // EMPLOYEE grants are checked against the operation-specific keys below
+  // and remain scoped server-side to their own dept (never another
   // dept's roster, see EmployeesService.deptScopeForEmployee). Creating an
   // account, suspending one, or granting/revoking permissions stays
   // IT_MANAGER-only — deliberately not part of this narrow grant.
   @Get('employees')
   @Roles('IT_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('us_manage')
+  @RequiresPermission('us_list')
   @ApiOperation({ summary: 'فهرست کارمندان — فیلتر واحد/جستجو' })
   async list(
     @CurrentUser() actor: AuthenticatedUser,
@@ -56,6 +56,7 @@ export class EmployeesController {
   }
 
   @Post('employees')
+  @RequiresPermission('us_create')
   @ApiOperation({ summary: 'ایجاد کارمند جدید و اعطای دسترسی‌های اولیه' })
   async create(
     @CurrentUser() actor: AuthenticatedUser,
@@ -66,13 +67,14 @@ export class EmployeesController {
 
   @Get('employees/:id')
   @Roles('IT_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('us_manage')
+  @RequiresPermission('us_list')
   @ApiOperation({ summary: 'جزئیات کارمند + دسترسی‌های اعطاشده/قابل‌افزودن' })
   async get(@CurrentUser() actor: AuthenticatedUser, @Param('id') id: string) {
     return { success: true, data: await this.employees.get(actor, id) };
   }
 
   @Patch('employees/:id/status')
+  @RequiresPermission('us_status')
   @ApiOperation({ summary: 'مسدودسازی/فعال‌سازی حساب کارمند' })
   async setStatus(
     @CurrentUser() actor: AuthenticatedUser,
@@ -86,6 +88,7 @@ export class EmployeesController {
   }
 
   @Delete('employees/:id')
+  @RequiresPermission('us_status')
   @ApiOperation({ summary: 'بایگانی امن حساب کارمند و لغو فوری همه دسترسی‌ها' })
   async remove(
     @CurrentUser() actor: AuthenticatedUser,
@@ -95,6 +98,7 @@ export class EmployeesController {
   }
 
   @Patch('employees/:id/permissions')
+  @RequiresPermission('us_permissions')
   @ApiOperation({ summary: 'افزودن/حذف یک دسترسی مشخص' })
   async setPermission(
     @CurrentUser() actor: AuthenticatedUser,
@@ -114,7 +118,7 @@ export class EmployeesController {
 
   @Post('employees/:id/reset-password')
   @Roles('IT_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('us_manage')
+  @RequiresPermission('us_reset_password')
   @ApiOperation({
     summary: 'بازنشانی رمز عبور — رمز موقت فقط یک‌بار در پاسخ برگردانده می‌شود',
   })

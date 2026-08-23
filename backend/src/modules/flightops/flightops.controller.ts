@@ -6,11 +6,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 
 export const FLIGHTOPS_ROLES = [
   'SITE_ADMIN',
   'FINANCE_MANAGER',
   'COMMERCIAL_MANAGER',
+  'EMPLOYEE',
 ] as const;
 
 @ApiTags('flightops')
@@ -21,6 +23,8 @@ export class FlightopsController {
   constructor(private readonly flightops: FlightopsService) {}
 
   @Get()
+  @Roles('SITE_ADMIN', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('op_view')
   @ApiOperation({
     summary:
       'لیست پروازها + KPI — بستن خودکار فروش و بارگذاری نیرا هنگام مطالعه اعمال می‌شود',
@@ -30,6 +34,8 @@ export class FlightopsController {
   }
 
   @Get(':id')
+  @Roles('SITE_ADMIN', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('op_view')
   @ApiOperation({
     summary: 'جزئیات پرواز — وضعیت نیرا + لیست کامل مسافران',
   })

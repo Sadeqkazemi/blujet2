@@ -7,6 +7,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
+import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
+import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
 
 const REPORTING_ROLES = [
   'CEO',
@@ -18,12 +20,14 @@ const REPORTING_ROLES = [
 
 @ApiTags('reporting')
 @Controller('reporting')
-@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles(...REPORTING_ROLES)
 export class ReportingController {
   constructor(private readonly reporting: ReportingService) {}
 
   @Get('sales-chart')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_sales')
   @ApiOperation({
     summary:
       'Channel-split sales bars, shared identically by all 6 panels dashboards',
@@ -34,6 +38,8 @@ export class ReportingController {
   }
 
   @Get('flight-sales')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_sales')
   @ApiOperation({
     summary:
       'Departed flights with per-channel sales — «شماره پرواز» picker on analytic مالی',
@@ -85,7 +91,8 @@ export class ReportingController {
   }
 
   @Get('commercial-overview')
-  @Roles('COMMERCIAL_MANAGER')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_sales')
   @ApiOperation({
     summary:
       'Commercial Manager dashboard KPI row — active agencies, passengers this month, pending cooperation requests',
@@ -117,6 +124,8 @@ export class ReportingController {
   }
 
   @Get('revenue-mix')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_sales')
   @ApiOperation({ summary: 'ترکیب درآمد بر اساس کانال فروش' })
   async revenueMix(@Query() query: PeriodQueryDto) {
     const data = await this.reporting.revenueMix(query.granularity, query);

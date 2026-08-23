@@ -1,7 +1,12 @@
 /**
- * Verbatim reproduction of design-reference/site-data.js's PERM_CATALOG —
- * seeded into the `Permission` table (see docs/DB_SCHEMA.md -> Phase 8).
- * Keep in sync if the design bundle is ever re-exported.
+ * The unit-scoped access catalog shown by IT → Users & access.
+ *
+ * The legacy umbrella keys (for example `fl_manage` and `sv_control`) stay
+ * in the catalog so existing employees and guards continue to work. New
+ * entries are intentionally action-level: IT can grant only the part of a
+ * panel an employee needs. Employee-facing handlers use the same keys via
+ * `@RequiresPermission`; legacy section umbrellas remain accepted by the
+ * guard, while a new action grant never widens into an umbrella grant.
  */
 export interface PermissionCatalogEntry {
   dept: string;
@@ -24,6 +29,13 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     dept: 'commercial',
     sectionKey: 'agencies',
     sectionLabelFa: 'مدیریت آژانس‌ها',
+    key: 'ag_partners',
+    labelFa: 'مشاهده آژانس‌های همکار',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'agencies',
+    sectionLabelFa: 'مدیریت آژانس‌ها',
     key: 'ag_requests',
     labelFa: 'بررسی درخواست عضویت جدید آژانس',
   },
@@ -33,6 +45,48 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     sectionLabelFa: 'مدیریت آژانس‌ها',
     key: 'ag_info',
     labelFa: 'دسترسی به اطلاعات کامل آژانس',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'agencies',
+    sectionLabelFa: 'مدیریت آژانس‌ها',
+    key: 'ag_debtors',
+    labelFa: 'مشاهده آژانس‌های دارای بدهی',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'routes',
+    sectionLabelFa: 'مسیرهای پروازی',
+    key: 'rt_view',
+    labelFa: 'مشاهده مسیرهای پروازی',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'routes',
+    sectionLabelFa: 'مسیرهای پروازی',
+    key: 'rt_create',
+    labelFa: 'افزودن مسیر پروازی',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'routes',
+    sectionLabelFa: 'مسیرهای پروازی',
+    key: 'rt_manage',
+    labelFa: 'مدیریت مسیرهای فعال',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'aircraft',
+    sectionLabelFa: 'تعریف هواپیما',
+    key: 'ac_view',
+    labelFa: 'مشاهده هواپیماها و نقشه کابین',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'aircraft',
+    sectionLabelFa: 'تعریف هواپیما',
+    key: 'ac_manage',
+    labelFa: 'ایجاد و ویرایش هواپیما',
   },
   {
     dept: 'commercial',
@@ -48,6 +102,49 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     key: 'fl_manage',
     labelFa: 'ویرایش و مدیریت پرواز',
   },
+  ...[
+    ['fl_active', 'مشاهده پروازهای فعال'],
+    ['fl_add', 'افزودن پرواز'],
+    ['fl_assign', 'تعیین و برنامه‌ریزی پرواز'],
+    ['fl_completed', 'مشاهده پروازهای انجام‌شده'],
+    ['fl_cities', 'مدیریت شهرهای پروازی'],
+    ['fl_costs', 'مشاهده هزینه‌های سفر'],
+    ['fl_history', 'مشاهده تاریخچه پرواز'],
+  ].map(([key, labelFa]) => ({
+    dept: 'commercial',
+    sectionKey: 'flights',
+    sectionLabelFa: 'مدیریت پروازها',
+    key,
+    labelFa,
+  })),
+  {
+    dept: 'commercial',
+    sectionKey: 'operations',
+    sectionLabelFa: 'عملیات',
+    key: 'op_view',
+    labelFa: 'مشاهده عملیات پروازی',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'operations',
+    sectionLabelFa: 'عملیات',
+    key: 'op_manage',
+    labelFa: 'مدیریت و اجرای عملیات',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'services',
+    sectionLabelFa: 'خدمات',
+    key: 'sv_view',
+    labelFa: 'مشاهده خدمات',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'services',
+    sectionLabelFa: 'خدمات',
+    key: 'sv_manage',
+    labelFa: 'مدیریت خدمات',
+  },
   {
     dept: 'commercial',
     sectionKey: 'pricing',
@@ -61,6 +158,41 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     sectionLabelFa: 'گزارش‌ها',
     key: 'rp_sales',
     labelFa: 'گزارش فروش',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'reports',
+    sectionLabelFa: 'گزارش‌ها',
+    key: 'rp_passengers',
+    labelFa: 'گزارش مسافران',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'club',
+    sectionLabelFa: 'قوانین باشگاه مشتریان',
+    key: 'cl_rules_view',
+    labelFa: 'مشاهده قوانین باشگاه مشتریان',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'club',
+    sectionLabelFa: 'قوانین باشگاه مشتریان',
+    key: 'cl_rules_manage',
+    labelFa: 'مدیریت قوانین باشگاه مشتریان',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'webservice',
+    sectionLabelFa: 'وب‌سرویس',
+    key: 'ws_view',
+    labelFa: 'مشاهده وب‌سرویس‌ها',
+  },
+  {
+    dept: 'commercial',
+    sectionKey: 'webservice',
+    sectionLabelFa: 'وب‌سرویس',
+    key: 'ws_manage',
+    labelFa: 'مدیریت وب‌سرویس‌ها',
   },
   {
     dept: 'commercial',
@@ -114,6 +246,27 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
   },
   {
     dept: 'finance',
+    sectionKey: 'agencies',
+    sectionLabelFa: 'آژانس‌ها',
+    key: 'ag_list',
+    labelFa: 'مشاهده فهرست آژانس‌ها',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'credit',
+    sectionLabelFa: 'اعتبار و تسویه',
+    key: 'cr_view',
+    labelFa: 'مشاهده اعتبار و تسویه آژانس‌ها',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'credit',
+    sectionLabelFa: 'اعتبار و تسویه',
+    key: 'cr_manage',
+    labelFa: 'مدیریت اعتبار و تسویه آژانس‌ها',
+  },
+  {
+    dept: 'finance',
     sectionKey: 'finance',
     sectionLabelFa: 'امور مالی',
     key: 'fn_invoices',
@@ -125,6 +278,13 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     sectionLabelFa: 'گزارش‌ها',
     key: 'rp_finance',
     labelFa: 'گزارش مالی',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'reports',
+    sectionLabelFa: 'گزارش‌ها و خروجی',
+    key: 'rp_exports',
+    labelFa: 'گزارش‌ها و خروجی‌ها',
   },
   {
     dept: 'finance',
@@ -148,12 +308,39 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     key: 'us_manage',
     labelFa: 'ایجاد و مدیریت کاربران',
   },
+  ...[
+    ['us_list', 'مشاهده فهرست کاربران'],
+    ['us_create', 'افزودن کاربر'],
+    ['us_permissions', 'مدیریت دسترسی کاربران'],
+    ['us_status', 'فعال‌سازی و تعلیق کاربر'],
+    ['us_reset_password', 'بازنشانی رمز عبور'],
+  ].map(([key, labelFa]) => ({
+    dept: 'it',
+    sectionKey: 'users',
+    sectionLabelFa: 'مدیریت کاربران',
+    key,
+    labelFa,
+  })),
   {
     dept: 'it',
     sectionKey: 'services',
     sectionLabelFa: 'سرویس‌های سایت',
     key: 'sv_control',
     labelFa: 'کنترل و راه‌اندازی سرویس‌ها',
+  },
+  {
+    dept: 'it',
+    sectionKey: 'services',
+    sectionLabelFa: 'سرویس‌های سایت',
+    key: 'sv_view',
+    labelFa: 'مشاهده وضعیت سرویس‌ها',
+  },
+  {
+    dept: 'it',
+    sectionKey: 'services',
+    sectionLabelFa: 'سرویس‌های سایت',
+    key: 'sv_config',
+    labelFa: 'پیکربندی سرویس‌ها',
   },
   {
     dept: 'it',
@@ -164,10 +351,31 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
   },
   {
     dept: 'it',
+    sectionKey: 'security',
+    sectionLabelFa: 'امنیت',
+    key: 'sc_view',
+    labelFa: 'مشاهده سیاست و نشست‌های امنیتی',
+  },
+  {
+    dept: 'it',
+    sectionKey: 'security',
+    sectionLabelFa: 'امنیت',
+    key: 'sc_sessions',
+    labelFa: 'مدیریت نشست‌ها و خروج همه کاربران',
+  },
+  {
+    dept: 'it',
     sectionKey: 'logs',
     sectionLabelFa: 'لاگ و رویدادها',
     key: 'lg_view',
     labelFa: 'مشاهدهٔ لاگ و رویدادها',
+  },
+  {
+    dept: 'it',
+    sectionKey: 'logs',
+    sectionLabelFa: 'لاگ و رویدادها',
+    key: 'lg_export',
+    labelFa: 'خروجی گرفتن از لاگ‌ها',
   },
 ];
 

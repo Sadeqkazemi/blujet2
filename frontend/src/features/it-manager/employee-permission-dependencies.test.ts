@@ -26,4 +26,17 @@ describe('employee permission dependencies', () => {
       'ag_list',
     ]);
   });
+
+  it('keeps IT action grants independent from legacy section umbrellas', () => {
+    expect([...expandPermissionSelection(['us_list'])].sort()).toEqual([
+      'us_list',
+    ]);
+    expect([...expandPermissionSelection(['us_create'])].sort()).toEqual([
+      'us_create',
+    ]);
+    expect([...expandPermissionSelection(['sv_config'])].sort()).toEqual([
+      'sv_config',
+      'sv_view',
+    ]);
+  });
 });

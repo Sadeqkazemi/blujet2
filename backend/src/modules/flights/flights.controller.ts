@@ -418,7 +418,7 @@ export class FlightsController {
   // create/schedule/ai-analysis/plan/aircraft/fare-rule/allotment.
   @Get('overview')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_active', 'fl_completed')
   @ApiOperation({
     summary: 'کل تب مدیریت پروازها: KPI + فعال/انجام‌شده/آینده',
   })
@@ -429,7 +429,7 @@ export class FlightsController {
 
   @Get('airports')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_cities')
   @ApiOperation({ summary: 'کاتالوگ فرودگاه‌ها برای فرم افزودن پرواز' })
   async airports() {
     const data = await this.flights.airports();
@@ -438,7 +438,7 @@ export class FlightsController {
 
   @Post('airports')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_cities')
   @ApiOperation({ summary: 'افزودن شهر/فرودگاه جدید به کاتالوگ' })
   async createAirport(
     @CurrentUser() actor: AuthenticatedUser,
@@ -450,7 +450,7 @@ export class FlightsController {
 
   @Delete('airports/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_cities')
   @ApiOperation({
     summary: 'حذف فرودگاه ثبت‌شده در صورت استفاده‌نشدن در مسیرها',
   })
@@ -466,7 +466,7 @@ export class FlightsController {
 
   @Get('aircraft-types')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({ summary: 'کاتالوگ انواع هواپیما برای فرم تغییر نوع هواپیما' })
   async aircraftTypes() {
     const data = await this.flights.aircraftTypes();
@@ -475,7 +475,7 @@ export class FlightsController {
 
   @Get('aircraft')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({
     summary: 'فهرست تعریف هواپیماها (کد/مدل/وضعیت/ظرفیت/کابین‌ها)',
   })
@@ -486,7 +486,7 @@ export class FlightsController {
 
   @Get('aircraft/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({ summary: 'جزئیات تعریف هواپیما شامل کابین‌ها و صندلی‌ها' })
   async aircraftDetail(@Param('id') id: string) {
     const data = await this.aircraft.detail(id);
@@ -495,7 +495,7 @@ export class FlightsController {
 
   @Post('aircraft')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'ac_manage')
   @ApiOperation({
     summary:
       'افزودن تعریف هواپیما — کابین‌ها و صندلی‌ها از نقشه ردیف/ستون تولید می‌شوند',
@@ -510,7 +510,7 @@ export class FlightsController {
 
   @Put('aircraft/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'ac_manage')
   @ApiOperation({ summary: 'ویرایش تعریف هواپیما' })
   async updateAircraft(
     @CurrentUser() actor: AuthenticatedUser,
@@ -529,7 +529,7 @@ export class FlightsController {
 
   @Get('aircraft-definitions')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({
     summary:
       'فهرست تعریف هواپیماها (نام معیار canonical؛ معادل GET /flights/aircraft)',
@@ -541,7 +541,7 @@ export class FlightsController {
 
   @Post('aircraft-definitions')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'ac_manage')
   @ApiOperation({
     summary:
       'افزودن تعریف هواپیما (نام معیار canonical؛ معادل POST /flights/aircraft)',
@@ -556,7 +556,7 @@ export class FlightsController {
 
   @Get('aircraft-definitions/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({
     summary:
       'جزئیات تعریف هواپیما شامل cabins، totalCapacity و seatMap (نام معیار canonical)',
@@ -568,7 +568,7 @@ export class FlightsController {
 
   @Put('aircraft-definitions/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'ac_manage')
   @ApiOperation({ summary: 'ویرایش تعریف هواپیما (نام معیار canonical)' })
   async putAircraftDefinition(
     @CurrentUser() actor: AuthenticatedUser,
@@ -581,7 +581,7 @@ export class FlightsController {
 
   @Patch('aircraft-definitions/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'ac_manage')
   @ApiOperation({
     summary:
       'ویرایش تعریف هواپیما — همان بدنه کامل UpsertAircraftDto که PUT می‌پذیرد',
@@ -597,7 +597,7 @@ export class FlightsController {
 
   @Get('aircraft-definitions/:id/seat-map')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'ac_view')
   @ApiOperation({
     summary: 'نقشه صندلی (cabinLayout + seats) این تعریف هواپیما',
   })
@@ -608,7 +608,7 @@ export class FlightsController {
 
   @Post()
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_add')
   @ApiOperation({
     summary:
       'افزودن تعریف پرواز به‌صورت پیش‌نویس (DRAFT) — سپس submit-operations',
@@ -622,7 +622,8 @@ export class FlightsController {
   }
 
   @Get('operations-queue')
-  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER)
+  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('op_view')
   @ApiOperation({
     summary: 'صف بررسی مدیر عملیات (PENDING_OPERATIONS)',
   })
@@ -632,7 +633,8 @@ export class FlightsController {
   }
 
   @Get('operations-overview')
-  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER)
+  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @RequiresPermission('op_view')
   @ApiOperation({
     summary: 'داشبورد و فهرست وضعیت‌های گردش کار مدیر عملیات',
   })
@@ -644,7 +646,7 @@ export class FlightsController {
   @Post(':id/submit-operations')
   @HttpCode(200)
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'op_manage')
   @ApiOperation({
     summary: 'ارسال تعریف پرواز به مدیر عملیات (→ PENDING_OPERATIONS)',
   })
@@ -663,7 +665,7 @@ export class FlightsController {
 
   @Put(':id/complete-and-submit')
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_add')
   @ApiOperation({
     summary:
       'تکمیل اتمیک رخداد ساخته‌شده از مسیر پروازی و ارسال به مدیر عملیات',
@@ -704,7 +706,7 @@ export class FlightsController {
     Role.CEO,
     Role.EMPLOYEE,
   )
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_history')
   @ApiOperation({ summary: 'تاریخچه بررسی و audit تعریف پرواز' })
   async history(@Param('id') id: string) {
     const data = await this.workflow.history(id);
@@ -727,7 +729,7 @@ export class FlightsController {
 
   @Put(':id/definition')
   @Roles(Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_add', 'fl_assign')
   @ApiOperation({
     summary:
       'ویرایش تعریف پرواز — روی نسخه منتشرشده revision جدید (PENDING_REVISION) می‌سازد',
@@ -744,7 +746,7 @@ export class FlightsController {
   @Post('schedule-templates/preview')
   @HttpCode(200)
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'rt_create')
   @ApiOperation({
     summary: 'پیش‌نمایش تاریخ‌های برنامه فصلی (بدون ذخیره)',
   })
@@ -755,7 +757,7 @@ export class FlightsController {
 
   @Post('schedule-templates')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'rt_create')
   @ApiOperation({
     summary:
       'ایجاد برنامه فصلی و تولید instanceها (idempotent؛ بدون تغییر نقشه MD-80)',
@@ -770,7 +772,7 @@ export class FlightsController {
 
   @Get('schedule-templates')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'rt_view')
   @ApiOperation({ summary: 'فهرست برنامه‌های فصلی' })
   async listScheduleTemplates(@Query() query: ListScheduleTemplatesQueryDto) {
     const data = await this.scheduleTemplates.list(
@@ -782,7 +784,7 @@ export class FlightsController {
 
   @Get('schedule-templates/resolve')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'rt_view')
   @ApiOperation({
     summary: 'تکمیل مشخصات پرواز از روی شماره پرواز و مسیر فعال',
   })
@@ -797,7 +799,7 @@ export class FlightsController {
 
   @Get('schedule-templates/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'rt_view')
   @ApiOperation({ summary: 'جزئیات برنامه فصلی' })
   async getScheduleTemplate(@Param('id') id: string) {
     const data = await this.scheduleTemplates.get(id);
@@ -807,7 +809,7 @@ export class FlightsController {
   @Post('schedule-templates/:id/deactivate')
   @HttpCode(200)
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'rt_manage')
   @ApiOperation({
     summary: 'غیرفعال‌سازی آینده برنامه فصلی بدون حذف سوابق فروش‌شده',
   })
@@ -821,7 +823,7 @@ export class FlightsController {
 
   @Post('schedules')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'rt_create')
   @ApiOperation({
     summary: 'ثبت برنامه تکرارشونده پرواز (RRULE) و ساخت پروازهای آینده',
   })
@@ -837,7 +839,7 @@ export class FlightsController {
 
   @Get('schedules')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'rt_view')
   @ApiOperation({ summary: 'فهرست برنامه‌های تکرارشونده پرواز' })
   async listSchedules() {
     return { success: true, data: await this.flights.listSchedules() };
@@ -873,8 +875,8 @@ export class FlightsController {
   }
 
   @Get(':instanceId/commercial-control')
-  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER')
-  @RequiresPermission('fl_view')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_view', 'fl_active')
   @ApiOperation({ summary: 'کنترل فروش عمومی و تفکیک فروش کلاس‌های نرخی' })
   async commercialControl(
     @Param('instanceId', ParseUUIDPipe) instanceId: string,
@@ -884,8 +886,8 @@ export class FlightsController {
   }
 
   @Patch(':instanceId/sales-visibility')
-  @Roles('COMMERCIAL_MANAGER')
-  @RequiresPermission('fl_manage')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'فعال یا غیرفعال کردن فروش پرواز در سایت عمومی' })
   async updateSalesVisibility(
     @CurrentUser() actor: AuthenticatedUser,
@@ -902,7 +904,7 @@ export class FlightsController {
 
   @Patch(':instanceId/commercial-settings')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'تنظیمات پنل بازرگانی: نمایش در سایت، قیمت کلاس‌ها، آزادسازی آژانس',
@@ -937,7 +939,7 @@ export class FlightsController {
 
   @Patch(':instanceId/plan')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'نرخ‌گذاری و تخصیص پرواز آینده — نرخ قابل فروش همچنان با تأیید مدیر عامل (فاز ۶)',
@@ -953,7 +955,7 @@ export class FlightsController {
 
   @Patch(':instanceId/aircraft')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'تغییر نوع هواپیمای پرواز — رد با ۴۰۹ اگر ظرفیت جدید کمتر از رزروهای قطعی/لاک‌شده باشد',
@@ -975,7 +977,7 @@ export class FlightsController {
 
   @Get(':instanceId/fare-rules')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_active')
   @ApiOperation({ summary: 'فهرست کلاس‌های نرخی این پرواز' })
   async listFareRules(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listFareRules(instanceId);
@@ -983,8 +985,8 @@ export class FlightsController {
   }
 
   @Patch(':instanceId/fare-rules/:ruleId/site-price')
-  @Roles('COMMERCIAL_MANAGER')
-  @RequiresPermission('fl_manage')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'ثبت قیمت فروش سایت برای یک کلاس نرخی' })
   async updateFareClassSitePrice(
     @CurrentUser() actor: AuthenticatedUser,
@@ -1003,8 +1005,8 @@ export class FlightsController {
   }
 
   @Put(':instanceId/fare-rules/:ruleId/agency-release')
-  @Roles('COMMERCIAL_MANAGER')
-  @RequiresPermission('fl_manage')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'آزادسازی صندلی یک کلاس برای فروش آژانسی' })
   async upsertAgencyFareRelease(
     @CurrentUser() actor: AuthenticatedUser,
@@ -1023,7 +1025,7 @@ export class FlightsController {
 
   @Post(':instanceId/fare-rules')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'ایجاد کلاس نرخی — رد با ۴۰۰ اگر مجموع صندلی تخصیص‌یافته از ظرفیت کابین بیشتر شود',
@@ -1039,7 +1041,7 @@ export class FlightsController {
 
   @Patch(':instanceId/fare-rules/:ruleId')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'ویرایش کلاس نرخی' })
   async updateFareRule(
     @CurrentUser() actor: AuthenticatedUser,
@@ -1058,7 +1060,7 @@ export class FlightsController {
 
   @Delete(':instanceId/fare-rules/:ruleId')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary: 'حذف کلاس نرخی — رد با ۴۰۹ اگر رزرو فعالی از آن استفاده کند',
   })
@@ -1073,7 +1075,7 @@ export class FlightsController {
 
   @Get(':instanceId/allotments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_assign')
   @ApiOperation({ summary: 'فهرست سهمیه‌های آژانس این پرواز' })
   async listAllotments(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listAllotments(instanceId);
@@ -1082,7 +1084,7 @@ export class FlightsController {
 
   @Get(':instanceId/allotments/summary')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_assign')
   @ApiOperation({
     summary: 'خلاصه خودکار تعهدات آژانس، ظرفیت آزاد و درآمد قراردادی',
   })
@@ -1093,7 +1095,7 @@ export class FlightsController {
 
   @Post(':instanceId/allotments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'تخصیص سهمیه به آژانس — رد با ۴۰۰ اگر مجموع سهمیه‌ها از سقف کلی آژانس‌های پرواز بیشتر شود',
@@ -1108,6 +1110,8 @@ export class FlightsController {
   }
 
   @Delete(':instanceId/allotments/:allotmentId')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary: 'حذف سهمیه آژانس — رد با ۴۰۹ اگر آژانس رزرو فعالی داشته باشد',
   })
@@ -1126,7 +1130,7 @@ export class FlightsController {
 
   @Get(':instanceId/commitments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_assign')
   @ApiOperation({
     summary: 'فهرست تعهدات صندلی چارتر و آژانس این پرواز',
   })
@@ -1137,7 +1141,7 @@ export class FlightsController {
 
   @Get(':instanceId/commitments/summary')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view')
+  @RequiresPermission('fl_view', 'fl_assign')
   @ApiOperation({
     summary:
       'خلاصه ظرفیت هر کابین: کل / متعهد چارتر / متعهد آژانس / فروخته‌شده / قابل فروش آنلاین',
@@ -1149,7 +1153,7 @@ export class FlightsController {
 
   @Post(':instanceId/commitments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'ثبت تعهد صندلی (چارتر بدون agencyId؛ آژانس با agencyId) — رد با ۴۰۹ اگر مجموع تعهدات از ظرفیت کابین بیشتر شود',
@@ -1165,7 +1169,7 @@ export class FlightsController {
 
   @Delete(':instanceId/commitments/:id')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage')
+  @RequiresPermission('fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'لغو تعهد صندلی (چارتر یا آژانس)' })
   async cancelCommitment(
     @CurrentUser() actor: AuthenticatedUser,

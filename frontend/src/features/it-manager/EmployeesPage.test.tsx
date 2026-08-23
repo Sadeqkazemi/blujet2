@@ -33,6 +33,54 @@ const CATALOG: PermissionCatalog = {
   ],
 };
 
+const GRANULAR_CATALOG: PermissionCatalog = {
+  commercial: [
+    {
+      sectionKey: 'routes',
+      sectionLabelFa: 'مسیرهای پروازی',
+      perms: [
+        { key: 'rt_view', labelFa: 'مشاهده مسیرهای پروازی' },
+        { key: 'rt_create', labelFa: 'افزودن مسیر پروازی' },
+        { key: 'rt_manage', labelFa: 'مدیریت مسیرهای فعال' },
+      ],
+    },
+    {
+      sectionKey: 'flights',
+      sectionLabelFa: 'مدیریت پروازها',
+      perms: [{ key: 'fl_add', labelFa: 'افزودن پرواز' }],
+    },
+    {
+      sectionKey: 'reports',
+      sectionLabelFa: 'گزارش‌ها',
+      perms: [{ key: 'rp_passengers', labelFa: 'گزارش مسافران' }],
+    },
+    {
+      sectionKey: 'webservice',
+      sectionLabelFa: 'وب‌سرویس',
+      perms: [{ key: 'ws_manage', labelFa: 'مدیریت وب‌سرویس‌ها' }],
+    },
+  ],
+  finance: [
+    {
+      sectionKey: 'credit',
+      sectionLabelFa: 'اعتبار و تسویه',
+      perms: [{ key: 'cr_manage', labelFa: 'مدیریت اعتبار و تسویه آژانس‌ها' }],
+    },
+    {
+      sectionKey: 'reports',
+      sectionLabelFa: 'گزارش‌ها و خروجی',
+      perms: [{ key: 'rp_exports', labelFa: 'گزارش‌ها و خروجی‌ها' }],
+    },
+  ],
+  it: [
+    {
+      sectionKey: 'users',
+      sectionLabelFa: 'مدیریت کاربران',
+      perms: [{ key: 'us_permissions', labelFa: 'مدیریت دسترسی کاربران' }],
+    },
+  ],
+};
+
 describe('EmployeesPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -233,5 +281,36 @@ describe('EmployeesPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('حداقل یک دسترسی');
     expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the requested action-level groups and submits selected granular permissions', async () => {
+    vi.spyOn(itApi, 'fetchEmployees').mockResolvedValue([]);
+    vi.spyOn(itApi, 'fetchPermissionCatalog').mockResolvedValue(GRANULAR_CATALOG);
+    const createSpy = vi.spyOn(itApi, 'createEmployee').mockResolvedValue(DETAIL);
+
+    render(<EmployeesPage />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'افزودن کاربر' }));
+
+    expect(screen.getByText('مسیرهای پروازی')).toBeInTheDocument();
+    expect(screen.getByLabelText('افزودن مسیر پروازی')).toBeInTheDocument();
+    expect(screen.getByLabelText('گزارش مسافران')).toBeInTheDocument();
+    expect(screen.getByLabelText('مدیریت وب‌سرویس‌ها')).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('افزودن مسیر پروازی'));
+    await user.click(screen.getByLabelText('گزارش مسافران'));
+    await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'کارشناس پرواز');
+    await user.type(screen.getByLabelText('نام کاربری'), 'flight.staff');
+    await user.type(screen.getByLabelText('شماره موبایل'), '09121234567');
+    await user.type(screen.getByLabelText('رمز عبور اولیه'), 'Assigned@1405');
+    await user.click(screen.getByRole('button', { name: 'ایجاد حساب و اعلان به مدیر' }));
+
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permissionKeys: expect.arrayContaining(['rt_create', 'rt_view', 'rp_passengers']),
+        }),
+      ),
+    );
   });
 });

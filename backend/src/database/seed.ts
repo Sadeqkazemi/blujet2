@@ -22,6 +22,7 @@ import {
   EXTERNAL_SERVICE_SEED,
   INTERNAL_SERVICE_SEED,
   PERMISSION_CATALOG,
+  catalogDeptFor,
 } from '../modules/it-manager/permission-catalog';
 import {
   AgencyApiKeyStatus,
@@ -2133,8 +2134,12 @@ async function main() {
     [designDemoEmployee, ['ag_list', 'rp_sales', 'ct_list', 'ct_process']],
     [financeEmployee, ['rf_list']],
   ] as const) {
+    const catalogDept = catalogDeptFor(employee.dept ?? '');
     const perms = await permissionRepo.find({
-      where: { key: In(keys as unknown as string[]) },
+      where: {
+        dept: catalogDept,
+        key: In(keys as unknown as string[]),
+      },
     });
     for (const perm of perms) {
       await upsertBy(

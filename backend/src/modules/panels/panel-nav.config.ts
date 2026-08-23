@@ -131,8 +131,8 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
   IT_MANAGER: [
     // Phase 8: real service-health/os-metrics dashboard, not the shared
     // sales/KPI one the other 5 roles get (IT_MANAGER stays excluded from
-    // REPORTING_ROLES). reservation/panels/settings stay deferred to
-    // Phase 9 / Phase 12 respectively — see docs/API.md's Phase 8 note.
+    // REPORTING_ROLES). All eleven IT entries below have matching routes;
+    // employee-level delegation is limited to the catalogued operations.
     { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },
@@ -166,10 +166,10 @@ export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
  * static PANEL_NAV row. This maps each PERMISSION_CATALOG sectionKey to
  * the nav tab it unlocks and the exact catalog key(s) actually wired to
  * real backend access this phase. An employee only sees a tab if they hold
- * one of its wired keys. Read-only flight access unlocks the flight list;
- * route and aircraft management remain write-grant-only. IT capabilities
- * are also real, narrowly scoped employee surfaces (see the controller
- * comments), not access to the complete IT Manager role.
+ * one of its wired keys. Read-only flight, route, and aircraft grants unlock
+ * their corresponding views; mutations still require the matching write
+ * action. IT capabilities are also real, narrowly scoped employee surfaces
+ * (see the controller comments), not access to the complete IT Manager role.
  *
  * fn_invoices' real UI surface is the per-agency invoice list on
  * AgencyDetailPage (reached via the `agencies` tab, same as ag_settle) —
@@ -189,45 +189,77 @@ export const EMPLOYEE_SECTION_NAV: Record<
     labelFa: 'مدیریت آژانس‌ها',
     wiredKeys: [
       'ag_list',
+      'ag_partners',
       'ag_requests',
       'ag_info',
+      'ag_debtors',
       'ag_settle',
+      'cr_view',
+      'cr_manage',
       'fn_invoices',
     ],
   },
   flights: {
     labelFa: 'مدیریت پروازها',
-    wiredKeys: ['fl_view', 'fl_manage'],
+    wiredKeys: [
+      'fl_view',
+      'fl_manage',
+      'fl_active',
+      'fl_add',
+      'fl_assign',
+      'fl_completed',
+      'fl_cities',
+      'fl_costs',
+      'fl_history',
+    ],
   },
   routes: {
     labelFa: 'مسیرهای پروازی',
-    wiredKeys: ['fl_manage'],
+    wiredKeys: ['fl_manage', 'rt_view', 'rt_create', 'rt_manage'],
   },
   aircraft: {
     labelFa: 'تعریف هواپیما',
-    wiredKeys: ['fl_manage'],
+    wiredKeys: ['fl_manage', 'ac_view', 'ac_manage'],
   },
   pricing: { labelFa: 'نرخ‌گذاری', wiredKeys: ['pr_propose'] },
   refund: {
     labelFa: 'استرداد بلیط',
     wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
   },
-  reports: { labelFa: 'گزارش‌ها', wiredKeys: ['rp_sales', 'rp_finance'] },
+  reports: {
+    labelFa: 'گزارش‌ها',
+    wiredKeys: ['rp_sales', 'rp_passengers', 'rp_finance', 'rp_exports'],
+  },
   cartable: {
     labelFa: 'کارتابل',
     wiredKeys: ['ct_list', 'ct_process'],
   },
   users: {
     labelFa: 'کاربران و دسترسی‌ها',
-    wiredKeys: ['us_manage'],
+    wiredKeys: [
+      'us_manage',
+      'us_list',
+      'us_create',
+      'us_permissions',
+      'us_status',
+      'us_reset_password',
+    ],
   },
   security: {
     labelFa: 'رمزها و امنیت',
-    wiredKeys: ['sc_manage'],
+    wiredKeys: ['sc_manage', 'sc_view', 'sc_sessions'],
   },
   services: {
     labelFa: 'سرویس‌های سایت',
-    wiredKeys: ['sv_control'],
+    wiredKeys: ['sv_view', 'sv_manage', 'sv_control', 'sv_config'],
+  },
+  club: {
+    labelFa: 'قوانین باشگاه مشتریان',
+    wiredKeys: ['cl_rules_view', 'cl_rules_manage'],
+  },
+  webservice: {
+    labelFa: 'وب‌سرویس',
+    wiredKeys: ['ws_view', 'ws_manage'],
   },
   logs: {
     labelFa: 'لاگ و رویدادها',

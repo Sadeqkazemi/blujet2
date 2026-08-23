@@ -3649,3 +3649,14 @@ contracts and retires the production mock adapters.
 - [x] Added migration, API/schema documentation, and focused frontend/backend
   regression coverage. See `docs/features/public-checkout-profile-polish.md`.
 
+# IT manager access granularity — phase 1 (2026-08-22)
+
+- [x] Expanded the real permission catalog for commercial/sales, finance and
+  IT into unit/action-level entries while retaining legacy umbrella keys.
+- [x] Added idempotent migration and synchronized frontend/backend permission
+  dependencies for the add-employee and employee-detail flows.
+- [x] Documented acceptance criteria in
+  `docs/features/it-manager-access-granularity.md`.
+- [ ] Map each new action key to its operational endpoint guards (phase 2).
+- [ ] Merge, push and deploy only after phase 2 approval.
+
