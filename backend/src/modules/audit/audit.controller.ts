@@ -62,8 +62,17 @@ export class AuditController {
       page: 1,
       limit: 100,
     });
-    const csvCell = (value: unknown) =>
-      `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csvCell = (value: unknown) => {
+      const normalized =
+        value == null
+          ? ''
+          : typeof value === 'string'
+            ? value
+            : typeof value === 'object'
+              ? JSON.stringify(value)
+              : String(value);
+      return `"${normalized.replace(/"/g, '""')}"`;
+    };
     const rows = [
       ['زمان', 'کاربر', 'رویداد', 'واحد', 'سطح'],
       ...items.map((item) => [

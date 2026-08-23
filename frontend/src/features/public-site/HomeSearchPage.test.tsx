@@ -28,10 +28,10 @@ function mockMobile() {
   vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(true);
 }
 
-function mockHomeApis() {
+function mockHomeApis(priceCenterIso = new Date().toISOString().slice(0, 10)) {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
   vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue([
-    { date: '2026-08-01', minPriceIrr: '38000000', dateLabelFa: '2026-08-01', isCenter: true },
+    { date: priceCenterIso, minPriceIrr: '38000000', dateLabelFa: priceCenterIso, isCenter: true },
     { date: '2026-08-02', minPriceIrr: '0', dateLabelFa: '2026-08-02', isCenter: false },
     { date: '2026-08-03', minPriceIrr: '35000000', dateLabelFa: '2026-08-03', isCenter: false },
   ]);
@@ -195,7 +195,8 @@ describe('HomeSearchPage', () => {
   it('shows real fares inside the mobile departure-date calendar only', async () => {
     mockLocale('fa');
     mockMobile();
-    mockHomeApis();
+    const priceDate = new Date().toISOString().slice(0, 10);
+    mockHomeApis(priceDate);
     renderPage();
     await screen.findByTestId('home-origin');
 
@@ -207,7 +208,7 @@ describe('HomeSearchPage', () => {
     expect(screen.queryByTestId('home-price-calendar-wrap')).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId('home-date'));
     await waitFor(() => {
-      expect(screen.getByTestId('home-date-price-2026-08-01')).toBeInTheDocument();
+      expect(screen.getByTestId(`home-date-price-${priceDate}`)).toBeInTheDocument();
     });
     expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalled();
     expect(screen.getByTestId('home-date-confirm')).toBeInTheDocument();
