@@ -19,11 +19,6 @@ const SEATMAP: SeatMapResult = {
   ],
 };
 
-async function confirmDesktopBuyModal() {
-  await screen.findByTestId('results-buy-modal');
-  await userEvent.click(screen.getByTestId('results-buy-continue'));
-}
-
 function mockLocale(locale: 'fa' | 'en' | 'ar') {
   vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({
     locale,
@@ -641,9 +636,9 @@ describe('ResultsPage', () => {
       expect(screen.getByTestId('cabin-selector')).toBeInTheDocument();
       await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
       await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
-      await confirmDesktopBuyModal();
 
       expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
+      expect(screen.queryByTestId('results-buy-modal')).not.toBeInTheDocument();
     });
 
     it('navigates guests to checkout without a seat modal or OTP on results', async () => {
