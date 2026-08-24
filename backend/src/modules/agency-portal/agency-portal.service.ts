@@ -936,8 +936,9 @@ export class AgencyPortalService {
   }
 
   async mySeatRequests(actor: AuthenticatedUser) {
-    if (await this.isUatSandboxAgencyActor(actor)) return [];
-    await this.getOwnProfileOrThrow(actor);
+    if (!(await this.isUatSandboxAgencyActor(actor))) {
+      await this.getOwnProfileOrThrow(actor);
+    }
     const rows = await this.seatRequestRepo.find({
       where: { agencyId: actor.id },
       relations: {

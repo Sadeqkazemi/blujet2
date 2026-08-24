@@ -3637,15 +3637,23 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
   price, term, and decision status. The agency id always comes from the JWT;
   no client-supplied tenant id is accepted.
 
-- `GET /agency-portal/seat-request-options` (`AGENCY`) returns only future,
-  CEO-approved/published flight instances whose commercial manager has released
-  a positive agency quota for at least one fare class. Each response row is one
+- `GET /agency-portal/seat-request-options` (`AGENCY`) returns every future,
+  CEO-approved/published flight instance that has a fare class. Each response row is one
   flight occurrence plus one fare class and includes `cabin`, `fareClassCode`,
   `agencySeatsReleased`, `agencySeatsAllocated`, `availableToRequest`, and the
   commercial `agencyReleasePriceIrr`. Availability is derived from the released
   class quota minus active paid/credit agency allotments for that exact
   flight/class; physical aircraft capacity remains a hard upper bound. Expired
-  public holds and draft bookings never consume the agency release.
+  public holds and draft bookings never consume the agency release. Rows with
+  zero commercial release remain visible with `availableToRequest: 0` and a
+  null release price so the agency is informed about every active flight; the
+  existing request validation prevents submission until commercial capacity
+  and price are available.
+- The agency portal's **Active flights** projection combines this published
+  catalogue with the caller's active allotments. A catalogue row without an
+  allotment is displayed with honest zero allocated/sold values and opens the
+  request form preselected for that exact flight/cabin/class. An existing
+  class-bound allotment suppresses the matching zero-allocation catalogue card.
 - `POST /agency-portal/seat-requests` (`AGENCY`) accepts
   `{ flightInstanceId, cabin, fareClassCode, seats, preferredWeekdays?, termMonths?, payMethod? }`, validates the
   current capacity again, persists a structured `agency_seat_requests` row

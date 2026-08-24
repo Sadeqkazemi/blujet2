@@ -118,15 +118,20 @@ as a red "خطا در دریافت داشبورد" error instead of a working (e
   (`[]`), sales (zeroed summary + empty arrays), profile (the account's own
   real `User` fields — `fullName`, `phone`, `email` — with the
   business-only fields `managerName`/`licenseNo`/`city`/`address`/`tier`
-  explicitly `null`, not invented). `credit()`/`dashboard()` no longer call
+  explicitly `null`, not invented). The published seat-request catalogue is a
+  read-only shared flight projection, and `seat-requests` returns only request
+  rows whose `agencyId` is the temporary account's own user id. `credit()`/`dashboard()` no longer call
   `AgenciesService.getCredit()` for this account, since that call has its
   own independent `AgencyProfile` guard that would 404 regardless.
-- **Writes are refused, not silently faked**: every mutating method
+- **Writes are refused, not silently faked**: every unrelated mutating method
   (`payInvoice`, `requestCreditIncrease`, `postInboxMessage`,
   `uploadDocument`, `requestWebservice`) throws `403
   UAT_TEMPORARY_ACCOUNT_READ_ONLY` via `assertAgencyPortalWritable()` before
   touching any repository — this account can look around the panel but
-  can never create a booking, ledger entry, or request row.
+  can never create a booking or ledger entry. The deliberately scoped
+  `POST /agency-portal/seat-requests` sandbox journey is the sole request-row
+  exception: it records an agency demand for manager review but creates no
+  allotment, invoice, booking, or financial entry by itself.
 - **Frontend needed no production change**: `AgencyDashboardPage.tsx`
   already rendered zero-valued KPI cards and an empty chart whenever its
   API calls resolved (it only showed the red error on a rejected promise),
@@ -143,6 +148,8 @@ Acceptance:
 - [x] Every mutating agency-portal endpoint returns `403
   UAT_TEMPORARY_ACCOUNT_READ_ONLY` for `uat.agency` —
   `uat-shared-password.e2e-spec.ts`.
+- [x] The scoped seat-request exception can read back only its own persisted
+  requests — `uat-shared-password.e2e-spec.ts`.
 - [x] The exception never activates with `AUTH_SANDBOX_ENABLED=false` or
   once the account's temporary-access window has expired (falls back to
   the normal `404`) — `uat-shared-password.e2e-spec.ts`.

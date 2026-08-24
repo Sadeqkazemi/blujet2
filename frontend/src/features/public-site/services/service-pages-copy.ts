@@ -9,7 +9,7 @@ export type ServicePageId =
 
 export type Tr = { fa: string; en: string; ar: string };
 
-export type ServiceStep = { no: string; title: Tr; desc: Tr };
+export type ServiceStep = { no: number; title: Tr; desc: Tr };
 export type ServiceFaq = { q: Tr; a: Tr };
 export type ServiceCard = { title: Tr; desc: Tr; price: Tr };
 
@@ -93,7 +93,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
     ),
     steps: [
       {
-        no: '۱',
+        no: 1,
         title: tr('رزرو خود را باز کنید', 'Open your booking', 'افتح حجزك'),
         desc: tr(
           'از «مدیریت رزرو» با کد رهگیری و نام خانوادگی وارد شوید.',
@@ -102,7 +102,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
         ),
       },
       {
-        no: '۲',
+        no: 2,
         title: tr(
           'صندلی را از نقشه انتخاب کنید',
           'Pick a seat on the cabin map',
@@ -115,7 +115,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
         ),
       },
       {
-        no: '۳',
+        no: 3,
         title: tr('پرداخت و تأیید', 'Pay and confirm', 'ادفع واحصل على التأكيد'),
         desc: tr(
           'هزینه صندلی به بلیط اضافه و روی کارت پرواز ثبت می‌شود.',
@@ -211,7 +211,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
     stepsTitle: tr('مراحل خرید', 'How to buy', 'خطوات الشراء'),
     steps: [
       {
-        no: '۱',
+        no: 1,
         title: tr('رزرو را باز کنید', 'Open your booking', 'افتح حجزك'),
         desc: tr(
           'از «مدیریت رزرو» وارد شوید.',
@@ -220,7 +220,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
         ),
       },
       {
-        no: '۲',
+        no: 2,
         title: tr('بسته وزن را انتخاب کنید', 'Pick a weight pack', 'اختر حزمة الوزن'),
         desc: tr(
           '۵، ۱۰ یا ۱۵ کیلوگرم — قیمت بسته به مسیر.',
@@ -229,7 +229,7 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
         ),
       },
       {
-        no: '۳',
+        no: 3,
         title: tr('پرداخت و تأیید', 'Pay and confirm', 'ادفع وأكد'),
         desc: tr(
           'بار اضافه به برچسب بار شما اضافه می‌شود.',
@@ -293,17 +293,17 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
     stepsTitle: tr('مراحل استرداد', 'Refund steps', 'خطوات الاسترداد'),
     steps: [
       {
-        no: '۱',
+        no: 1,
         title: tr('جستجوی رزرو', 'Find your booking', 'ابحث عن حجزك'),
         desc: tr('کد رهگیری + نام خانوادگی در «مدیریت رزرو».', 'PNR + last name in Manage booking.', 'رمز الحجز + اسم العائلة.'),
       },
       {
-        no: '۲',
+        no: 2,
         title: tr('ثبت درخواست', 'Submit request', 'قدّم الطلب'),
         desc: tr('شماره شبا وارد کنید؛ جریمه محاسبه می‌شود.', 'Enter IBAN; penalty is calculated.', 'أدخل الآيبان؛ تُحسب الغرامة.'),
       },
       {
-        no: '۳',
+        no: 3,
         title: tr('بازگشت وجه', 'Refund payout', 'استرداد المبلغ'),
         desc: tr('۷ تا ۱۵ روز کاری به حساب پرداخت‌کننده.', '7–15 business days to payer account.', '٧–١٥ يوم عمل إلى حساب الدافع.'),
       },
@@ -354,17 +354,17 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
     stepsTitle: tr('مراحل درخواست', 'How to request', 'خطوات الطلب'),
     steps: [
       {
-        no: '۱',
+        no: 1,
         title: tr('بررسی شرایط', 'Check requirements', 'تحقق من الشروط'),
         desc: tr('وزن، ابعاد قفس و مدارک سلامت.', 'Weight, carrier size, health docs.', 'الوزن وحجم الحامل والوثائق.'),
       },
       {
-        no: '۲',
+        no: 2,
         title: tr('ثبت درخواست', 'Submit request', 'قدّم الطلب'),
         desc: tr('از مدیریت رزرو یا تماس با پشتیبانی.', 'Via Manage booking or support.', 'عبر إدارة الحجز أو الدعم.'),
       },
       {
-        no: '۳',
+        no: 3,
         title: tr('پرداخت و تأیید', 'Pay and confirm', 'ادفع وأكد'),
         desc: tr('هزینه بسته به مسیر و نوع حمل.', 'Fee depends on route and cabin/hold.', 'الرسوم حسب المسار ونوع النقل.'),
       },
@@ -410,17 +410,17 @@ export const SERVICE_PAGES: Record<ServicePageId, ServicePageConfig> = {
     stepsTitle: tr('مراحل درخواست', 'How to request', 'خطوات الطلب'),
     steps: [
       {
-        no: '۱',
+        no: 1,
         title: tr('نوع کمک را انتخاب کنید', 'Choose assistance level', 'اختر مستوى المساعدة'),
         desc: tr('WCHR، WCHS یا WCHC طبق استاندارد IATA.', 'WCHR, WCHS, or WCHC per IATA codes.', 'WCHR أو WCHS أو WCHC.'),
       },
       {
-        no: '۲',
+        no: 2,
         title: tr('ثبت در رزرو', 'Add to booking', 'أضف إلى الحجز'),
         desc: tr('از مدیریت رزرو یا پشتیبانی.', 'Via Manage booking or support.', 'عبر إدارة الحجز أو الدعم.'),
       },
       {
-        no: '۳',
+        no: 3,
         title: tr('هماهنگی در فرودگاه', 'Airport coordination', 'التنسيق في المطار'),
         desc: tr('همکاران blujet در گیت و سوار شدن همراهی می‌کنند.', 'blujet staff assist at gate and boarding.', 'موظفو blujet يساعدون عند البوابة.'),
       },

@@ -2835,6 +2835,14 @@ allotments; it then creates one `AgencyAllotment` per occurrence only when the
 sum remains within both the released class quota and the aircraft cabin map.
 The allotment becomes bookable inventory only after this atomic activation.
 
+The agency **Active flights** list is a read projection, not a new inventory
+table: future `SCHEDULED` + `PUBLISHED` `flight_instances` joined to their
+`fare_rules` are combined with the caller's active `agency_allotments`. A
+published row is visible even when its release/allotment values are zero. Zero
+allocated/sold values in that projection do not create an `AgencyAllotment`;
+only the existing approval/payment activation path creates bookable agency
+inventory.
+
 `FlightInstance.status` is time-driven: sold-out capacity never changes
 `SCHEDULED` to a completed state. `DEPARTED` is set only at/after
 `departureAt`; booking/passenger `FLOWN` projections follow that lifecycle.

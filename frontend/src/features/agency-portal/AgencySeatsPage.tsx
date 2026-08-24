@@ -48,9 +48,9 @@ const STR: Record<
 > = {
   fa: {
     infoBanner:
-      'صندلی‌های تخصیص‌یافته از سوی ایرلاین بر اساس میزان تقاضای آژانس شما، برای پروازهایی که مجوز پرواز آن‌ها صادر شده است. این ظرفیت برای فروش در اختیار شما قرار گرفته است.',
+      'همه پروازهای فعال و منتشرشده در این بخش نمایش داده می‌شوند. ظرفیت تخصیص‌یافته برای فروش در اختیار شماست و برای سایر پروازها می‌توانید درخواست خرید صندلی ثبت کنید.',
     errorFallback: 'خطا در دریافت سهمیه‌های صندلی.',
-    empty: 'هنوز سهمیه‌ای برای آژانس شما ثبت نشده است.',
+    empty: 'در حال حاضر پرواز فعال و منتشرشده‌ای وجود ندارد.',
     activeBadge: 'فعال',
     releasedBadge: 'آزادشده',
     allocatedLabel: 'تخصیص‌یافته',
@@ -67,9 +67,9 @@ const STR: Record<
   },
   en: {
     infoBanner:
-      "Seats allocated by the airline based on your agency's demand, for flights whose operating license has been issued. This capacity is available for you to sell.",
+      'Every active published flight is listed here. Allocated capacity is available for you to sell, and you can request seat purchases for other flights.',
     errorFallback: 'Error loading seat allotments.',
-    empty: 'No allotment has been recorded for your agency yet.',
+    empty: 'There are currently no active published flights.',
     activeBadge: 'Active',
     releasedBadge: 'Released',
     allocatedLabel: 'Allocated',
@@ -86,9 +86,9 @@ const STR: Record<
   },
   ar: {
     infoBanner:
-      'مقاعد مخصصة من شركة الطيران بناءً على طلب وكالتك، للرحلات التي صدر لها تصريح تشغيل. هذه السعة متاحة لك للبيع.',
+      'تظهر هنا جميع الرحلات النشطة والمنشورة. السعة المخصصة متاحة لك للبيع، ويمكنك طلب شراء مقاعد للرحلات الأخرى.',
     errorFallback: 'خطأ في تحميل حصص المقاعد.',
-    empty: 'لم يتم تسجيل أي حصة لوكالتك بعد.',
+    empty: 'لا توجد حاليًا رحلات نشطة ومنشورة.',
     activeBadge: 'نشط',
     releasedBadge: 'مُحرَّر',
     allocatedLabel: 'مخصَّص',
@@ -285,6 +285,31 @@ export default function AgencySeatsPage() {
   const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
   const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
   const activeAllotments = (rows ?? []).filter((row) => row.active);
+  const activeCatalogOptions = (requestOptions ?? []).filter(
+    (option) =>
+      !activeAllotments.some(
+        (allotment) =>
+          allotment.flightInstanceId === option.flightInstanceId &&
+          (!allotment.cabin || allotment.cabin === option.cabin) &&
+          (!allotment.fareClassCode ||
+            allotment.fareClassCode === option.fareClassCode),
+      ),
+  );
+  const activeFlightCount = new Set([
+    ...activeAllotments.map((row) => row.flightInstanceId),
+    ...(requestOptions ?? []).map((row) => row.flightInstanceId),
+  ]).size;
+
+  function openSeatRequest(option: AgencySeatRequestOption) {
+    setOriginCode(option.originCode);
+    setDestCode(option.destCode);
+    setRequestFlightId(optionKey(option));
+    setPreferredWeekdays([]);
+    setSeatInquiryState('idle');
+    setSeatInquiry(null);
+    setSeatInquiryError(null);
+    setActiveView('routes');
+  }
 
   async function submitSeatRequest() {
     if (!requestFlight || requestedSeats < 1) return;
@@ -378,7 +403,7 @@ export default function AgencySeatsPage() {
           ['routes', locale === 'fa' ? 'مسیر پروازی موجود' : locale === 'ar' ? 'المسارات المتاحة' : 'Available routes', availableRouteCount],
           ['requested', locale === 'fa' ? 'پروازهای درخواست‌شده' : locale === 'ar' ? 'الرحلات المطلوبة' : 'Requested flights', pendingRequests.length],
           ['invoices', locale === 'fa' ? 'فاکتور پروازهای پرداخت‌نشده' : locale === 'ar' ? 'فواتير الرحلات غير المدفوعة' : 'Unpaid flight invoices', unpaidRequests.length],
-          ['active', locale === 'fa' ? 'پروازهای فعال' : locale === 'ar' ? 'الرحلات النشطة' : 'Active flights', activeAllotments.length],
+          ['active', locale === 'fa' ? 'پروازهای فعال' : locale === 'ar' ? 'الرحلات النشطة' : 'Active flights', activeFlightCount],
           ['rejected', locale === 'fa' ? 'پروازهای کنسل‌شده' : locale === 'ar' ? 'الرحلات الملغاة' : 'Cancelled flights', rejectedRequests.length],
         ] as const).map(([key, label, count]) => (
           <button
@@ -702,7 +727,7 @@ export default function AgencySeatsPage() {
       {error && <p className="mb-4 text-xs text-danger">{error}</p>}
       {notice && <p className="mb-4 rounded-xl bg-[#e8f5ee] p-3 text-xs font-bold text-[#1f8a5b]">{notice}</p>}
 
-      {activeView === 'active' && rows && activeAllotments.length === 0 && <p className="rounded-2xl border border-[#edf0f5] bg-white py-12 text-center text-xs text-muted">{t.empty}</p>}
+      {activeView === 'active' && rows && requestOptions && activeFlightCount === 0 && <p className="rounded-2xl border border-[#edf0f5] bg-white py-12 text-center text-xs text-muted">{t.empty}</p>}
 
       {(activeView === 'requested' || activeView === 'rejected' || activeView === 'invoices') && (
         <div className="space-y-3">
@@ -718,8 +743,85 @@ export default function AgencySeatsPage() {
       )}
 
       {activeView === 'active' && <div className="flex flex-col gap-4">
+        {activeCatalogOptions.map((option) => (
+          <article
+            key={optionKey(option)}
+            data-testid={`active-flight-card-${option.flightInstanceId}-${option.cabin}-${option.fareClassCode}`}
+            className="rounded-2xl border border-[#e8eef6] bg-white p-5 shadow-sm"
+          >
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f7fd] text-base">
+                  ✈
+                </span>
+                <div>
+                  <div className="text-sm font-black text-[#0d2640]">
+                    {airportCityLabel(option.originCode, locale)} ← {airportCityLabel(option.destCode, locale)}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-[#8a96a6]">
+                    <span dir="ltr">{option.flightNo}</span> · {formatLocaleDateTime(option.departureAt, locale)}
+                  </div>
+                  <div className="mt-0.5 text-[10px] text-[#8a96a6]" dir="ltr">
+                    {option.aircraftType} · {option.cabin}/{option.fareClassCode}
+                  </div>
+                </div>
+              </div>
+              <span className="rounded-full bg-[#e8f5ee] px-3 py-1 text-[10.5px] font-extrabold text-[#1f8a5b]">
+                {t.activeBadge}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                [t.allocatedLabel, option.ownAllocated, '#1668c4'],
+                [t.soldLabel, 0, '#1f8a5b'],
+                [
+                  locale === 'en'
+                    ? 'Available to request'
+                    : locale === 'ar'
+                      ? 'متاح للطلب'
+                      : 'قابل درخواست',
+                  option.availableToRequest,
+                  option.availableToRequest > 0 ? '#0d2640' : '#d64545',
+                ],
+              ] as const).map(([label, value, color]) => (
+                <div key={label} className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center">
+                  <div className="mb-1 text-[10.5px] text-[#8a96a6]">{label}</div>
+                  <div className="text-lg font-black" style={{ color }}>
+                    {localeDigits(value, locale)}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {option.availableToRequest < 1 && (
+              <p className="mt-4 rounded-xl bg-[#fff7ed] p-3 text-[11px] font-bold text-[#b25e18]">
+                {locale === 'en'
+                  ? 'The flight is active; commercial agency capacity has not been released yet.'
+                  : locale === 'ar'
+                    ? 'الرحلة نشطة، لكن السعة التجارية للوكالات لم تُحرر بعد.'
+                    : 'پرواز فعال است؛ ظرفیت فروش آژانسی هنوز توسط بازرگانی آزاد نشده است.'}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => openSeatRequest(option)}
+              className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white"
+            >
+              {locale === 'en'
+                ? 'Request seat purchase'
+                : locale === 'ar'
+                  ? 'طلب شراء مقاعد'
+                  : 'درخواست خرید صندلی'}
+            </button>
+          </article>
+        ))}
         {activeAllotments.map((f) => {
           const left = Math.max(f.seatsAllocated - f.seatsUsed, 0);
+          const matchingRequestOption = (requestOptions ?? []).find(
+            (option) =>
+              option.flightInstanceId === f.flightInstanceId &&
+              (!f.cabin || f.cabin === option.cabin) &&
+              (!f.fareClassCode || f.fareClassCode === option.fareClassCode),
+          );
           return (
             <div
               key={f.id}
@@ -770,6 +872,20 @@ export default function AgencySeatsPage() {
                   className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white"
                 >
                   {t.sell}
+                </button>
+              )}
+
+              {matchingRequestOption && selectedId !== f.id && (
+                <button
+                  type="button"
+                  onClick={() => openSeatRequest(matchingRequestOption)}
+                  className="mt-2 w-full rounded-xl border border-[#1668c4] bg-white px-4 py-3 text-xs font-black text-[#1668c4]"
+                >
+                  {locale === 'en'
+                    ? 'Request more seats'
+                    : locale === 'ar'
+                      ? 'طلب مقاعد إضافية'
+                      : 'درخواست صندلی بیشتر'}
                 </button>
               )}
 
