@@ -293,7 +293,6 @@ describe('PanelShell', () => {
     vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
       { key: 'tickets', labelFa: 'تیکت‌ها', implemented: true },
-      { key: 'blog', labelFa: 'مدیریت بلاگ', implemented: true },
       { key: 'media', labelFa: 'مدیریت سایت', implemented: true },
       { key: 'jobapps', labelFa: 'درخواست‌های استخدام', implemented: true },
       { key: 'rules', labelFa: 'قوانین سایت', implemented: true },
@@ -312,7 +311,6 @@ describe('PanelShell', () => {
     expect(await screen.findByText('تیکت‌ها')).toBeInTheDocument();
     expect(screen.getByText('مدیریت سایت')).toBeInTheDocument();
     expect(screen.getByText('درخواست‌های استخدام')).toBeInTheDocument();
-    expect(screen.getByText('مدیریت بلاگ')).toBeInTheDocument();
     expect(screen.getByText('قوانین سایت')).toBeInTheDocument();
     expect(screen.queryByText('احراز هویت مشتریان')).not.toBeInTheDocument();
     expect(screen.queryByText('تنظیمات سامانه')).not.toBeInTheDocument();

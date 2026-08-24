@@ -66,17 +66,26 @@ export function priceBreakdown(priceIrr: bigint): { baseIrr: bigint; taxIrr: big
 
 export function sortFlights(
   list: SearchFlightResult[],
-  sort: 'cheap' | 'fast' | 'early',
+  sort: 'recommended' | 'closest' | 'cheap',
 ): SearchFlightResult[] {
   const copy = [...list];
   copy.sort((a, b) => {
-    if (sort === 'early') return a.departureAt.localeCompare(b.departureAt);
-    if (sort === 'fast') {
-      return flightDurationMinutes(a.departureAt, a.arrivalAt) - flightDurationMinutes(b.departureAt, b.arrivalAt);
-    }
     const pa = BigInt(primaryCabin(a)?.priceIrr ?? '0');
     const pb = BigInt(primaryCabin(b)?.priceIrr ?? '0');
-    return pa < pb ? -1 : pa > pb ? 1 : 0;
+    const priceOrder = pa < pb ? -1 : pa > pb ? 1 : 0;
+    const departureOrder = a.departureAt.localeCompare(b.departureAt);
+    const durationOrder =
+      flightDurationMinutes(a.departureAt, a.arrivalAt) -
+      flightDurationMinutes(b.departureAt, b.arrivalAt);
+    if (sort === 'closest') return departureOrder || priceOrder || durationOrder;
+    if (sort === 'cheap') return priceOrder || durationOrder;
+
+    // Recommendation is deterministic and data-backed: prefer Blujet-operated
+    // flights, then shorter journeys, then the lower fare.
+    const airlineOrder =
+      Number(flightAirlineLabel(a.flightNo) !== 'blujet') -
+      Number(flightAirlineLabel(b.flightNo) !== 'blujet');
+    return airlineOrder || durationOrder || priceOrder;
   });
   return copy;
 }

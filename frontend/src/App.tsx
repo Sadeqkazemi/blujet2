@@ -82,8 +82,6 @@ import SurveyPage from './features/survey/SurveyPage';
 import SurveyRouter from './components/SurveyRouter';
 import CareersPage from './features/public-site/CareersPage';
 import CareersApplyPage from './features/public-site/CareersApplyPage';
-import BlogPage from './features/public-site/BlogPage';
-import BlogPostPage from './features/public-site/BlogPostPage';
 import {
   SeatSelectionInfoPage,
   ExtraBaggageInfoPage,
@@ -93,7 +91,6 @@ import {
 } from './features/public-site/services/PublicServicePages';
 import SelectServicesPage from './features/public-site/services/SelectServicesPage';
 import CareersAdminPage from './features/careers/CareersAdminPage';
-import BlogAdminPage from './features/blog/BlogAdminPage';
 import MediaAdminPage from './features/site-content/MediaAdminPage';
 import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 import AdminLoansPage from './features/loans/AdminLoansPage';
@@ -137,8 +134,6 @@ export default function App() {
           <Route path="/survey/:token" element={<SurveyPage />} />
           <Route path="/careers" element={<CareersPage />} />
           <Route path="/careers/:jobId/apply" element={<CareersApplyPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<BlogPostPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/two-factor" element={<TwoFactorPage />} />
@@ -241,9 +236,6 @@ export default function App() {
               </Route>
               <Route path="rules" element={<TabGate tabKey="rules" />}>
                 <Route index element={<SiteRulesPage />} />
-              </Route>
-              <Route path="blog" element={<TabGate tabKey="blog" />}>
-                <Route index element={<BlogAdminPage />} />
               </Route>
               <Route path="media" element={<TabGate tabKey="media" />}>
                 <Route index element={<MediaAdminPage />} />

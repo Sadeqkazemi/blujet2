@@ -291,7 +291,6 @@ describe('Panels (e2e)', () => {
       'cartable',
       'tickets',
       'media',
-      'blog',
       'jobapps',
       'rules',
     ]);

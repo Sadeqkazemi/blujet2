@@ -22,9 +22,9 @@ export type ResultsCopy = {
   aiRecommendationBuy: string;
   aiRecommendationWait: string;
   aiPredictedPrice: string;
+  sortRecommended: string;
+  sortClosest: string;
   sortCheap: string;
-  sortFast: string;
-  sortEarly: string;
   filterLabel: string;
   nonstopLabel: string;
   all: string;
@@ -132,9 +132,9 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     aiRecommendationBuy: 'همین حالا بخرید',
     aiRecommendationWait: 'بهتر است صبر کنید',
     aiPredictedPrice: 'قیمت پیش‌بینی‌شده',
-    sortCheap: 'پیشنهاد بلوجت',
-    sortFast: 'سریع‌ترین',
-    sortEarly: 'زودترین پرواز',
+    sortRecommended: 'پیشنهاد بلوجت',
+    sortClosest: 'نزدیک‌ترین',
+    sortCheap: 'ارزان‌ترین',
     filterLabel: 'فیلتر',
     nonstopLabel: 'بدون توقف',
     all: 'همه',
@@ -240,9 +240,9 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     aiRecommendationBuy: 'Buy now',
     aiRecommendationWait: 'Better to wait',
     aiPredictedPrice: 'Predicted price',
-    sortCheap: 'Blujet recommendation',
-    sortFast: 'Fastest',
-    sortEarly: 'Earliest flight',
+    sortRecommended: 'Blujet recommendation',
+    sortClosest: 'Closest',
+    sortCheap: 'Cheapest',
     filterLabel: 'Filter',
     nonstopLabel: 'Nonstop',
     all: 'All',
@@ -348,9 +348,9 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     aiRecommendationBuy: 'اشترِ الآن',
     aiRecommendationWait: 'من الأفضل الانتظار',
     aiPredictedPrice: 'السعر المتوقع',
-    sortCheap: 'اقتراح بلوجت',
-    sortFast: 'الأسرع',
-    sortEarly: 'أبكر رحلة',
+    sortRecommended: 'اقتراح بلوجت',
+    sortClosest: 'الأقرب',
+    sortCheap: 'الأرخص',
     filterLabel: 'تصفية',
     nonstopLabel: 'مباشر',
     all: 'الكل',
