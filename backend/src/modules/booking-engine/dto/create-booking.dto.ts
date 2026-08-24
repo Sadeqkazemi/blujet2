@@ -4,6 +4,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsIn,
   IsInt,
@@ -12,6 +13,7 @@ import {
   IsUUID,
   Max,
   Min,
+  MinLength,
   ValidateNested,
   ValidateIf,
 } from 'class-validator';
@@ -27,8 +29,9 @@ export class BookingPassengerDto {
   fullName: string;
 
   @ApiProperty({ example: '0012345678', required: false })
-  @IsOptional()
+  @ValidateIf((passenger: BookingPassengerDto) => !passenger.passportNo)
   @IsString()
+  @MinLength(10)
   nationalId?: string;
 
   @ApiProperty({
@@ -36,8 +39,9 @@ export class BookingPassengerDto {
     required: false,
     description: 'Passport number when travelling on passport',
   })
-  @IsOptional()
+  @ValidateIf((passenger: BookingPassengerDto) => !passenger.nationalId)
   @IsString()
+  @MinLength(5)
   passportNo?: string;
 
   @ApiProperty({
@@ -80,6 +84,15 @@ export class BookingPassengerDto {
   @ValidateIf((value: BookingPassengerDto) => value.passengerType !== 'INFANT')
   @IsString()
   seatCode?: string;
+
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: 'Reserve one adjacent EXST seat without baggage entitlement',
+  })
+  @IsOptional()
+  @IsBoolean()
+  extraSeatRequested?: boolean;
 }
 
 export class BookingExtraSelectionDto {

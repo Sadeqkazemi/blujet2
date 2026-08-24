@@ -30,6 +30,28 @@ describe('national-id-seat-limit', () => {
     ).not.toThrow();
   });
 
+  it('counts one passenger with EXST as two occupied seats', () => {
+    expect(() =>
+      assertInRequestNationalIdSeatLimit([
+        {
+          nationalId: VALID_NID,
+          passengerType: 'ADULT',
+          extraSeatRequested: true,
+        },
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      assertInRequestNationalIdSeatLimit([
+        {
+          nationalId: VALID_NID,
+          passengerType: 'ADULT',
+          extraSeatRequested: true,
+        },
+        { nationalId: VALID_NID, passengerType: 'ADULT' },
+      ]),
+    ).toThrow(/حداکثر/);
+  });
+
   it(`rejects more than ${MAX_SEATS_PER_NATIONAL_ID} seats for the same national ID`, () => {
     expect(() =>
       assertInRequestNationalIdSeatLimit([

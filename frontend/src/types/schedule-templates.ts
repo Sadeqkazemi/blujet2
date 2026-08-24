@@ -5,6 +5,7 @@ export interface ScheduleTemplatePayload {
   destinationAirportId: string;
   flightNoBase: string;
   aircraftDefinitionId: string;
+  cabinCapacities: CabinCapacity[];
   departureTime: string;
   durationMinutes: number;
   startDate: string;

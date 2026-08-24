@@ -5,6 +5,7 @@ import {
   sumCabinSeats,
 } from "../../../lib/flight-definition";
 import { faDigits, latinDigits } from "../../../lib/fa-format";
+import type { AircraftCabinCapacity } from "../../../types/aircraft";
 
 const selectClass =
   "w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none";
@@ -22,11 +23,14 @@ export default function CabinCapacityEditor({
   onChange,
   error,
   readOnly = false,
+  availableCabins,
 }: {
   rows: CabinCapacityRow[];
   onChange: (rows: CabinCapacityRow[]) => void;
   error?: string | null;
   readOnly?: boolean;
+  /** Authoritative per-cabin maxima from the selected aircraft. */
+  availableCabins?: AircraftCabinCapacity[];
 }) {
   const used = new Set(rows.map((r) => r.cabin));
   const total = sumCabinSeats(
@@ -46,6 +50,14 @@ export default function CabinCapacityEditor({
     ]);
   }
 
+  function toggleAvailable(cabin: CabinKind, enabled: boolean, maximum: number) {
+    if (!enabled) {
+      onChange(rows.filter((row) => row.cabin !== cabin));
+      return;
+    }
+    onChange([...rows, { key: `cab-${cabin}`, cabin, seats: String(maximum) }]);
+  }
+
   return (
     <div data-testid="cabin-capacity-editor">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -60,14 +72,16 @@ export default function CabinCapacityEditor({
             </span>
           </p>
         </div>
-        <button
-          type="button"
-          onClick={addRow}
-          disabled={readOnly || used.size >= CABIN_OPTIONS.length}
-          className="rounded-[9px] bg-[#3b82f6] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50"
-        >
-          افزودن کابین
-        </button>
+        {!availableCabins && (
+          <button
+            type="button"
+            onClick={addRow}
+            disabled={readOnly || used.size >= CABIN_OPTIONS.length}
+            className="rounded-[9px] bg-[#3b82f6] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+          >
+            افزودن کابین
+          </button>
+        )}
       </div>
       {error && (
         <p
@@ -77,15 +91,76 @@ export default function CabinCapacityEditor({
           {error}
         </p>
       )}
-      <div className="flex flex-col gap-2">
-        {rows.map((row) => {
-          const available = CABIN_OPTIONS.filter(
-            (c) => c.value === row.cabin || !used.has(c.value),
-          );
-          return (
-            <div
-              key={row.key}
-              className="grid grid-cols-1 items-end gap-2 rounded-xl border border-[#28344c] bg-[#0f1623] p-2.5 sm:grid-cols-[1fr_1fr_auto]"
+      {availableCabins ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {availableCabins.map((available) => {
+            const cabin = available.cabinType as CabinKind;
+            const row = rows.find((item) => item.cabin === cabin);
+            return (
+              <div
+                key={cabin}
+                className={`rounded-xl border p-3 ${
+                  row
+                    ? "border-[#3b82f6] bg-[rgba(59,130,246,.08)]"
+                    : "border-[#28344c] bg-[#0f1623]"
+                }`}
+                data-testid={`available-cabin-${cabin}`}
+              >
+                <label className="flex items-center justify-between gap-2 text-[12px] font-bold text-white">
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      aria-label={`فعال‌سازی ${cabinLabel(cabin)}`}
+                      checked={Boolean(row)}
+                      disabled={readOnly}
+                      onChange={(event) =>
+                        toggleAvailable(cabin, event.target.checked, available.capacity)
+                      }
+                    />
+                    {cabinLabel(cabin)}
+                  </span>
+                  <span className="font-num text-[10.5px] text-[#8fb8ff]">
+                    حداکثر {faDigits(available.capacity)}
+                  </span>
+                </label>
+                {row ? (
+                  <label className="mt-3 block text-[10.5px] text-[#9fb0c7]">
+                    تعداد صندلی فعال در این پرواز
+                    <input
+                      dir="ltr"
+                      inputMode="numeric"
+                      min={1}
+                      max={available.capacity}
+                      aria-label={`تعداد صندلی ${cabinLabel(cabin)}`}
+                      value={row.seats}
+                      readOnly={readOnly}
+                      onChange={(event) =>
+                        update(row.key, {
+                          seats: latinDigits(event.target.value).replace(/\D/g, "").slice(0, 4),
+                        })
+                      }
+                      className={`${inputClass} mt-1 text-left font-num read-only:cursor-not-allowed read-only:opacity-60`}
+                    />
+                  </label>
+                ) : null}
+              </div>
+            );
+          })}
+          <p className="sm:col-span-2 m-0 text-[10.5px] text-[#8ea0b8]">
+            حداکثر ظرفیت هواپیما:{" "}
+            {faDigits(availableCabins.reduce((sum, row) => sum + row.capacity, 0))} صندلی
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {rows.map((row) => {
+            const available = CABIN_OPTIONS.filter(
+              (c) => c.value === row.cabin || !used.has(c.value),
+            );
+            return (
+              <div
+                key={row.key}
+                className="grid grid-cols-1 items-end gap-2 rounded-xl border border-[#28344c] bg-[#0f1623] p-2.5 sm:grid-cols-[1fr_1fr_auto]"
               data-testid="cabin-row"
             >
               <div>
@@ -101,11 +176,11 @@ export default function CabinCapacityEditor({
                   className={`${selectClass} disabled:cursor-not-allowed disabled:opacity-60`}
                   aria-label={`نوع کابین ${cabinLabel(row.cabin)}`}
                 >
-                  {available.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
+                    {available.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>
@@ -115,7 +190,7 @@ export default function CabinCapacityEditor({
                 <input
                   dir="ltr"
                   inputMode="numeric"
-                  value={row.seats}
+                    value={row.seats}
                   readOnly={readOnly}
                   onChange={(e) =>
                     update(row.key, {
@@ -125,21 +200,22 @@ export default function CabinCapacityEditor({
                     })
                   }
                   className={`${inputClass} text-left font-num read-only:cursor-not-allowed read-only:opacity-60`}
-                  aria-label={`تعداد صندلی ${cabinLabel(row.cabin)}`}
-                />
+                    aria-label={`تعداد صندلی ${cabinLabel(row.cabin)}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
+                  disabled={readOnly || rows.length <= 1}
+                  className="h-11 rounded-[9px] bg-[rgba(248,113,113,.12)] px-3 text-[11px] font-bold text-[#f87171] disabled:opacity-40"
+                >
+                  حذف
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
-                disabled={readOnly || rows.length <= 1}
-                className="h-11 rounded-[9px] bg-[rgba(248,113,113,.12)] px-3 text-[11px] font-bold text-[#f87171] disabled:opacity-40"
-              >
-                حذف
-              </button>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

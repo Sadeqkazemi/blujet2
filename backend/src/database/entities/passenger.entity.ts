@@ -65,6 +65,13 @@ export class Passenger {
   @Column({ type: 'text', nullable: true })
   seatCode!: string | null;
 
+  /** Adjacent EXST seat occupied by this same passenger. No baggage entitlement. */
+  @Column({ type: 'text', nullable: true })
+  extraSeatCode!: string | null;
+
+  @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
+  extraSeatFareIrr = 0n;
+
   @Column({ type: 'text', default: 'ADULT' })
   passengerType: PassengerType = 'ADULT';
 

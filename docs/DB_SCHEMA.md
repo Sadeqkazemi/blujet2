@@ -2921,3 +2921,21 @@ as one JSONB value in the existing `system_settings` row whose key is
 exactly once. `updatedById` and `updatedAt` continue to provide setting-level
 provenance, while `audit_logs` records each save. Public reads expose this
 value only through the allowlisted rules projection.
+## Aircraft cabin capacity and route activation (2026-08-24)
+
+- `AircraftCabin` remains the normalized, authoritative per-aircraft capacity
+  table for `FIRST|BUSINESS|COMFORT|ECONOMY`. Aircraft create/update now accepts
+  these values explicitly and verifies them against the physical
+  `AircraftSeatMap` before replacing the rows.
+- `FlightInstance.cabinCapacities` is the per-occurrence activation snapshot.
+  Only selected cabins appear; each selected quantity is positive and bounded
+  by the linked `AircraftDefinition -> AircraftCabin` capacity.
+
+## Passenger adjacent extra seat (2026-08-24)
+
+- `Passenger.extraSeatCode text NULL` stores the adjacent EXST assigned to the
+  same traveller. It is inventory only and does not create a second passenger
+  or baggage allowance.
+- `Passenger.extraSeatFareIrr bigint NOT NULL DEFAULT 0` stores the audited
+  base-fare amount charged for that seat. Active inventory and fare-bucket
+  queries count a non-null `extraSeatCode` as one additional occupied seat.

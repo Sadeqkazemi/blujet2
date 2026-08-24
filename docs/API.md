@@ -3855,3 +3855,33 @@ grant does not imply an unrelated action; only the documented read
 prerequisite is expanded. No reservation seat-lock permission is added for
 `IT_MANAGER`.
 
+## Aircraft cabin capacity and per-route activation (2026-08-24)
+
+- `POST|PUT /flights/aircraft` keeps the existing seat-band payload and adds
+  `cabinCapacities: [{ cabinType: FIRST|BUSINESS|COMFORT|ECONOMY, capacity }]`.
+  Positive rows must be unique, sum to `totalCapacity`, and cannot exceed the
+  matching cabin bands in the submitted physical map. The response continues
+  to expose the persisted `AircraftCabin[]` rows.
+- Route-template preview/create accepts `cabinCapacities` and persists only the
+  cabins activated for that route. Add Flight reads those rows as authoritative
+  maxima. Its submitted
+  `cabinCapacities` contains only cabins explicitly activated for the flight;
+  each quantity must be `1..aircraftCabin.capacity`. A cabin absent from the
+  aircraft or with zero capacity is rejected server-side.
+
+## Passenger validation and adjacent extra seat (2026-08-24)
+
+- Checkout validates guest and signed-in passenger data before opening OTP or
+  advancing: first name, last name, gender, complete birth date, and either a
+  checksum-valid Iranian national ID or a passport are required. The passenger
+  form renders field-specific localized inline errors.
+- `POST /bookings` and the agency-allotment booking endpoint accept
+  `passengers[].extraSeatRequested`. For a seated passenger the booking
+  transaction reserves an immediate adjacent seat in the same row, cabin and
+  aisle side. If the initially selected seat is isolated, the transaction uses
+  another free adjacent pair; `409 POOL_EXHAUSTED` is returned only when no pair
+  exists.
+- The EXST is charged at one base fare without a second tax or baggage
+  entitlement. Booking detail returns `extraSeatCode` and `extraSeatFareIrr`.
+  Capacity, fare-bucket usage, seat maps, agency allotments, and the two-seats-
+  per-national-ID rule all count the EXST as an occupied seat.

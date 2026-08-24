@@ -56,6 +56,7 @@ export interface UpsertAircraftDefinitionPayload {
   model: string;
   title: string;
   totalCapacity: number;
+  cabinCapacities?: AircraftCabinCapacity[];
   businessRowStart?: number | null;
   businessRowEnd?: number | null;
   businessColsLeft?: string[] | null;
@@ -85,7 +86,10 @@ export interface AircraftSeatMapBandDraft {
   colsRight: string[];
 }
 
-export const AIRCRAFT_CABIN_OPTIONS: { value: AircraftCabinType; label: string }[] = [
+export const AIRCRAFT_CABIN_OPTIONS: {
+  value: AircraftCabinType;
+  label: string;
+}[] = [
   { value: 'FIRST', label: 'فرست' },
   { value: 'BUSINESS', label: 'بیزنس' },
   { value: 'COMFORT', label: 'کامفورت' },

@@ -1,6 +1,38 @@
-import { enumerateSeats } from './seat-layout';
+import {
+  enumerateSeats,
+  findAdjacentSeatCode,
+  findAdjacentSeatPair,
+} from './seat-layout';
 
 describe('enumerateSeats', () => {
+  it('finds an adjacent free seat without crossing the aisle', () => {
+    const map = {
+      businessRowStart: 1,
+      businessRowEnd: 1,
+      businessColsLeft: ['A', 'B'],
+      businessColsRight: ['E', 'F'],
+      economyRowStart: 2,
+      economyRowEnd: 2,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['E', 'F'],
+      excludedSeatCodes: [],
+    };
+    expect(findAdjacentSeatCode(map, '2A', new Set(['2A']))).toBe('2B');
+    expect(findAdjacentSeatCode(map, '2B', new Set(['2A', '2B']))).toBeNull();
+    expect(findAdjacentSeatCode(map, '2B', new Set(['2B']))).toBe('2A');
+  });
+
+  it('finds another available pair when the preferred row has no adjacent seat', () => {
+    const map = {
+      economyRowStart: 1,
+      economyRowEnd: 2,
+      economyColsLeft: ['A', 'B'],
+      economyColsRight: ['E', 'F'],
+    };
+    expect(
+      findAdjacentSeatPair(map, 'ECONOMY', new Set(['1B', '1E', '1F'])),
+    ).toEqual(['2A', '2B']);
+  });
   it('applies MD-80 column letters and excluded rear seats', () => {
     const seats = enumerateSeats({
       businessRowStart: 3,

@@ -111,11 +111,14 @@ export async function resolveFareClass(
   const usageRows = await manager
     .createQueryBuilder(Booking, 'b')
     .select('b.fareClassCode', 'fareClassCode')
-    .addSelect('COUNT(p.id)', 'count')
+    .addSelect(
+      'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
+      'count',
+    )
     .innerJoin(
       'passengers',
       'p',
-      'p."bookingId" = b.id AND p."seatCode" IS NOT NULL',
+      'p."bookingId" = b.id AND (p."seatCode" IS NOT NULL OR p."extraSeatCode" IS NOT NULL)',
     )
     .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
     .andWhere('b.cabin = :cabin', { cabin })

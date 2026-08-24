@@ -27,6 +27,10 @@ import {
   FlightScheduleTemplateStatus,
   PriceLockStatus,
 } from '../../database/enums';
+import {
+  normalizeCabinCapacities,
+  serializeCabinCapacities,
+} from './flight-definition.util';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AuditService } from '../audit/audit.service';
@@ -123,11 +127,36 @@ export class ScheduleTemplateService {
         message: 'ظرفیت کابین برای این هواپیما تعریف نشده است.',
       });
     }
-    const cabinCapacities = cabins.map((c) => ({
-      cabin: c.cabinType,
-      seats: c.capacity,
-    }));
-    const capacity = cabins.reduce((s, c) => s + c.capacity, 0);
+    const aircraftCapacityByCabin = new Map(
+      cabins.map((c) => [c.cabinType, c.capacity]),
+    );
+    const requestedCabins =
+      dto.cabinCapacities ??
+      cabins.map((c) => ({ cabin: c.cabinType, seats: c.capacity }));
+    const requestedTotal = requestedCabins.reduce(
+      (sum, row) => sum + Number(row.seats ?? 0),
+      0,
+    );
+    const cabinCapacities = normalizeCabinCapacities(
+      requestedCabins,
+      requestedTotal,
+    ).filter((row) => row.seats > 0);
+    if (cabinCapacities.length === 0) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'حداقل یک کابین فعال برای مسیر پروازی انتخاب کنید.',
+      });
+    }
+    for (const row of cabinCapacities) {
+      const maximum = aircraftCapacityByCabin.get(row.cabin);
+      if (maximum == null || row.seats > maximum) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `ظرفیت کابین ${row.cabin} از ظرفیت تعریف‌شده هواپیما بیشتر است.`,
+        });
+      }
+    }
+    const capacity = cabinCapacities.reduce((s, c) => s + c.seats, 0);
 
     const dates = enumerateMatchingDates(
       dto.startDate,
@@ -199,7 +228,9 @@ export class ScheduleTemplateService {
       this.asDateOnly(t.endDate) === dto.endDate &&
       weekdaysA === weekdaysB &&
       t.agencyPriceIrr === ctx.agency &&
-      t.legalCeilingIrr === ctx.legal
+      t.legalCeilingIrr === ctx.legal &&
+      JSON.stringify(serializeCabinCapacities(t.cabinCapacities)) ===
+        JSON.stringify(ctx.cabinCapacities)
     );
   }
 
@@ -228,10 +259,7 @@ export class ScheduleTemplateService {
   }
 
   /** Independent advisory lock keypair for a resource kind. */
-  private advisoryLockPair(
-    kind: 'flightNo',
-    value: string,
-  ): [number, number] {
+  private advisoryLockPair(kind: 'flightNo', value: string): [number, number] {
     const digest = createHash('sha256')
       .update(`schedule-template:${kind}:${value}`)
       .digest();
@@ -270,10 +298,7 @@ export class ScheduleTemplateService {
     }
 
     const templateId = await this.dataSource.transaction(async (manager) => {
-      await this.acquireScheduleLocks(
-        manager,
-        dto.flightNoBase,
-      );
+      await this.acquireScheduleLocks(manager, dto.flightNoBase);
 
       const raced = await manager.findOne(FlightScheduleTemplate, {
         where: { idempotencyKey: dto.idempotencyKey },

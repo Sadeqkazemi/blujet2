@@ -37,12 +37,7 @@ const LOCK_HOLD_TTL_HOURS = 48;
  * across every flight instance (⚑ global, not per-flight — see docs). */
 const MAX_ACTIVE_MANAGERIAL_LOCKS_PER_REQUESTER = 5;
 
-export type ManagerSeatStatus =
-  | 'FREE'
-  | 'HELD'
-  | 'SOLD'
-  | 'LOCKED'
-  | 'BLOCKED';
+export type ManagerSeatStatus = 'FREE' | 'HELD' | 'SOLD' | 'LOCKED' | 'BLOCKED';
 
 export function classifySeatProjection(
   bookingStatus: string | null | undefined,
@@ -101,7 +96,9 @@ export class SeatmapService {
     return this.passengerRepo
       .createQueryBuilder('p')
       .innerJoin('p.booking', 'b')
-      .where('p.seatCode = :seatCode', { seatCode })
+      .where('(p.seatCode = :seatCode OR p.extraSeatCode = :seatCode)', {
+        seatCode,
+      })
       .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
       .andWhere(
         `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b."holdExpiresAt" > :now))`,
@@ -166,7 +163,7 @@ export class SeatmapService {
       this.passengerRepo
         .createQueryBuilder('p')
         .innerJoin('p.booking', 'b')
-        .where('p.seatCode IS NOT NULL')
+        .where('(p.seatCode IS NOT NULL OR p.extraSeatCode IS NOT NULL)')
         .andWhere('b.flightInstanceId = :flightInstanceId', {
           flightInstanceId,
         })
@@ -174,7 +171,12 @@ export class SeatmapService {
           `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b."holdExpiresAt" > :now))`,
           { now: new Date() },
         )
-        .select(['p.seatCode', 'p.fullName', 'p.nationalIdEnc'])
+        .select([
+          'p.seatCode',
+          'p.extraSeatCode',
+          'p.fullName',
+          'p.nationalIdEnc',
+        ])
         .addSelect(['b.pnr', 'b.status', 'b.priceIrr', 'b.holdExpiresAt'])
         .getMany(),
       this.seatLockRepo.find({
@@ -192,9 +194,13 @@ export class SeatmapService {
       }),
     ]);
     const cityByCode = new Map(airports.map((a) => [a.code, a.cityFa]));
-    const soldByCode = new Map(
-      soldPassengers.map((p) => [p.seatCode!, p] as const),
-    );
+    const soldByCode = new Map<string, Passenger>();
+    for (const passenger of soldPassengers) {
+      if (passenger.seatCode) soldByCode.set(passenger.seatCode, passenger);
+      if (passenger.extraSeatCode) {
+        soldByCode.set(passenger.extraSeatCode, passenger);
+      }
+    }
     const lockedByCode = new Map(activeLocks.map((l) => [l.seatCode, l]));
 
     const rowsMap = new Map<
@@ -238,9 +244,7 @@ export class SeatmapService {
           : null,
         lockExpiresAt: lock?.expiresAt ?? null,
         holdExpiresAt:
-          sold?.booking.status === 'HELD'
-            ? sold.booking.holdExpiresAt
-            : null,
+          sold?.booking.status === 'HELD' ? sold.booking.holdExpiresAt : null,
         lockClassification: lock?.classification ?? null,
         lockApprovalStatus: lock?.approvalStatus ?? null,
         lockPassengerName: lock?.passengerName ?? null,
@@ -278,9 +282,8 @@ export class SeatmapService {
       managerLockedCount: activeLocks.filter(
         (lock) => lock.classification !== 'FREE',
       ).length,
-      blockedCount: activeLocks.filter(
-        (lock) => lock.classification === 'FREE',
-      ).length,
+      blockedCount: activeLocks.filter((lock) => lock.classification === 'FREE')
+        .length,
       // Backwards-compatible total for older executive consumers.
       lockedCount: activeLocks.length,
       freeCount: Math.max(

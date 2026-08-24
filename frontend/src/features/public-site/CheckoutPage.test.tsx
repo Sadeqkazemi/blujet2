@@ -249,7 +249,7 @@ describe('CheckoutPage', () => {
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
     await user.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
-    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345679');
     const selects = screen.getAllByRole('combobox');
     await user.selectOptions(selects[1]!, '1');
     await user.selectOptions(selects[2]!, '1');
@@ -263,6 +263,35 @@ describe('CheckoutPage', () => {
     await user.click(screen.getByTestId('checkout-login-close'));
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
     expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
+  });
+
+  it('keeps a guest on the passenger step and shows field errors before OTP', async () => {
+    mockAuth('unauthenticated');
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('checkout-pax-step');
+    await user.click(screen.getByTestId('checkout-next'));
+
+    expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
+    expect(screen.getByText('نام را وارد کنید.')).toBeInTheDocument();
+    expect(screen.getByText('نام خانوادگی را وارد کنید.')).toBeInTheDocument();
+    expect(screen.getByText('کد ملی را وارد کنید.')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-first-0')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {
@@ -324,7 +353,7 @@ describe('CheckoutPage', () => {
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
     await user.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
-    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345679');
     const selects = screen.getAllByRole('combobox');
     await user.selectOptions(selects[1]!, '1');
     await user.selectOptions(selects[2]!, '1');
@@ -391,7 +420,11 @@ describe('CheckoutPage', () => {
     await userEvent.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await userEvent.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
     await userEvent.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
-    await userEvent.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    await userEvent.type(screen.getByTestId('checkout-pax-nid-0'), '0012345679');
+    await userEvent.click(screen.getByTestId('checkout-extra-seat-0'));
+    expect(screen.getByTestId('checkout-pricing-sidebar')).toHaveTextContent(
+      'صندلی اضافه کنار مسافر',
+    );
 
     // DOB selects — first select in each group is day/month/year
     const selects = screen.getAllByRole('combobox');
@@ -419,9 +452,10 @@ describe('CheckoutPage', () => {
         passengers: [
           expect.objectContaining({
             fullName: 'ALI REZAEI',
-            nationalId: '0012345678',
+            nationalId: '0012345679',
             gender: 'male',
             seatCode: '7A',
+            extraSeatRequested: true,
           }),
         ],
         extras: [{ id: BAGGAGE_ID, quantity: 1 }],

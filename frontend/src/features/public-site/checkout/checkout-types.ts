@@ -59,6 +59,8 @@ export interface PassengerFormDraft {
   birthMonth: string;
   birthYear: string;
   seatCode: string;
+  /** One additional adjacent seat for this passenger; no baggage entitlement. */
+  extraSeatRequested?: boolean;
 }
 
 export interface ExtraServiceState {
@@ -92,6 +94,7 @@ export function emptyPassenger(
     birthMonth: '',
     birthYear: '',
     seatCode,
+    extraSeatRequested: false,
   };
 }
 

@@ -147,6 +147,12 @@ describe("AddFlightPage", () => {
       expect(screen.getByLabelText(/تعداد صندلی اکونومی/)).toHaveValue("132");
     });
     expect(screen.getByLabelText(/تعداد صندلی بیزینس/)).toHaveValue("18");
+    expect(screen.getByRole("checkbox", { name: /فعال‌سازی اکونومی/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /فعال‌سازی بیزینس/ })).toBeChecked();
+
+    await user.click(screen.getByRole("checkbox", { name: /فعال‌سازی بیزینس/ }));
+    expect(screen.queryByLabelText(/تعداد صندلی بیزینس/)).not.toBeInTheDocument();
+    expect(screen.getByText(/حداکثر ظرفیت هواپیما: ۱۵۰/)).toBeInTheDocument();
   });
 
   it("keeps duration selects aligned with other h-11 fields and computes arrival", async () => {

@@ -20,6 +20,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { localeMoney } from '../../lib/fa-format';
 import { parseLocaleDateToIso } from '../../lib/locale-format';
 import { nationalIdsExceedingSeatLimit } from './checkout/national-id-seat-limit';
+import { isPassengerValid } from './checkout/passenger-validation';
 import type {
   BookingDetail,
   CabinClass,
@@ -69,14 +70,6 @@ import {
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
 const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
 
-function isPassengerComplete(p: PassengerFormDraft): boolean {
-  if (!p.firstNameLatin.trim() || !p.lastNameLatin.trim() || !p.gender)
-    return false;
-  if (!p.birthDay || !p.birthMonth || !p.birthYear) return false;
-  if (p.docType === 'NATIONAL_ID') return p.nationalId.trim().length >= 10;
-  return p.passportNo.trim().length >= 5;
-}
-
 export default function CheckoutPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const [params] = useSearchParams();
@@ -105,6 +98,7 @@ export default function CheckoutPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [editPaxOpen, setEditPaxOpen] = useState(false);
+  const [showPassengerErrors, setShowPassengerErrors] = useState(false);
 
   useEffect(() => {
     if (!isWizard || !draft) return;
@@ -364,7 +358,8 @@ export default function CheckoutPage() {
   function goNext() {
     setError(null);
     if (step === 'pax') {
-      if (passengers.some((p) => !isPassengerComplete(p))) {
+      setShowPassengerErrors(true);
+      if (passengers.some((p) => !isPassengerValid(p))) {
         setError(t.completePaxError);
         return;
       }
@@ -446,7 +441,8 @@ export default function CheckoutPage() {
       setLoginOpen(true);
       return;
     }
-    if (passengers.some((p) => !isPassengerComplete(p))) {
+    if (passengers.some((p) => !isPassengerValid(p))) {
+      setShowPassengerErrors(true);
       setError(t.completePaxError);
       setStep('pax');
       return;
@@ -518,6 +514,7 @@ export default function CheckoutPage() {
               p.passengerType === 'INFANT'
                 ? undefined
                 : seatList[seatIndex++]!,
+            extraSeatRequested: p.passengerType === 'INFANT' ? false : p.extraSeatRequested,
           };
         });
       };
@@ -573,6 +570,7 @@ export default function CheckoutPage() {
               p.passengerType === 'INFANT'
                 ? undefined
                 : seatCodes[seatIndex++]!,
+            extraSeatRequested: p.passengerType === 'INFANT' ? false : p.extraSeatRequested,
           };
         }),
         extras: extras
@@ -595,7 +593,13 @@ export default function CheckoutPage() {
       }
       setError(
         err instanceof ApiRequestError
-          ? err.message
+          ? err.code === 'POOL_EXHAUSTED'
+            ? locale === 'en'
+              ? 'Capacity is full; two adjacent seats are not available.'
+              : locale === 'ar'
+                ? 'اكتملت السعة؛ لا يتوفر مقعدان متجاوران.'
+                : 'ظرفیت تکمیل است؛ دو صندلی کنار هم موجود نیست.'
+            : err.message
           : locale === 'en'
             ? 'Booking failed. Please try again.'
             : 'ثبت رزرو ناموفق بود. لطفاً دوباره تلاش کنید.',
@@ -699,16 +703,23 @@ export default function CheckoutPage() {
   const outboundTicketIrr = draft.outboundLeg
     ? passengerTotalIrr(draft.outboundLeg.flight.priceIrr, currentPassengerMix)
     : 0n;
-  const ticketIrr = returnTicketIrr + outboundTicketIrr;
+  const baseTicketIrr = returnTicketIrr + outboundTicketIrr;
+  const extraSeatCount = passengers.filter(
+    (passenger) => passenger.passengerType !== 'INFANT' && passenger.extraSeatRequested,
+  ).length;
+  const extraSeatUnitIrr =
+    BigInt(priceIrr) + (draft.outboundLeg ? BigInt(draft.outboundLeg.flight.priceIrr || '0') : 0n);
+  const extraSeatIrr = extraSeatUnitIrr * BigInt(extraSeatCount);
   const extrasIrr = extras
     .filter((extra) => extra.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
-  const grandIrr = ticketIrr + extrasIrr;
+  const grandIrr = baseTicketIrr + extraSeatIrr + extrasIrr;
   const grandDisplay = localeMoney(grandIrr.toString(), locale);
-  const passengerFormsComplete = passengers.every(isPassengerComplete);
   const passengerCompletionNotice =
-    step === 'pax' && !passengerFormsComplete ? t.completePaxError : null;
-  const nextDisabled = busy || Boolean(passengerCompletionNotice);
+    showPassengerErrors && step === 'pax' && passengers.some((p) => !isPassengerValid(p))
+      ? t.completePaxError
+      : null;
+  const nextDisabled = busy;
 
   const loginModal = loginOpen ? (
     <div
@@ -794,6 +805,7 @@ export default function CheckoutPage() {
           savedPassengers={savedPassengers}
           savedPassengersEnabled={isAuthenticated}
           departureAt={draft.flight.departureAt}
+          showValidationErrors={showPassengerErrors}
         />
       )}
       {step === 'extras' && (
@@ -874,7 +886,9 @@ export default function CheckoutPage() {
           {/* Design: full CTA in price card + sticky duplicate at bottom */}
           <PricingSidebar
             locale={locale}
-            priceIrr={ticketIrr.toString()}
+            priceIrr={baseTicketIrr.toString()}
+            extraSeatCount={extraSeatCount}
+            extraSeatIrr={extraSeatIrr.toString()}
             paxCount={Math.max(1, passengers.length)}
             passengerMix={currentPassengerMix}
             extras={extras}
@@ -884,7 +898,7 @@ export default function CheckoutPage() {
             canBack={step !== 'pax'}
             busy={busy}
             error={error}
-            disabled={Boolean(passengerCompletionNotice)}
+            disabled={false}
             disabledHint={passengerCompletionNotice}
           />
         </div>
@@ -949,7 +963,9 @@ export default function CheckoutPage() {
         </div>
         <PricingSidebar
           locale={locale}
-          priceIrr={ticketIrr.toString()}
+          priceIrr={baseTicketIrr.toString()}
+          extraSeatCount={extraSeatCount}
+          extraSeatIrr={extraSeatIrr.toString()}
           paxCount={Math.max(1, passengers.length)}
           passengerMix={currentPassengerMix}
           extras={extras}
@@ -959,7 +975,7 @@ export default function CheckoutPage() {
           canBack={step !== 'pax'}
           busy={busy}
           error={error}
-          disabled={Boolean(passengerCompletionNotice)}
+          disabled={false}
           disabledHint={passengerCompletionNotice}
         />
       </div>

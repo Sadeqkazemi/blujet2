@@ -552,8 +552,8 @@ export class SearchService {
       this.passengerRepo
         .createQueryBuilder('p')
         .innerJoin('p.booking', 'b')
-        .select(['p.seatCode'])
-        .where('p.seatCode IS NOT NULL')
+        .select(['p.seatCode', 'p.extraSeatCode'])
+        .where('(p.seatCode IS NOT NULL OR p.extraSeatCode IS NOT NULL)')
         .andWhere('b.flightInstanceId = :flightInstanceId', {
           flightInstanceId,
         })
@@ -575,7 +575,9 @@ export class SearchService {
       }),
     ]);
     return new Set([
-      ...passengers.map((p) => p.seatCode!),
+      ...passengers.flatMap((p) =>
+        [p.seatCode, p.extraSeatCode].filter((code): code is string => !!code),
+      ),
       ...locks.map((l) => l.seatCode),
     ]);
   }
@@ -645,8 +647,11 @@ export class SearchService {
         .createQueryBuilder('p')
         .innerJoin('p.booking', 'b')
         .select('b.channel', 'channel')
-        .addSelect('COUNT(*)', 'count')
-        .where('p.seatCode IS NOT NULL')
+        .addSelect(
+          'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
+          'count',
+        )
+        .where('(p.seatCode IS NOT NULL OR p.extraSeatCode IS NOT NULL)')
         .andWhere('b.flightInstanceId = :flightInstanceId', {
           flightInstanceId,
         })

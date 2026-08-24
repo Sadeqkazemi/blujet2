@@ -8,10 +8,25 @@ import {
   IsString,
   Max,
   Min,
+  ValidateNested,
 } from 'class-validator';
-import { AircraftStatus } from '../../../database/enums';
+import { Type } from 'class-transformer';
+import { AircraftStatus, CabinClass } from '../../../database/enums';
 
 const AIRCRAFT_STATUSES = Object.values(AircraftStatus);
+const CABIN_CLASSES = Object.values(CabinClass);
+
+export class AircraftCabinCapacityDto {
+  @ApiProperty({ enum: CABIN_CLASSES, example: CabinClass.ECONOMY })
+  @IsIn(CABIN_CLASSES)
+  cabinType!: CabinClass;
+
+  @ApiProperty({ example: 120, description: 'ظرفیت عملیاتی این کابین' })
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  capacity!: number;
+}
 
 /** Create/update payload — same row/column band shape as the legacy
  * AircraftSeatMap (see seat-layout.ts's AircraftSeatMapLike), so the
@@ -41,6 +56,18 @@ export class UpsertAircraftDto {
   @Min(1)
   @Max(1000)
   totalCapacity!: number;
+
+  @ApiPropertyOptional({
+    type: [AircraftCabinCapacityDto],
+    description:
+      'ظرفیت عددی کابین‌های فعال؛ هر مقدار باید از نقشه فیزیکی همان کابین بیشتر نباشد',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => AircraftCabinCapacityDto)
+  cabinCapacities?: AircraftCabinCapacityDto[];
 
   @ApiProperty({ example: 3 })
   @IsInt()

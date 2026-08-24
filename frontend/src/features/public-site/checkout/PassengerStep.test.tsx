@@ -218,4 +218,49 @@ describe('PassengerStep — saved passengers', () => {
     expect(screen.getByText('1. نوزاد')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-add-pax')).not.toBeInTheDocument();
   });
+
+  it('marks missing and invalid fields in red with specific inline messages', () => {
+    const invalidPassenger = {
+      ...emptyPassenger(''),
+      nationalId: '0012345678',
+    };
+    render(
+      <PassengerStep
+        locale="fa"
+        passengers={[invalidPassenger]}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+        showValidationErrors
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-pax-first-0')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('نام را وارد کنید.')).toBeInTheDocument();
+    expect(screen.getByText('نام خانوادگی را وارد کنید.')).toBeInTheDocument();
+    expect(screen.getByText('کد ملی اشتباه وارد شده است.')).toBeInTheDocument();
+    expect(screen.getByText('تاریخ تولد را کامل وارد کنید.')).toBeInTheDocument();
+  });
+
+  it('offers an adjacent extra seat only to seated passengers and explains baggage', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <PassengerStep
+        locale="fa"
+        passengers={[emptyPassenger('')]}
+        onChange={onChange}
+        savedPassengers={[]}
+      />,
+    );
+
+    await user.click(screen.getByTestId('checkout-extra-seat-0'));
+    expect(onChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({ extraSeatRequested: true }),
+    ]);
+    expect(
+      screen.getByText(
+        'برای صندلی اضافه بار مجزا تعلق نمی‌گیرد؛ بار اضافه باید جداگانه خریداری شود.',
+      ),
+    ).toBeInTheDocument();
+  });
 });

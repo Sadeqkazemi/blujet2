@@ -65,6 +65,7 @@ export interface CreateBookingPassenger {
   gender?: 'male' | 'female';
   mobile?: string;
   seatCode?: string;
+  extraSeatRequested?: boolean;
 }
 
 export function createBooking(dto: {
