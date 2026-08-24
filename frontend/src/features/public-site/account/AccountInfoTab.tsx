@@ -3,6 +3,7 @@ import JalaliDatePicker from '../../../components/JalaliDatePicker';
 import { formatLocaleDate, parseLocaleDateToIso } from '../../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../../hooks/useLocale';
 import type { UserProfile } from '../../../types/public-site';
+import { splitPersonName } from '../../../lib/person-name';
 
 const STR: Record<
   StoredLocale,
@@ -10,7 +11,8 @@ const STR: Record<
     accountInfoHeading: string;
     editInfoBtn: string;
     notCompleted: string;
-    fullNameLabel: string;
+    firstNameLabel: string;
+    lastNameLabel: string;
     nationalIdLabel: string;
     birthDateLabel: string;
     passportLabel: string;
@@ -31,7 +33,8 @@ const STR: Record<
     accountInfoHeading: 'اطلاعات حساب',
     editInfoBtn: 'ویرایش اطلاعات',
     notCompleted: 'تکمیل نشده',
-    fullNameLabel: 'نام و نام خانوادگی',
+    firstNameLabel: 'نام',
+    lastNameLabel: 'نام خانوادگی',
     nationalIdLabel: 'کد ملی',
     birthDateLabel: 'تاریخ تولد',
     passportLabel: 'شماره گذرنامه',
@@ -51,7 +54,8 @@ const STR: Record<
     accountInfoHeading: 'Account Information',
     editInfoBtn: 'Edit Info',
     notCompleted: 'Not completed',
-    fullNameLabel: 'Full Name',
+    firstNameLabel: 'First Name',
+    lastNameLabel: 'Last Name',
     nationalIdLabel: 'National ID',
     birthDateLabel: 'Date of Birth',
     passportLabel: 'Passport Number',
@@ -71,7 +75,8 @@ const STR: Record<
     accountInfoHeading: 'معلومات الحساب',
     editInfoBtn: 'تعديل المعلومات',
     notCompleted: 'لم يكتمل',
-    fullNameLabel: 'الاسم الكامل',
+    firstNameLabel: 'الاسم الأول',
+    lastNameLabel: 'اسم العائلة',
     nationalIdLabel: 'الرقم الوطني',
     birthDateLabel: 'تاريخ الميلاد',
     passportLabel: 'رقم جواز السفر',
@@ -101,7 +106,8 @@ function FieldCell({ label, value, dir }: { label: string; value: string; dir?: 
 }
 
 interface ProfileForm {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   nationalId: string;
   birthDate: string;
   passportNo: string;
@@ -146,6 +152,7 @@ export default function AccountInfoTab({
   const fieldsCols = isMobile ? '1fr' : 'repeat(2, 1fr)';
 
   const fieldValue = (value: string | null | undefined) => value?.trim() || t.notCompleted;
+  const profileName = splitPersonName(profile?.fullName);
   const birthDateIso = (() => {
     const raw = profileForm.birthDate.trim();
     if (!raw) return null;
@@ -158,8 +165,13 @@ export default function AccountInfoTab({
 
   const profileFields = [
     {
-      label: t.fullNameLabel,
-      value: fieldValue(profile?.fullName ?? profileForm.fullName),
+      label: t.firstNameLabel,
+      value: fieldValue(profileName.firstName || profileForm.firstName),
+      dir: locale === 'en' ? ('ltr' as const) : ('rtl' as const),
+    },
+    {
+      label: t.lastNameLabel,
+      value: fieldValue(profileName.lastName || profileForm.lastName),
       dir: locale === 'en' ? ('ltr' as const) : ('rtl' as const),
     },
     { label: t.nationalIdLabel, value: fieldValue(profile?.nationalId ?? profileForm.nationalId), dir: 'ltr' as const },
@@ -217,16 +229,29 @@ export default function AccountInfoTab({
         </div>
         {editing ? (
           <form onSubmit={onSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div>
-              <label htmlFor="profile-fullName" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
-                {t.fullNameLabel}
+            <div style={{ display: 'grid', gridTemplateColumns: fieldsCols, gap: 11 }}>
+              <div>
+              <label htmlFor="profile-firstName" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.firstNameLabel}
               </label>
               <input
-                id="profile-fullName"
-                value={profileForm.fullName}
-                onChange={(e) => onProfileFormChange({ ...profileForm, fullName: e.target.value })}
+                id="profile-firstName"
+                value={profileForm.firstName}
+                onChange={(e) => onProfileFormChange({ ...profileForm, firstName: e.target.value })}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
               />
+              </div>
+              <div>
+              <label htmlFor="profile-lastName" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.lastNameLabel}
+              </label>
+              <input
+                id="profile-lastName"
+                value={profileForm.lastName}
+                onChange={(e) => onProfileFormChange({ ...profileForm, lastName: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
+              />
+              </div>
             </div>
             <div>
               <label htmlFor="profile-nationalId" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>

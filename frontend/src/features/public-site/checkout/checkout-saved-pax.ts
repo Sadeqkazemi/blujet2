@@ -1,6 +1,7 @@
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { isoDateToFormParts } from '../../../lib/locale-format';
 import type { SavedPassenger } from '../../../types/public-site';
+import { splitPersonName } from '../../../lib/person-name';
 import type { Gender, PassengerFormDraft } from './checkout-types';
 
 /** Autofill payload for one saved-passenger chip on the checkout form. */
@@ -81,13 +82,6 @@ export function monthNameToValue(month: string): string {
   return '';
 }
 
-function splitLatinName(latinName: string): { first: string; last: string } {
-  const parts = latinName.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return { first: '', last: '' };
-  if (parts.length === 1) return { first: parts[0]!, last: '' };
-  return { first: parts[0]!, last: parts.slice(1).join(' ') };
-}
-
 function mapGender(value: SavedPassenger['gender']): Gender {
   if (value === 'male' || value === 'female') return value;
   return '';
@@ -98,15 +92,17 @@ export function apiToCheckoutSavedOptions(
   locale: StoredLocale,
 ): CheckoutSavedPaxOption[] {
   return rows.map((row) => {
-    const { first, last } = splitLatinName(row.latinName || '');
+    // Legacy rows sometimes contain only the family name. Treat a single
+    // token as last name so it never lands in the checkout first-name box.
+    const { firstName, lastName } = splitPersonName(row.latinName, 'last');
     const birth = row.birthDate
       ? isoDateToFormParts(row.birthDate, locale)
       : { birthDay: '', birthMonth: '', birthYear: '' };
     return {
       id: row.id,
       label: row.fullName,
-      firstNameLatin: first,
-      lastNameLatin: last,
+      firstNameLatin: firstName,
+      lastNameLatin: lastName,
       gender: mapGender(row.gender),
       nationalId: row.nationalId ?? '',
       passportNo: row.passportNo ?? '',

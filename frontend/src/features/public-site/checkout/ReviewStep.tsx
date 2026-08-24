@@ -22,7 +22,9 @@ export default function ReviewStep({
   const picked = extras.filter((e) => e.selected).map((e) => extraTitle(e, locale));
   const genderLabel = (g: PassengerFormDraft['gender']) =>
     g === 'female' ? t.female : g === 'male' ? t.male : t.noneSelected;
-  const tableCols = isMobile ? '1fr 1fr' : 'repeat(4, 1fr)';
+  const tableCols = isMobile
+    ? 'repeat(2, minmax(0, 1fr))'
+    : 'minmax(0, 1.35fr) minmax(130px, .9fr) minmax(130px, .9fr) minmax(80px, .6fr)';
   const reviewExtraCols = isMobile ? '1fr' : '1fr 1fr';
 
   return (
@@ -50,15 +52,17 @@ export default function ReviewStep({
       </div>
 
       <div className="mb-3 overflow-hidden rounded-[13px] border border-[#eef1f5]">
-        <div
-          className="gap-0 bg-[#f8fafc] px-3.5 py-2.5 text-[10.5px] font-bold text-[#8a96a6]"
-          style={{ display: 'grid', gridTemplateColumns: tableCols }}
-        >
-          <span>{t.passenger}</span>
-          <span>{t.document}</span>
-          {!isMobile && <span>{t.dateOfBirth}</span>}
-          {!isMobile && <span>{t.gender}</span>}
-        </div>
+        {!isMobile && (
+          <div
+            className="gap-x-4 bg-[#f8fafc] px-3.5 py-2.5 text-[10.5px] font-bold text-[#8a96a6]"
+            style={{ display: 'grid', gridTemplateColumns: tableCols }}
+          >
+            <span>{t.passenger}</span>
+            <span>{t.document}</span>
+            <span>{t.dateOfBirth}</span>
+            <span>{t.gender}</span>
+          </div>
+        )}
         {passengers.map((p, i) => {
           const doc = p.docType === 'PASSPORT' ? p.passportNo || t.passport : p.nationalId || t.nationalId;
           const birth =
@@ -70,15 +74,32 @@ export default function ReviewStep({
           return (
             <div
               key={i}
-              className="items-center border-t border-[#f0f2f6] px-3.5 py-3 text-xs"
+              className="items-center gap-x-4 gap-y-3 border-t border-[#f0f2f6] px-3.5 py-3 text-xs"
               style={{ display: 'grid', gridTemplateColumns: tableCols }}
             >
-              <span className="font-bold text-[#0d2640]">{passengerFullName(p)}</span>
-              <span className="font-mono text-[11.5px] text-[#3b4554]" dir="ltr">
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-bold text-[#0d2640]">
+                {isMobile && <small className="mb-1 block text-[9.5px] font-medium text-[#8a96a6]">{t.passenger}</small>}
+                {passengerFullName(p)}
+              </span>
+              <span
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11.5px] text-[#3b4554]"
+                dir="ltr"
+                data-testid={`checkout-review-document-${i}`}
+              >
+                {isMobile && <small className="mb-1 block text-[9.5px] font-medium text-[#8a96a6]" dir={locale === 'en' ? 'ltr' : 'rtl'}>{t.document}</small>}
                 {doc}
               </span>
-              {!isMobile && <span className="text-[#3b4554]">{birth}</span>}
-              {!isMobile && <span className="text-[#3b4554]">{genderLabel(p.gender)}</span>}
+              <span
+                className="min-w-0 whitespace-nowrap text-[#3b4554]"
+                data-testid={`checkout-review-birth-date-${i}`}
+              >
+                {isMobile && <small className="mb-1 block text-[9.5px] font-medium text-[#8a96a6]">{t.dateOfBirth}</small>}
+                {birth}
+              </span>
+              <span className="min-w-0 whitespace-nowrap text-[#3b4554]">
+                {isMobile && <small className="mb-1 block text-[9.5px] font-medium text-[#8a96a6]">{t.gender}</small>}
+                {genderLabel(p.gender)}
+              </span>
             </div>
           );
         })}

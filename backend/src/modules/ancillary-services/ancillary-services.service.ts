@@ -242,8 +242,27 @@ export class AncillaryServicesService implements OnModuleInit {
   private async syncTravelExtra(row: AncillaryService) {
     const mapping = ANCILLARY_TRAVEL_EXTRA_BY_KEY.get(row.key);
     if (!mapping) return;
-    const extra = await this.travelExtraRepo.findOneBy({ code: mapping.code });
-    if (!extra) return;
+    let extra = await this.travelExtraRepo.findOneBy({ code: mapping.code });
+    if (!extra) {
+      // Older installations can have the permanent ancillary catalogue row
+      // without its checkout mirror. Recreate it at startup so fixed services
+      // such as seat selection cannot silently disappear from checkout.
+      extra = this.travelExtraRepo.create({
+        code: mapping.code,
+        titleFa: row.titleFa,
+        titleEn: null,
+        titleAr: null,
+        descriptionFa: row.descriptionFa || null,
+        billingUnit: mapping.billingUnit,
+        priceIrr: row.priceIrr,
+        active: row.enabled,
+        purchaseEnabled: row.enabled,
+        sortOrder: 0,
+        updatedById: row.updatedById,
+      });
+      await this.travelExtraRepo.save(extra);
+      return;
+    }
     extra.priceIrr = row.priceIrr;
     extra.active = row.enabled;
     extra.purchaseEnabled = row.enabled;

@@ -52,7 +52,13 @@ describe('FlightPriceCalendar', () => {
     expect(screen.getByRole('button', { name: 'روزهای قبلی' })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'روزهای بعدی' }));
-    expect(screen.getByTestId('price-calendar-visible-day-2026-08-04')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(publicSiteApi.fetchPriceCalendar).toHaveBeenLastCalledWith(
+        'THR',
+        'MHD',
+        '2026-08-07',
+      ),
+    );
 
     await userEvent.click(screen.getByTestId('price-calendar-day-2026-08-02'));
     expect(onSelect).toHaveBeenCalledWith('2026-08-02');
@@ -84,5 +90,43 @@ describe('FlightPriceCalendar', () => {
       expect(screen.getByTestId('price-calendar-strip')).toBeInTheDocument();
     });
     expect(spy.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+  });
+
+  it('loads further date windows in both directions without disabling navigation', async () => {
+    const spy = vi
+      .spyOn(publicSiteApi, 'fetchPriceCalendar')
+      .mockResolvedValue(DAYS);
+
+    render(
+      <FlightPriceCalendar
+        origin="THR"
+        dest="MHD"
+        selectedDate="2026-08-01"
+        locale="fa"
+        onSelectDate={vi.fn()}
+      />,
+    );
+
+    await screen.findByTestId('price-calendar-strip');
+    const next = screen.getByRole('button', { name: 'روزهای بعدی' });
+    const previous = screen.getByRole('button', { name: 'روزهای قبلی' });
+
+    expect(next).not.toBeDisabled();
+    expect(previous).not.toBeDisabled();
+
+    await userEvent.click(next);
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-07'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'روزهای قبلی' }));
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-01'),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'روزهای قبلی' }));
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-07-26'),
+    );
   });
 });

@@ -58,6 +58,7 @@ import type { TabKey } from './account/account-types';
 import { isAccountTabKey } from './account/account-nav-items';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import MoneyInput from '../../components/MoneyInput';
+import { joinPersonName, splitPersonName } from '../../lib/person-name';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -591,7 +592,8 @@ export default function AccountPage() {
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileForm, setProfileForm] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     nationalId: '',
     birthDate: '',
     passportNo: '',
@@ -665,9 +667,11 @@ export default function AccountPage() {
     fetchMyIdentity().then(setIdentity).catch(() => setIdentity(null));
     fetchMyProfile()
       .then((p) => {
+        const name = splitPersonName(p.fullName);
         setProfile(p);
         setProfileForm({
-          fullName: p.fullName ?? '',
+          firstName: name.firstName,
+          lastName: name.lastName,
           nationalId: p.nationalId ?? '',
           birthDate: p.birthDate ? formatLocaleDate(p.birthDate, locale) : '',
           passportNo: p.passportNo ?? '',
@@ -705,7 +709,7 @@ export default function AccountPage() {
         return;
       }
       const updated = await updateMyProfile({
-        fullName: profileForm.fullName || undefined,
+        fullName: joinPersonName(profileForm.firstName, profileForm.lastName) || undefined,
         nationalId: profileForm.nationalId || undefined,
         birthDate,
         passportNo: profileForm.passportNo || undefined,
@@ -715,6 +719,7 @@ export default function AccountPage() {
       setProfile(updated);
       setProfileForm((current) => ({
         ...current,
+        ...splitPersonName(updated.fullName),
         email: updated.email ?? '',
       }));
       setProfileNotice(t.saveSuccess);
@@ -991,8 +996,8 @@ export default function AccountPage() {
         throw new Error('birthDate');
       }
       const dto = {
-        fullName: form.fullName.trim(),
-        latinName: form.latinName.trim(),
+        fullName: joinPersonName(form.firstName, form.lastName),
+        latinName: joinPersonName(form.firstNameLatin, form.lastNameLatin),
         gender: form.gender,
         birthDate,
         nationalId: form.nationalId.trim() || undefined,
