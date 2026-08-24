@@ -218,13 +218,17 @@ export default function PublicHeader() {
   }
 
   async function confirmSignOut() {
+    // Close immediately: server-side token revocation is best-effort and must
+    // never leave the customer trapped behind a stale confirmation overlay.
+    setLogoutConfirmOpen(false);
     setLogoutBusy(true);
     try {
       await signOut();
-      setLogoutConfirmOpen(false);
-      navigate('/', { replace: true });
+    } catch {
+      // useAuth still clears the local session even if the revoke call fails.
     } finally {
       setLogoutBusy(false);
+      navigate('/', { replace: true });
     }
   }
 

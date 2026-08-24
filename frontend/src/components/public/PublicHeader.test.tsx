@@ -111,6 +111,43 @@ describe('PublicHeader — logged-in user', () => {
     expect(signOut).toHaveBeenCalledOnce();
   });
 
+  it('closes the sign-out confirmation even when server-side revocation fails', async () => {
+    mockLocale();
+    mockCustomerNotifications();
+    const signOut = vi.fn().mockRejectedValue(new Error('logout endpoint unavailable'));
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut,
+    });
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'GOLD', balance: 12450 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی',
+      nationalId: null,
+      birthDate: null,
+      passportNo: null,
+      email: null,
+      emailVerifiedAt: null,
+      completionPct: 100,
+      profileIncomplete: false,
+      missingProfileFields: [],
+    });
+
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
+    await userEvent.click(screen.getByTestId('public-logout'));
+    await userEvent.click(screen.getByTestId('public-logout-confirm-confirm'));
+
+    expect(signOut).toHaveBeenCalledOnce();
+    await waitFor(() => {
+      expect(screen.queryByTestId('public-logout-confirm')).not.toBeInTheDocument();
+    });
+  });
+
   it('loads real notifications and marks one as read when opened', async () => {
     mockLocale();
     mockCustomerNotifications([

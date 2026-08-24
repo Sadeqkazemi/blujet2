@@ -58,7 +58,12 @@ export default function ReviewStep({
             style={{ display: 'grid', gridTemplateColumns: tableCols }}
           >
             <span>{t.passenger}</span>
-            <span>{t.document}</span>
+            <span
+              className="text-center"
+              data-testid="checkout-review-document-heading"
+            >
+              {t.document}
+            </span>
             <span>{t.dateOfBirth}</span>
             <span>{t.gender}</span>
           </div>
@@ -82,7 +87,7 @@ export default function ReviewStep({
                 {passengerFullName(p)}
               </span>
               <span
-                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11.5px] text-[#3b4554]"
+                className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-center font-mono text-[11.5px] text-[#3b4554]"
                 dir="ltr"
                 data-testid={`checkout-review-document-${i}`}
               >

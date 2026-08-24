@@ -429,15 +429,19 @@ export default function AccountPassengersTab({
           }}
         >
           <form
+            data-testid="passengers-form"
             onClick={(e) => e.stopPropagation()}
             onSubmit={submit}
             style={{
               background: '#fff',
               borderRadius: 18,
-              width: 460,
+              width: 760,
               maxWidth: '100%',
+              maxHeight: 'calc(100vh - 32px)',
               overflow: 'hidden',
               boxShadow: '0 30px 80px -20px rgba(13,38,102,.35)',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <div
@@ -447,6 +451,7 @@ export default function AccountPassengersTab({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flex: 'none',
               }}
             >
               <div style={{ fontSize: 16, fontWeight: 900, color: '#0d2640' }}>
@@ -469,9 +474,20 @@ export default function AccountPassengersTab({
                 ×
               </button>
             </div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div
+              data-testid="passengers-form-fields"
+              style={{
+                padding: 20,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: 14,
+                overflowY: 'auto',
+                minHeight: 0,
+                overscrollBehavior: 'contain',
+              }}
+            >
               {(localError || formError) && (
-                <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0 }}>
+                <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0, gridColumn: '1 / -1' }}>
                   {localError ?? formError}
                 </p>
               )}
@@ -532,7 +548,7 @@ export default function AccountPassengersTab({
                   <option value="female">{t.female}</option>
                 </select>
               </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: '1 / -1' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.dateOfBirth}</span>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr', gap: 8 }}>
                   <select
@@ -615,6 +631,39 @@ export default function AccountPassengersTab({
                 />
                 {t.isChild}
               </label>
+            </div>
+            <div
+              style={{
+                flex: 'none',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 10,
+                padding: '14px 20px',
+                borderTop: '1px solid #eef1f5',
+                background: '#fff',
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeModal}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 110,
+                  height: 46,
+                  borderRadius: 12,
+                  background: '#fff',
+                  color: '#526071',
+                  fontSize: 13,
+                  fontWeight: 800,
+                  border: '1px solid #d9e1eb',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {t.cancel}
+              </button>
               <button
                 type="submit"
                 data-testid="passengers-form-save"
@@ -623,7 +672,8 @@ export default function AccountPassengersTab({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  height: 50,
+                  minWidth: 160,
+                  height: 46,
                   borderRadius: 12,
                   background: '#1668c4',
                   color: '#fff',
@@ -632,7 +682,6 @@ export default function AccountPassengersTab({
                   border: 'none',
                   cursor: formBusy ? 'wait' : 'pointer',
                   fontFamily: 'inherit',
-                  marginTop: 4,
                 }}
               >
                 {formBusy ? '…' : t.save}

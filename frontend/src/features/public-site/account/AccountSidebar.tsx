@@ -247,7 +247,7 @@ interface Props {
   onTabChange: (tab: TabKey) => void;
   user: AuthUser | null;
   club: { isMember: boolean; level: string | null; balance: number } | null;
-  onSignOut: () => void;
+  onSignOut: () => void | Promise<void>;
   isMobile: boolean;
 }
 
@@ -276,10 +276,13 @@ export default function AccountSidebar({
   const sidebarNav = sidebarAccountNavItems(isMobile);
 
   async function confirmSignOut() {
+    setLogoutConfirmOpen(false);
     setLogoutBusy(true);
     try {
       await onSignOut();
-      setLogoutConfirmOpen(false);
+    } catch {
+      // Local session cleanup/navigation is owned by the parent and remains
+      // best-effort even when the revoke endpoint is temporarily unavailable.
     } finally {
       setLogoutBusy(false);
     }

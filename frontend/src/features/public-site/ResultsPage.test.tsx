@@ -186,6 +186,43 @@ describe('ResultsPage', () => {
     expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalledTimes(1);
   });
 
+  it('scrolls the Persian calendar one day without changing the selected search date', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    const search = vi
+      .spyOn(publicSiteApi, 'searchFlights')
+      .mockResolvedValue([RESULT]);
+    renderPage();
+
+    const strip = await screen.findByTestId('price-calendar-strip');
+    expect(strip.firstElementChild).toBe(
+      screen.getByTestId('price-calendar-next'),
+    );
+    await waitFor(() => {
+      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+    });
+    const searchCallsBeforeArrow = search.mock.calls.length;
+
+    await userEvent.click(screen.getByTestId('price-calendar-next'));
+
+    await waitFor(() => {
+      expect(publicSiteApi.fetchPriceCalendar).toHaveBeenLastCalledWith(
+        'THR',
+        'MHD',
+        '2026-08-02',
+      );
+    });
+    expect(search).toHaveBeenCalledTimes(searchCallsBeforeArrow);
+    expect(search).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-01');
+    expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveStyle({
+      background: '#1668c4',
+    });
+  });
+
   it('does not render or request the price calendar on mobile results', async () => {
     mockLocale('fa');
     mockSearchApis();

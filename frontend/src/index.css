@@ -120,3 +120,39 @@ body {
   flex: none;
   touch-action: pan-x;
 }
+@keyframes price-calendar-enter-from-left {
+  from {
+    opacity: 0.52;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes price-calendar-enter-from-right {
+  from {
+    opacity: 0.52;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.price-calendar-slide-from-left {
+  animation: price-calendar-enter-from-left 190ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.price-calendar-slide-from-right {
+  animation: price-calendar-enter-from-right 190ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .price-calendar-slide-from-left,
+  .price-calendar-slide-from-right {
+    animation: none;
+  }
+}
