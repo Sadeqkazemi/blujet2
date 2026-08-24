@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -348,8 +348,10 @@ describe('AccountPage', () => {
     });
     renderPage('/account?tab=passengers');
     await userEvent.click(await screen.findByTestId('passengers-add-open'));
-    await userEvent.type(screen.getByLabelText('نام و نام خانوادگی'), 'سارا احمدی');
-    await userEvent.type(screen.getByLabelText('نام لاتین (روی بلیط)'), 'Sara Ahmadi');
+    await userEvent.type(screen.getByLabelText('نام'), 'سارا');
+    await userEvent.type(screen.getByLabelText('نام خانوادگی'), 'احمدی');
+    await userEvent.type(screen.getByLabelText('نام لاتین'), 'Sara');
+    await userEvent.type(screen.getByLabelText('نام خانوادگی لاتین'), 'Ahmadi');
     await userEvent.selectOptions(screen.getByTestId('passengers-form-gender'), 'female');
     await userEvent.selectOptions(screen.getByTestId('passengers-form-birth-day'), '20');
     await userEvent.selectOptions(screen.getByTestId('passengers-form-birth-month'), '5');
@@ -501,7 +503,14 @@ describe('AccountPage', () => {
     expect(await screen.findByTestId('profile-incomplete-banner')).toHaveTextContent('۲۰٪');
 
     await userEvent.click(screen.getByTestId('account-tab-account-info'));
+    const profileFields = await screen.findByTestId('profile-fields-grid');
+    expect(within(profileFields).getByText('نام')).toBeInTheDocument();
+    expect(within(profileFields).getByText('نگار')).toBeInTheDocument();
+    expect(within(profileFields).getByText('نام خانوادگی')).toBeInTheDocument();
+    expect(within(profileFields).getByText('رضایی')).toBeInTheDocument();
     await userEvent.click(await screen.findByTestId('profile-edit-toggle'));
+    expect(screen.getByLabelText('نام')).toHaveValue('نگار');
+    expect(screen.getByLabelText('نام خانوادگی')).toHaveValue('رضایی');
     const nationalIdInput = await screen.findByLabelText('کد ملی');
     await userEvent.type(nationalIdInput, '0012345679');
     await userEvent.type(screen.getByLabelText('تاریخ تولد'), '۱۳۷۰/۰۵/۱۲');

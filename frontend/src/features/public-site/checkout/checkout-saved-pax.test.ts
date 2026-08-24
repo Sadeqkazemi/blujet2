@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  apiToCheckoutSavedOptions,
   monthNameToValue,
   resolveCheckoutSavedPassengers,
   savedOptionToPassengerPatch,
@@ -33,5 +34,29 @@ describe('checkout-saved-pax', () => {
     });
     expect(patch.firstNameLatin).toBe('NEGAR');
     expect(patch.lastNameLatin).toBe('REZAEI');
+  });
+
+  it('treats a legacy one-part Latin name as the last name', () => {
+    const [option] = apiToCheckoutSavedOptions(
+      [
+        {
+          id: 'saved-legacy',
+          fullName: 'صادق کاظمی',
+          latinName: 'KAZEMI',
+          gender: 'male',
+          birthDate: '1999-02-10',
+          nationalId: '0603267874',
+          passportNo: null,
+          mobile: null,
+          isChild: false,
+          createdAt: '2026-08-01T00:00:00.000Z',
+          updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+      'fa',
+    );
+
+    expect(option?.firstNameLatin).toBe('');
+    expect(option?.lastNameLatin).toBe('KAZEMI');
   });
 });

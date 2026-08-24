@@ -11,6 +11,14 @@ import type { PriceCalendarDay } from '../../../types/public-site';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error' | 'empty';
 
+const CALENDAR_PAGE_DAYS = 6;
+
+function shiftIsoDate(isoDate: string, days: number): string {
+  const date = new Date(`${isoDate.slice(0, 10)}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function FlightPriceCalendar({
   origin,
   dest,
@@ -32,32 +40,35 @@ export default function FlightPriceCalendar({
   const [days, setDays] = useState<PriceCalendarDay[]>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [reloadKey, setReloadKey] = useState(0);
-  const [windowStart, setWindowStart] = useState(0);
+  const [calendarCenter, setCalendarCenter] = useState(selectedDate.slice(0, 10));
+
+  useEffect(() => {
+    setCalendarCenter(selectedDate.slice(0, 10));
+  }, [origin, dest, selectedDate]);
 
   const load = useCallback(async () => {
-    if (!origin || !dest || !selectedDate) {
+    if (!origin || !dest || !calendarCenter) {
       setDays([]);
       setState('idle');
       return;
     }
     setState('loading');
     try {
-      const data = await fetchPriceCalendar(origin, dest, selectedDate.slice(0, 10));
+      const data = await fetchPriceCalendar(origin, dest, calendarCenter);
       setDays([...data].sort((a, b) => a.date.localeCompare(b.date)));
-      setWindowStart(0);
       setState(data.length === 0 ? 'empty' : 'ready');
     } catch {
       setDays([]);
       setState('error');
     }
-  }, [origin, dest, selectedDate]);
+  }, [origin, dest, calendarCenter]);
 
   useEffect(() => {
     void load();
   }, [load, reloadKey]);
 
   const cheapestDate = useMemo(() => findCheapestPriceCalendarDate(days), [days]);
-  const visibleDays = days.slice(windowStart, windowStart + 6);
+  const visibleDays = days.slice(0, CALENDAR_PAGE_DAYS);
 
   if (!origin || !dest || !selectedDate) return null;
 
@@ -152,9 +163,8 @@ export default function FlightPriceCalendar({
             <button
               type="button"
               aria-label={isRTL ? 'روزهای بعدی' : 'Next days'}
-              disabled={windowStart + 6 >= days.length}
-              onClick={() => setWindowStart((value) => Math.min(Math.max(0, days.length - 6), value + 1))}
-              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart + 6 >= days.length ? .35 : 1, fontSize: 21, lineHeight: 1 }}
+              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, CALENDAR_PAGE_DAYS))}
+              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ‹
             </button>
@@ -246,9 +256,8 @@ export default function FlightPriceCalendar({
             <button
               type="button"
               aria-label={isRTL ? 'روزهای قبلی' : 'Previous days'}
-              disabled={windowStart === 0}
-              onClick={() => setWindowStart((value) => Math.max(0, value - 1))}
-              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', opacity: windowStart === 0 ? .35 : 1, fontSize: 21, lineHeight: 1 }}
+              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, -CALENDAR_PAGE_DAYS))}
+              style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ›
             </button>

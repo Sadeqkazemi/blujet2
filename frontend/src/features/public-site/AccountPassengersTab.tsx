@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { isoDateToFormParts, localeDigits } from '../../lib/locale-format';
+import { splitPersonName } from '../../lib/person-name';
 import type { SavedPassenger } from '../../types/public-site';
 
 const STR: Record<
@@ -14,8 +15,10 @@ const STR: Record<
     save: string;
     cancel: string;
     edit: string;
-    fullName: string;
-    latinName: string;
+    firstName: string;
+    lastName: string;
+    firstNameLatin: string;
+    lastNameLatin: string;
     nationalId: string;
     passportNo: string;
     mobile: string;
@@ -43,8 +46,10 @@ const STR: Record<
     save: 'ذخیره',
     cancel: 'انصراف',
     edit: 'ویرایش',
-    fullName: 'نام و نام خانوادگی',
-    latinName: 'نام لاتین (روی بلیط)',
+    firstName: 'نام',
+    lastName: 'نام خانوادگی',
+    firstNameLatin: 'نام لاتین',
+    lastNameLatin: 'نام خانوادگی لاتین',
     nationalId: 'کد ملی',
     passportNo: 'شماره گذرنامه',
     mobile: 'موبایل',
@@ -71,8 +76,10 @@ const STR: Record<
     save: 'Save',
     cancel: 'Cancel',
     edit: 'Edit',
-    fullName: 'Full name',
-    latinName: 'Latin name (on ticket)',
+    firstName: 'First name',
+    lastName: 'Last name',
+    firstNameLatin: 'Latin first name',
+    lastNameLatin: 'Latin last name',
     nationalId: 'National ID',
     passportNo: 'Passport number',
     mobile: 'Mobile',
@@ -99,8 +106,10 @@ const STR: Record<
     save: 'حفظ',
     cancel: 'إلغاء',
     edit: 'تعديل',
-    fullName: 'الاسم الكامل',
-    latinName: 'الاسم اللاتيني (على التذكرة)',
+    firstName: 'الاسم الأول',
+    lastName: 'اسم العائلة',
+    firstNameLatin: 'الاسم الأول باللاتينية',
+    lastNameLatin: 'اسم العائلة باللاتينية',
     nationalId: 'الرقم الوطني',
     passportNo: 'رقم جواز السفر',
     mobile: 'الجوال',
@@ -121,8 +130,10 @@ const STR: Record<
 };
 
 export interface SavedPassengerForm {
-  fullName: string;
-  latinName: string;
+  firstName: string;
+  lastName: string;
+  firstNameLatin: string;
+  lastNameLatin: string;
   gender: '' | 'male' | 'female';
   birthDay: string;
   birthMonth: string;
@@ -134,8 +145,10 @@ export interface SavedPassengerForm {
 }
 
 export const emptyPassengerForm = (): SavedPassengerForm => ({
-  fullName: '',
-  latinName: '',
+  firstName: '',
+  lastName: '',
+  firstNameLatin: '',
+  lastNameLatin: '',
   gender: '',
   birthDay: '',
   birthMonth: '',
@@ -209,10 +222,14 @@ export default function AccountPassengersTab({
     const birth = p.birthDate
       ? isoDateToFormParts(p.birthDate, locale)
       : { birthDay: '', birthMonth: '', birthYear: '' };
+    const nativeName = splitPersonName(p.fullName, 'last');
+    const latinName = splitPersonName(p.latinName, 'last');
     setEditingId(p.id);
     setForm({
-      fullName: p.fullName,
-      latinName: p.latinName,
+      firstName: nativeName.firstName,
+      lastName: nativeName.lastName,
+      firstNameLatin: latinName.firstName,
+      lastNameLatin: latinName.lastName,
       gender: p.gender ?? '',
       birthDay: birth.birthDay,
       birthMonth: birth.birthMonth,
@@ -235,7 +252,12 @@ export default function AccountPassengersTab({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.fullName.trim() || !form.latinName.trim()) return;
+    if (
+      !form.firstName.trim() ||
+      !form.lastName.trim() ||
+      !form.firstNameLatin.trim() ||
+      !form.lastNameLatin.trim()
+    ) return;
     if (!form.gender) {
       setLocalError(t.genderRequired);
       return;
@@ -449,21 +471,40 @@ export default function AccountPassengersTab({
                 </p>
               )}
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.fullName}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.firstName}</span>
                 <input
                   required
-                  value={form.fullName}
-                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                  value={form.firstName}
+                  onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
                   style={inputStyle}
                 />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.latinName}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.lastName}</span>
+                <input
+                  required
+                  value={form.lastName}
+                  onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.firstNameLatin}</span>
                 <input
                   required
                   dir="ltr"
-                  value={form.latinName}
-                  onChange={(e) => setForm((f) => ({ ...f, latinName: e.target.value }))}
+                  value={form.firstNameLatin}
+                  onChange={(e) => setForm((f) => ({ ...f, firstNameLatin: e.target.value }))}
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#0d2640' }}>{t.lastNameLatin}</span>
+                <input
+                  required
+                  dir="ltr"
+                  value={form.lastNameLatin}
+                  onChange={(e) => setForm((f) => ({ ...f, lastNameLatin: e.target.value }))}
                   style={inputStyle}
                 />
               </label>

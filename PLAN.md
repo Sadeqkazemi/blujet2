@@ -3705,3 +3705,17 @@ contracts and retires the production mock adapters.
   `git diff --check`.
 - [ ] Commit/push, review, merge, and deploy after explicit user approval.
 
+# Customer profile, checkout, and price-calendar corrections (2026-08-24)
+
+- [x] Split account and saved-passenger first/last-name editing while keeping
+  the existing combined-name wire contract compatible with stored data.
+- [x] Map legacy one-part saved Latin names to the family-name field and keep
+  national ID and birth date in distinct responsive review cells.
+- [x] Recreate a missing permanent `SEAT_SELECTION` checkout mirror from the
+  real ancillary catalogue at backend startup, preserving its managed price.
+- [x] Make price-calendar arrows load unlimited earlier/later six-day windows.
+- [x] Verified the full 820-test frontend suite, full 243-test backend unit
+  suite, frontend lint, both production builds, and `git diff --check`.
+  See `docs/features/customer-profile-checkout-calendar-fixes.md`.
+- [ ] Commit/push, review, merge, and deploy after explicit user approval.
+
