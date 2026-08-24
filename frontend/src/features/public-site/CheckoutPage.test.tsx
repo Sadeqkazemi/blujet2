@@ -137,6 +137,43 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-from-saved-0')).toHaveTextContent('از مسافران ذخیره‌شده');
   });
 
+  it('shows the approved add/remove passenger controls in checkout', async () => {
+    mockAuth();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const add = await screen.findByTestId('checkout-add-pax');
+    expect(add).toHaveTextContent('مسافر جدید');
+    await user.click(add);
+
+    expect(screen.getByTestId('checkout-pax-card-1')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-remove-pax-0')).toHaveTextContent('حذف');
+    expect(screen.getByTestId('checkout-remove-pax-1')).toHaveTextContent('حذف');
+    expect(screen.getByTestId('checkout-pricing-sidebar')).toHaveTextContent(
+      'قیمت بلیط (بزرگسال × ۲)',
+    );
+
+    await user.click(screen.getByTestId('checkout-remove-pax-1'));
+    expect(screen.queryByTestId('checkout-pax-card-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pricing-sidebar')).toHaveTextContent(
+      'قیمت بلیط (بزرگسال × ۱)',
+    );
+  });
+
   it('shows the actual adult, child, and infant mix in the pricing sidebar', async () => {
     mockAuth();
     render(

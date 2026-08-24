@@ -387,18 +387,23 @@ export default function AccountPassengersTab({
                 <button
                   type="button"
                   aria-label={t.remove}
+                  data-testid={`passenger-remove-${p.id}`}
                   disabled={busyId === p.id}
                   onClick={() => onRemove(p.id)}
                   style={{
-                    fontSize: 14,
-                    color: '#c2cad6',
-                    background: 'none',
-                    border: 'none',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#e5484d',
+                    background: '#fff5f5',
+                    border: '1px solid #f7d4d6',
+                    borderRadius: 8,
                     cursor: busyId === p.id ? 'wait' : 'pointer',
-                    padding: 4,
+                    padding: '6px 10px',
+                    fontFamily: 'inherit',
+                    opacity: busyId === p.id ? 0.65 : 1,
                   }}
                 >
-                  ✕
+                  {busyId === p.id ? '…' : t.remove}
                 </button>
               </div>
             ))}

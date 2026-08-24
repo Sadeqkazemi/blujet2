@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchPriceCalendar } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import {
@@ -41,10 +41,23 @@ export default function FlightPriceCalendar({
   const [state, setState] = useState<LoadState>('idle');
   const [reloadKey, setReloadKey] = useState(0);
   const [calendarCenter, setCalendarCenter] = useState(selectedDate.slice(0, 10));
+  const [activeDate, setActiveDate] = useState(selectedDate.slice(0, 10));
+  const routeKey = `${origin}|${dest}`;
+  const routeKeyRef = useRef(routeKey);
+  const visibleDateSetRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    setCalendarCenter(selectedDate.slice(0, 10));
-  }, [origin, dest, selectedDate]);
+    const normalizedSelectedDate = selectedDate.slice(0, 10);
+    const routeChanged = routeKeyRef.current !== routeKey;
+    routeKeyRef.current = routeKey;
+    setActiveDate(normalizedSelectedDate);
+    setCalendarCenter((current) => {
+      if (!routeChanged && visibleDateSetRef.current.has(normalizedSelectedDate)) {
+        return current;
+      }
+      return normalizedSelectedDate;
+    });
+  }, [routeKey, selectedDate]);
 
   const load = useCallback(async () => {
     if (!origin || !dest || !calendarCenter) {
@@ -69,6 +82,11 @@ export default function FlightPriceCalendar({
 
   const cheapestDate = useMemo(() => findCheapestPriceCalendarDate(days), [days]);
   const visibleDays = days.slice(0, CALENDAR_PAGE_DAYS);
+  visibleDateSetRef.current = new Set(visibleDays.map((day) => day.date));
+  const previousDaysLabel =
+    locale === 'fa' ? 'روزهای قبلی' : locale === 'ar' ? 'الأيام السابقة' : 'Previous days';
+  const nextDaysLabel =
+    locale === 'fa' ? 'روزهای بعدی' : locale === 'ar' ? 'الأيام التالية' : 'Next days';
 
   if (!origin || !dest || !selectedDate) return null;
 
@@ -149,6 +167,7 @@ export default function FlightPriceCalendar({
         {state === 'ready' && (
           <div
             data-testid="price-calendar-strip"
+            dir="ltr"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -162,14 +181,15 @@ export default function FlightPriceCalendar({
           >
             <button
               type="button"
-              aria-label={isRTL ? 'روزهای بعدی' : 'Next days'}
-              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, CALENDAR_PAGE_DAYS))}
+              data-testid="price-calendar-previous"
+              aria-label={previousDaysLabel}
+              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, -CALENDAR_PAGE_DAYS))}
               style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ‹
             </button>
             {visibleDays.map((day) => {
-              const selected = day.date === selectedDate.slice(0, 10);
+              const selected = day.date === activeDate;
               const isCheapest = cheapestDate != null && day.date === cheapestDate;
               const empty = formatPriceCalendarPrice(day.minPriceIrr, locale, copy.emptyDay) === copy.emptyDay;
               const parts = formatPriceCalendarDayParts(day.date, locale);
@@ -197,7 +217,11 @@ export default function FlightPriceCalendar({
                   data-selected={selected ? 'true' : 'false'}
                   data-empty={empty ? 'true' : 'false'}
                   aria-pressed={selected}
-                  onClick={() => onSelectDate(day.date)}
+                  dir={isRTL ? 'rtl' : 'ltr'}
+                  onClick={() => {
+                    setActiveDate(day.date);
+                    onSelectDate(day.date);
+                  }}
                   style={{
                     flex: compact ? '1 0 104px' : '1 1 0',
                     minWidth: compact ? 104 : 0,
@@ -255,8 +279,9 @@ export default function FlightPriceCalendar({
             })}
             <button
               type="button"
-              aria-label={isRTL ? 'روزهای قبلی' : 'Previous days'}
-              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, -CALENDAR_PAGE_DAYS))}
+              data-testid="price-calendar-next"
+              aria-label={nextDaysLabel}
+              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, CALENDAR_PAGE_DAYS))}
               style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ›
