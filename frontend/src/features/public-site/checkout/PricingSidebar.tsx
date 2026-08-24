@@ -15,6 +15,8 @@ export default function PricingSidebar({
   paxCount,
   passengerMix,
   extras,
+  extraSeatCount = 0,
+  extraSeatIrr = '0',
   nextLabel,
   onNext,
   onBack,
@@ -31,6 +33,8 @@ export default function PricingSidebar({
   paxCount: number;
   passengerMix: PassengerMix;
   extras: ExtraServiceState[];
+  extraSeatCount?: number;
+  extraSeatIrr?: string;
   nextLabel: string;
   onNext: () => void;
   onBack?: () => void;
@@ -43,10 +47,11 @@ export default function PricingSidebar({
 }) {
   const t = CHECKOUT_COPY[locale];
   const ticketIrr = BigInt(priceIrr || '0');
+  const additionalSeatIrr = BigInt(extraSeatIrr || '0');
   const extrasIrr = extras
     .filter((e) => e.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, paxCount), 0n);
-  const grandIrr = ticketIrr + extrasIrr;
+  const grandIrr = ticketIrr + additionalSeatIrr + extrasIrr;
   return (
     <aside
       className="flex flex-col rounded-[18px] border border-[#eef1f5] bg-white p-[22px] lg:sticky lg:top-[90px]"
@@ -67,6 +72,20 @@ export default function PricingSidebar({
             {localeMoney(ticketIrr.toString(), locale)}
           </span>
         </div>
+        {extraSeatCount > 0 && (
+          <div className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]">
+            <span>
+              {locale === 'en'
+                ? `Adjacent extra seat × ${extraSeatCount}`
+                : locale === 'ar'
+                  ? `مقعد مجاور إضافي × ${extraSeatCount}`
+                  : `صندلی اضافه کنار مسافر × ${extraSeatCount}`}
+            </span>
+            <span className="font-bold text-[#16202e]">
+              {localeMoney(additionalSeatIrr.toString(), locale)}
+            </span>
+          </div>
+        )}
         {extras
           .filter((e) => e.selected)
           .map((e) => (

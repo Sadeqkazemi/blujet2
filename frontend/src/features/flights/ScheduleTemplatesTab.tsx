@@ -16,7 +16,7 @@ import {
 } from "../../api/flights";
 import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
-import { faDigits, faMoney, parseTomanToRialString } from "../../lib/fa-format";
+import { faDigits, faMoney, latinDigits, parseTomanToRialString } from "../../lib/fa-format";
 import { dayjs, formatJalaliDate, toIsoDateOnly } from "../../lib/jalali";
 import { normalizeTomanInput } from "../../lib/money-input";
 import { tomanInputWords } from "../../lib/persian-number-words";
@@ -28,6 +28,9 @@ import type {
   ScheduleTemplatePreview,
   ScheduleTemplateRow,
 } from "../../types/schedule-templates";
+import CabinCapacityEditor, {
+  type CabinCapacityRow,
+} from "./components/CabinCapacityEditor";
 
 const WEEKDAYS = [
   [6, "شنبه"],
@@ -99,6 +102,7 @@ export default function ScheduleTemplatesTab() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [routeCabins, setRouteCabins] = useState<CabinCapacityRow[]>([]);
   const [deactivateRow, setDeactivateRow] =
     useState<ScheduleTemplateRow | null>(null);
   const [routeTab, setRouteTab] = useState<"active" | "history">("active");
@@ -112,6 +116,21 @@ export default function ScheduleTemplatesTab() {
   const selectedAircraft = aircraft.find(
     (row) => row.id === form.aircraftDefinitionId,
   );
+  const routeCabinError = useMemo(() => {
+    if (!selectedAircraft) return null;
+    if (routeCabins.length === 0) return "حداقل یک کابین باید برای مسیر فعال باشد.";
+    for (const row of routeCabins) {
+      const seats = Number(latinDigits(row.seats)) || 0;
+      const maximum = selectedAircraft.cabins.find(
+        (cabin) => cabin.cabinType === row.cabin,
+      )?.capacity;
+      if (!maximum) return `کابین ${row.cabin} در هواپیمای انتخابی وجود ندارد.`;
+      if (seats < 1 || seats > maximum) {
+        return `ظرفیت فعال ${row.cabin} باید بین ۱ تا ${faDigits(maximum)} باشد.`;
+      }
+    }
+    return null;
+  }, [routeCabins, selectedAircraft]);
 
   const activeRoutes = useMemo(
     () => (items ?? []).filter((row) => row.status === "ACTIVE"),
@@ -155,6 +174,8 @@ export default function ScheduleTemplatesTab() {
       form.weekdays.length === 0 ||
       !agencyPriceIrr ||
       !legalCeilingIrr ||
+      routeCabinError ||
+      routeCabins.length === 0 ||
       Number(form.durationMinutes) <= 0
     )
       return null;
@@ -163,6 +184,10 @@ export default function ScheduleTemplatesTab() {
       destinationAirportId: form.destinationAirportId,
       flightNoBase: form.flightNoBase.trim().toUpperCase(),
       aircraftDefinitionId: form.aircraftDefinitionId,
+      cabinCapacities: routeCabins.map((row) => ({
+        cabin: row.cabin,
+        seats: Number(latinDigits(row.seats)),
+      })),
       departureTime: form.departureTime,
       durationMinutes: Number(form.durationMinutes),
       startDate: toIsoDateOnly(dayjs(form.startDate)),
@@ -171,7 +196,7 @@ export default function ScheduleTemplatesTab() {
       agencyPriceIrr,
       legalCeilingIrr,
     };
-  }, [form]);
+  }, [form, routeCabinError, routeCabins]);
 
   const payloadKey = payload ? JSON.stringify(payload) : null;
   const previewIsCurrent = Boolean(
@@ -275,6 +300,10 @@ export default function ScheduleTemplatesTab() {
       return;
     }
     if (!payload) {
+      if (routeCabinError) {
+        setError(routeCabinError);
+        return;
+      }
       showValidationError(validateFields());
       return;
     }
@@ -308,7 +337,9 @@ export default function ScheduleTemplatesTab() {
       return;
     }
     if (!payload || !previewIsCurrent) {
-      setError("ابتدا برای اطلاعات فعلی پیش‌نمایش معتبر بگیرید.");
+      setError(
+        routeCabinError ?? "ابتدا برای اطلاعات فعلی پیش‌نمایش معتبر بگیرید.",
+      );
       return;
     }
     setBusy(true);
@@ -319,6 +350,7 @@ export default function ScheduleTemplatesTab() {
         idempotencyKey: createRequestKey(),
       });
       setForm(INITIAL);
+      setRouteCabins([]);
       setInvalidFields(new Set());
       setPreview(null);
       setPreviewedPayloadKey(null);
@@ -371,6 +403,7 @@ export default function ScheduleTemplatesTab() {
         destinationAirportId: row.destinationAirportId,
         flightNoBase: row.flightNoBase,
         aircraftDefinitionId: row.aircraftDefinitionId,
+        cabinCapacities: row.cabinCapacities,
         departureTime: row.departureTime,
         durationMinutes: row.durationMinutes,
         startDate: row.startDate,
@@ -471,7 +504,20 @@ export default function ScheduleTemplatesTab() {
             نوع هواپیما *
             <select
               value={form.aircraftDefinitionId}
-              onChange={(e) => updateForm("aircraftDefinitionId", e.target.value)}
+              onChange={(e) => {
+                const aircraftDefinitionId = e.target.value;
+                const definition = aircraft.find(
+                  (row) => row.id === aircraftDefinitionId,
+                );
+                updateForm("aircraftDefinitionId", aircraftDefinitionId);
+                setRouteCabins(
+                  (definition?.cabins ?? []).map((cabin) => ({
+                    key: `route-${cabin.cabinType}`,
+                    cabin: cabin.cabinType,
+                    seats: String(cabin.capacity),
+                  })),
+                );
+              }}
               className={fieldClass("aircraftDefinitionId")}
               aria-invalid={invalidFields.has("aircraftDefinitionId")}
             >
@@ -483,6 +529,16 @@ export default function ScheduleTemplatesTab() {
               ))}
             </select>
           </label>
+          {selectedAircraft && (
+            <div className="md:col-span-2">
+              <CabinCapacityEditor
+                rows={routeCabins}
+                onChange={setRouteCabins}
+                availableCabins={selectedAircraft.cabins}
+                error={routeCabinError}
+              />
+            </div>
+          )}
           <label className="text-xs font-bold text-panel-muted">
             تعداد صندلی هواپیما *
             <input
@@ -640,6 +696,7 @@ export default function ScheduleTemplatesTab() {
                 setPreviewedPayloadKey(null);
                 setError(null);
                 setInvalidFields(new Set());
+                setRouteCabins([]);
               }}
               className="rounded-lg border border-panel-border px-4 py-3 text-xs font-black text-panel-muted"
             >

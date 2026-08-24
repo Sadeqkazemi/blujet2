@@ -219,7 +219,7 @@ describe('AircraftFormPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('create form shows MD-80 lock message when code is MD-80', async () => {
+  it('keeps the MD-80 seat map editable so commercial can define its cabins', async () => {
     const user = userEvent.setup();
 
     render(
@@ -233,8 +233,12 @@ describe('AircraftFormPage', () => {
     await user.type(screen.getByTestId('aircraft-code'), 'MD-80');
     await user.type(screen.getByTestId('aircraft-name'), 'MD-80');
 
-    expect(screen.getByTestId('md80-locked-message')).toBeInTheDocument();
-    expect(screen.queryByTestId('seat-map-editor')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('md80-locked-message')).not.toBeInTheDocument();
+    expect(screen.getByTestId('seat-map-editor')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-cabin-capacity-FIRST')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-cabin-capacity-BUSINESS')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-cabin-capacity-COMFORT')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-cabin-capacity-ECONOMY')).toBeInTheDocument();
   });
 
   it('validates cabin seat sum before submit', async () => {
@@ -284,12 +288,22 @@ describe('AircraftFormPage', () => {
       expect(screen.getByDisplayValue('ایرباس A320')).toBeInTheDocument();
     });
 
+    expect(screen.getByTestId('aircraft-cabin-capacity-BUSINESS')).toHaveValue('3');
+    expect(screen.getByTestId('aircraft-cabin-capacity-ECONOMY')).toHaveValue('6');
+    expect(screen.getByTestId('aircraft-cabin-capacity-FIRST')).toHaveValue('');
+
     await user.clear(screen.getByTestId('aircraft-name'));
     await user.type(screen.getByTestId('aircraft-name'), 'ایرباس A320neo');
     await user.click(screen.getByTestId('aircraft-form-submit'));
 
     await waitFor(() => {
       expect(updateSpy).toHaveBeenCalled();
+    });
+    expect(updateSpy.mock.calls[0]?.[1]).toMatchObject({
+      cabinCapacities: [
+        { cabinType: 'BUSINESS', capacity: 3 },
+        { cabinType: 'ECONOMY', capacity: 6 },
+      ],
     });
   });
 });

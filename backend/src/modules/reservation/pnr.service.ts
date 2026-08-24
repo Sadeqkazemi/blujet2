@@ -102,7 +102,9 @@ export class PnrService {
     const qb = manager
       .createQueryBuilder(Passenger, 'p')
       .innerJoin('p.booking', 'b')
-      .where('p.seatCode = :seatCode', { seatCode })
+      .where('(p.seatCode = :seatCode OR p.extraSeatCode = :seatCode)', {
+        seatCode,
+      })
       .andWhere('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
       .andWhere('b.status != :cancelled', { cancelled: 'CANCELLED' });
     if (excludeBookingId) {

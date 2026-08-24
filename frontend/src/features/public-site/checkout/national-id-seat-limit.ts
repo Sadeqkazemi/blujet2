@@ -14,7 +14,7 @@ function normalizeNationalIdInput(value: string): string {
  */
 export function nationalIdsExceedingSeatLimit(
   passengers: ReadonlyArray<
-    Pick<PassengerFormDraft, 'nationalId' | 'docType' | 'passengerType'>
+    Pick<PassengerFormDraft, 'nationalId' | 'docType' | 'passengerType' | 'extraSeatRequested'>
   >,
   max = MAX_SEATS_PER_NATIONAL_ID,
 ): string[] {
@@ -24,7 +24,7 @@ export function nationalIdsExceedingSeatLimit(
     if (passenger.docType !== 'NATIONAL_ID') continue;
     const nid = normalizeNationalIdInput(passenger.nationalId);
     if (nid.length < 10) continue;
-    counts.set(nid, (counts.get(nid) ?? 0) + 1);
+    counts.set(nid, (counts.get(nid) ?? 0) + 1 + (passenger.extraSeatRequested ? 1 : 0));
   }
   return [...counts.entries()]
     .filter(([, count]) => count > max)

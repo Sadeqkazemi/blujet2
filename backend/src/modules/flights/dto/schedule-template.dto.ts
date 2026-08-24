@@ -11,8 +11,10 @@ import {
   Max,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CabinCapacityDto } from './flight-definition.dto';
 
 export class ScheduleTemplatePreviewDto {
   @ApiProperty({ example: 'uuid-origin-airport' })
@@ -33,6 +35,17 @@ export class ScheduleTemplatePreviewDto {
   @IsString()
   @MinLength(1)
   aircraftDefinitionId!: string;
+
+  @ApiPropertyOptional({
+    type: [CabinCapacityDto],
+    description: 'کابین‌های فعال و ظرفیت هرکدام در این مسیر/برنامه پروازی',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CabinCapacityDto)
+  cabinCapacities?: CabinCapacityDto[];
 
   @ApiProperty({
     example: '07:30',

@@ -8,6 +8,58 @@ import * as aircraftApi from "../../api/aircraft";
 afterEach(() => vi.restoreAllMocks());
 
 describe("ScheduleTemplatesTab", () => {
+  it("shows the selected aircraft cabins and allows per-route activation", async () => {
+    vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([]);
+    vi.spyOn(aircraftApi, "fetchAircraftDefinitions").mockResolvedValue([
+      {
+        id: "md80-1",
+        code: "MD80",
+        model: "MD-80",
+        title: "MD-80",
+        status: "ACTIVE",
+        totalCapacity: 144,
+        version: 1,
+        cabins: [
+          { cabinType: "BUSINESS", capacity: 12 },
+          { cabinType: "COMFORT", capacity: 18 },
+          { cabinType: "ECONOMY", capacity: 114 },
+        ],
+      },
+    ]);
+    vi.spyOn(flightsApi, "fetchScheduleTemplates").mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+    });
+    const user = userEvent.setup();
+
+    render(<ScheduleTemplatesTab />);
+    await user.click(await screen.findByRole("button", { name: "افزودن مسیر جدید" }));
+    await user.selectOptions(screen.getByLabelText("نوع هواپیما *"), "md80-1");
+
+    const business = (await screen.findByTestId("available-cabin-BUSINESS")).querySelector(
+      "input[type=checkbox]",
+    ) as HTMLInputElement;
+    const comfort = screen
+      .getByTestId("available-cabin-COMFORT")
+      .querySelector("input[type=checkbox]") as HTMLInputElement;
+    const economy = screen
+      .getByTestId("available-cabin-ECONOMY")
+      .querySelector("input[type=checkbox]") as HTMLInputElement;
+    expect(business).toBeChecked();
+    expect(comfort).toBeChecked();
+    expect(economy).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "فعال‌سازی فرست" })).not.toBeInTheDocument();
+
+    await user.click(comfort);
+    expect(comfort).not.toBeChecked();
+    expect(screen.queryByLabelText("تعداد صندلی کامفورت")).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("available-cabin-BUSINESS").querySelector('input[inputmode="numeric"]'),
+    ).toHaveValue("12");
+  });
+
   it("loads route templates from real APIs and renders an empty state without filler rows", async () => {
     vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([]);
     vi.spyOn(aircraftApi, "fetchAircraftDefinitions").mockResolvedValue([]);

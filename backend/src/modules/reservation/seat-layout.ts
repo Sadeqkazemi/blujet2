@@ -113,3 +113,54 @@ export function isKnownSeat(
 ): boolean {
   return enumerateSeats(map).some((s) => s.seatCode === seatCode);
 }
+
+function cabinSides(
+  map: AircraftSeatMapLike,
+  cabin: SeatCell['cabin'],
+): string[][] {
+  if (cabin === 'FIRST')
+    return [map.firstColsLeft ?? [], map.firstColsRight ?? []];
+  if (cabin === 'BUSINESS')
+    return [map.businessColsLeft ?? [], map.businessColsRight ?? []];
+  if (cabin === 'COMFORT')
+    return [map.comfortColsLeft ?? [], map.comfortColsRight ?? []];
+  return [map.economyColsLeft ?? [], map.economyColsRight ?? []];
+}
+
+/** Finds a free adjacent seat in the same row/cabin and aisle side. */
+export function findAdjacentSeatCode(
+  map: AircraftSeatMapLike,
+  primarySeatCode: string,
+  unavailable: ReadonlySet<string>,
+): string | null {
+  const primary = enumerateSeats(map).find(
+    (seat) => seat.seatCode === primarySeatCode,
+  );
+  if (!primary) return null;
+  const column = primarySeatCode.slice(String(primary.row).length);
+  for (const side of cabinSides(map, primary.cabin)) {
+    const index = side.indexOf(column);
+    if (index < 0) continue;
+    for (const adjacentIndex of [index - 1, index + 1]) {
+      const adjacentColumn = side[adjacentIndex];
+      if (!adjacentColumn) continue;
+      const code = `${primary.row}${adjacentColumn}`;
+      if (!unavailable.has(code) && isKnownSeat(map, code)) return code;
+    }
+  }
+  return null;
+}
+
+/** Finds any two free adjacent seats in one cabin, without crossing an aisle. */
+export function findAdjacentSeatPair(
+  map: AircraftSeatMapLike,
+  cabin: SeatCell['cabin'],
+  unavailable: ReadonlySet<string>,
+): [string, string] | null {
+  for (const seat of enumerateSeats(map)) {
+    if (seat.cabin !== cabin || unavailable.has(seat.seatCode)) continue;
+    const adjacent = findAdjacentSeatCode(map, seat.seatCode, unavailable);
+    if (adjacent) return [seat.seatCode, adjacent];
+  }
+  return null;
+}

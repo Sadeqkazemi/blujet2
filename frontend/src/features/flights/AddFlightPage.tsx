@@ -24,7 +24,7 @@ import { ApiRequestError } from "../../api/envelope";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
 import MoneyInput from "../../components/MoneyInput";
 import TimePicker from "../../components/TimePicker";
-import { toFlightCabinKind } from "../../types/aircraft";
+import { toFlightCabinKind, type AircraftCabinCapacity } from "../../types/aircraft";
 import {
   chargeRuleFromApi,
   draftRulesToApi,
@@ -236,6 +236,7 @@ export default function AddFlightPage({
   const [aircraft, setAircraft] = useState("Airbus A320");
   const [cabinRows, setCabinRows] =
     useState<CabinCapacityRow[]>(defaultCabinRows);
+  const [aircraftCabinLimits, setAircraftCabinLimits] = useState<AircraftCabinCapacity[]>([]);
   const [charter, setCharter] = useState("");
   const [resolvedTemplate, setResolvedTemplate] =
     useState<ResolvedScheduleTemplate | null>(null);
@@ -338,8 +339,17 @@ export default function AddFlightPage({
       return "حداقل یک کابین با صندلی بیشتر از صفر لازم است";
     const cabins = cabinRows.map((r) => r.cabin);
     if (new Set(cabins).size !== cabins.length) return "کابین تکراری مجاز نیست";
+    for (const row of cabinRows) {
+      const maximum = aircraftCabinLimits.find(
+        (candidate) => candidate.cabinType === row.cabin,
+      )?.capacity;
+      const configured = Number(latinDigits(row.seats)) || 0;
+      if (maximum == null) return `کابین ${cabinLabel(row.cabin)} در هواپیمای انتخابی وجود ندارد`;
+      if (configured > maximum)
+        return `ظرفیت ${cabinLabel(row.cabin)} نمی‌تواند بیشتر از ${faDigits(maximum)} صندلی باشد`;
+    }
     return null;
-  }, [cabinRows, showValidation]);
+  }, [aircraftCabinLimits, cabinRows, showValidation]);
 
   useEffect(() => {
     fetchAirports()
@@ -380,6 +390,12 @@ export default function AddFlightPage({
                 seats: String(c.seats),
               }))
             : defaultCabinRows(),
+        );
+        setAircraftCabinLimits(
+          def.cabinCapacities.map((c) => ({
+            cabinType: c.cabin,
+            capacity: c.seats,
+          })),
         );
         setCharter(String(def.charterSeats ?? 0));
         setAircraft(def.aircraftType || "Airbus A320");
@@ -490,6 +506,12 @@ export default function AddFlightPage({
             );
           }
           if (template.cabinCapacities.length > 0) {
+            setAircraftCabinLimits(
+              template.cabinCapacities.map((row) => ({
+                cabinType: row.cabin,
+                capacity: row.seats,
+              })),
+            );
             setCabinRows(
               template.cabinCapacities.map((row, index) => ({
                 key: `template-cabin-${index}`,
@@ -556,6 +578,11 @@ export default function AddFlightPage({
       );
       if (!match) throw new Error("NO_DEFINITION");
       const detail = await fetchAircraftDefinition(match.id);
+      setAircraftCabinLimits(
+        detail.cabins
+          .filter((c) => c.capacity > 0)
+          .map((c) => ({ cabinType: c.cabinType, capacity: c.capacity })),
+      );
       const rows: CabinCapacityRow[] = [];
       for (const c of detail.cabins) {
         if (c.capacity <= 0) continue;
@@ -572,6 +599,7 @@ export default function AddFlightPage({
     } catch {
       const match = aircraftTypes.find((a) => a.aircraftType === type);
       if (match && match.capacity > 0) {
+        setAircraftCabinLimits([{ cabinType: "ECONOMY", capacity: match.capacity }]);
         setCabinRows([
           { key: "cab-auto", cabin: "ECONOMY", seats: String(match.capacity) },
         ]);
@@ -1264,6 +1292,7 @@ export default function AddFlightPage({
                   onChange={setCabinRows}
                   error={cabinCapacityError}
                   readOnly={inheritedOccurrenceLocked}
+                  availableCabins={aircraftCabinLimits.length > 0 ? aircraftCabinLimits : undefined}
                 />
               </div>
               {resolvedTemplate && !isEdit && (
@@ -1465,21 +1494,24 @@ export default function AddFlightPage({
                             inputMode="decimal"
                             value={fareForm.taxPercent}
                             onChange={(e) =>
-                              setFareForm((f) => ({ ...f, taxPercent: e.target.value }))
+                              setFareForm((f) => ({
+                                ...f,
+                                taxPercent: e.target.value,
+                              }))
                             }
                             placeholder="مثلاً ۹٪"
                             className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#0f1726] px-3 pr-9 text-left font-num text-[11.5px] text-[#e7ecf3] outline-none"
                             data-testid="fare-tax-percent"
                           />
-                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#9fb0c7]">٪</span>
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#9fb0c7]">
+                            ٪
+                          </span>
                         </div>
                       ) : (
                         <MoneyInput
                           label="مالیات و عوارض (تومان)"
                           valueToman={fareForm.taxToman}
-                          onChangeToman={(v) =>
-                            setFareForm((f) => ({ ...f, taxToman: v }))
-                          }
+                          onChangeToman={(v) => setFareForm((f) => ({ ...f, taxToman: v }))}
                           testId="fare-tax-money"
                         />
                       )}

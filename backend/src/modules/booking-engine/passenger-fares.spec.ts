@@ -21,6 +21,22 @@ function passenger(
 describe('passenger fares', () => {
   const departureAt = new Date('2026-08-10T10:00:00.000Z');
 
+  it('prices an extra seat at one base fare without tax', () => {
+    const row = passengerFareRows(
+      [
+        {
+          ...passenger('ADULT', '1990-01-01', '1A'),
+          extraSeatRequested: true,
+        },
+      ],
+      10_000n,
+      2_000n,
+      'SYSTEM',
+    )[0]!;
+    expect(row.extraSeatFareIrr).toBe(10_000n);
+    expect(row.taxIrr).toBe(2_000n);
+  });
+
   it('prices adult, system child and lap infant at 100%, 50% and 10%', () => {
     const rows = passengerFareRows(
       [

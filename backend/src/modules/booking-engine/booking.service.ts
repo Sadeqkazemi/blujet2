@@ -37,7 +37,11 @@ import {
   isValidIranianNationalId,
   normalizeNationalId,
 } from '../../common/pii-crypto';
-import { enumerateSeats } from '../reservation/seat-layout';
+import {
+  enumerateSeats,
+  findAdjacentSeatCode,
+  findAdjacentSeatPair,
+} from '../reservation/seat-layout';
 import { matchesLastName } from '../../common/passenger-name.util';
 import { resolveAircraftType } from '../flights/aircraft-type.util';
 import { assertSellableForSale } from '../flights/definition-sellability';
@@ -87,6 +91,52 @@ function cabinLabelFa(cabin: CabinClass): string {
     default:
       return cabin;
   }
+}
+
+function allocateAdjacentExtraSeats(
+  map: AircraftSeatMap,
+  cabin: CabinClass,
+  passengers: CreateBookingDto['passengers'],
+  taken: ReadonlySet<string>,
+): {
+  primarySeatCodes: Array<string | null>;
+  extraSeatCodes: Array<string | null>;
+} {
+  const primarySeatCodes = passengers.map((passenger) =>
+    passenger.seatCode ? passenger.seatCode : null,
+  );
+  const unavailable = new Set([
+    ...taken,
+    ...primarySeatCodes.filter((code): code is string => Boolean(code)),
+  ]);
+  const extraSeatCodes = passengers.map((passenger, passengerIndex) => {
+    if (!passenger.extraSeatRequested) return null;
+    const requestedPrimary = primarySeatCodes[passengerIndex]!;
+    let extraSeatCode = findAdjacentSeatCode(
+      map,
+      requestedPrimary,
+      unavailable,
+    );
+    if (!extraSeatCode) {
+      // Auto-selection may initially land on an isolated free seat. Move this
+      // passenger to another free pair before declaring the cabin full.
+      unavailable.delete(requestedPrimary);
+      const pair = findAdjacentSeatPair(map, cabin, unavailable);
+      if (!pair) {
+        unavailable.add(requestedPrimary);
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message: 'ظرفیت تکمیل است؛ دو صندلی کنار هم موجود نیست.',
+        });
+      }
+      primarySeatCodes[passengerIndex] = pair[0];
+      unavailable.add(pair[0]);
+      extraSeatCode = pair[1];
+    }
+    unavailable.add(extraSeatCode);
+    return extraSeatCode;
+  });
+  return { primarySeatCodes, extraSeatCodes };
 }
 
 function generatePnr(): string {
@@ -218,6 +268,8 @@ export class BookingService {
       passengers: b.passengers.map((p) => ({
         fullName: p.fullName,
         seatCode: p.seatCode,
+        extraSeatCode: p.extraSeatCode,
+        extraSeatFareIrr: p.extraSeatFareIrr,
         passengerType: p.passengerType,
         birthDate: p.birthDate,
         occupiesSeat: p.occupiesSeat,
@@ -431,11 +483,15 @@ export class BookingService {
       (fareClass?.taxIrr ?? 0n) + chargePerPax,
       instance.charterSeats >= instance.capacity ? 'CHARTER' : 'SYSTEM',
     );
-    const occupiedSeatCount = fareRows.filter((row) => row.occupiesSeat).length;
+    const occupiedSeatCount =
+      fareRows.filter((row) => row.occupiesSeat).length +
+      fareRows.filter((row) => row.passenger.extraSeatRequested).length;
     const taxIrr: Irr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
     const priceIrr: Irr =
-      fareRows.reduce((sum, row) => sum + row.fareIrr + row.taxIrr, 0n) +
-      extrasIrr;
+      fareRows.reduce(
+        (sum, row) => sum + row.fareIrr + row.taxIrr + row.extraSeatFareIrr,
+        0n,
+      ) + extrasIrr;
     const contactUser = await this.userRepo
       .createQueryBuilder('u')
       .select(['u.id', 'u.phone'])
@@ -463,6 +519,13 @@ export class BookingService {
           message: `صندلی ${conflict} هم‌اکنون در دسترس نیست.`,
         });
       }
+
+      const { primarySeatCodes, extraSeatCodes } = allocateAdjacentExtraSeats(
+        map,
+        dto.cabin,
+        dto.passengers,
+        taken,
+      );
 
       // Charter/agency seat commitments aren't tied to specific seat codes,
       // so the per-seat conflict check above can't see them — a cabin's
@@ -537,7 +600,7 @@ export class BookingService {
         }),
       );
 
-      const passengerEntities = fareRows.map((row) => {
+      const passengerEntities = fareRows.map((row, passengerIndex) => {
         const p = row.passenger;
         const nationalId = p.nationalId
           ? normalizeNationalId(p.nationalId)
@@ -545,7 +608,9 @@ export class BookingService {
         return tx.create(Passenger, {
           bookingId: created.id,
           fullName: p.fullName,
-          seatCode: p.seatCode ?? null,
+          seatCode: primarySeatCodes[passengerIndex] ?? null,
+          extraSeatCode: extraSeatCodes[passengerIndex] ?? null,
+          extraSeatFareIrr: row.extraSeatFareIrr,
           passengerType: p.passengerType,
           birthDate: p.birthDate,
           occupiesSeat: row.occupiesSeat,
@@ -843,10 +908,12 @@ export class BookingService {
       (fareClass?.taxIrr ?? 0n) + chargePerPax,
       instance.charterSeats >= instance.capacity ? 'CHARTER' : 'SYSTEM',
     );
-    const occupiedSeatCount = fareRows.filter((row) => row.occupiesSeat).length;
+    const occupiedSeatCount =
+      fareRows.filter((row) => row.occupiesSeat).length +
+      fareRows.filter((row) => row.passenger.extraSeatRequested).length;
     const taxIrr: Irr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
     const priceIrr: Irr = fareRows.reduce(
-      (sum, row) => sum + row.fareIrr + row.taxIrr,
+      (sum, row) => sum + row.fareIrr + row.taxIrr + row.extraSeatFareIrr,
       0n,
     );
     const contactUser = await this.userRepo.findOneByOrFail({ id: actor.id });
@@ -910,15 +977,27 @@ export class BookingService {
           });
         }
 
-        const usedSeats = await tx
+        const { primarySeatCodes, extraSeatCodes } = allocateAdjacentExtraSeats(
+          map,
+          dto.cabin,
+          dto.passengers,
+          taken,
+        );
+
+        const usedSeatRow = await tx
           .createQueryBuilder(Passenger, 'p')
           .innerJoin(Booking, 'b', 'b.id = p.bookingId')
+          .select(
+            'COALESCE(SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END), 0)',
+            'count',
+          )
           .where('b.allotmentId = :allotmentId', { allotmentId })
           .andWhere(
             `(b.status IN ('PAID', 'TICKETED', 'FLOWN', 'NO_SHOW') OR (b.status = 'HELD' AND b.holdExpiresAt > :now))`,
             { now: new Date() },
           )
-          .getCount();
+          .getRawOne<{ count: string }>();
+        const usedSeats = Number(usedSeatRow?.count ?? 0);
         if (usedSeats + occupiedSeatCount > lockedAllotment.seatsAllocated) {
           throw new ConflictException({
             code: ErrorCode.POOL_EXHAUSTED,
@@ -973,28 +1052,37 @@ export class BookingService {
           }),
         );
         await tx.save(
-          fareRows.map(({ passenger, occupiesSeat, fareIrr, taxIrr }) => {
-            const nationalId = passenger.nationalId
-              ? normalizeNationalId(passenger.nationalId)
-              : undefined;
-            return tx.create(Passenger, {
-              bookingId: created.id,
-              fullName: passenger.fullName,
-              seatCode: passenger.seatCode,
-              passengerType: passenger.passengerType,
-              birthDate: passenger.birthDate,
-              occupiesSeat,
-              fareIrr,
-              taxIrr,
-              gender: passenger.gender ?? null,
-              nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
-              nationalIdHash: nationalId ? hashPii(nationalId) : null,
-              passportNoEnc: passenger.passportNo?.trim()
-                ? encryptPii(passenger.passportNo.trim().toUpperCase())
-                : null,
-              mobileEnc: passenger.mobile ? encryptPii(passenger.mobile) : null,
-            });
-          }),
+          fareRows.map(
+            (
+              { passenger, occupiesSeat, fareIrr, taxIrr, extraSeatFareIrr },
+              passengerIndex,
+            ) => {
+              const nationalId = passenger.nationalId
+                ? normalizeNationalId(passenger.nationalId)
+                : undefined;
+              return tx.create(Passenger, {
+                bookingId: created.id,
+                fullName: passenger.fullName,
+                seatCode: primarySeatCodes[passengerIndex],
+                extraSeatCode: extraSeatCodes[passengerIndex] ?? null,
+                extraSeatFareIrr,
+                passengerType: passenger.passengerType,
+                birthDate: passenger.birthDate,
+                occupiesSeat,
+                fareIrr,
+                taxIrr,
+                gender: passenger.gender ?? null,
+                nationalIdEnc: nationalId ? encryptPii(nationalId) : null,
+                nationalIdHash: nationalId ? hashPii(nationalId) : null,
+                passportNoEnc: passenger.passportNo?.trim()
+                  ? encryptPii(passenger.passportNo.trim().toUpperCase())
+                  : null,
+                mobileEnc: passenger.mobile
+                  ? encryptPii(passenger.mobile)
+                  : null,
+              });
+            },
+          ),
         );
         await tx.save(
           tx.create(LedgerEntry, {
@@ -1120,6 +1208,7 @@ export class BookingService {
           passengerType: passenger.passengerType,
           birthDate: passenger.birthDate,
           seatCode: passenger.seatCode ?? undefined,
+          extraSeatRequested: Boolean(passenger.extraSeatCode),
         })),
         unitFare,
         (currentFareClass?.taxIrr ?? 0n) + chargePerPax,
@@ -1129,8 +1218,10 @@ export class BookingService {
       );
       currentTaxIrr = fareRows.reduce((sum, row) => sum + row.taxIrr, 0n);
       currentPriceIrr =
-        fareRows.reduce((sum, row) => sum + row.fareIrr + row.taxIrr, 0n) +
-        booking.extrasIrr;
+        fareRows.reduce(
+          (sum, row) => sum + row.fareIrr + row.taxIrr + row.extraSeatFareIrr,
+          0n,
+        ) + booking.extrasIrr;
       currentChargeSnapshot = unitCharges;
     }
 

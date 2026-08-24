@@ -12,8 +12,6 @@ import type { BookingPassengerDto } from './dto/create-booking.dto';
 /** Max seats one national ID may occupy on the same flight (identical passenger). */
 export const MAX_SEATS_PER_NATIONAL_ID = 2;
 
-const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
-
 /**
  * Count seat-occupying passengers in a request by nationalIdHash.
  * Infants (no seat) are ignored. Invalid NIDs are skipped here — checksum
@@ -21,7 +19,10 @@ const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
  */
 export function countOccupyingNationalIdHashes(
   passengers: ReadonlyArray<
-    Pick<BookingPassengerDto, 'nationalId' | 'passengerType'>
+    Pick<
+      BookingPassengerDto,
+      'nationalId' | 'passengerType' | 'extraSeatRequested'
+    >
   >,
 ): Map<string, number> {
   const counts = new Map<string, number>();
@@ -32,14 +33,20 @@ export function countOccupyingNationalIdHashes(
     const nationalId = normalizeNationalId(raw);
     if (!isValidIranianNationalId(nationalId)) continue;
     const hash = hashPii(nationalId);
-    counts.set(hash, (counts.get(hash) ?? 0) + 1);
+    counts.set(
+      hash,
+      (counts.get(hash) ?? 0) + 1 + (passenger.extraSeatRequested ? 1 : 0),
+    );
   }
   return counts;
 }
 
 export function assertInRequestNationalIdSeatLimit(
   passengers: ReadonlyArray<
-    Pick<BookingPassengerDto, 'nationalId' | 'passengerType'>
+    Pick<
+      BookingPassengerDto,
+      'nationalId' | 'passengerType' | 'extraSeatRequested'
+    >
   >,
 ): void {
   for (const [, count] of countOccupyingNationalIdHashes(passengers)) {
@@ -61,7 +68,10 @@ export async function assertNationalIdSeatLimitForFlight(
   tx: EntityManager,
   flightInstanceId: string,
   passengers: ReadonlyArray<
-    Pick<BookingPassengerDto, 'nationalId' | 'passengerType'>
+    Pick<
+      BookingPassengerDto,
+      'nationalId' | 'passengerType' | 'extraSeatRequested'
+    >
   >,
 ): Promise<void> {
   assertInRequestNationalIdSeatLimit(passengers);
@@ -74,11 +84,15 @@ export async function assertNationalIdSeatLimitForFlight(
     .createQueryBuilder(Passenger, 'p')
     .innerJoin('p.booking', 'b')
     .select('p.nationalIdHash', 'hash')
-    .addSelect('COUNT(*)', 'cnt')
+    .addSelect(
+      'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
+      'cnt',
+    )
     .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
-    .andWhere('b.status IN (:...statuses)', {
-      statuses: [...ACTIVE_BOOKING_STATUSES],
-    })
+    .andWhere(
+      `(b.status IN ('DRAFT', 'PAID', 'TICKETED') OR (b.status = 'HELD' AND b.holdExpiresAt > :now))`,
+      { now: new Date() },
+    )
     .andWhere('p.deletedAt IS NULL')
     .andWhere('p.occupiesSeat = true')
     .andWhere('p.nationalIdHash IN (:...hashes)', { hashes })

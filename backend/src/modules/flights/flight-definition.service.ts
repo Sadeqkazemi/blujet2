@@ -10,6 +10,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Airport } from '../../database/entities/airport.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
+import { AircraftCabin } from '../../database/entities/aircraft-cabin.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { FareRule } from '../../database/entities/fare-rule.entity';
@@ -102,6 +103,8 @@ export class FlightDefinitionService {
     private readonly airportRepo: Repository<Airport>,
     @InjectRepository(AircraftSeatMap)
     private readonly seatMapRepo: Repository<AircraftSeatMap>,
+    @InjectRepository(AircraftCabin)
+    private readonly aircraftCabinRepo: Repository<AircraftCabin>,
     @InjectRepository(FlightChargeRule)
     private readonly chargeRuleRepo: Repository<FlightChargeRule>,
     @InjectRepository(FarePricingProposal)
@@ -137,11 +140,19 @@ export class FlightDefinitionService {
     );
   }
 
-  private validateCabinCapacitiesAgainstSeatMap(
-    map: AircraftSeatMapLike,
+  private async validateCabinCapacitiesAgainstSeatMap(
+    map: AircraftSeatMapLike & { aircraftDefinitionId?: string | null },
     cabinCapacities: NormalizedCabinCapacity[],
   ) {
     const physical = countSeatsByCabin(map);
+    const operational = map.aircraftDefinitionId
+      ? await this.aircraftCabinRepo.findBy({
+          aircraftDefinitionId: map.aircraftDefinitionId,
+        })
+      : [];
+    const operationalByCabin = new Map(
+      operational.map((row) => [row.cabinType, row.capacity]),
+    );
     for (const row of cabinCapacities) {
       const configured = row.seats;
       const phys = physical[row.cabin];
@@ -156,6 +167,15 @@ export class FlightDefinitionService {
           code: ErrorCode.VALIDATION_FAILED,
           message: `ظرفیت ${row.cabin} از تعداد صندلی فیزیکی (${phys}) بیشتر است.`,
         });
+      }
+      if (operational.length > 0) {
+        const maximum = operationalByCabin.get(row.cabin) ?? 0;
+        if (configured > maximum) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `ظرفیت ${row.cabin} از ظرفیت تعریف‌شده هواپیما (${maximum}) بیشتر است.`,
+          });
+        }
       }
     }
   }
@@ -536,7 +556,10 @@ export class FlightDefinitionService {
           message: 'نقشه صندلی هواپیمای این رخداد یافت نشد.',
         });
       }
-      this.validateCabinCapacitiesAgainstSeatMap(seatMap, cabinCapacities);
+      await this.validateCabinCapacitiesAgainstSeatMap(
+        seatMap,
+        cabinCapacities,
+      );
 
       const charterSeats = dto.charterSeats ?? 0;
       if (charterSeats >= physicalTotal) {
@@ -751,7 +774,7 @@ export class FlightDefinitionService {
         message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
       });
     }
-    this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
+    await this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
 
     const createdId = await this.dataSource.transaction(async (manager) => {
       let route = await manager.findOneBy(Route, {
@@ -955,7 +978,7 @@ export class FlightDefinitionService {
         message: 'نوع هواپیمای انتخاب‌شده در کاتالوگ نیست.',
       });
     }
-    this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
+    await this.validateCabinCapacitiesAgainstSeatMap(map, cabinCapacities);
 
     const status = instance.definitionStatus;
 

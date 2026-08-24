@@ -7,11 +7,15 @@ import {
 } from '../../api/aircraft';
 import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
-import { isMd80Aircraft } from '../public-site/checkout/md80-seat-layout';
-import type { UpsertAircraftDefinitionPayload } from '../../types/aircraft';
+import {
+  AIRCRAFT_CABIN_OPTIONS,
+  type AircraftCabinType,
+  type UpsertAircraftDefinitionPayload,
+} from '../../types/aircraft';
 import SeatMapEditor from './SeatMapEditor';
 import {
   bandsToUpsertFields,
+  countBandSeats,
   detailToBands,
   emptyBands,
   totalBandSeats,
@@ -31,15 +35,28 @@ export default function AircraftFormPage() {
   const [title, setTitle] = useState('');
   const [totalCapacity, setTotalCapacity] = useState('');
   const [bands, setBands] = useState(emptyBands);
+  const [cabinCapacities, setCabinCapacities] = useState<Record<AircraftCabinType, string>>({
+    FIRST: '',
+    BUSINESS: '',
+    COMFORT: '',
+    ECONOMY: '',
+  });
   const [excluded, setExcluded] = useState<string[]>([]);
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const locked = isMd80Aircraft(code) || isMd80Aircraft(model) || isMd80Aircraft(title);
   const derivedSeats = useMemo(
     () => totalBandSeats(bands, excluded),
     [bands, excluded],
+  );
+  const physicalByCabin = useMemo(
+    () =>
+      Object.fromEntries(bands.map((band) => [band.cabinType, countBandSeats(band)])) as Record<
+        AircraftCabinType,
+        number
+      >,
+    [bands],
   );
 
   useEffect(() => {
@@ -52,6 +69,12 @@ export default function AircraftFormPage() {
         setTitle(def.title);
         setTotalCapacity(String(def.totalCapacity));
         setBands(detailToBands(def));
+        setCabinCapacities({
+          FIRST: String(def.cabins.find((c) => c.cabinType === 'FIRST')?.capacity ?? ''),
+          BUSINESS: String(def.cabins.find((c) => c.cabinType === 'BUSINESS')?.capacity ?? ''),
+          COMFORT: String(def.cabins.find((c) => c.cabinType === 'COMFORT')?.capacity ?? ''),
+          ECONOMY: String(def.cabins.find((c) => c.cabinType === 'ECONOMY')?.capacity ?? ''),
+        });
         setExcluded([...(def.seatMap?.excludedSeatCodes ?? [])]);
       })
       .catch((e) =>
@@ -77,9 +100,33 @@ export default function AircraftFormPage() {
       setError('ظرفیت کل را وارد کنید.');
       return;
     }
-    if (!locked && derivedSeats !== capacity) {
+    const configuredCabins = AIRCRAFT_CABIN_OPTIONS.flatMap(({ value }) => {
+      const cabinCapacity = Number(cabinCapacities[value]) || 0;
+      return cabinCapacity > 0 ? [{ cabinType: value, capacity: cabinCapacity }] : [];
+    });
+    const configuredTotal = configuredCabins.reduce((sum, cabin) => sum + cabin.capacity, 0);
+    if (configuredCabins.length === 0) {
+      setError('مجموع صندلی‌های کابین باید بیشتر از صفر باشد.');
+      return;
+    }
+    if (configuredTotal !== capacity) {
       setError(
-        `مجموع صندلی‌های کابین (${faDigits(derivedSeats)}) باید برابر ظرفیت کل (${faDigits(capacity)}) باشد.`,
+        `مجموع ظرفیت کابین‌ها (${faDigits(configuredTotal)}) باید برابر ظرفیت کل (${faDigits(capacity)}) باشد.`,
+      );
+      return;
+    }
+    const abovePhysical = configuredCabins.find(
+      (cabin) => cabin.capacity > physicalByCabin[cabin.cabinType],
+    );
+    if (abovePhysical) {
+      setError(
+        `ظرفیت ${AIRCRAFT_CABIN_OPTIONS.find((c) => c.value === abovePhysical.cabinType)?.label} از تعداد صندلی فیزیکی آن بیشتر است.`,
+      );
+      return;
+    }
+    if (derivedSeats < capacity) {
+      setError(
+        `مجموع صندلی‌های فیزیکی (${faDigits(derivedSeats)}) نباید از ظرفیت کل (${faDigits(capacity)}) کمتر باشد.`,
       );
       return;
     }
@@ -89,9 +136,8 @@ export default function AircraftFormPage() {
       model: model.trim(),
       title: title.trim() || model.trim(),
       totalCapacity: capacity,
-      ...(locked
-        ? { excludedSeatCodes: excluded }
-        : bandsToUpsertFields(bands, excluded)),
+      cabinCapacities: configuredCabins,
+      ...bandsToUpsertFields(bands, excluded),
     };
 
     setSaving(true);
@@ -209,19 +255,66 @@ export default function AircraftFormPage() {
         </div>
       </div>
 
+      <div className={`${cardClass} mb-4`} data-testid="aircraft-cabin-capacities">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-[14px] font-extrabold text-white">تعریف ظرفیت کابین‌ها</h2>
+            <p className="mt-1 text-[11px] text-[#6b7b94]">
+              ظرفیت عددی هر کابین را وارد کنید؛ مقدار صفر یعنی آن کابین در این هواپیما وجود ندارد.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const next = { ...cabinCapacities };
+              for (const cabin of AIRCRAFT_CABIN_OPTIONS) {
+                const count = physicalByCabin[cabin.value];
+                next[cabin.value] = count > 0 ? String(count) : '';
+              }
+              setCabinCapacities(next);
+              setTotalCapacity(String(Object.values(physicalByCabin).reduce((a, b) => a + b, 0)));
+            }}
+            className="rounded-lg border border-[#33415c] px-3 py-2 text-[11px] font-bold text-[#8fb8ff]"
+          >
+            کپی ظرفیت از نقشه صندلی
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {AIRCRAFT_CABIN_OPTIONS.map((cabin) => (
+            <label
+              key={cabin.value}
+              className="rounded-xl border border-[#28344c] bg-[#0f1623] p-3 text-[11px] text-[#9fb0c7]"
+            >
+              {cabin.label}
+              <input
+                data-testid={`aircraft-cabin-capacity-${cabin.value}`}
+                dir="ltr"
+                inputMode="numeric"
+                value={cabinCapacities[cabin.value]}
+                onChange={(event) =>
+                  setCabinCapacities((current) => ({
+                    ...current,
+                    [cabin.value]: event.target.value.replace(/\D/g, '').slice(0, 4),
+                  }))
+                }
+                placeholder="0"
+                className={`${inputClass} mt-2 text-left`}
+              />
+              <span className="mt-1 block text-[10px] text-[#6b7b94]">
+                ظرفیت فیزیکی نقشه: {faDigits(physicalByCabin[cabin.value])}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className={`${cardClass} mb-4`}>
         <h2 className="mb-3 text-[14px] font-extrabold text-white">نقشه صندلی</h2>
-        {locked ? (
-          <p data-testid="md80-locked-message" className="mb-3 text-[12px] text-[#f59e0b]">
-            نقشه MD-80 قفل است و از این پنل تغییر نمی‌کند.
-          </p>
-        ) : null}
         <SeatMapEditor
           bands={bands}
           onChange={setBands}
           excludedSeatCodes={excluded}
           onExcludedChange={setExcluded}
-          locked={locked}
         />
       </div>
 

@@ -60,6 +60,12 @@ export function validatePassengerManifest(
         message: 'برای نوزاد بدون صندلی نباید صندلی انتخاب شود.',
       });
     }
+    if (type === 'INFANT' && passenger.extraSeatRequested) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'برای نوزاد بدون صندلی امکان افزودن صندلی اضافه وجود ندارد.',
+      });
+    }
     if (type !== 'INFANT' && !passenger.seatCode) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -97,6 +103,8 @@ export function passengerFareRows(
       occupiesSeat: passenger.passengerType !== 'INFANT',
       fareIrr: applyBps(unitFareIrr, multiplier),
       taxIrr: applyBps(unitTaxIrr, multiplier),
+      // EXST is one adult base fare only: no tax, charge or baggage entitlement.
+      extraSeatFareIrr: passenger.extraSeatRequested ? unitFareIrr : 0n,
     };
   });
 }

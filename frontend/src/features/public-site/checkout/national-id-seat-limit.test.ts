@@ -3,9 +3,30 @@ import { nationalIdsExceedingSeatLimit } from './national-id-seat-limit';
 import { emptyPassenger } from './checkout-types';
 
 describe('nationalIdsExceedingSeatLimit', () => {
+  const passenger = (extraSeatRequested = false) => ({
+    nationalId: '0012345679',
+    docType: 'NATIONAL_ID' as const,
+    passengerType: 'ADULT' as const,
+    extraSeatRequested,
+  });
+
+  it('counts an additional seat as a second occupied seat', () => {
+    expect(nationalIdsExceedingSeatLimit([passenger(true)])).toEqual([]);
+    expect(nationalIdsExceedingSeatLimit([passenger(true), passenger(false)])).toEqual([
+      '0012345679',
+    ]);
+  });
   it('allows two seats with the same national ID', () => {
-    const a = { ...emptyPassenger(''), nationalId: '0012345679', docType: 'NATIONAL_ID' as const };
-    const b = { ...emptyPassenger(''), nationalId: '0012345679', docType: 'NATIONAL_ID' as const };
+    const a = {
+      ...emptyPassenger(''),
+      nationalId: '0012345679',
+      docType: 'NATIONAL_ID' as const,
+    };
+    const b = {
+      ...emptyPassenger(''),
+      nationalId: '0012345679',
+      docType: 'NATIONAL_ID' as const,
+    };
     expect(nationalIdsExceedingSeatLimit([a, b])).toEqual([]);
   });
 

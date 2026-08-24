@@ -20,6 +20,7 @@ import {
   type AircraftSeatMapLike,
 } from '../reservation/seat-layout';
 import type { UpsertAircraftDto } from './dto/aircraft.dto';
+import { resolveAircraftCabinCapacities } from './aircraft-capacity.util';
 
 @Injectable()
 export class AircraftService {
@@ -225,20 +226,19 @@ export class AircraftService {
     const seatMapLike = this.toSeatMapLike(dto);
     const seats = enumerateSeats(seatMapLike);
     const cabinCounts = countSeatsByCabin(seatMapLike);
-    const derivedTotal = Object.values(cabinCounts).reduce((a, b) => a + b, 0);
+    const physicalTotal = Object.values(cabinCounts).reduce((a, b) => a + b, 0);
 
-    if (derivedTotal === 0) {
+    if (physicalTotal === 0) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'حداقل یک کابین باید حداقل یک صندلی داشته باشد.',
       });
     }
-    if (derivedTotal !== dto.totalCapacity) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: `مجموع ظرفیت کابین‌ها (${derivedTotal}) با ظرفیت کل هواپیما (${dto.totalCapacity}) برابر نیست.`,
-      });
-    }
+    const configuredCabins = resolveAircraftCabinCapacities(
+      dto.cabinCapacities,
+      cabinCounts,
+      dto.totalCapacity,
+    );
     // enumerateSeats() already guarantees unique seatCode-per-cabin-band
     // combination within one call, but a seat could theoretically collide
     // across two overlapping bands (bad input) — check explicitly so the
@@ -299,11 +299,8 @@ export class AircraftService {
       await manager.delete(AircraftCabin, {
         aircraftDefinitionId: aircraft.id,
       });
-      const cabinEntries = (
-        Object.entries(cabinCounts) as [keyof typeof cabinCounts, number][]
-      ).filter(([, count]) => count > 0);
       await manager.save(
-        cabinEntries.map(([cabinType, capacity]) =>
+        configuredCabins.map(({ cabinType, capacity }) =>
           manager.create(AircraftCabin, {
             aircraftDefinitionId: aircraft.id,
             cabinType,

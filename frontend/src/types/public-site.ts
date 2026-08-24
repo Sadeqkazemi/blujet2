@@ -95,6 +95,8 @@ export type BookingStatus =
 export interface BookingPassengerView {
   fullName: string;
   seatCode: string | null;
+  extraSeatCode: string | null;
+  extraSeatFareIrr: string;
   passengerType: 'ADULT' | 'CHILD' | 'INFANT';
   birthDate: string;
   occupiesSeat: boolean;
