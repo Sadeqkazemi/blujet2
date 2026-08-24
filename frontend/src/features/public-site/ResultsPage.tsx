@@ -111,7 +111,7 @@ export default function ResultsPage() {
     'all',
   );
   const [fAirline, setFAirline] = useState('all');
-  const [sort, setSort] = useState<'cheap' | 'fast' | 'early'>('cheap');
+  const [sort, setSort] = useState<'recommended' | 'closest' | 'cheap'>('recommended');
   const [aiState, setAiState] = useState<
     'idle' | 'loading' | 'done' | 'unavailable' | 'error'
   >('idle');
@@ -711,9 +711,9 @@ export default function ResultsPage() {
           >
             {(
               [
+                ['recommended', copy.sortRecommended],
+                ['closest', copy.sortClosest],
                 ['cheap', copy.sortCheap],
-                ['fast', copy.sortFast],
-                ['early', copy.sortEarly],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -732,7 +732,7 @@ export default function ResultsPage() {
                   border: 'none',
                   cursor: 'pointer',
                   fontFamily: 'inherit',
-                  borderRight: k !== 'early' ? '1px solid #eef1f5' : undefined,
+                  borderRight: k !== 'cheap' ? '1px solid #eef1f5' : undefined,
                 }}
               >
                 {label}

@@ -46,7 +46,7 @@ describe('PublicFooter — desktop', () => {
     mockLocale('fa');
     renderFooter();
     expect(screen.getByText('خدمات')).toBeInTheDocument();
-    expect(screen.getAllByText('رزرو پرواز')[0]).toHaveAttribute('href', '/results');
+    expect(screen.queryByText('رزرو پرواز')).not.toBeInTheDocument();
     expect(screen.getByText('© ۱۴۰۵ blujet. تمامی حقوق محفوظ است.')).toBeInTheDocument();
     expect(screen.queryByText('استرداد بلیط')).not.toBeInTheDocument();
     expect(screen.queryByText('بلاگ')).not.toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('PublicFooter — desktop', () => {
     mockLocale('en');
     renderFooter();
     expect(screen.getByText('Services')).toBeInTheDocument();
-    expect(screen.getAllByText('Book a Flight')[0]).toHaveAttribute('href', '/results');
+    expect(screen.queryByText('Book a Flight')).not.toBeInTheDocument();
     expect(screen.getByText('© 2026 blujet. All rights reserved.')).toBeInTheDocument();
     expect(screen.getByTestId('footer-desktop-tools')).toHaveClass('items-end');
     expect(screen.getByTestId('footer-desktop-trust-row')).toHaveClass('justify-end');

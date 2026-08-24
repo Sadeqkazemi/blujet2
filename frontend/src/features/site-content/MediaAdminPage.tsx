@@ -465,16 +465,6 @@ export default function MediaAdminPage() {
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <a
-          href="/panel/blog"
-          className={`${cardClass()} flex items-center justify-between no-underline`}
-        >
-          <div>
-            <h3 className="m-0 text-[14.5px] font-extrabold text-white">مدیریت بلاگ</h3>
-            <p className="mb-0 mt-1 text-[11px] text-[#6b7b94]">ایجاد، ویرایش، انتشار و حذف مطالب و تصویر شاخص</p>
-          </div>
-          <span className="text-lg text-accent">←</span>
-        </a>
-        <a
           href="/panel/jobapps"
           className={`${cardClass()} flex items-center justify-between no-underline`}
         >

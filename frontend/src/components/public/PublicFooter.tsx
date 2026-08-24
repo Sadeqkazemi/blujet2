@@ -168,7 +168,6 @@ export default function PublicFooter() {
   const careersEnabled = useCareersEnabled();
 
   const serviceLinks = [
-    { to: '/results', label: t('footerBookFlight') },
     { to: '/manage-booking', label: t('footerManageBooking') },
     { to: '/flight-status', label: t('footerFlightStatus') },
     { to: '/club', label: t('navLoyalty') },
@@ -182,7 +181,6 @@ export default function PublicFooter() {
   const supportLinks = [
     { to: '/support', label: t('footerHelpCenter') },
     { to: '/support', label: t('footerFaq') },
-    { to: '/results', label: t('footerBookFlight') },
   ];
 
   return (

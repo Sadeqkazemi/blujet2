@@ -112,7 +112,9 @@ function emptyFareForm() {
     cabin: "ECONOMY" as CabinKind,
     classCode: "",
     priceToman: "",
+    taxMode: "FIXED" as "FIXED" | "PERCENTAGE",
     taxToman: "0",
+    taxPercent: "",
     seatsAllocated: "",
     baggageKg: "",
     refundable: true,
@@ -615,7 +617,9 @@ export default function AddFlightPage({
       cabin: f.cabin,
       classCode: f.classCode,
       priceToman: formatTomanGrouped(String(Math.round(f.priceIrr / 10))),
+      taxMode: "FIXED" as const,
       taxToman: formatTomanGrouped(String(Math.round(f.taxIrr / 10))),
+      taxPercent: "",
       seatsAllocated: String(f.seatsAllocated),
       baggageKg: f.baggageAllowanceKg ? String(f.baggageAllowanceKg) : "",
       refundable: f.refundable,
@@ -631,7 +635,17 @@ export default function AddFlightPage({
   function saveFareDraft() {
     setFareError(null);
     const priceIrr = moneyInputToRial(fareForm.priceToman);
-    const taxIrr = moneyInputToRial(fareForm.taxToman) ?? 0;
+    let taxIrr = 0;
+    if (fareForm.taxMode === "PERCENTAGE") {
+      const percent = Number(latinDigits(fareForm.taxPercent).replace(",", "."));
+      if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+        setFareError("درصد مالیات و عوارض باید بین ۰ تا ۱۰۰ باشد");
+        return;
+      }
+      taxIrr = Math.round((priceIrr ?? 0) * percent / 100);
+    } else {
+      taxIrr = moneyInputToRial(fareForm.taxToman) ?? 0;
+    }
     const seats = Number(latinDigits(fareForm.seatsAllocated));
     if (!fareForm.classCode.trim()) {
       setFareError("کد کلاس نرخی را وارد کنید");
@@ -1426,14 +1440,50 @@ export default function AddFlightPage({
                       }
                       testId="fare-price-money"
                     />
-                    <MoneyInput
-                      label="مالیات و عوارض (تومان)"
-                      valueToman={fareForm.taxToman}
-                      onChangeToman={(v) =>
-                        setFareForm((f) => ({ ...f, taxToman: v }))
-                      }
-                      testId="fare-tax-money"
-                    />
+                    <div>
+                      <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
+                        روش مالیات و عوارض
+                      </label>
+                      <select
+                        value={fareForm.taxMode}
+                        onChange={(e) =>
+                          setFareForm((f) => ({
+                            ...f,
+                            taxMode: e.target.value as "FIXED" | "PERCENTAGE",
+                          }))
+                        }
+                        className="mb-1.5 h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-[11.5px] text-[#e7ecf3]"
+                        data-testid="fare-tax-mode"
+                      >
+                        <option value="FIXED">مبلغ ثابت</option>
+                        <option value="PERCENTAGE">درصد از قیمت</option>
+                      </select>
+                      {fareForm.taxMode === "PERCENTAGE" ? (
+                        <div className="relative">
+                          <input
+                            dir="ltr"
+                            inputMode="decimal"
+                            value={fareForm.taxPercent}
+                            onChange={(e) =>
+                              setFareForm((f) => ({ ...f, taxPercent: e.target.value }))
+                            }
+                            placeholder="مثلاً ۹٪"
+                            className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#0f1726] px-3 pr-9 text-left font-num text-[11.5px] text-[#e7ecf3] outline-none"
+                            data-testid="fare-tax-percent"
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[11px] text-[#9fb0c7]">٪</span>
+                        </div>
+                      ) : (
+                        <MoneyInput
+                          label="مالیات و عوارض (تومان)"
+                          valueToman={fareForm.taxToman}
+                          onChangeToman={(v) =>
+                            setFareForm((f) => ({ ...f, taxToman: v }))
+                          }
+                          testId="fare-tax-money"
+                        />
+                      )}
+                    </div>
                     <div data-testid="fare-infant-auto">
                       <label className="mb-1.5 block text-[10.5px] text-[#9fb0c7]">
                         نرخ نوزاد (خودکار، ۱۰٪)

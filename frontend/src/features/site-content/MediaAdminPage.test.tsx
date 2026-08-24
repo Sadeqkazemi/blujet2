@@ -144,7 +144,7 @@ describe('MediaAdminPage', () => {
     expect(screen.getByText('شبکه‌های اجتماعی')).toBeInTheDocument();
     expect(screen.getByText('تماس پشتیبانی')).toBeInTheDocument();
     expect(screen.getByText('کتابخانهٔ تصاویر')).toBeInTheDocument();
-    expect(screen.getByText('مدیریت بلاگ')).toBeInTheDocument();
+    expect(screen.queryByText('مدیریت بلاگ')).not.toBeInTheDocument();
     expect(screen.getByText('فرصت‌های شغلی')).toBeInTheDocument();
   });
 
