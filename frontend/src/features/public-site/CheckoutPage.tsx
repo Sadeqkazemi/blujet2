@@ -46,6 +46,7 @@ import {
   buildPassengersFromMix,
   emptyPassenger,
   extraTotalIrr,
+  mixFromPassengers,
   normalizePassengerMix,
   passengerTotalIrr,
   validatePassengerAges,
@@ -693,9 +694,10 @@ export default function CheckoutPage() {
       ? draft.flight.priceIrr
       : '0';
   const passengerCount = Math.max(1, passengers.length);
-  const returnTicketIrr = passengerTotalIrr(priceIrr, draft.passengerMix);
+  const currentPassengerMix = mixFromPassengers(passengers);
+  const returnTicketIrr = passengerTotalIrr(priceIrr, currentPassengerMix);
   const outboundTicketIrr = draft.outboundLeg
-    ? passengerTotalIrr(draft.outboundLeg.flight.priceIrr, draft.passengerMix)
+    ? passengerTotalIrr(draft.outboundLeg.flight.priceIrr, currentPassengerMix)
     : 0n;
   const ticketIrr = returnTicketIrr + outboundTicketIrr;
   const extrasIrr = extras
@@ -792,7 +794,6 @@ export default function CheckoutPage() {
           savedPassengers={savedPassengers}
           savedPassengersEnabled={isAuthenticated}
           departureAt={draft.flight.departureAt}
-          lockPassengerCount
         />
       )}
       {step === 'extras' && (
@@ -875,7 +876,7 @@ export default function CheckoutPage() {
             locale={locale}
             priceIrr={ticketIrr.toString()}
             paxCount={Math.max(1, passengers.length)}
-            passengerMix={draft.passengerMix}
+            passengerMix={currentPassengerMix}
             extras={extras}
             nextLabel={nextLabel}
             onNext={goNext}
@@ -950,7 +951,7 @@ export default function CheckoutPage() {
           locale={locale}
           priceIrr={ticketIrr.toString()}
           paxCount={Math.max(1, passengers.length)}
-          passengerMix={draft.passengerMix}
+          passengerMix={currentPassengerMix}
           extras={extras}
           nextLabel={nextLabel}
           onNext={goNext}

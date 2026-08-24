@@ -59,4 +59,28 @@ describe('checkout-saved-pax', () => {
     expect(option?.firstNameLatin).toBe('');
     expect(option?.lastNameLatin).toBe('KAZEMI');
   });
+
+  it('recovers a missing Latin first name from a complete Latin full name', () => {
+    const [option] = apiToCheckoutSavedOptions(
+      [
+        {
+          id: 'saved-legacy-latin-full-name',
+          fullName: 'SADEQ KAZEMI',
+          latinName: 'KAZEMI',
+          gender: 'male',
+          birthDate: '1999-02-10',
+          nationalId: '0603267874',
+          passportNo: null,
+          mobile: null,
+          isChild: false,
+          createdAt: '2026-08-01T00:00:00.000Z',
+          updatedAt: '2026-08-01T00:00:00.000Z',
+        },
+      ],
+      'fa',
+    );
+
+    expect(option?.firstNameLatin).toBe('SADEQ');
+    expect(option?.lastNameLatin).toBe('KAZEMI');
+  });
 });

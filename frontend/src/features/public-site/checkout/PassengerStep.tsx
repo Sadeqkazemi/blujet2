@@ -258,7 +258,9 @@ export default function PassengerStep({
                 <button
                   type="button"
                   onClick={() => onChange(passengers.filter((_, j) => j !== i))}
-                  className="text-[11px] font-bold text-[#e5484d]"
+                  aria-label={t.remove}
+                  data-testid={`checkout-remove-pax-${i}`}
+                  className="cursor-pointer text-[11px] font-bold text-[#e5484d]"
                 >
                   {t.remove}
                 </button>
@@ -442,7 +444,7 @@ export default function PassengerStep({
         </div>
       ))}
 
-      {!lockPassengerCount && (
+      {!lockPassengerCount && passengers.length < 6 && (
         <button
           type="button"
           onClick={() => onChange([...passengers, emptyPassenger('', 'ADULT')])}

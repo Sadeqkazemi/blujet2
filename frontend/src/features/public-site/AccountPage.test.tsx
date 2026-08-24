@@ -335,6 +335,7 @@ describe('AccountPage', () => {
     const row = await screen.findByTestId('account-passenger');
     expect(row).toHaveTextContent('محمد رضایی');
     expect(row).toHaveTextContent('MOHAMMAD REZAEI · A22113344');
+    expect(screen.getByTestId('passenger-remove-sp-1')).toHaveTextContent('حذف');
   });
 
   it('adds a saved passenger from the modal', async () => {

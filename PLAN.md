@@ -3719,3 +3719,19 @@ contracts and retires the production mock adapters.
   See `docs/features/customer-profile-checkout-calendar-fixes.md`.
 - [ ] Commit/push, review, merge, and deploy after explicit user approval.
 
+# Price-calendar navigation and saved-passenger autofill corrections (2026-08-24)
+
+- [x] Keep the clicked price-calendar day selected and blue without shifting the visible date window.
+- [x] Keep the previous arrow physically on the left and the next arrow physically on the right in Persian, English, and Arabic.
+- [x] Preserve unlimited backward and forward price-calendar navigation through API-backed date windows.
+- [x] Recover a missing Latin first name for compatible legacy saved-passenger rows without placing Persian text in Latin ticket fields.
+- [x] Cover the fixes with component, page-integration, and full frontend regression tests.
+
+# Checkout passenger controls and profile deletion (2026-08-24)
+
+- [x] Expose the approved add-passenger control in the checkout passenger step.
+- [x] Show a localized remove control on every checkout card when more than one passenger exists.
+- [x] Recalculate the displayed passenger mix and ticket total after checkout add/remove actions.
+- [x] Replace the ambiguous saved-passenger × icon with an explicit localized remove button in the user account.
+- [x] Cover checkout add/remove, pricing synchronization, profile deletion, and all three locales with regression tests.
+- [ ] Commit/push, review, merge, and deploy after explicit user approval.

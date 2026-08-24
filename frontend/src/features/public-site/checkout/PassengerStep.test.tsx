@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -83,6 +84,35 @@ describe('PassengerStep — saved passengers', () => {
     expect(screen.queryByTestId('checkout-saved-panel-0')).not.toBeInTheDocument();
   });
 
+  it('visibly fills both name boxes for a recoverable legacy saved passenger', async () => {
+    const user = userEvent.setup();
+    const legacySavedPassenger: SavedPassenger = {
+      ...realSavedPassenger,
+      id: 'legacy-1',
+      fullName: 'SADEQ KAZEMI',
+      latinName: 'KAZEMI',
+    };
+
+    function ControlledPassengerStep() {
+      const [passengers, setPassengers] = useState([emptyPassenger('')]);
+      return (
+        <PassengerStep
+          locale="fa"
+          passengers={passengers}
+          onChange={setPassengers}
+          savedPassengers={[legacySavedPassenger]}
+        />
+      );
+    }
+
+    render(<ControlledPassengerStep />);
+    await user.click(screen.getByTestId('checkout-from-saved-0'));
+    await user.click(screen.getByTestId('checkout-saved-chip-legacy-1'));
+
+    expect(screen.getByTestId('checkout-pax-first-0')).toHaveValue('SADEQ');
+    expect(screen.getByTestId('checkout-pax-last-0')).toHaveValue('KAZEMI');
+  });
+
   it('prefers API saved passengers over the demo list', async () => {
     const user = userEvent.setup();
     const apiRows: SavedPassenger[] = [realSavedPassenger];
@@ -129,6 +159,41 @@ describe('PassengerStep — saved passengers', () => {
 
     expect(screen.getByTestId('checkout-passenger-age-notice-1')).toHaveTextContent(
       'رده سنی مسافر و قیمت بلیط بر اساس تاریخ تولد در روز پرواز محاسبه می‌شود.',
+    );
+  });
+
+  it('localizes the add and remove passenger controls in English and Arabic', () => {
+    const passengers = [emptyPassenger(''), emptyPassenger('')];
+    const { rerender } = render(
+      <PassengerStep
+        locale="en"
+        passengers={passengers}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-add-pax')).toHaveTextContent(
+      'Add new passenger',
+    );
+    expect(screen.getByTestId('checkout-remove-pax-1')).toHaveTextContent(
+      'Remove',
+    );
+
+    rerender(
+      <PassengerStep
+        locale="ar"
+        passengers={passengers}
+        onChange={vi.fn()}
+        savedPassengers={[]}
+      />,
+    );
+
+    expect(screen.getByTestId('checkout-add-pax')).toHaveTextContent(
+      'إضافة مسافر جديد',
+    );
+    expect(screen.getByTestId('checkout-remove-pax-1')).toHaveTextContent(
+      'حذف',
     );
   });
 

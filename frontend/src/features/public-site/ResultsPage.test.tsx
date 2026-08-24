@@ -176,6 +176,14 @@ describe('ResultsPage', () => {
     await waitFor(() => {
       expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-02');
     });
+    expect(screen.getByTestId('price-calendar-day-2026-08-02')).toHaveAttribute(
+      'data-selected',
+      'true',
+    );
+    expect(screen.getByTestId('price-calendar-day-2026-08-02')).toHaveStyle({
+      background: '#1668c4',
+    });
+    expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalledTimes(1);
   });
 
   it('does not render or request the price calendar on mobile results', async () => {

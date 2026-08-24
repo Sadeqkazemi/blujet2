@@ -87,6 +87,21 @@ function mapGender(value: SavedPassenger['gender']): Gender {
   return '';
 }
 
+function savedPassengerLatinNameParts(row: SavedPassenger) {
+  const latinName = splitPersonName(row.latinName, 'last');
+  if (latinName.firstName) return latinName;
+
+  const fullName = row.fullName.trim();
+  if (!/^[A-Za-z][A-Za-z\s'-]*$/.test(fullName)) return latinName;
+  const fallback = splitPersonName(fullName);
+  if (!fallback.firstName || !fallback.lastName) return latinName;
+
+  return {
+    firstName: fallback.firstName,
+    lastName: latinName.lastName || fallback.lastName,
+  };
+}
+
 export function apiToCheckoutSavedOptions(
   rows: SavedPassenger[],
   locale: StoredLocale,
@@ -94,7 +109,7 @@ export function apiToCheckoutSavedOptions(
   return rows.map((row) => {
     // Legacy rows sometimes contain only the family name. Treat a single
     // token as last name so it never lands in the checkout first-name box.
-    const { firstName, lastName } = splitPersonName(row.latinName, 'last');
+    const { firstName, lastName } = savedPassengerLatinNameParts(row);
     const birth = row.birthDate
       ? isoDateToFormParts(row.birthDate, locale)
       : { birthDay: '', birthMonth: '', birthYear: '' };

@@ -51,6 +51,14 @@ describe('FlightPriceCalendar', () => {
     expect(screen.getByRole('button', { name: 'روزهای بعدی' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'روزهای قبلی' })).toBeInTheDocument();
 
+    const strip = screen.getByTestId('price-calendar-strip');
+    const previous = screen.getByTestId('price-calendar-previous');
+    const next = screen.getByTestId('price-calendar-next');
+    expect(strip.firstElementChild).toBe(previous);
+    expect(strip.lastElementChild).toBe(next);
+    expect(previous).toHaveTextContent('‹');
+    expect(next).toHaveTextContent('›');
+
     await userEvent.click(screen.getByRole('button', { name: 'روزهای بعدی' }));
     await waitFor(() =>
       expect(publicSiteApi.fetchPriceCalendar).toHaveBeenLastCalledWith(
@@ -129,4 +137,31 @@ describe('FlightPriceCalendar', () => {
       expect(spy).toHaveBeenLastCalledWith('THR', 'MHD', '2026-07-26'),
     );
   });
+
+  it.each(['fa', 'en', 'ar'] as const)(
+    'keeps previous on the physical left and next on the physical right for %s',
+    async (locale) => {
+      vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue(DAYS);
+
+      render(
+        <FlightPriceCalendar
+          origin="THR"
+          dest="MHD"
+          selectedDate="2026-08-01"
+          locale={locale}
+          onSelectDate={vi.fn()}
+        />,
+      );
+
+      const strip = await screen.findByTestId('price-calendar-strip');
+      const previous = screen.getByTestId('price-calendar-previous');
+      const next = screen.getByTestId('price-calendar-next');
+
+      expect(strip).toHaveAttribute('dir', 'ltr');
+      expect(strip.firstElementChild).toBe(previous);
+      expect(strip.lastElementChild).toBe(next);
+      expect(previous).toHaveTextContent('‹');
+      expect(next).toHaveTextContent('›');
+    },
+  );
 });
