@@ -3678,3 +3678,30 @@ contracts and retires the production mock adapters.
   See `docs/features/uat-agency-results-profile-corrections.md`.
 - [ ] Commit/push and merge only after explicit user approval.
 
+# Service-page localized step digits (2026-08-24)
+
+- [x] Replaced Persian display strings used as service-step ordinals with
+  locale-neutral numeric values on seat selection, extra baggage, ticket
+  refund, pet travel, and wheelchair pages.
+- [x] Added English and Arabic regression coverage for all five pages so the
+  cards render `1/2/3` in English and `١/٢/٣` in Arabic, never Persian digits.
+- [x] Verified 11 focused tests, the full 815-test frontend suite, frontend
+  lint, and the production build.
+- [ ] Commit/push, review, merge, and deploy after user approval.
+
+# Agency active-flight catalogue (2026-08-24)
+
+- [x] The agency **Active flights** tab now combines every future published
+  flight/fare class with the agency's real active allotments, including honest
+  zero-allocation cards for flights that have not yet been allotted.
+- [x] The tab count is based on unique flight instances; matching class-bound
+  allotments are not duplicated, and both new and already-allotted flights can
+  open the exact existing seat-purchase request flow.
+- [x] The temporary UAT agency can read its own persisted seat-request history
+  without bypassing tenant isolation or creating fabricated inventory.
+- [x] Verified 12 focused agency tests, the full 817-test frontend suite, the
+  full 242-test backend unit suite, all 31 UAT shared-password E2E tests,
+  frontend lint, targeted backend lint, both production builds, and
+  `git diff --check`.
+- [ ] Commit/push, review, merge, and deploy after explicit user approval.
+

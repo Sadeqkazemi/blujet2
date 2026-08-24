@@ -7,11 +7,18 @@ import { App } from 'supertest/types';
 import { DataSource, In } from 'typeorm';
 import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencySeatRequest } from '../src/database/entities/agency-seat-request.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { Booking } from '../src/database/entities/booking.entity';
+import { CartableTask } from '../src/database/entities/cartable-task.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
 import { User } from '../src/database/entities/user.entity';
+import {
+  AgencySeatRequestPayMethod,
+  AgencySeatRequestStatus,
+  CabinClass,
+} from '../src/database/enums';
 import { getSandboxOtpCode } from '../src/common/sandbox-auth';
 import {
   TEMPORARY_PANEL_ACCOUNTS,
@@ -96,6 +103,9 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       // writes one) — must be cleared before the users delete.
       await dataSource.getRepository(AuditLog).delete({ actorId: In(ids) });
       await dataSource.getRepository(RefreshToken).delete({ userId: In(ids) });
+      await dataSource
+        .getRepository(CartableTask)
+        .delete({ assigneeId: In(ids) });
       await userRepo.delete({ username: In(ALL_USERNAMES) });
     }
   }
@@ -459,6 +469,72 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         expect(res.status).toBe(200);
         expect(Array.isArray(res.body.data)).toBe(true);
         await assertNoAgencyBusinessData();
+      });
+
+      it('seat request history returns only the UAT agency own persisted requests', async () => {
+        const accessToken = await loginUatAgency();
+        const agencyUser = await dataSource
+          .getRepository(User)
+          .findOneByOrFail({ username: 'uat.agency' });
+        const otherAgencyId = 'different-agency-user-id';
+        const requestRepo = dataSource.getRepository(AgencySeatRequest);
+        const ownRequest = await requestRepo.save(
+          requestRepo.create({
+            agencyId: agencyUser.id,
+            routeId: null,
+            aircraftType: 'Airbus A320',
+            cabin: CabinClass.ECONOMY,
+            fareClassCode: 'Y',
+            seats: 3,
+            termMonths: null,
+            unitPriceIrr: 30_000_000n,
+            payMethod: AgencySeatRequestPayMethod.INVOICE,
+            status: AgencySeatRequestStatus.PENDING,
+            invoiceId: null,
+            dueAt: null,
+            decidedById: null,
+            decidedAt: null,
+          }),
+        );
+        const otherRequest = await requestRepo.save(
+          requestRepo.create({
+            agencyId: otherAgencyId,
+            routeId: null,
+            aircraftType: 'Airbus A320',
+            cabin: CabinClass.ECONOMY,
+            fareClassCode: 'Y',
+            seats: 9,
+            termMonths: null,
+            unitPriceIrr: 30_000_000n,
+            payMethod: AgencySeatRequestPayMethod.INVOICE,
+            status: AgencySeatRequestStatus.PENDING,
+            invoiceId: null,
+            dueAt: null,
+            decidedById: null,
+            decidedAt: null,
+          }),
+        );
+
+        try {
+          const res = await request(app.getHttpServer())
+            .get('/agency-portal/seat-requests')
+            .set('Authorization', `Bearer ${accessToken}`);
+
+          expect(res.status).toBe(200);
+          expect(res.body.data).toHaveLength(1);
+          expect(res.body.data[0]).toMatchObject({
+            id: ownRequest.id,
+            seats: 3,
+            status: AgencySeatRequestStatus.PENDING,
+          });
+          expect(
+            res.body.data.some(
+              (row: { id: string }) => row.id === otherRequest.id,
+            ),
+          ).toBe(false);
+        } finally {
+          await requestRepo.delete([ownRequest.id, otherRequest.id]);
+        }
       });
 
       it('every other read endpoint returns a real empty state (200) instead of the profile-not-found 404', async () => {

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgencySeatsPage from './AgencySeatsPage';
@@ -306,13 +306,98 @@ describe('AgencySeatsPage', () => {
     expect(screen.getByText('۸')).toBeInTheDocument();
   });
 
+  it('lists every published flight in active flights without requiring an allotment and opens its request flow', async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi-active-without-allotment',
+      flightNo: 'BJ-330',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: '2026-09-04T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
+      capacity: 180,
+      agencySeatsReleased: 40,
+      agencyAllocated: 10,
+      ownAllocated: 0,
+      availableToRequest: 30,
+      pricePerSeatIrr: '30000000',
+      specialOffer: false,
+      definitionStatus: 'PUBLISHED',
+    };
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([
+      option,
+      {
+        ...option,
+        cabin: 'BUSINESS',
+        fareClassCode: 'J',
+        agencySeatsReleased: 12,
+        availableToRequest: 12,
+      },
+    ]);
+
+    render(<AgencySeatsPage />);
+
+    const activeTab = await screen.findByRole('button', { name: /پروازهای فعال/ });
+    expect(activeTab).toHaveTextContent('۱');
+    await user.click(activeTab);
+    const activeCard = await screen.findByTestId(
+      'active-flight-card-fi-active-without-allotment-ECONOMY-Y',
+    );
+    expect(activeCard).toHaveTextContent('BJ-330');
+    expect(activeCard).toHaveTextContent('۳۰');
+    expect(screen.queryByText('هنوز سهمیه‌ای برای آژانس شما ثبت نشده است.')).not.toBeInTheDocument();
+
+    await user.click(within(activeCard).getByRole('button', { name: 'درخواست خرید صندلی' }));
+
+    expect(await screen.findByTestId('agency-seat-request-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('agency-request-origin')).toHaveValue('THR');
+    expect(screen.getByTestId('agency-request-destination')).toHaveValue('MHD');
+    expect(screen.getByTestId('agency-request-flight-detail')).toHaveTextContent('BJ-330');
+  });
+
+  it('keeps an existing allotment card without duplicating the matching catalogue class', async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi1',
+      flightNo: 'BJ-100',
+      originCode: 'THR',
+      destCode: 'DXB',
+      departureAt: '2026-09-05T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
+      capacity: 180,
+      agencySeatsReleased: 40,
+      agencyAllocated: 20,
+      ownAllocated: 20,
+      availableToRequest: 20,
+      pricePerSeatIrr: '30000000',
+      specialOffer: false,
+      definitionStatus: 'PUBLISHED',
+    };
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue(ROWS);
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+
+    render(<AgencySeatsPage />);
+
+    await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
+    expect(await screen.findByTestId('alloc-card')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('active-flight-card-fi1-ECONOMY-Y'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'درخواست صندلی بیشتر' })).toBeInTheDocument();
+  });
+
   it('shows the empty state when the agency has no allotments', async () => {
     const user = userEvent.setup();
     vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
     render(<AgencySeatsPage />);
 
     await user.click(await screen.findByRole('button', { name: /پروازهای فعال/ }));
-    expect(await screen.findByText('هنوز سهمیه‌ای برای آژانس شما ثبت نشده است.')).toBeInTheDocument();
+    expect(await screen.findByText('در حال حاضر پرواز فعال و منتشرشده‌ای وجود ندارد.')).toBeInTheDocument();
   });
 
   it('renders translated info banner and labels in English', async () => {
