@@ -33,9 +33,7 @@ type Props = {
   originTz?: string;
   destTz?: string;
   cityName: (code: string) => string;
-  savedKeys: Set<string>;
   lockBusyKey: string | null;
-  saveBusyKey: string | null;
   showGoldLock: boolean;
   passengerMix: PassengerMix;
   preferredCabin?: CabinClass;
@@ -43,7 +41,6 @@ type Props = {
   onToggle: () => void;
   onBuy: (cabin: CabinClass) => void;
   onLock: (cabin: CabinClass) => void;
-  onSave: (cabin: CabinClass) => void;
 };
 
 export default function ResultsFlightCard({
@@ -57,9 +54,7 @@ export default function ResultsFlightCard({
   originTz,
   destTz,
   cityName,
-  savedKeys,
   lockBusyKey,
-  saveBusyKey,
   showGoldLock,
   passengerMix,
   preferredCabin,
@@ -67,7 +62,6 @@ export default function ResultsFlightCard({
   onToggle,
   onBuy,
   onLock,
-  onSave,
 }: Props) {
   const defaultCabin =
     (preferredCabin
@@ -712,30 +706,6 @@ export default function ResultsFlightCard({
                   : `🔒 ${copy.priceLock}`}
               </button>
             )}
-            <button
-              type="button"
-              disabled={saveBusyKey === key || savedKeys.has(key)}
-              onClick={() => onSave(cabin.cabin)}
-              data-testid={`real-save-${flight.flightInstanceId}-${cabin.cabin}`}
-              style={{
-                marginTop: 8,
-                height: 36,
-                borderRadius: 10,
-                border: '1px solid #d5e1f0',
-                color: '#5a6678',
-                fontSize: 11,
-                fontWeight: 700,
-                background: '#fff',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              {saveBusyKey === key
-                ? copy.aiAnalyzing
-                : savedKeys.has(key)
-                  ? `✓ ${copy.savedFlight}`
-                  : `🔖 ${copy.saveFlight}`}
-            </button>
           </div>
         </div>
       )}

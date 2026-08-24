@@ -7,7 +7,7 @@ import {
 describe('profile completion', () => {
   it('uses the same six equally weighted fields including the encrypted address', () => {
     expect(assessProfileCompletion({ fullName: 'Ali' })).toEqual({
-      completionPct: 100 / 6,
+      completionPct: 17,
       profileIncomplete: true,
       missingProfileFields: [
         'nationalId',

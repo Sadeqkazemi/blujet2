@@ -1,6 +1,7 @@
 import type { SearchAdvisoryResult } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { formatToman, localeMoney } from '../../../lib/fa-format';
+import { formatLocaleDate } from '../../../lib/locale-format';
 import type { ResultsCopy } from './results-copy';
 import { translateAdvisoryReason } from './results-copy';
 
@@ -216,13 +217,22 @@ export default function ResultsAiRadar({ locale, copy, aiState, advisory, onAnal
             )}
             {advisory.cheapestDayLabel && (
               <span style={{ fontSize: 13.5, color: '#5a6678' }}>
-                {copy.aiCheaperDayLabel} <b style={{ color: '#1668c4' }}>{advisory.cheapestDayLabel}</b>
+                {copy.aiCheaperDayLabel}{' '}
+                <b style={{ color: '#1668c4' }}>
+                  {formatLocaleDate(advisory.cheapestDayLabel, locale)}
+                </b>
               </span>
             )}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, lineHeight: 1.8 }}>
             <span style={{ color: '#1668c4', fontWeight: 800, whiteSpace: 'nowrap' }}>✓ {copy.aiBestPickLabel}</span>
-            <span style={{ color: '#16202e' }}>{translateAdvisoryReason(advisory.reasonFa, locale)}</span>
+            <span style={{ color: '#16202e' }}>
+              {translateAdvisoryReason(
+                advisory.reasonFa,
+                locale,
+                advisory.recommendation,
+              )}
+            </span>
           </div>
         </div>
       )}

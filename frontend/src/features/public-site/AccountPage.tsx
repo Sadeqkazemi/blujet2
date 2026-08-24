@@ -596,6 +596,7 @@ export default function AccountPage() {
     birthDate: '',
     passportNo: '',
     address: '',
+    email: '',
   });
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
@@ -671,6 +672,7 @@ export default function AccountPage() {
           birthDate: p.birthDate ? formatLocaleDate(p.birthDate, locale) : '',
           passportNo: p.passportNo ?? '',
           address: p.address ?? '',
+          email: p.email ?? '',
         });
       })
       .catch(() => setProfile(null));
@@ -708,8 +710,13 @@ export default function AccountPage() {
         birthDate,
         passportNo: profileForm.passportNo || undefined,
         address: profileForm.address.trim() || undefined,
+        email: profileForm.email.trim() || undefined,
       });
       setProfile(updated);
+      setProfileForm((current) => ({
+        ...current,
+        email: updated.email ?? '',
+      }));
       setProfileNotice(t.saveSuccess);
     } catch (err) {
       setProfileError(err instanceof ApiRequestError ? err.message : t.saveErrorFallback);
@@ -1099,7 +1106,7 @@ export default function AccountPage() {
             }}
           >
             <span style={{ fontSize: 12.5, color: '#8a6a1f' }}>
-              {t.bannerText(localeDigits(profile.completionPct, locale))}
+              {t.bannerText(localeDigits(Math.round(profile.completionPct), locale))}
             </span>
             <div style={{ display: 'flex', gap: 10 }}>
               <button

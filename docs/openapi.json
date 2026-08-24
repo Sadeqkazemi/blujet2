@@ -9656,6 +9656,16 @@
           "passportNo": {
             "type": "string",
             "example": "A12345678"
+          },
+          "address": {
+            "type": "string",
+            "example": "تهران، خیابان ولیعصر، کوچه بهار، پلاک ۱۲",
+            "description": "آدرس محل سکونت؛ به‌صورت رمزگذاری‌شده نگهداری می‌شود"
+          },
+          "email": {
+            "type": "string",
+            "example": "customer@example.com",
+            "description": "ایمیل حساب؛ تغییر آن نیازمند تأیید مجدد است"
           }
         }
       },

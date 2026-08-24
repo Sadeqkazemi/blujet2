@@ -30,9 +30,10 @@ export function assessProfileCompletion(source: ProfileCompletionSource) {
   const missingProfileFields = PROFILE_COMPLETION_FIELDS.filter(
     (field) => !present[field],
   );
-  const completionPct =
+  const completionPct = Math.round(
     ((PROFILE_COMPLETION_FIELDS.length - missingProfileFields.length) * 100) /
-    PROFILE_COMPLETION_FIELDS.length;
+      PROFILE_COMPLETION_FIELDS.length,
+  );
   return {
     completionPct,
     profileIncomplete: missingProfileFields.length > 0,

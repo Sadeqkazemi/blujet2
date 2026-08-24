@@ -449,10 +449,16 @@ export const ADVISORY_REASON: Record<string, Record<StoredLocale, string>> = {
   },
 };
 
-export function translateAdvisoryReason(reasonFa: string | undefined, locale: StoredLocale): string {
+export function translateAdvisoryReason(
+  reasonFa: string | undefined,
+  locale: StoredLocale,
+  recommendation: 'buy' | 'wait' = 'buy',
+): string {
   if (!reasonFa) return '';
   if (locale === 'fa') return reasonFa;
   if (reasonFa.includes('روزهای نزدیک پایین‌تر')) return ADVISORY_REASON.wait_nearby_cheaper[locale];
   if (reasonFa.includes('محدوده مناسب')) return ADVISORY_REASON.buy_good_price[locale];
-  return reasonFa;
+  return ADVISORY_REASON[
+    recommendation === 'wait' ? 'wait_nearby_cheaper' : 'buy_good_price'
+  ][locale];
 }

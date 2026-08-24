@@ -1246,7 +1246,13 @@ step anywhere in the project.
 - **Profile completion** is computed server-side, never stored — a
   simple weighted check over which of {fullName, nationalId, birthDate,
   passportNo, address, emailVerifiedAt} are present, matching the design's
-  percentage bar and its "complete passport + verify email" hint text.
+  percentage bar and its "complete passport + verify email" hint text. The
+  final value is rounded to an integer before it leaves the server so the UI
+  never displays repeating decimals.
+- `User.email` remains the existing nullable unique account column. Customer
+  profile editing may update it; the value is normalized to lowercase and any
+  actual change atomically clears `emailVerifiedAt` so completion cannot count
+  an address that has not been verified. No migration is required.
 - **Email verification**: reuses the existing OTP/2FA delivery
   machinery — a short-lived code sent to the address, confirmed via a
   new endpoint, stamps `emailVerifiedAt`. No new provider.

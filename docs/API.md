@@ -935,9 +935,11 @@ See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
   owner only), `emailVerifiedAt`, plus a
   server-computed `completionPct`.
 - `PATCH /my/profile` (new, `USER` role) — partial update of the same
-  fields; national ID validated with the official checksum server-side
-  (CLAUDE.md security rule). National ID, passport and address are encrypted
-  at rest immediately.
+  fields, including the account `email`; national ID validated with the
+  official checksum server-side (CLAUDE.md security rule). National ID,
+  passport and address are encrypted at rest immediately. Email is normalized
+  to lowercase, must remain unique, and changing it clears `emailVerifiedAt`
+  until the new address completes the existing verification flow.
 - `POST /my/profile/email/verify-request` (new, `USER` role, `@Throttle`
   5/min) — sends a short-lived code to the account's current `email` via
   the existing `TwoFactorProvider`. 400 if no email is set yet.
@@ -946,6 +948,17 @@ See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
 - No change to any booking/checkout endpoint's validation — national ID
   stays optional there, exactly as today; the checkout banner is a
   frontend-only read of `GET /users/me/profile`'s `completionPct`.
+
+### UAT correction (2026-08-24)
+
+- `completionPct` is returned as a rounded integer from 0 through 100; clients
+  must not expose repeating decimal percentages.
+- `POST /agency-portal/seat-requests/inquiry` is unchanged. The agency client
+  now calls it automatically after a short debounce whenever a valid requested
+  seat count changes, and ignores stale responses.
+- `GET /search/advisory` is unchanged. Non-Persian clients localize the
+  advisory reason and ISO cheapest-day value at render time, including a safe
+  localized fallback for previously unseen Persian ML reasons.
 
 ## Phase 18 — SITE_ADMIN + EMPLOYEE panel access
 

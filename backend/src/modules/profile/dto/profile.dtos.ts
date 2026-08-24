@@ -1,9 +1,11 @@
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import {
   IsDateString,
+  IsEmail,
   IsOptional,
   IsString,
   Length,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -38,6 +40,15 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(5)
   address?: string;
+
+  @ApiPropertyOptional({
+    example: 'customer@example.com',
+    description: 'ایمیل حساب؛ تغییر آن نیازمند تأیید مجدد است',
+  })
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(254)
+  email?: string;
 }
 
 export class VerifyEmailDto {

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   UnauthorizedException,
@@ -7,7 +8,7 @@ import {
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { TwoFactorChallenge } from '../../database/entities/two-factor-challenge.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
@@ -63,6 +64,9 @@ export class ProfileService {
   }
 
   async updateProfile(actor: AuthenticatedUser, dto: UpdateProfileDto) {
+    const currentUser = await findOneOrThrow(this.userRepo, {
+      where: { id: actor.id },
+    });
     const data: {
       fullName?: string;
       birthDate?: Date;
@@ -70,6 +74,8 @@ export class ProfileService {
       nationalIdHash?: string;
       passportNoEnc?: string;
       addressEnc?: string;
+      email?: string;
+      emailVerifiedAt?: Date | null;
     } = {};
 
     if (dto.fullName !== undefined) data.fullName = dto.fullName;
@@ -89,6 +95,22 @@ export class ProfileService {
     }
     if (dto.address !== undefined) {
       data.addressEnc = encryptPii(dto.address.trim());
+    }
+    if (dto.email !== undefined) {
+      const normalizedEmail = dto.email.trim().toLowerCase();
+      const existing = await this.userRepo.findOne({
+        where: { email: ILike(normalizedEmail) },
+      });
+      if (existing && existing.id !== actor.id) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این ایمیل قبلاً برای حساب دیگری ثبت شده است.',
+        });
+      }
+      data.email = normalizedEmail;
+      if ((currentUser.email ?? '').toLowerCase() !== normalizedEmail) {
+        data.emailVerifiedAt = null;
+      }
     }
 
     await this.userRepo.update(
