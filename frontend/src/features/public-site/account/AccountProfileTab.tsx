@@ -223,14 +223,16 @@ export default function AccountProfileTab({
           >
             <span style={{ color: '#aac4e2' }}>{t.completionLabel}</span>
             <span style={{ fontWeight: 800, color: '#f2d98a' }}>
-              {profile ? formatLocalePercent(profile.completionPct, locale) : '—'}
+              {profile
+                ? formatLocalePercent(Math.round(profile.completionPct), locale)
+                : '—'}
             </span>
           </div>
           <div style={{ height: 7, borderRadius: 6, background: '#ffffff1c', overflow: 'hidden' }}>
             <div
               style={{
                 height: '100%',
-                width: `${profile?.completionPct ?? 0}%`,
+                width: `${Math.min(100, Math.max(0, Math.round(profile?.completionPct ?? 0)))}%`,
                 borderRadius: 6,
                 background: 'linear-gradient(90deg,#f2d98a,#caa53a)',
               }}

@@ -39,7 +39,7 @@ describe('Phase 17 — user profile (e2e)', () => {
     expect(res.body.data.completionPct).toBeLessThan(100);
   });
 
-  it('PATCH validates identity, persists birth date, and encrypts national ID and address at rest', async () => {
+  it('PATCH validates identity, saves email, and encrypts profile PII at rest', async () => {
     const { accessToken, userId } = await loginAsCustomer(app, '09901119922');
 
     const invalid = await request(app.getHttpServer())
@@ -56,12 +56,16 @@ describe('Phase 17 — user profile (e2e)', () => {
         passportNo: 'A12345678',
         birthDate: '1990-01-01',
         address: 'تهران، خیابان ولیعصر، پلاک ۱۲',
+        email: 'Customer.Profile@Test.Example',
       });
     expect(valid.status).toBe(200);
     expect(valid.body.data.nationalId).toBe('0012345679');
     expect(valid.body.data.passportNo).toBe('A12345678');
     expect(valid.body.data.birthDate).toBeTruthy();
     expect(valid.body.data.address).toBe('تهران، خیابان ولیعصر، پلاک ۱۲');
+    expect(valid.body.data.email).toBe('customer.profile@test.example');
+    expect(valid.body.data.completionPct).toEqual(expect.any(Number));
+    expect(Number.isInteger(valid.body.data.completionPct)).toBe(true);
 
     const row = await dataSource
       .getRepository(User)
@@ -70,6 +74,8 @@ describe('Phase 17 — user profile (e2e)', () => {
     expect(row.nationalIdHash).toBeTruthy();
     expect(row.addressEnc).toBeTruthy();
     expect(row.addressEnc).not.toContain('خیابان ولیعصر');
+    expect(row.email).toBe('customer.profile@test.example');
+    expect(row.emailVerifiedAt).toBeNull();
   });
 
   it('email verification: request → wrong code rejected → correct code stamps emailVerifiedAt', async () => {
@@ -103,6 +109,27 @@ describe('Phase 17 — user profile (e2e)', () => {
       .getRepository(User)
       .findOneByOrFail({ id: userId! });
     expect(row.emailVerifiedAt).not.toBeNull();
+  });
+
+  it('PATCH rejects invalid and already-used profile emails', async () => {
+    const first = await loginAsCustomer(app, '09901119955');
+    const second = await loginAsCustomer(app, '09901119966');
+    await dataSource
+      .getRepository(User)
+      .update({ id: first.userId! }, { email: 'already-used@test.example' });
+
+    const invalid = await request(app.getHttpServer())
+      .patch('/my/profile')
+      .set('Authorization', auth(second.accessToken))
+      .send({ email: 'not-an-email' });
+    expect(invalid.status).toBe(400);
+
+    const duplicate = await request(app.getHttpServer())
+      .patch('/my/profile')
+      .set('Authorization', auth(second.accessToken))
+      .send({ email: 'Already-Used@Test.Example' });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe('CONFLICT');
   });
 
   it('email verify-request 400s when no email is on file yet', async () => {

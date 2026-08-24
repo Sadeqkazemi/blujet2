@@ -287,6 +287,7 @@ export function updateMyProfile(dto: {
   birthDate?: string;
   passportNo?: string;
   address?: string;
+  email?: string;
 }) {
   return apiPatch<UserProfile>('/my/profile', dto);
 }

@@ -506,6 +506,7 @@ describe('AccountPage', () => {
     await userEvent.type(nationalIdInput, '0012345679');
     await userEvent.type(screen.getByLabelText('تاریخ تولد'), '۱۳۷۰/۰۵/۱۲');
     await userEvent.type(screen.getByLabelText('آدرس محل سکونت'), 'تهران، خیابان آزادی، پلاک ۱۲');
+    await userEvent.type(screen.getByLabelText('ایمیل'), 'Negar.New@Example.com');
     await userEvent.click(screen.getByRole('button', { name: 'ذخیره اطلاعات' }));
 
     await screen.findByText('اطلاعات پروفایل ذخیره شد ✓');
@@ -515,6 +516,7 @@ describe('AccountPage', () => {
       birthDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       passportNo: undefined,
       address: 'تهران، خیابان آزادی، پلاک ۱۲',
+      email: 'Negar.New@Example.com',
     });
   });
 

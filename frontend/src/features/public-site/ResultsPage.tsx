@@ -4,9 +4,7 @@ import {
   createPriceLock,
   fetchAirports,
   fetchClubPoints,
-  fetchSavedFlights,
   fetchSearchAdvisory,
-  saveFlight,
   searchFlights,
 } from '../../api/publicSite';
 import FlightPriceCalendar from './components/FlightPriceCalendar';
@@ -143,8 +141,6 @@ export default function ResultsPage() {
     level: string | null;
   } | null>(null);
   const [lockBusyKey, setLockBusyKey] = useState<string | null>(null);
-  const [saveBusyKey, setSaveBusyKey] = useState<string | null>(null);
-  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [realLockResult, setRealLockResult] = useState<RealLockResult | null>(
     null,
   );
@@ -158,19 +154,11 @@ export default function ResultsPage() {
   useEffect(() => {
     if (status !== 'authenticated') {
       setClub(null);
-      setSavedKeys(new Set());
       return;
     }
     fetchClubPoints()
       .then((c) => setClub({ isMember: c.isMember, level: c.level }))
       .catch(() => setClub(null));
-    fetchSavedFlights()
-      .then((rows) =>
-        setSavedKeys(
-          new Set(rows.map((r) => `${r.flightInstanceId}:${r.cabin}`)),
-        ),
-      )
-      .catch(() => setSavedKeys(new Set()));
   }, [status]);
 
   useEffect(() => {
@@ -252,27 +240,6 @@ export default function ResultsPage() {
       return null;
     return filteredResults[0]?.flightInstanceId ?? null;
   }, [advisory, filteredResults]);
-
-  async function onSaveClick(flightInstanceId: string, cabin: CabinClass) {
-    if (status !== 'authenticated') {
-      navigate('/signin', { state: { from: `/results?${params.toString()}` } });
-      return;
-    }
-    const key = `${flightInstanceId}:${cabin}`;
-    if (savedKeys.has(key)) return;
-    setSaveBusyKey(key);
-    try {
-      await saveFlight(flightInstanceId, cabin);
-      setSavedKeys((prev) => new Set(prev).add(key));
-    } catch (err) {
-      setRealLockResult({
-        kind: 'error',
-        message: err instanceof ApiRequestError ? err.message : ERR[locale],
-      });
-    } finally {
-      setSaveBusyKey(null);
-    }
-  }
 
   async function onRealLockClick(flightInstanceId: string, cabin: CabinClass) {
     if (status !== 'authenticated') {
@@ -979,9 +946,7 @@ export default function ResultsPage() {
                 originTz={airportMap.get(r.originCode)?.tz}
                 destTz={airportMap.get(r.destCode)?.tz}
                 cityName={cityName}
-                savedKeys={savedKeys}
                 lockBusyKey={lockBusyKey}
-                saveBusyKey={saveBusyKey}
                 showGoldLock={Boolean(
                   club?.isMember && GOLD_TIER_LEVELS.includes(club.level ?? ''),
                 )}
@@ -999,7 +964,6 @@ export default function ResultsPage() {
                 }
                 onBuy={(c) => handleBuy(r, c)}
                 onLock={(c) => void onRealLockClick(r.flightInstanceId, c)}
-                onSave={(c) => void onSaveClick(r.flightInstanceId, c)}
               />
             );
           })}

@@ -3660,3 +3660,21 @@ contracts and retires the production mock adapters.
 - [ ] Map each new action key to its operational endpoint guards (phase 2).
 - [ ] Merge, push and deploy only after phase 2 approval.
 
+# UAT agency/results/profile corrections (2026-08-24)
+
+- [x] Made the agency seat inquiry debounced and automatic for each valid seat
+  count, ignored stale responses, and stopped the input box from stretching to
+  the height of the result card.
+- [x] Localized unknown Persian smart-radar ML reasons safely in English and
+  Arabic, localized the cheapest date, and removed the save-flight button from
+  expanded results.
+- [x] Added end-to-end customer email editing with normalization, uniqueness,
+  verification reset, and integer profile-completion percentages.
+- [x] Verified the full frontend suite (805 tests), full backend unit suite
+  (242 tests), 5 profile E2E tests, both production builds, frontend/backend
+  semantic lint, and `git diff --check`. Backend Prettier-only EOL checks remain
+  noisy on the repository's pre-existing mixed CRLF/LF files; ESLint with that
+  formatting rule disabled is clean.
+  See `docs/features/uat-agency-results-profile-corrections.md`.
+- [ ] Commit/push and merge only after explicit user approval.
+

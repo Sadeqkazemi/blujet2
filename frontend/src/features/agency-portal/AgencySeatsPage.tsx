@@ -120,6 +120,7 @@ export default function AgencySeatsPage() {
   const [seatInquiry, setSeatInquiry] = useState<AgencySeatInquiry | null>(null);
   const [seatInquiryLoading, setSeatInquiryLoading] = useState(false);
   const [seatInquiryError, setSeatInquiryError] = useState<string | null>(null);
+  const [seatInquiryNonce, setSeatInquiryNonce] = useState(0);
   const [preferredWeekdays, setPreferredWeekdays] = useState<number[]>([]);
   const [termMonths, setTermMonths] = useState<0 | 1 | 3 | 6 | 12>(3);
   const [payMethod, setPayMethod] = useState<'INVOICE' | 'CREDIT'>('INVOICE');
@@ -232,7 +233,54 @@ export default function AgencySeatsPage() {
     setSeatInquiryState('idle');
     setSeatInquiry(null);
     setSeatInquiryError(null);
-  }, [requestFlightId, requestedSeats, requestAvailable]);
+
+    if (
+      !requestFlight ||
+      requestedSeats < 1 ||
+      requestAvailable < 1 ||
+      requestedSeats > requestAvailable
+    ) {
+      setSeatInquiryLoading(false);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setSeatInquiryLoading(true);
+      void inquireAgencySeats({
+        flightInstanceId: requestFlight.flightInstanceId,
+        cabin: requestFlight.cabin,
+        fareClassCode: requestFlight.fareClassCode,
+        seats: requestedSeats,
+      })
+        .then((result) => {
+          if (!active) return;
+          setSeatInquiry(result);
+          setSeatInquiryState('ready');
+        })
+        .catch((cause: unknown) => {
+          if (!active) return;
+          setSeatInquiryError(
+            cause instanceof Error ? cause.message : t.errorFallback,
+          );
+        })
+        .finally(() => {
+          if (active) setSeatInquiryLoading(false);
+        });
+    }, 350);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    requestFlightId,
+    requestedSeats,
+    requestAvailable,
+    seatInquiryNonce,
+    requestFlight,
+    t.errorFallback,
+  ]);
   const pendingRequests = requestHistory.filter((row) => row.status === 'PENDING' || row.status === 'PENDING_FINANCE');
   const rejectedRequests = requestHistory.filter((row) => row.status === 'REJECTED');
   const unpaidRequests = requestHistory.filter((row) => row.invoice && row.invoice.status !== 'PAID');
@@ -267,28 +315,6 @@ export default function AgencySeatsPage() {
       setError(cause instanceof Error ? cause.message : t.errorFallback);
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function handleSeatInquiry() {
-    if (!requestFlight || requestedSeats < 1 || requestedSeats > requestAvailable) return;
-    setSeatInquiryLoading(true);
-    setSeatInquiryError(null);
-    setSeatInquiryState('idle');
-    try {
-      const result = await inquireAgencySeats({
-        flightInstanceId: requestFlight.flightInstanceId,
-        cabin: requestFlight.cabin,
-        fareClassCode: requestFlight.fareClassCode,
-        seats: requestedSeats,
-      });
-      setSeatInquiry(result);
-      setSeatInquiryState('ready');
-    } catch (cause) {
-      setSeatInquiry(null);
-      setSeatInquiryError(cause instanceof Error ? cause.message : t.errorFallback);
-    } finally {
-      setSeatInquiryLoading(false);
     }
   }
 
@@ -539,8 +565,11 @@ export default function AgencySeatsPage() {
             <div className="mb-4 rounded-xl bg-[#f6f3ff] p-4 text-xs font-bold text-[#6547a8]">
               {locale === 'fa' ? 'پس از ثبت، وضعیت این مسیر در تب «پروازهای درخواست‌شده» نمایش داده می‌شود؛ کلیدهای فعال فقط در بخش وب‌سرویس در دسترس‌اند.' : locale === 'ar' ? 'بعد الإرسال تظهر حالة المسار في تبويب الرحلات المطلوبة، وتبقى المفاتيح في قسم خدمة الويب.' : 'After submission, the route status appears under requested flights; active keys remain in Web service.'}
             </div>
-            <div className="grid items-stretch gap-3 md:grid-cols-[1fr_1.4fr]">
-              <label className="flex h-full flex-col text-[11px] font-bold text-[#3f546b]">
+            <div className="grid items-start gap-3 md:grid-cols-[1fr_1.4fr]">
+              <label
+                className="self-start text-[11px] font-bold text-[#3f546b]"
+                data-testid="agency-seat-count-box"
+              >
                 {locale === 'en' ? 'Seats needed' : locale === 'ar' ? 'عدد المقاعد المطلوبة' : 'تعداد صندلی مورد نیاز'}
                 <input
                   type="number"
@@ -551,25 +580,38 @@ export default function AgencySeatsPage() {
                     setRequestedSeats(Math.max(1, Number(event.target.value) || 1));
                     setSeatInquiryState('idle');
                   }}
-                  className="mt-1 w-full flex-1 rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
+                  className="mt-1 w-full rounded-xl border border-[#d6e4f8] bg-white p-3 text-sm outline-none"
                   data-testid="agency-request-seat-count"
                 />
               </label>
-              <div className="flex h-full flex-col rounded-xl border border-[#d6e4f8] bg-white p-3 text-[11px] text-[#3f546b]">
+              <div
+                className="min-h-[74px] self-start rounded-xl border border-[#d6e4f8] bg-white p-3 text-[11px] text-[#3f546b]"
+                data-testid="agency-seat-inquiry-box"
+                aria-live="polite"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-bold">{locale === 'en' ? 'Seat availability inquiry' : locale === 'ar' ? 'استعلام توفر المقاعد' : 'استعلام تعداد صندلی'}</span>
                   <button
                     type="button"
                     disabled={requestAvailable < 1 || requestedSeats > requestAvailable || seatInquiryLoading}
-                    onClick={() => void handleSeatInquiry()}
+                    onClick={() => setSeatInquiryNonce((value) => value + 1)}
                     className="rounded-lg border border-[#1668c4] px-3 py-2 font-black text-[#1668c4] disabled:opacity-40"
                     data-testid="agency-seat-inquiry"
                   >
                     {seatInquiryLoading
                       ? locale === 'en' ? 'Checking…' : locale === 'ar' ? 'جارٍ الاستعلام…' : 'در حال استعلام…'
-                      : locale === 'en' ? 'Get inquiry' : locale === 'ar' ? 'استعلام' : 'پاسخ استعلام'}
+                      : locale === 'en' ? 'Refresh inquiry' : locale === 'ar' ? 'تحديث الاستعلام' : 'استعلام مجدد'}
                   </button>
                 </div>
+                {!seatInquiry && !seatInquiryError && !seatInquiryLoading && (
+                  <div className="mt-3 text-[#7d8ba0]">
+                    {locale === 'en'
+                      ? 'The result appears automatically after you change the seat count.'
+                      : locale === 'ar'
+                        ? 'تظهر النتيجة تلقائيًا بعد تغيير عدد المقاعد.'
+                        : 'پس از تغییر تعداد صندلی، نتیجه به‌صورت خودکار نمایش داده می‌شود.'}
+                  </div>
+                )}
                 {seatInquiryError && <div className="mt-3 rounded-lg bg-[#fff4e9] p-3 text-[#b25e18]">{seatInquiryError}</div>}
                 {seatInquiry && seatInquiryState !== 'idle' && (
                   <div className="mt-3 rounded-lg bg-[#f6f3ff] p-3 text-[#6547a8]" data-testid="agency-seat-inquiry-result">

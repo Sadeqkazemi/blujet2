@@ -106,6 +106,7 @@ interface ProfileForm {
   birthDate: string;
   passportNo: string;
   address: string;
+  email: string;
 }
 
 interface Props {
@@ -288,6 +289,20 @@ export default function AccountInfoTab({
                 value={profileForm.address}
                 onChange={(e) => onProfileFormChange({ ...profileForm, address: e.target.value })}
                 style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, resize: 'vertical', fontFamily: 'inherit', fontSize: 13, lineHeight: 1.8 }}
+              />
+            </div>
+            <div>
+              <label htmlFor="profile-email" style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#5a6678', marginBottom: 6 }}>
+                {t.emailLabel}
+              </label>
+              <input
+                id="profile-email"
+                dir="ltr"
+                type="email"
+                autoComplete="email"
+                value={profileForm.email}
+                onChange={(e) => onProfileFormChange({ ...profileForm, email: e.target.value })}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '10px 13px', border: '1.5px solid #e3e9f1', borderRadius: 10, fontFamily: 'inherit', fontSize: 13 }}
               />
             </div>
             <button

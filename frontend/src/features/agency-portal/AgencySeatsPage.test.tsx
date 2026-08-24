@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgencySeatsPage from './AgencySeatsPage';
@@ -108,14 +108,17 @@ describe('AgencySeatsPage', () => {
     await user.keyboard('{Control>}a{/Control}12');
     expect(screen.getByTestId('agency-submit-seat-request')).toBeDisabled();
     const inquiry = vi.mocked(portalApi.inquireAgencySeats);
-    await user.click(screen.getByTestId('agency-seat-inquiry'));
-    expect(inquiry).toHaveBeenCalledWith({
-      flightInstanceId: option.flightInstanceId,
-      cabin: option.cabin,
-      fareClassCode: option.fareClassCode,
-      seats: 12,
+    await waitFor(() => {
+      expect(inquiry).toHaveBeenLastCalledWith({
+        flightInstanceId: option.flightInstanceId,
+        cabin: option.cabin,
+        fareClassCode: option.fareClassCode,
+        seats: 12,
+      });
     });
     expect(await screen.findByTestId('agency-seat-inquiry-result')).toHaveTextContent('ظرفیت آزاد واقعی');
+    expect(screen.getByTestId('agency-seat-count-box')).toHaveClass('self-start');
+    expect(screen.getByTestId('agency-seat-inquiry-box')).toHaveClass('self-start');
     await user.click(screen.getByTestId('agency-seat-inquiry-confirm'));
     await user.click(screen.getByTestId('agency-submit-seat-request'));
 
@@ -129,6 +132,102 @@ describe('AgencySeatsPage', () => {
       payMethod: 'INVOICE',
     });
     expect(await screen.findByText('درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.')).toBeInTheDocument();
+  });
+
+  it('ignores a slower response for an older seat count', async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: 'fi-live-inquiry',
+      flightNo: 'BJ-211',
+      originCode: 'THR',
+      destCode: 'MHD',
+      departureAt: '2026-09-01T05:00:00.000Z',
+      aircraftType: 'Airbus A320',
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
+      capacity: 180,
+      agencySeatsReleased: 150,
+      agencyAllocated: 30,
+      ownAllocated: 10,
+      availableToRequest: 150,
+      pricePerSeatIrr: '30000000',
+      specialOffer: false,
+      definitionStatus: 'PUBLISHED',
+    };
+    const resultFor = (seats: number): AgencySeatInquiry => ({
+      flightInstanceId: option.flightInstanceId,
+      cabin: option.cabin,
+      fareClassCode: option.fareClassCode,
+      requestedSeats: seats,
+      capacity: 180,
+      soldSeats: 20,
+      heldSeats: 2,
+      agencyAllocated: 30,
+      agencySoldSeats: 4,
+      reservedAgencySeats: 3,
+      availableSeats: 158,
+      availableToRequest: 150,
+      totalAgencies: 4,
+      agenciesWithDemand: 2,
+      historicalAgencyBookings: 5,
+      historicalAgencySeatsSold: 18,
+      season: 'تابستان',
+      occasion: null,
+      demandLevel: 'MEDIUM',
+      recommendation: 'ظرفیت برای این درخواست کافی است.',
+      pricePerSeatIrr: '30000000',
+      totalPriceIrr: String(seats * 30000000),
+    });
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+    vi.spyOn(portalApi, 'fetchAllotments').mockResolvedValue([]);
+
+    let resolveTwo!: (value: AgencySeatInquiry) => void;
+    let resolveThree!: (value: AgencySeatInquiry) => void;
+    const inquiry = vi
+      .mocked(portalApi.inquireAgencySeats)
+      .mockImplementation((dto) => {
+        if (dto.seats === 2) {
+          return new Promise((resolve) => {
+            resolveTwo = resolve;
+          });
+        }
+        if (dto.seats === 3) {
+          return new Promise((resolve) => {
+            resolveThree = resolve;
+          });
+        }
+        return Promise.resolve(resultFor(dto.seats));
+      });
+
+    render(<AgencySeatsPage />);
+    await user.selectOptions(await screen.findByTestId('agency-request-origin'), 'THR');
+    await user.selectOptions(screen.getByTestId('agency-request-destination'), 'MHD');
+    await user.click(screen.getByTestId('agency-request-route-fi-live-inquiry'));
+
+    const seats = screen.getByTestId('agency-request-seat-count');
+    await user.click(seats);
+    await user.keyboard('{Control>}a{/Control}2');
+    await waitFor(() =>
+      expect(inquiry).toHaveBeenCalledWith(expect.objectContaining({ seats: 2 })),
+    );
+
+    await user.click(seats);
+    await user.keyboard('{Control>}a{/Control}3');
+    await waitFor(() =>
+      expect(inquiry).toHaveBeenCalledWith(expect.objectContaining({ seats: 3 })),
+    );
+
+    resolveThree(resultFor(3));
+    expect(await screen.findByTestId('agency-seat-inquiry-result')).toHaveTextContent(
+      '۳ صندلی درخواستی',
+    );
+
+    resolveTwo(resultFor(2));
+    await waitFor(() =>
+      expect(screen.getByTestId('agency-seat-inquiry-result')).toHaveTextContent(
+        '۳ صندلی درخواستی',
+      ),
+    );
   });
 
   it('keeps commercial route options usable when allotment history fails to load', async () => {
