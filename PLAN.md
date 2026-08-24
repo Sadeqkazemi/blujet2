@@ -3735,3 +3735,21 @@ contracts and retires the production mock adapters.
 - [x] Replace the ambiguous saved-passenger × icon with an explicit localized remove button in the user account.
 - [x] Cover checkout add/remove, pricing synchronization, profile deletion, and all three locales with regression tests.
 - [ ] Commit/push, review, merge, and deploy after explicit user approval.
+
+# Price calendar and customer UI local follow-up (2026-08-24)
+
+- [x] Match adjacent-day browsing to locale direction: Persian/Arabic
+  physical-left browses forward, English physical-left browses backward, one
+  day per click.
+- [x] Keep the passenger's selected price-calendar card blue while arrows only
+  browse the nearby-day window; change the search date only on a direct day click.
+- [x] Keep the carousel rendered during adjacent-window requests, animate new
+  cards from the clicked side, and ignore stale out-of-order responses from
+  rapid arrow clicks.
+- [x] Redesign the saved-passenger dialog to stay within the viewport with a
+  responsive field grid, scrolling body, and persistent action bar.
+- [x] Center national ID/passport directly below the Document heading in the
+  checkout review table.
+- [x] Close the customer logout confirmation immediately and tolerate a failed
+  best-effort server revoke without trapping the user behind the overlay.
+- [ ] Await user review on the local server before commit/push/deploy.

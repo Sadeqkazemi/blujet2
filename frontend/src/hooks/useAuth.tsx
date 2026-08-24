@@ -155,6 +155,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // trap the user in a session they clicked "sign out" on.
     try {
       await authApi.logout();
+    } catch {
+      // The local authentication state is authoritative for the browser UI;
+      // the short-lived server token will expire even if revocation is down.
     } finally {
       setUser(null);
       setStatus('unauthenticated');

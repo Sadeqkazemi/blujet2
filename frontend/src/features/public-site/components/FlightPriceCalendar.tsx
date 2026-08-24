@@ -42,15 +42,23 @@ export default function FlightPriceCalendar({
   const [reloadKey, setReloadKey] = useState(0);
   const [calendarCenter, setCalendarCenter] = useState(selectedDate.slice(0, 10));
   const [activeDate, setActiveDate] = useState(selectedDate.slice(0, 10));
+  const [isBrowsing, setIsBrowsing] = useState(false);
+  const [slideFrom, setSlideFrom] = useState<'left' | 'right' | null>(null);
+  const [renderVersion, setRenderVersion] = useState(0);
   const routeKey = `${origin}|${dest}`;
   const routeKeyRef = useRef(routeKey);
   const visibleDateSetRef = useRef<Set<string>>(new Set());
+  const daysRef = useRef<PriceCalendarDay[]>([]);
+  const requestSequenceRef = useRef(0);
+  const pendingSlideFromRef = useRef<'left' | 'right' | null>(null);
 
   useEffect(() => {
     const normalizedSelectedDate = selectedDate.slice(0, 10);
     const routeChanged = routeKeyRef.current !== routeKey;
     routeKeyRef.current = routeKey;
     setActiveDate(normalizedSelectedDate);
+    pendingSlideFromRef.current = null;
+    setSlideFrom(null);
     setCalendarCenter((current) => {
       if (!routeChanged && visibleDateSetRef.current.has(normalizedSelectedDate)) {
         return current;
@@ -60,19 +68,37 @@ export default function FlightPriceCalendar({
   }, [routeKey, selectedDate]);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequenceRef.current;
+    const keepsCurrentStrip = daysRef.current.length > 0;
+    const requestedSlideFrom = pendingSlideFromRef.current;
     if (!origin || !dest || !calendarCenter) {
       setDays([]);
+      daysRef.current = [];
       setState('idle');
+      setIsBrowsing(false);
       return;
     }
-    setState('loading');
+    if (keepsCurrentStrip) setIsBrowsing(true);
+    else setState('loading');
     try {
       const data = await fetchPriceCalendar(origin, dest, calendarCenter);
-      setDays([...data].sort((a, b) => a.date.localeCompare(b.date)));
+      if (requestId !== requestSequenceRef.current) return;
+      const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
+      daysRef.current = sorted;
+      setDays(sorted);
       setState(data.length === 0 ? 'empty' : 'ready');
+      setSlideFrom(requestedSlideFrom);
+      setRenderVersion((version) => version + 1);
     } catch {
-      setDays([]);
-      setState('error');
+      if (requestId !== requestSequenceRef.current) return;
+      if (keepsCurrentStrip) setState('ready');
+      else {
+        setDays([]);
+        daysRef.current = [];
+        setState('error');
+      }
+    } finally {
+      if (requestId === requestSequenceRef.current) setIsBrowsing(false);
     }
   }, [origin, dest, calendarCenter]);
 
@@ -83,10 +109,19 @@ export default function FlightPriceCalendar({
   const cheapestDate = useMemo(() => findCheapestPriceCalendarDate(days), [days]);
   const visibleDays = days.slice(0, CALENDAR_PAGE_DAYS);
   visibleDateSetRef.current = new Set(visibleDays.map((day) => day.date));
+  const orderedVisibleDays = isRTL ? [...visibleDays].reverse() : visibleDays;
   const previousDaysLabel =
-    locale === 'fa' ? 'روزهای قبلی' : locale === 'ar' ? 'الأيام السابقة' : 'Previous days';
+    locale === 'fa' ? 'روز قبل' : locale === 'ar' ? 'اليوم السابق' : 'Previous day';
   const nextDaysLabel =
-    locale === 'fa' ? 'روزهای بعدی' : locale === 'ar' ? 'الأيام التالية' : 'Next days';
+    locale === 'fa' ? 'روز بعد' : locale === 'ar' ? 'اليوم التالي' : 'Next day';
+
+  function scrollCalendar(delta: -1 | 1, visualFrom: 'left' | 'right') {
+    // Arrows browse the nearby-price window only. The passenger's chosen
+    // travel date stays selected (blue) until they click a day card itself.
+    pendingSlideFromRef.current = visualFrom;
+    setIsBrowsing(true);
+    setCalendarCenter((current) => shiftIsoDate(current, delta));
+  }
 
   if (!origin || !dest || !selectedDate) return null;
 
@@ -168,6 +203,8 @@ export default function FlightPriceCalendar({
           <div
             data-testid="price-calendar-strip"
             dir="ltr"
+            aria-busy={isBrowsing}
+            aria-live="polite"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -181,14 +218,28 @@ export default function FlightPriceCalendar({
           >
             <button
               type="button"
-              data-testid="price-calendar-previous"
-              aria-label={previousDaysLabel}
-              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, -CALENDAR_PAGE_DAYS))}
+              data-testid={isRTL ? 'price-calendar-next' : 'price-calendar-previous'}
+              aria-label={isRTL ? nextDaysLabel : previousDaysLabel}
+              onClick={() => scrollCalendar(isRTL ? 1 : -1, 'left')}
               style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ‹
             </button>
-            {visibleDays.map((day) => {
+            <div
+              key={renderVersion}
+              data-testid="price-calendar-days-track"
+              data-slide-from={slideFrom ?? 'none'}
+              className={slideFrom ? `price-calendar-slide-from-${slideFrom}` : undefined}
+              style={{
+                display: 'flex',
+                alignItems: 'stretch',
+                gap: 8,
+                flex: '1 1 0',
+                minWidth: 0,
+                maxWidth: '100%',
+              }}
+            >
+            {orderedVisibleDays.map((day) => {
               const selected = day.date === activeDate;
               const isCheapest = cheapestDate != null && day.date === cheapestDate;
               const empty = formatPriceCalendarPrice(day.minPriceIrr, locale, copy.emptyDay) === copy.emptyDay;
@@ -277,11 +328,12 @@ export default function FlightPriceCalendar({
                 </button>
               );
             })}
+            </div>
             <button
               type="button"
-              data-testid="price-calendar-next"
-              aria-label={nextDaysLabel}
-              onClick={() => setCalendarCenter((value) => shiftIsoDate(value, CALENDAR_PAGE_DAYS))}
+              data-testid={isRTL ? 'price-calendar-previous' : 'price-calendar-next'}
+              aria-label={isRTL ? previousDaysLabel : nextDaysLabel}
+              onClick={() => scrollCalendar(isRTL ? -1 : 1, 'right')}
               style={{ width: 40, height: 40, flex: '0 0 40px', borderRadius: 999, border: '1px solid #e6eaf0', background: '#fff', color: '#1668c4', cursor: 'pointer', fontSize: 21, lineHeight: 1 }}
             >
               ›

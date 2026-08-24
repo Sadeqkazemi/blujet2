@@ -1087,7 +1087,13 @@ export default function AccountPage() {
           onTabChange={selectTab}
           user={user}
           club={club}
-          onSignOut={() => void signOut().then(() => navigate('/', { replace: true }))}
+          onSignOut={async () => {
+            try {
+              await signOut();
+            } finally {
+              navigate('/', { replace: true });
+            }
+          }}
           isMobile={isMobile}
         />
 

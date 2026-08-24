@@ -28,10 +28,13 @@ describe('ReviewStep passenger details', () => {
     );
 
     const documentCell = screen.getByTestId('checkout-review-document-0');
+    const documentHeading = screen.getByTestId('checkout-review-document-heading');
     const birthCell = screen.getByTestId('checkout-review-birth-date-0');
     expect(documentCell).toHaveTextContent('0603267874');
     expect(documentCell).not.toHaveTextContent('۱۳۷۷');
     expect(birthCell).toHaveTextContent('۱۳۷۷/۱۱/۲۰');
     expect(birthCell).not.toHaveTextContent('0603267874');
+    expect(documentHeading).toHaveClass('text-center');
+    expect(documentCell).toHaveClass('text-center');
   });
 });

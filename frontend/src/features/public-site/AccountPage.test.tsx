@@ -490,6 +490,14 @@ describe('AccountPage', () => {
 
     await userEvent.click(screen.getByTestId('passengers-add-open'));
     expect(await screen.findByTestId('passengers-form-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('passengers-form')).toHaveStyle({
+      maxHeight: 'calc(100vh - 32px)',
+      display: 'flex',
+      flexDirection: 'column',
+    });
+    expect(screen.getByTestId('passengers-form-fields')).toHaveStyle({
+      overflowY: 'auto',
+    });
   });
 
   it('shows an incomplete-profile banner and saves identity fields from the account-info tab', async () => {
