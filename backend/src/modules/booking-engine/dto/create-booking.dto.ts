@@ -29,7 +29,7 @@ export class BookingPassengerDto {
   fullName: string;
 
   @ApiProperty({ example: '0012345678', required: false })
-  @ValidateIf((passenger: BookingPassengerDto) => !passenger.passportNo)
+  @IsOptional()
   @IsString()
   @MinLength(10)
   nationalId?: string;
@@ -39,7 +39,7 @@ export class BookingPassengerDto {
     required: false,
     description: 'Passport number when travelling on passport',
   })
-  @ValidateIf((passenger: BookingPassengerDto) => !passenger.nationalId)
+  @IsOptional()
   @IsString()
   @MinLength(5)
   passportNo?: string;

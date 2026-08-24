@@ -291,8 +291,6 @@ export class BookingService {
           ? p.fullName
           : 'مسافر همراه',
         seatCode: p.seatCode,
-        extraSeatCode: p.extraSeatCode,
-        extraSeatFareIrr: p.extraSeatFareIrr,
       })),
     };
   }
