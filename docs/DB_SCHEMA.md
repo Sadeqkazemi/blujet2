@@ -2762,6 +2762,12 @@ than relying on any cascade.
 - `flight_schedule_templates` — seasonal template with airports, aircraft,
   weekdays, IRR prices, cabin capacity snapshot, idempotencyKey, status.
 - `flight_instances.scheduleTemplateId` — nullable link to template.
+- A template materializes one `flight_instances` row per matching operating
+  date. These rows intentionally reuse the route's flight number, are ordered
+  by their dated departure, and begin with `definitionStatus=DRAFT` and
+  `publicSaleEnabled=false`. The existing approval workflow is the only path
+  that opens them to public/agency sale. This invariant uses existing columns
+  and requires no migration.
 - `bank_loan_applications` — bankReferenceId, requestedAmountIrr, bankStatus,
   statusSummary (non-sensitive), webhook event id, optional walletCreditReference;
   unique(`userId`,`idempotencyKey`); unique partial `walletCreditReference`;

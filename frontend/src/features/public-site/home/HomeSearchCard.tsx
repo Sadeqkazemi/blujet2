@@ -1191,6 +1191,7 @@ export default function HomeSearchCard({
                     placeholder={t.selectPlaceholder}
                     subLabel={dateIso ? undefined : t.lblDepartDate}
                     isRTL={isRTL}
+                    granularNavigation={false}
                     priceCalendar={
                       isMobile && origin && dest && origin !== dest
                         ? { origin, dest, locale }
@@ -1222,6 +1223,7 @@ export default function HomeSearchCard({
                       placeholder={t.selectPlaceholder}
                       subLabel={returnIso ? undefined : t.lblReturnDate}
                       isRTL={isRTL}
+                      granularNavigation={false}
                     />
                   </div>
                 )}
@@ -1808,6 +1810,7 @@ export default function HomeSearchCard({
                     placeholder={t.phFlightDate}
                     isRTL={isRTL}
                     embedded
+                    granularNavigation={false}
                   />
                 </div>
               </div>

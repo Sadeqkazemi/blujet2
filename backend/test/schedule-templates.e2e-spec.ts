@@ -109,6 +109,7 @@ describe('Seasonal schedule templates (e2e)', () => {
       .send(body);
     expect(preview.status).toBe(200);
     expect(preview.body.data.occurrenceCount).toBeGreaterThan(0);
+    const expectedOccurrenceCount = Number(preview.body.data.occurrenceCount);
 
     const key = `sched-e2e-${Date.now()}`;
     const created = await request(app.getHttpServer())
@@ -116,9 +117,7 @@ describe('Seasonal schedule templates (e2e)', () => {
       .set('Authorization', `Bearer ${accessToken}`)
       .send({ ...body, idempotencyKey: key });
     expect(created.status).toBe(201);
-    expect(created.body.data.instanceCount).toBe(
-      preview.body.data.occurrenceCount,
-    );
+    expect(created.body.data.instanceCount).toBe(expectedOccurrenceCount);
 
     const replay = await request(app.getHttpServer())
       .post('/flights/schedule-templates')
@@ -133,12 +132,36 @@ describe('Seasonal schedule templates (e2e)', () => {
       .send({ ...body, idempotencyKey: `${key}-b` });
     expect(conflict.status).toBe(409);
 
-    const instances = await dataSource
-      .getRepository(FlightInstance)
-      .createQueryBuilder('fi')
-      .where('fi.scheduleTemplateId = :id', { id: created.body.data.id })
-      .getCount();
-    expect(instances).toBe(preview.body.data.occurrenceCount);
+    const instances = await dataSource.getRepository(FlightInstance).find({
+      where: { scheduleTemplateId: created.body.data.id },
+      order: { departureAt: 'ASC' },
+    });
+    expect(instances).toHaveLength(expectedOccurrenceCount);
+    expect(instances.every((row) => row.definitionStatus === 'DRAFT')).toBe(
+      true,
+    );
+    expect(instances.every((row) => row.publicSaleEnabled === false)).toBe(
+      true,
+    );
+    expect(
+      new Set(instances.map((row) => row.departureAt.toISOString())).size,
+    ).toBe(instances.length);
+
+    const resolved = await request(app.getHttpServer())
+      .get('/flights/schedule-templates/resolve')
+      .query({ flightNo: body.flightNoBase })
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(resolved.status).toBe(200);
+    expect(resolved.body.data.occurrences).toHaveLength(instances.length);
+    expect(resolved.body.data.nextFlightInstanceId).toBe(instances[0].id);
+    expect(resolved.body.data.occurrences[0]).toMatchObject({
+      id: instances[0].id,
+      departureAt: instances[0].departureAt.toISOString(),
+      arrivalAt: instances[0].arrivalAt.toISOString(),
+      definitionStatus: 'DRAFT',
+      publicSaleEnabled: false,
+      version: instances[0].version,
+    });
   });
 
   it('completes one materialized occurrence atomically and rolls back invalid fare rules', async () => {

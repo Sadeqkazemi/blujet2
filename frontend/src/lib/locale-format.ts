@@ -96,6 +96,24 @@ export function localeMonthYear(
   }).format(new Date(`${gregorian.format('YYYY-MM')}-15T12:00:00Z`));
 }
 
+export function localeMonthName(
+  value: ReturnType<typeof dayjs>,
+  locale: StoredLocale,
+): string {
+  if (locale === 'fa') {
+    return [
+      'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+      'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+    ][value.month()]!;
+  }
+  const gregorian = value.calendar('gregory');
+  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : 'en', {
+    calendar: 'gregory',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${gregorian.format('YYYY-MM')}-15T12:00:00Z`));
+}
+
 export function localeWeekdayLong(
   value: ReturnType<typeof dayjs>,
   locale: StoredLocale,

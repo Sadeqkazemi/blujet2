@@ -186,6 +186,48 @@ describe("FlightsPage", () => {
     expect(screen.getByText("۳٬۸۰۰٬۰۰۰ تومان")).toBeInTheDocument();
   });
 
+  it("filters flight management by route and flight number and exposes the date calendar", async () => {
+    mockRole("SENIOR_MANAGER");
+    mockData();
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<FlightsPage />);
+
+    await screen.findByText("مدیریت پروازها و موجودی");
+    expect(screen.getByTestId("flight-filter-date")).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByTestId("flight-filter-dest"), "MHD");
+    expect(screen.getByText("RV-431")).toBeInTheDocument();
+    expect(screen.queryByText("EP-821")).not.toBeInTheDocument();
+
+    await userEvent.clear(screen.getByTestId("flight-filter-number"));
+    await userEvent.type(screen.getByTestId("flight-filter-number"), "EP-821");
+    expect(screen.getByText("پروازی مطابق فیلترها یافت نشد.")).toBeInTheDocument();
+  });
+
+  it("shows weak-sales warnings as a one-card carousel", async () => {
+    mockRole("COMMERCIAL_MANAGER");
+    const weak = OVERVIEW.active.map((row, index) => ({
+      ...row,
+      derivedStatus: "SELLING" as const,
+      salesHealth: {
+        isWeak: true,
+        occupancyPct: 10,
+        hoursToDeparture: 24 + index,
+        thresholdPct: 40,
+        windowHours: 168,
+        reasonFa: "فروش کمتر از حد انتظار است.",
+      },
+    }));
+    mockData({ ...OVERVIEW, active: weak });
+    const { default: userEvent } = await import("@testing-library/user-event");
+    render(<FlightsPage />);
+
+    expect(await screen.findByTestId("weak-sales-alert-fi1")).toBeInTheDocument();
+    expect(screen.queryByTestId("weak-sales-alert-fi2")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("weak-sales-next"));
+    expect(await screen.findByTestId("weak-sales-alert-fi2")).toBeInTheDocument();
+    expect(screen.queryByTestId("weak-sales-alert-fi1")).not.toBeInTheDocument();
+  });
+
   it("opens the full-page add-flight form when + افزودن پرواز is clicked", async () => {
     mockRole("SENIOR_MANAGER");
     mockData();

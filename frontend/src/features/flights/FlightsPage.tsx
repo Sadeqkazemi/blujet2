@@ -139,6 +139,11 @@ export default function FlightsPage() {
 
   const [futureDay, setFutureDay] = useState<string | null>(null);
   const [historyQuery, setHistoryQuery] = useState("");
+  const [filterOrigin, setFilterOrigin] = useState("");
+  const [filterDest, setFilterDest] = useState("");
+  const [filterFlightNo, setFilterFlightNo] = useState("");
+  const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [weakAlertIndex, setWeakAlertIndex] = useState(0);
   const [calOpen, setCalOpen] = useState(false);
   const [expandedFuture, setExpandedFuture] = useState<string | null>(null);
   const [plan, setPlan] = useState<FutureFlightRow | null>(null);
@@ -503,7 +508,41 @@ export default function FlightsPage() {
     }
   }
 
-  const future = useMemo(() => data?.future ?? [], [data]);
+  const matchesManagementFilters = useCallback(
+    (row: {
+      originCode: string;
+      destCode: string;
+      flightNo: string;
+      departureAt: string;
+    }) => {
+      const normalizedFlightNo = latinDigits(filterFlightNo)
+        .trim()
+        .toLowerCase();
+      return (
+        (!filterOrigin || row.originCode === filterOrigin) &&
+        (!filterDest || row.destCode === filterDest) &&
+        (!normalizedFlightNo ||
+          latinDigits(row.flightNo).toLowerCase().includes(normalizedFlightNo)) &&
+        (!filterDate ||
+          dayjs(row.departureAt).format("YYYY-MM-DD") ===
+            dayjs(filterDate).format("YYYY-MM-DD"))
+      );
+    },
+    [filterDate, filterDest, filterFlightNo, filterOrigin],
+  );
+
+  const activeFlights = useMemo(
+    () => (data?.active ?? []).filter(matchesManagementFilters),
+    [data?.active, matchesManagementFilters],
+  );
+  const completedFlights = useMemo(
+    () => (data?.completed?.rows ?? []).filter(matchesManagementFilters),
+    [data?.completed?.rows, matchesManagementFilters],
+  );
+  const future = useMemo(
+    () => (data?.future ?? []).filter(matchesManagementFilters),
+    [data?.future, matchesManagementFilters],
+  );
 
   // Jalali calendar for the month of the first future flight (falls back to
   // today's month) — only days that actually have flights are clickable.
@@ -533,19 +572,27 @@ export default function FlightsPage() {
       )
     : future;
 
-  const activePager = usePagination(data?.active ?? []);
-  const completedPager = usePagination(data?.completed?.rows ?? []);
+  const activePager = usePagination(activeFlights);
+  const completedPager = usePagination(completedFlights);
   const futurePager = usePagination(visibleFuture);
   const weakActiveFlights = useMemo(
     () =>
-      (data?.active ?? []).filter(
+      activeFlights.filter(
         (row) =>
           row.salesHealth?.isWeak === true &&
           row.salesHealth.hoursToDeparture >= 0 &&
           row.salesHealth.hoursToDeparture <= 7 * 24,
       ),
-    [data?.active],
+    [activeFlights],
   );
+
+  useEffect(() => {
+    if (weakActiveFlights.length === 0) {
+      setWeakAlertIndex(0);
+      return;
+    }
+    setWeakAlertIndex((index) => index % weakActiveFlights.length);
+  }, [weakActiveFlights.length]);
 
   const kpis = data?.kpis;
   const isCommercial =
@@ -574,10 +621,10 @@ export default function FlightsPage() {
   const opsPager = usePagination(opsFlights);
   const historyFlights = useMemo(() => {
     const rows = [
-      ...(data?.active ?? [])
+      ...activeFlights
         .filter((row) => row.derivedStatus !== "CANCELLED")
         .map((row) => ({ kind: "active" as const, row })),
-      ...(data?.completed?.rows ?? []).map((row) => ({
+      ...completedFlights.map((row) => ({
         kind: "completed" as const,
         row,
       })),
@@ -595,7 +642,7 @@ export default function FlightsPage() {
         row.destCode.toLowerCase().includes(qLatin)
       );
     });
-  }, [data, historyQuery, routeLabel]);
+  }, [activeFlights, completedFlights, historyQuery, routeLabel]);
 
   function exportCompletedFlights() {
     const rows = data?.completed?.rows ?? [];
@@ -767,6 +814,97 @@ export default function FlightsPage() {
         ))}
       </div>
 
+      {subTab !== "cities" && subTab !== "costs" && (
+        <section
+          className="mb-4 rounded-xl border border-panel-border bg-panel-surface p-4"
+          data-testid="flight-management-search"
+        >
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-extrabold text-panel-ink">
+                جستجوی پرواز
+              </h2>
+              <p className="mt-1 text-[10.5px] text-panel-muted">
+                فیلتر بر اساس مبدأ، مقصد، شماره و تاریخ پرواز
+              </p>
+            </div>
+            {(filterOrigin || filterDest || filterFlightNo || filterDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterOrigin("");
+                  setFilterDest("");
+                  setFilterFlightNo("");
+                  setFilterDate(null);
+                }}
+                className="text-[10.5px] font-bold text-accent"
+              >
+                پاک‌کردن فیلترها
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <label className="text-[10.5px] text-panel-muted">
+              مبدأ
+              <select
+                value={filterOrigin}
+                onChange={(event) => setFilterOrigin(event.target.value)}
+                data-testid="flight-filter-origin"
+                className="mt-1.5 h-10 w-full rounded-lg border border-panel-border bg-panel-canvas px-3 text-xs text-panel-ink outline-none focus:border-accent"
+              >
+                <option value="">همه مبدأها</option>
+                {airports.map((airport) => (
+                  <option key={airport.id} value={airport.code}>
+                    {airport.cityFa} ({airport.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[10.5px] text-panel-muted">
+              مقصد
+              <select
+                value={filterDest}
+                onChange={(event) => setFilterDest(event.target.value)}
+                data-testid="flight-filter-dest"
+                className="mt-1.5 h-10 w-full rounded-lg border border-panel-border bg-panel-canvas px-3 text-xs text-panel-ink outline-none focus:border-accent"
+              >
+                <option value="">همه مقصدها</option>
+                {airports.map((airport) => (
+                  <option key={airport.id} value={airport.code}>
+                    {airport.cityFa} ({airport.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-[10.5px] text-panel-muted">
+              شماره پرواز
+              <input
+                dir="ltr"
+                value={filterFlightNo}
+                onChange={(event) => setFilterFlightNo(event.target.value)}
+                placeholder="XY1234"
+                data-testid="flight-filter-number"
+                className="font-num mt-1.5 h-10 w-full rounded-lg border border-panel-border bg-panel-canvas px-3 text-left text-xs text-panel-ink outline-none placeholder:text-panel-muted focus:border-accent"
+              />
+            </label>
+            <div className="text-[10.5px] text-panel-muted">
+              تاریخ پرواز
+              <div className="mt-1.5 h-10 rounded-lg border border-panel-border bg-panel-canvas">
+                <JalaliDatePicker
+                  label="تاریخ پرواز"
+                  value={filterDate}
+                  onChange={setFilterDate}
+                  testId="flight-filter-date"
+                  theme="dark"
+                  singleLine
+                  placeholder="انتخاب تاریخ"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {loading ? (
         <p className="py-6 text-center text-sm text-panel-muted">
           در حال بارگذاری…
@@ -800,9 +938,12 @@ export default function FlightsPage() {
                 </div>
               </div>
               {isCommercial && weakActiveFlights.length > 0 && (
-                <div className="space-y-3 border-b border-panel-border bg-[#f59e0b0b] p-4" data-testid="weak-sales-ai-list">
-                  {weakActiveFlights.map((flight) => (
-                    <article key={flight.id} className="rounded-xl border border-[#f59e0b55] bg-[#171d29] p-4">
+                <div className="border-b border-panel-border bg-[#f59e0b0b] p-4" data-testid="weak-sales-ai-list">
+                  {(() => {
+                    const flight = weakActiveFlights[weakAlertIndex];
+                    if (!flight) return null;
+                    return (
+                    <article key={flight.id} className="rounded-xl border border-[#f59e0b55] bg-[#171d29] p-4" data-testid={`weak-sales-alert-${flight.id}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-xs font-extrabold text-[#fbbf24]">هشدار خودکار فروش ضعیف</div>
@@ -820,7 +961,50 @@ export default function FlightsPage() {
                       {flight.aiSuggestion ? <div className="mt-3 rounded-lg bg-black/15 p-3"><div className="text-[10px] text-panel-muted">پیشنهاد رقابتی هوش مصنوعی</div><div className="font-num mt-1 text-base font-black text-[#34d399]">{faMoney(flight.aiSuggestion.priceIrr)} تومان</div><p className="mt-1 text-[10.5px] leading-5 text-[#aebbd0]">{flight.aiSuggestion.reason}</p></div> : <p className="mt-3 text-[10.5px] text-panel-muted">پیشنهاد قیمت در حال آماده‌سازی است؛ نرخ فعلی خودکار تغییر نمی‌کند.</p>}
                       <button type="button" onClick={() => void openDetail(flight.id)} className="mt-3 text-[11px] font-bold text-accent">{canManageFlights ? 'مشاهده و مدیریت پرواز' : 'مشاهده پرواز'} ←</button>
                     </article>
-                  ))}
+                    );
+                  })()}
+                  {weakActiveFlights.length > 1 && (
+                    <div className="mt-3 flex items-center justify-between gap-3" aria-label="اسلایدر هشدار فروش">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWeakAlertIndex((index) =>
+                            (index + 1) % weakActiveFlights.length,
+                          )
+                        }
+                        data-testid="weak-sales-next"
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#f59e0b55] text-[#fbbf24]"
+                        aria-label="هشدار بعدی"
+                      >
+                        ‹
+                      </button>
+                      <div className="flex items-center gap-1.5" data-testid="weak-sales-position">
+                        {weakActiveFlights.map((flight, index) => (
+                          <button
+                            type="button"
+                            key={flight.id}
+                            onClick={() => setWeakAlertIndex(index)}
+                            aria-label={`هشدار ${faDigits(index + 1)}`}
+                            className={`h-2 rounded-full transition ${index === weakAlertIndex ? "w-6 bg-[#fbbf24]" : "w-2 bg-[#f59e0b55]"}`}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWeakAlertIndex((index) =>
+                            (index - 1 + weakActiveFlights.length) %
+                            weakActiveFlights.length,
+                          )
+                        }
+                        data-testid="weak-sales-previous"
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-[#f59e0b55] text-[#fbbf24]"
+                        aria-label="هشدار قبلی"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               <div className="overflow-x-auto">
@@ -1020,9 +1204,11 @@ export default function FlightsPage() {
                   </ul>
                     </>
                   )}
-                  {data.active.length === 0 && (
+                  {activeFlights.length === 0 && (
                     <p className="py-6 text-center text-xs text-panel-muted">
-                      پروازی ثبت نشده است.
+                      {data.active.length === 0
+                        ? "پروازی ثبت نشده است."
+                        : "پروازی مطابق فیلترها یافت نشد."}
                     </p>
                   )}
                   <Pagination

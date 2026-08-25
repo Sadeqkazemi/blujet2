@@ -9,6 +9,7 @@ import {
   calendarOffset,
   formatLocaleDate,
   localeDigits,
+  localeMonthName,
   localeMonthYear,
   localeWeekdayLong,
   localeWeekdays,
@@ -24,6 +25,8 @@ interface Cell {
   iso: string;
   disabled: boolean;
 }
+
+type CalendarViewMode = "day" | "month" | "year";
 
 function buildMonthCells(
   viewMonth: ReturnType<typeof dayjs>,
@@ -71,6 +74,8 @@ interface JalaliDatePickerProps {
     locale: StoredLocale;
   };
   disabled?: boolean;
+  /** Keep the original month-only header navigation when false. */
+  granularNavigation?: boolean;
 }
 
 function CalendarPortal({ children }: { children: React.ReactNode }) {
@@ -94,6 +99,7 @@ export default function JalaliDatePicker({
   locale: localeProp,
   priceCalendar,
   disabled = false,
+  granularNavigation = true,
 }: JalaliDatePickerProps) {
   const isPriceCalendar = Boolean(priceCalendar);
   const locale = localeProp ?? priceCalendar?.locale ?? "fa";
@@ -110,6 +116,7 @@ export default function JalaliDatePicker({
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesError, setPricesError] = useState(false);
+  const [viewMode, setViewMode] = useState<CalendarViewMode>("day");
   const [viewMonth, setViewMonth] = useState(() =>
     value
       ? dayjs(value).calendar(calendarSystem)
@@ -126,10 +133,12 @@ export default function JalaliDatePicker({
   const minIso = minDate ?? null;
   const cells = buildMonthCells(viewMonth, minIso, locale);
   const monthKey = `${viewMonth.year()}-${viewMonth.month()}`;
+  const yearRangeStart = viewMonth.year() - 5;
 
   useEffect(() => {
     const source = value ? dayjs(value) : dayjs();
     setViewMonth(source.calendar(calendarSystem));
+    setViewMode("day");
   }, [calendarSystem, value]);
 
   useEffect(() => {
@@ -180,7 +189,7 @@ export default function JalaliDatePicker({
   }, [open, isRTL, viewMonth, isPriceCalendar, isResponsiveCalendar]);
 
   useEffect(() => {
-    if (!open || !priceCalendar) return;
+    if (!open || !priceCalendar || viewMode !== "day") return;
 
     const visibleCells = buildMonthCells(
       viewMonth,
@@ -233,7 +242,7 @@ export default function JalaliDatePicker({
     return () => {
       cancelled = true;
     };
-  }, [open, monthKey, minDate, priceCalendar, viewMonth, locale]);
+  }, [open, monthKey, minDate, priceCalendar, viewMonth, locale, viewMode]);
 
   const selectedIsoDay = priceCalendar
     ? draftIso
@@ -318,6 +327,7 @@ export default function JalaliDatePicker({
           if (disabled) return;
           setDraftIso(value ? value.slice(0, 10) : null);
           if (value) setViewMonth(dayjs(value).calendar(calendarSystem));
+          setViewMode("day");
           setOpen((v) => !v);
         }}
         style={{
@@ -602,6 +612,7 @@ export default function JalaliDatePicker({
                   const iso = toIsoDateOnly(today);
                   if (minIso && iso < minIso.slice(0, 10)) return;
                   setViewMonth(today);
+                  setViewMode("day");
                   if (priceCalendar) {
                     setDraftIso(iso);
                   } else {
@@ -636,8 +647,18 @@ export default function JalaliDatePicker({
                 marginBottom: 12,
               }}
             >
-              <span
-                onClick={() => setViewMonth(viewMonth.subtract(1, "month"))}
+              <button
+                type="button"
+                aria-label={locale === "en" ? "Previous" : "قبلی"}
+                data-testid={testId ? `${testId}-previous-month` : undefined}
+                onClick={() =>
+                  setViewMonth(
+                    viewMonth.subtract(
+                      viewMode === "day" ? 1 : viewMode === "month" ? 1 : 12,
+                      viewMode === "day" ? "month" : "year",
+                    ),
+                  )
+                }
                 style={{
                   width: 36,
                   height: 36,
@@ -649,24 +670,51 @@ export default function JalaliDatePicker({
                   color: "#1668c4",
                   fontSize: "14.5px",
                   cursor: "pointer",
+                  background: "transparent",
                 }}
               >
                 ‹
-              </span>
-              <div
+              </button>
+              <button
+                type="button"
+                disabled={!granularNavigation}
                 data-testid={testId ? `${testId}-month-label` : undefined}
+                onClick={() =>
+                  granularNavigation &&
+                  setViewMode((mode) =>
+                    mode === "day" ? "month" : mode === "month" ? "year" : "month",
+                  )
+                }
+                aria-disabled={!granularNavigation}
                 style={{
                   textAlign: "center",
                   fontSize: "13.5px",
                   fontWeight: 800,
                   color: dark ? "#e7ecf3" : "#0d2640",
+                  border: 0,
+                  background: "transparent",
+                  cursor: granularNavigation ? "pointer" : "default",
+                  fontFamily: "inherit",
                 }}
               >
-                {localeMonthYear(viewMonth, locale)}
-              </div>
-              <span
+                {viewMode === "day"
+                  ? localeMonthYear(viewMonth, locale)
+                  : viewMode === "month"
+                    ? localeDigits(viewMonth.year(), locale)
+                    : `${localeDigits(yearRangeStart, locale)} – ${localeDigits(yearRangeStart + 11, locale)}`}
+              </button>
+              <button
+                type="button"
+                aria-label={locale === "en" ? "Next" : "بعدی"}
                 data-testid={testId ? `${testId}-next-month` : undefined}
-                onClick={() => setViewMonth(viewMonth.add(1, "month"))}
+                onClick={() =>
+                  setViewMonth(
+                    viewMonth.add(
+                      viewMode === "day" ? 1 : viewMode === "month" ? 1 : 12,
+                      viewMode === "day" ? "month" : "year",
+                    ),
+                  )
+                }
                 style={{
                   width: 36,
                   height: 36,
@@ -678,13 +726,15 @@ export default function JalaliDatePicker({
                   color: "#1668c4",
                   fontSize: "14.5px",
                   cursor: "pointer",
+                  background: "transparent",
                 }}
               >
                 ›
-              </span>
+              </button>
             </div>
 
-            <div
+            {viewMode === "day" && (
+            <><div
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(7,1fr)",
@@ -795,8 +845,88 @@ export default function JalaliDatePicker({
                   </span>
                 );
               })}
-            </div>
-            {priceCalendar && (
+            </div></>
+            )}
+            {viewMode === "month" && (
+              <div
+                data-testid={testId ? `${testId}-month-grid` : undefined}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3,1fr)",
+                  gap: 8,
+                  minHeight: 250,
+                  alignContent: "start",
+                }}
+              >
+                {Array.from({ length: 12 }, (_, monthIndex) => {
+                  const month = viewMonth.month(monthIndex);
+                  const selected = monthIndex === viewMonth.month();
+                  return (
+                    <button
+                      type="button"
+                      key={monthIndex}
+                      data-testid={testId ? `${testId}-month-${monthIndex}` : undefined}
+                      onClick={() => {
+                        setViewMonth(viewMonth.month(monthIndex));
+                        setViewMode("day");
+                      }}
+                      style={{
+                        height: 44,
+                        border: `1px solid ${selected ? "#3f6fc6" : popupBorder}`,
+                        borderRadius: 10,
+                        background: selected ? "#3f6fc6" : "transparent",
+                        color: selected ? "#fff" : dark ? "#e7ecf3" : "#16202e",
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {localeMonthName(month, locale)}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {viewMode === "year" && (
+              <div
+                data-testid={testId ? `${testId}-year-grid` : undefined}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3,1fr)",
+                  gap: 8,
+                  minHeight: 250,
+                  alignContent: "start",
+                }}
+              >
+                {Array.from({ length: 12 }, (_, offset) => yearRangeStart + offset).map(
+                  (year) => {
+                    const selected = year === viewMonth.year();
+                    return (
+                      <button
+                        type="button"
+                        key={year}
+                        data-testid={testId ? `${testId}-year-${year}` : undefined}
+                        onClick={() => {
+                          setViewMonth(viewMonth.year(year));
+                          setViewMode("month");
+                        }}
+                        style={{
+                          height: 44,
+                          border: `1px solid ${selected ? "#3f6fc6" : popupBorder}`,
+                          borderRadius: 10,
+                          background: selected ? "#3f6fc6" : "transparent",
+                          color: selected ? "#fff" : dark ? "#e7ecf3" : "#16202e",
+                          fontFamily: "inherit",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {localeDigits(year, locale)}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            )}
+            {priceCalendar && viewMode === "day" && (
               <div
                 style={{
                   display: "flex",

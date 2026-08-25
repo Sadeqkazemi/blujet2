@@ -390,6 +390,7 @@ export class ScheduleTemplateService {
         charterSeats: 0,
         status: FlightInstanceStatus.SCHEDULED,
         definitionStatus: FlightDefinitionStatus.DRAFT,
+        publicSaleEnabled: false,
         durationMinutes: dto.durationMinutes,
         basePriceIrr: ctx.agency,
         cabinCapacities: ctx.cabinCapacities,
@@ -477,7 +478,7 @@ export class ScheduleTemplateService {
       });
     }
 
-    const nextInstance = await this.instanceRepo
+    const occurrences = await this.instanceRepo
       .createQueryBuilder('fi')
       .where('fi.scheduleTemplateId = :templateId', { templateId: template.id })
       .andWhere('fi.departureAt >= :now', { now: new Date() })
@@ -485,12 +486,21 @@ export class ScheduleTemplateService {
         cancelled: FlightInstanceStatus.CANCELLED,
       })
       .orderBy('fi.departureAt', 'ASC')
-      .getOne();
+      .getMany();
+    const nextInstance = occurrences[0];
 
     return {
       ...this.serialize(template),
       nextFlightInstanceId: nextInstance?.id ?? null,
       nextDepartureAt: nextInstance?.departureAt.toISOString() ?? null,
+      occurrences: occurrences.map((instance) => ({
+        id: instance.id,
+        departureAt: instance.departureAt.toISOString(),
+        arrivalAt: instance.arrivalAt.toISOString(),
+        definitionStatus: instance.definitionStatus,
+        publicSaleEnabled: instance.publicSaleEnabled,
+        version: instance.version,
+      })),
     };
   }
 

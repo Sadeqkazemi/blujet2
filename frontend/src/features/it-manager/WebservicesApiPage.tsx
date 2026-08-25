@@ -7,6 +7,7 @@ import {
   updateItApiClient,
 } from '../../api/it-manager';
 import Modal from '../../components/Modal';
+import JalaliDatePicker from '../../components/JalaliDatePicker';
 import { useStepUp } from '../../hooks/useStepUp';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
@@ -762,12 +763,17 @@ function ClientSettingsModal({
           </label>
           <label className="block text-xs">
             <span className="mb-1 block font-bold">تاریخ انقضای کلید</span>
-            <input
-              type="date"
+            <div className="h-10 rounded-xl border border-[#2a3550] bg-[#0d1625]">
+            <JalaliDatePicker
+              label="تاریخ انقضای کلید"
               value={expiresAt}
-              onChange={(e) => setExpiresAt(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[#2a3550] bg-[#0d1625] px-3 text-xs"
+              onChange={(iso) => setExpiresAt(iso.slice(0, 10))}
+              theme="dark"
+              singleLine
+              testId="api-client-expiry-date"
+              placeholder="انتخاب تاریخ"
             />
+            </div>
           </label>
         </div>
 
