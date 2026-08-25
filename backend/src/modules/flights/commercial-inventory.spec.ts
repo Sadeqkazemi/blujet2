@@ -1,6 +1,7 @@
 import { FlightDefinitionStatus } from '../../database/enums';
 import {
   commercialSalesHealth,
+  isCommercialActiveOccurrence,
   isCommercialInventoryVisible,
 } from './flights.service';
 
@@ -29,6 +30,17 @@ describe('commercial active inventory policy', () => {
         approvedSnapshot: { id: 'approved-snapshot' },
       }),
     ).toBe(true);
+  });
+
+  it('keeps every approved occurrence in the active list beyond seven days', () => {
+    const occurrences = Array.from({ length: 17 }, (_, index) => ({
+      status: 'SCHEDULED' as const,
+      departureAt: new Date(now.getTime() + (index + 1) * 3 * 86_400_000),
+    }));
+
+    expect(
+      occurrences.filter((row) => isCommercialActiveOccurrence(row, now)),
+    ).toHaveLength(17);
   });
 
   it('does not expose inventory before sale starts or after sale ends', () => {

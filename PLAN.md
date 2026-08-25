@@ -19,6 +19,20 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Remove ticket refund from Commercial services (2026-08-25)** — the
+  commercial ancillary-services API and page omit the legacy `refund-fee`
+  entry while retaining the actual customer refund and finance workflows.
+  The UI also filters the legacy key defensively during mixed-version deploys.
+  Acceptance and proof:
+  `docs/features/commercial-services-refund-visibility.md`.
+
+- [x] **Approved series visibility + manual airport entry (2026-08-25)** —
+  remove the seven-day cutoff from the commercial active-flight inventory so
+  every CEO-published occurrence is listed separately, and allow commercial
+  users to type a city name and three-letter IATA code instead of being limited
+  to the bundled reference catalog. Acceptance and proof:
+  `docs/features/approved-flight-series-and-manual-airport.md`.
+
 - [x] **Schedule occurrences, flight-management search and calendar drill-down
   (2026-08-25)** — seasonal route creation now persists one future flight
   instance per matching operating day and explicitly starts every instance as

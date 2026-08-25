@@ -22,6 +22,8 @@ import {
   ANCILLARY_TRAVEL_EXTRA_BY_KEY,
 } from './ancillary-services.catalog';
 
+const COMMERCIAL_HIDDEN_SERVICE_KEYS = new Set(['refund-fee']);
+
 @Injectable()
 export class AncillaryServicesService implements OnModuleInit {
   constructor(
@@ -75,7 +77,11 @@ export class AncillaryServicesService implements OnModuleInit {
       .filter((row) => row.category === AncillaryServiceCategory.SEAT)
       .map((row) => this.toSeatRow(row));
     const otherServices = rows
-      .filter((row) => row.category === AncillaryServiceCategory.OTHER)
+      .filter(
+        (row) =>
+          row.category === AncillaryServiceCategory.OTHER &&
+          !COMMERCIAL_HIDDEN_SERVICE_KEYS.has(row.key),
+      )
       .map((row) => this.toOtherRow(row));
     return { seatServices, otherServices };
   }

@@ -18,7 +18,13 @@ interface FlightCitiesTabProps {
 function TrashIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13M10 11v5m4-5v5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -28,7 +34,11 @@ export default function FlightCitiesTab({
   onCreated,
   onDeleted,
 }: FlightCitiesTabProps) {
+  const [entryMode, setEntryMode] = useState<"catalog" | "manual">("catalog");
   const [selectedCode, setSelectedCode] = useState("");
+  const [manualCity, setManualCity] = useState("");
+  const [manualCode, setManualCode] = useState("");
+  const [manualAirportName, setManualAirportName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,22 +57,42 @@ export default function FlightCitiesTab({
   async function onSubmit() {
     setError(null);
     setNotice(null);
-    if (!selectedAirport) {
-      setError("یک شهر و فرودگاه را از فهرست انتخاب کنید.");
+    const manual = entryMode === "manual";
+    const cityFa = manual ? manualCity.trim() : selectedAirport?.cityFa;
+    const code = manual
+      ? manualCode.trim().toUpperCase()
+      : selectedAirport?.code;
+    const airportNameFa = manual
+      ? manualAirportName.trim() || undefined
+      : selectedAirport?.airportNameFa;
+    const tz = manual ? "Asia/Tehran" : selectedAirport?.tz;
+    if (!cityFa) {
+      setError(
+        manual
+          ? "نام شهر را وارد کنید."
+          : "یک شهر و فرودگاه را از فهرست انتخاب کنید.",
+      );
+      return;
+    }
+    if (!code || !/^[A-Z]{3}$/.test(code)) {
+      setError("کد فرودگاه باید دقیقاً سه حرف انگلیسی باشد.");
       return;
     }
     setBusy(true);
     try {
       const created = await createAirport({
-        cityFa: selectedAirport.cityFa,
-        code: selectedAirport.code,
-        airportNameFa: selectedAirport.airportNameFa,
-        tz: selectedAirport.tz,
+        cityFa,
+        code,
+        airportNameFa,
+        tz,
       });
       setSelectedCode("");
+      setManualCity("");
+      setManualCode("");
+      setManualAirportName("");
       onCreated(created);
       setNotice(
-        `«${selectedAirport.airportNameFa}» اضافه شد و از اکنون در انتخابگرهای پرواز و جستجوی سایت نمایش داده می‌شود.`,
+        `«${airportNameFa || `فرودگاه ${cityFa}`}» اضافه شد و از اکنون در انتخابگرهای پرواز و جستجوی سایت نمایش داده می‌شود.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "خطا در ثبت فرودگاه.");
@@ -96,40 +126,74 @@ export default function FlightCitiesTab({
       {notice && <PanelAlert tone="success">{notice}</PanelAlert>}
 
       <section className="rounded-[14px] border border-panel-border bg-panel-card p-5">
-        <div className="mb-5 flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-panel-accent" />
-          <h2 className="text-sm font-bold text-white">افزودن شهر جدید</h2>
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-panel-accent" />
+            <h2 className="text-sm font-bold text-white">افزودن شهر جدید</h2>
+          </div>
+          <div className="flex rounded-lg border border-panel-border-2 bg-panel-elevated p-1">
+            <button
+              type="button"
+              onClick={() => setEntryMode("catalog")}
+              className={`rounded-md px-3 py-2 text-[11px] font-bold transition ${entryMode === "catalog" ? "bg-panel-accent text-white" : "text-panel-muted"}`}
+            >
+              فهرست فرودگاه‌ها
+            </button>
+            <button
+              type="button"
+              onClick={() => setEntryMode("manual")}
+              className={`rounded-md px-3 py-2 text-[11px] font-bold transition ${entryMode === "manual" ? "bg-panel-accent text-white" : "text-panel-muted"}`}
+            >
+              ورود دستی
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.25fr_.65fr_1.25fr_auto] xl:items-end">
-          <label className="block">
-            <span className="mb-2 block text-[11px] font-bold text-panel-muted">
-              نام شهر و فرودگاه *
-            </span>
-            <select
-              aria-label="نام شهر و فرودگاه"
-              value={selectedCode}
-              onChange={(event) => setSelectedCode(event.target.value)}
-              className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none focus:border-panel-accent"
-            >
-              <option value="">انتخاب از فهرست فرودگاه‌ها</option>
-              {AIRPORT_REFERENCE_COUNTRIES.map((country) => {
-                const rows = AIRPORT_REFERENCE_CATALOG.filter(
-                  (item) => item.countryFa === country && !activeCodes.has(item.code),
-                );
-                if (rows.length === 0) return null;
-                return (
-                  <optgroup key={country} label={country}>
-                    {rows.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.cityFa} — {item.airportNameFa} ({item.code})
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
-            </select>
-          </label>
+          {entryMode === "catalog" ? (
+            <label className="block">
+              <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+                نام شهر و فرودگاه *
+              </span>
+              <select
+                aria-label="نام شهر و فرودگاه"
+                value={selectedCode}
+                onChange={(event) => setSelectedCode(event.target.value)}
+                className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none focus:border-panel-accent"
+              >
+                <option value="">انتخاب از فهرست فرودگاه‌ها</option>
+                {AIRPORT_REFERENCE_COUNTRIES.map((country) => {
+                  const rows = AIRPORT_REFERENCE_CATALOG.filter(
+                    (item) =>
+                      item.countryFa === country && !activeCodes.has(item.code),
+                  );
+                  if (rows.length === 0) return null;
+                  return (
+                    <optgroup key={country} label={country}>
+                      {rows.map((item) => (
+                        <option key={item.code} value={item.code}>
+                          {item.cityFa} — {item.airportNameFa} ({item.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+            </label>
+          ) : (
+            <label className="block">
+              <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+                نام شهر *
+              </span>
+              <input
+                aria-label="نام شهر"
+                value={manualCity}
+                onChange={(event) => setManualCity(event.target.value)}
+                placeholder="مثلاً گرگان"
+                className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none focus:border-panel-accent"
+              />
+            </label>
+          )}
 
           <label className="block">
             <span className="mb-2 block text-[11px] font-bold text-panel-muted">
@@ -137,9 +201,22 @@ export default function FlightCitiesTab({
             </span>
             <input
               aria-label="کد فرودگاه"
-              readOnly
+              readOnly={entryMode === "catalog"}
               dir="ltr"
-              value={selectedAirport?.code ?? ""}
+              maxLength={3}
+              value={
+                entryMode === "catalog"
+                  ? (selectedAirport?.code ?? "")
+                  : manualCode
+              }
+              onChange={(event) =>
+                setManualCode(
+                  event.target.value
+                    .replace(/[^A-Za-z]/g, "")
+                    .slice(0, 3)
+                    .toUpperCase(),
+                )
+              }
               placeholder="IATA"
               className="font-num h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs font-bold text-panel-link outline-none"
             />
@@ -151,16 +228,30 @@ export default function FlightCitiesTab({
             </span>
             <input
               aria-label="نام فرودگاه"
-              readOnly
-              value={selectedAirport?.airportNameFa ?? ""}
-              placeholder="پس از انتخاب شهر تکمیل می‌شود"
+              readOnly={entryMode === "catalog"}
+              value={
+                entryMode === "catalog"
+                  ? (selectedAirport?.airportNameFa ?? "")
+                  : manualAirportName
+              }
+              onChange={(event) => setManualAirportName(event.target.value)}
+              placeholder={
+                entryMode === "catalog"
+                  ? "پس از انتخاب شهر تکمیل می‌شود"
+                  : "اختیاری"
+              }
               className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none"
             />
           </label>
 
           <button
             type="button"
-            disabled={busy || !selectedAirport}
+            disabled={
+              busy ||
+              (entryMode === "catalog"
+                ? !selectedAirport
+                : !manualCity.trim() || !/^[A-Z]{3}$/.test(manualCode))
+            }
             onClick={() => void onSubmit()}
             className="h-11 rounded-lg bg-panel-accent px-6 text-xs font-bold text-white transition hover:bg-panel-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -169,9 +260,9 @@ export default function FlightCitiesTab({
         </div>
 
         <p className="mt-4 text-[11px] leading-6 text-panel-muted">
-          فهرست مرجع شامل فرودگاه‌های ایران و مقاصد منتخب امارات، عمان، قطر،
-          ترکیه، ارمنستان و عراق است. فقط شهرهای ثبت‌شده در این صفحه در جستجوی
-          بلیط سایت نمایش داده می‌شوند.
+          می‌توانید از فهرست مرجع انتخاب کنید یا نام شهر و کد سه‌حرفی IATA را
+          دستی وارد کنید. فقط شهرهای ثبت‌شده در این صفحه در جستجوی بلیط سایت
+          نمایش داده می‌شوند.
         </p>
       </section>
 

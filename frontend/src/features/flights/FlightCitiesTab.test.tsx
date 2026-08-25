@@ -37,9 +37,14 @@ describe("FlightCitiesTab", () => {
       />,
     );
 
-    await userEvent.selectOptions(screen.getByLabelText("نام شهر و فرودگاه"), "VAN");
+    await userEvent.selectOptions(
+      screen.getByLabelText("نام شهر و فرودگاه"),
+      "VAN",
+    );
     expect(screen.getByLabelText("کد فرودگاه")).toHaveValue("VAN");
-    expect(screen.getByLabelText("نام فرودگاه")).toHaveValue("فرودگاه فرید ملن");
+    expect(screen.getByLabelText("نام فرودگاه")).toHaveValue(
+      "فرودگاه فرید ملن",
+    );
     await userEvent.click(screen.getByRole("button", { name: "افزودن شهر" }));
 
     await waitFor(() =>
@@ -65,12 +70,16 @@ describe("FlightCitiesTab", () => {
       />,
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "حذف تهران THR" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "حذف تهران THR" }),
+    );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "تأیید حذف" }));
 
     await waitFor(() => expect(onDeleted).toHaveBeenCalledWith("a1"));
-    expect(screen.getByText(/از شهرهای قابل انتخاب حذف شد/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/از شهرهای قابل انتخاب حذف شد/),
+    ).toBeInTheDocument();
   });
 
   it("supports two airports in the same city", () => {
@@ -84,5 +93,43 @@ describe("FlightCitiesTab", () => {
 
     const picker = screen.getByLabelText("نام شهر و فرودگاه");
     expect(picker).toHaveTextContent("فرودگاه بین‌المللی امام خمینی (IKA)");
+  });
+
+  it("allows a city and airport code to be entered manually", async () => {
+    const created: AirportEntry = {
+      id: "a3",
+      code: "GBT",
+      cityFa: "گرگان",
+      airportNameFa: "فرودگاه گرگان",
+      tz: "Asia/Tehran",
+    };
+    const createSpy = vi
+      .spyOn(flightsApi, "createAirport")
+      .mockResolvedValue(created);
+    const onCreated = vi.fn();
+
+    render(
+      <FlightCitiesTab
+        airports={AIRPORTS}
+        onCreated={onCreated}
+        onDeleted={vi.fn()}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "ورود دستی" }));
+    await userEvent.type(screen.getByLabelText("نام شهر"), "گرگان");
+    await userEvent.type(screen.getByLabelText("کد فرودگاه"), "gbt");
+    await userEvent.type(screen.getByLabelText("نام فرودگاه"), "فرودگاه گرگان");
+    await userEvent.click(screen.getByRole("button", { name: "افزودن شهر" }));
+
+    await waitFor(() =>
+      expect(createSpy).toHaveBeenCalledWith({
+        cityFa: "گرگان",
+        code: "GBT",
+        airportNameFa: "فرودگاه گرگان",
+        tz: "Asia/Tehran",
+      }),
+    );
+    expect(onCreated).toHaveBeenCalledWith(created);
   });
 });

@@ -70,8 +70,8 @@ import {
   type CommercialPanelSettings,
 } from './commercial-panel-settings';
 
-/** SCHEDULED instances departing beyond this window belong to the
- * پروازهای آینده sub-tab; the rest are پروازهای فعال. */
+/** Long-range published inventory is repeated in the planning tab, but it
+ * must never be removed from the complete active-flight list. */
 const FUTURE_WINDOW_DAYS = 7;
 
 /** Statuses that count as a sold seat (design: «صندلی فروخته‌شده»). */
@@ -110,6 +110,18 @@ export function isCommercialInventoryVisible(
     ) &&
     (!instance.saleStartsAt || instance.saleStartsAt <= now) &&
     (!instance.saleEndsAt || instance.saleEndsAt >= now)
+  );
+}
+
+/** Every published occurrence stays in the active list until departure. */
+export function isCommercialActiveOccurrence(
+  instance: Pick<FlightInstance, 'status' | 'departureAt'>,
+  now = new Date(),
+): boolean {
+  return (
+    instance.status === FlightInstanceStatus.CANCELLED ||
+    (instance.status === FlightInstanceStatus.SCHEDULED &&
+      instance.departureAt >= now)
   );
 }
 
@@ -445,9 +457,10 @@ export class FlightsService {
     const scheduled = instances.filter((instance) =>
       isCommercialInventoryVisible(instance, now),
     );
-    const activeRows = scheduled.filter(
-      (i) =>
-        (i.departureAt <= futureCutoff || (sold.get(i.id) ?? 0) > 0),
+    // CEO approval publishes every materialized occurrence. The active list
+    // mirrors that occurrence-level contract and never applies a date cutoff.
+    const activeRows = scheduled.filter((i) =>
+      isCommercialActiveOccurrence(i, now),
     );
     const futureRows = scheduled.filter(
       (i) =>
@@ -623,6 +636,12 @@ export class FlightsService {
     const code = dto.code.trim().toUpperCase();
     const cityFa = dto.cityFa.trim();
     const airportNameFa = dto.airportNameFa?.trim() || null;
+    if (!/^[A-Z]{3}$/.test(code)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'کد فرودگاه باید دقیقاً سه حرف انگلیسی باشد.',
+      });
+    }
     if (!cityFa) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
