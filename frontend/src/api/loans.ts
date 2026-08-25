@@ -1,8 +1,43 @@
-import { apiGet, apiPost } from './http';
-import type { LoanApplication, LoanApplicationList } from '../types/loans';
+import { apiGet, apiPost } from "./http";
+import type {
+  LoanApplication,
+  LoanApplicationList,
+  LoanCustomerProfile,
+} from "../types/loans";
 
-export function createLoanApplication(requestedAmountIrr: string, idempotencyKey: string) {
-  return apiPost<LoanApplication>('/me/loan-applications', {
+export function fetchLoanProfile() {
+  return apiGet<LoanCustomerProfile>("/me/loan-profile");
+}
+
+export function startLoanAccountOpening(idempotencyKey: string) {
+  return apiPost<LoanCustomerProfile>("/me/loan-profile/account-opening", {
+    idempotencyKey,
+  });
+}
+
+export function syncLoanAccountOpening() {
+  return apiPost<LoanCustomerProfile>("/me/loan-profile/account-opening/sync");
+}
+
+export function startLoanEligibility(
+  customerNumber: string,
+  idempotencyKey: string,
+) {
+  return apiPost<LoanCustomerProfile>("/me/loan-profile/eligibility", {
+    customerNumber,
+    idempotencyKey,
+  });
+}
+
+export function syncLoanEligibility() {
+  return apiPost<LoanCustomerProfile>("/me/loan-profile/eligibility/sync");
+}
+
+export function createLoanApplication(
+  requestedAmountIrr: string,
+  idempotencyKey: string,
+) {
+  return apiPost<LoanApplication>("/me/loan-applications", {
     requestedAmountIrr,
     idempotencyKey,
   });

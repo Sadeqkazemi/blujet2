@@ -52,58 +52,58 @@ decimal string or a plain integer as client input.
 
 ### Auth (`backend/src/modules/auth/`)
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/auth/staff/login` | public | `{ username, password }` → if correct, issues a `TwoFactorChallenge` and returns `{ challengeId }` (never a token yet). Rate-limited per-IP + per-account. |
-| POST | `/auth/staff/login/verify` | public | `{ challengeId, code }` → on success, sets refresh cookie + returns `{ accessToken, user }`. 6-digit/2-min TTL/single-use/hashed, per Security Rules. |
-| POST | `/auth/refresh` | refresh cookie | Rotates refresh token, returns new access token. |
-| POST | `/auth/logout` | bearer | Revokes the current refresh token. |
-| GET | `/auth/me` | bearer | `{ id, fullName, role, permissions? }` — drives the frontend's role-scoped nav. |
+| Method | Path                       | Auth           | Notes                                                                                                                                                      |
+| ------ | -------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/staff/login`        | public         | `{ username, password }` → if correct, issues a `TwoFactorChallenge` and returns `{ challengeId }` (never a token yet). Rate-limited per-IP + per-account. |
+| POST   | `/auth/staff/login/verify` | public         | `{ challengeId, code }` → on success, sets refresh cookie + returns `{ accessToken, user }`. 6-digit/2-min TTL/single-use/hashed, per Security Rules.      |
+| POST   | `/auth/refresh`            | refresh cookie | Rotates refresh token, returns new access token.                                                                                                           |
+| POST   | `/auth/logout`             | bearer         | Revokes the current refresh token.                                                                                                                         |
+| GET    | `/auth/me`                 | bearer         | `{ id, fullName, role, permissions? }` — drives the frontend's role-scoped nav.                                                                            |
 
 Error codes: `INVALID_CREDENTIALS`, `TWO_FACTOR_REQUIRED`, `TWO_FACTOR_INVALID`, `TWO_FACTOR_EXPIRED`, `ACCOUNT_SUSPENDED`.
 
 ### Panels (`backend/src/modules/panels/`)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/panels/nav` | any staff role | Returns the caller's role-scoped tab list (server-computed — the frontend never decides visibility itself, per CLAUDE.md's "never by hiding UI alone" rule). |
-| GET | `/panels/access` | CEO, SENIOR_MANAGER, IT_MANAGER | Current `PanelAccessFlag` states for the panels that role is allowed to toggle (CEO: finance/commercial/IT; Senior Manager: +CEO panel, site admin; IT: none — IT's "دسترسی به پنل‌ها" tab in the design is read-only informational, no toggle wired). |
-| PATCH | `/panels/access/:panelKey` | CEO, SENIOR_MANAGER | `{ enabled }` → toggles a sibling panel; writes an `AuditLog(category=ACCESS)` row. |
+| Method | Path                       | Roles                           | Notes                                                                                                                                                                                                                                                  |
+| ------ | -------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/panels/nav`              | any staff role                  | Returns the caller's role-scoped tab list (server-computed — the frontend never decides visibility itself, per CLAUDE.md's "never by hiding UI alone" rule).                                                                                           |
+| GET    | `/panels/access`           | CEO, SENIOR_MANAGER, IT_MANAGER | Current `PanelAccessFlag` states for the panels that role is allowed to toggle (CEO: finance/commercial/IT; Senior Manager: +CEO panel, site admin; IT: none — IT's "دسترسی به پنل‌ها" tab in the design is read-only informational, no toggle wired). |
+| PATCH  | `/panels/access/:panelKey` | CEO, SENIOR_MANAGER             | `{ enabled }` → toggles a sibling panel; writes an `AuditLog(category=ACCESS)` row.                                                                                                                                                                    |
 
 ### Customers — SITE_ADMIN / SENIOR_MANAGER (`backend/src/modules/customers/`)
 
 پنل ادمین سایت → تب «مشتریان» (فهرست USERها، جستجو با موبایل، جزئیات).
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/customers` | SITE_ADMIN, SENIOR_MANAGER | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Completion uses the five canonical fields defined in Phase 68. National ID is decrypted for site admin and masked for senior manager. |
-| GET | `/customers/incomplete-count` | SITE_ADMIN, SENIOR_MANAGER | `{ count }` for sidebar badge. |
-| GET | `/customers/:id` | SITE_ADMIN, SENIOR_MANAGER | Read-only detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. Sensitive identity data is masked for senior manager. |
+| Method | Path                          | Roles                      | Notes                                                                                                                                                                                                                                 |
+| ------ | ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/customers`                  | SITE_ADMIN, SENIOR_MANAGER | Query: `q?` (mobile digits). Returns `{ customers[], incompleteCount, total }`. Completion uses the five canonical fields defined in Phase 68. National ID is decrypted for site admin and masked for senior manager.                 |
+| GET    | `/customers/incomplete-count` | SITE_ADMIN, SENIOR_MANAGER | `{ count }` for sidebar badge.                                                                                                                                                                                                        |
+| GET    | `/customers/:id`              | SITE_ADMIN, SENIOR_MANAGER | Read-only detail for tabs: profile, `docs` (KYC id-card), `purchases` (bookings), `refunds` (استرداد via booking.userId), `contacts` (support tickets by userId/phone), `club`. Sensitive identity data is masked for senior manager. |
 
 ### Reporting (`backend/src/modules/reporting/`)
 
 Shared by all 6 panels' dashboard/finance tabs — confirmed identical KPI
 set and chart shape across every panel report.
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/reporting/sales-chart` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `granularity=day\|month\|q3\|q6\|year\|flight`, `month?`, `date?`, `flightNo?`. Returns per-period `{ label, systemIrr, charterIrr, agencyIrr }[]` — computed server-side from `LedgerEntry`, grouped by `Booking.channel`. |
-| GET | `/reporting/flight-sales` | same | «شماره پرواز» picker for the analytic مالی tab: departed `FlightInstance` rows (newest first, cap 60) with per-channel SALE sums, route cities, seats. `{ rows: [{ flightInstanceId, flightNo, originCode, destCode, originCityFa, destCityFa, departureAt, systemIrr, charterIrr, agencyIrr, totalIrr, capacity, soldSeats }] }`. The CEO/analytic UI collapses rows that share the same `flightNo` into one card (summed channel sales + seats) and shows cards only after the user searches (no default list). |
-| GET | `/reporting/kpis` | same | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule. |
-| GET | `/reporting/completed-flights-summary` | same | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart. |
-| GET | `/reporting/low-sales-alerts` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query. |
-| GET | `/reporting/commercial-overview` | COMMERCIAL_MANAGER | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`. |
-| GET | `/reporting/site-admin-overview` | SITE_ADMIN | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A). |
-| GET | `/reporting/finance-dashboard-stats` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint. |
+| Method | Path                                   | Roles                                                                 | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------ | -------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/reporting/sales-chart`               | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `granularity=day\|month\|q3\|q6\|year\|flight`, `month?`, `date?`, `flightNo?`. Returns per-period `{ label, systemIrr, charterIrr, agencyIrr }[]` — computed server-side from `LedgerEntry`, grouped by `Booking.channel`.                                                                                                                                                                                                                                                                                |
+| GET    | `/reporting/flight-sales`              | same                                                                  | «شماره پرواز» picker for the analytic مالی tab: departed `FlightInstance` rows (newest first, cap 60) with per-channel SALE sums, route cities, seats. `{ rows: [{ flightInstanceId, flightNo, originCode, destCode, originCityFa, destCityFa, departureAt, systemIrr, charterIrr, agencyIrr, totalIrr, capacity, soldSeats }] }`. The CEO/analytic UI collapses rows that share the same `flightNo` into one card (summed channel sales + seats) and shows cards only after the user searches (no default list). |
+| GET    | `/reporting/kpis`                      | same                                                                  | Query: `granularity`, `periodKey?` (selected bar/day/month) → `{ revenueIrr, profitIrr, marginPct, operatingCostIrr, agencyDebtIrr, agencyDebtCount, trend: {...} }`. Re-scopes to the selected period, matching the "KPIs re-scope when a chart month is selected" rule.                                                                                                                                                                                                                                         |
+| GET    | `/reporting/completed-flights-summary` | same                                                                  | Same `granularity`/`periodKey` filter → `{ flightCount, totalSeats, soldSeats, unsoldSeats }`, synced to the same period as the chart.                                                                                                                                                                                                                                                                                                                                                                            |
+| GET    | `/reporting/low-sales-alerts`          | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query.                                                                                                                                                                                                                                                                                                                        |
+| GET    | `/reporting/commercial-overview`       | COMMERCIAL_MANAGER                                                    | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| GET    | `/reporting/site-admin-overview`       | SITE_ADMIN                                                            | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A).                                                                 |
+| GET    | `/reporting/finance-dashboard-stats`   | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER                     | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint.                                                                                                                                      |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/audit/manager-reports` | CEO (excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor), BOARD_CHAIR (sees all), SENIOR_MANAGER (sees all) | Query: `category?`, `actorRole?`, `q?` (search action/detail/actor name). Each row includes `actorName`. Role-specific exclusion filters are server-side per the confirmed per-panel behavior — never left to the frontend to hide rows. |
-| GET | `/audit/logs` | IT_MANAGER, EMPLOYEE | `category=SYSTEM` + account-management entries — IT's "لاگ و رویدادها" tab; EMPLOYEE requires `lg_view`. |
-| GET | `/audit/logs/export` | IT_MANAGER, EMPLOYEE | UTF-8 CSV export (up to 100 filtered rows); EMPLOYEE requires `lg_export`. |
-| POST | `/audit` | internal (called by other modules, not directly by clients) | Every write in every later-phase module calls this — not a public endpoint. |
+| Method | Path                     | Roles                                                                                                     | Notes                                                                                                                                                                                                                                    |
+| ------ | ------------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/audit/manager-reports` | CEO (excludes CEO/SENIOR_MANAGER/BOARD_CHAIR as actor), BOARD_CHAIR (sees all), SENIOR_MANAGER (sees all) | Query: `category?`, `actorRole?`, `q?` (search action/detail/actor name). Each row includes `actorName`. Role-specific exclusion filters are server-side per the confirmed per-panel behavior — never left to the frontend to hide rows. |
+| GET    | `/audit/logs`            | IT_MANAGER, EMPLOYEE                                                                                      | `category=SYSTEM` + account-management entries — IT's "لاگ و رویدادها" tab; EMPLOYEE requires `lg_view`.                                                                                                                                 |
+| GET    | `/audit/logs/export`     | IT_MANAGER, EMPLOYEE                                                                                      | UTF-8 CSV export (up to 100 filtered rows); EMPLOYEE requires `lg_export`.                                                                                                                                                               |
+| POST   | `/audit`                 | internal (called by other modules, not directly by clients)                                               | Every write in every later-phase module calls this — not a public endpoint.                                                                                                                                                              |
 
 ---
 
@@ -118,27 +118,27 @@ the parent resource.
 
 ### `backend/src/modules/agencies/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/agencies` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Query: `q?` (name/license/manager/city search), `debtorsOnly?` (Commercial's "آژانس‌های دارای بدهی" panel). Returns list + the same 4 KPI cards (active count, total credit granted, total used/debt, pending-settlement count) confirmed identical across all three panels. |
-| GET | `/agencies/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER and FINANCE_MANAGER, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance/history sub-sections. |
-| PATCH | `/agencies/:id/suspend` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ reason }` (required) → sets `suspendedAt`/`suspendReason`, `AuditLog(category=AGENCY)`. |
-| PATCH | `/agencies/:id/reactivate` | same as suspend | Clears suspension. |
-| GET | `/agencies/:id/credit` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ limitIrr, usedIrr (derived), remainingIrr }`. |
-| PATCH | `/agencies/:id/credit` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `{ limitIrr }` — confirmed present in all three panels' Credit modal. Writes `AuditLog(category=AGENCY)`. |
-| POST | `/agencies/:id/settle` | SENIOR_MANAGER, FINANCE_MANAGER | "ثبت تسویه" — creates a `LedgerEntry(type=SETTLEMENT)` for the outstanding balance. **Not** shown in Commercial Manager's UI (which settles via invoices instead — see below), so not authorized for that role. |
-| GET | `/agencies/requests` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | List membership requests, `status?` filter. The public **POST** (an agency's own signup form) is deferred entirely — not implemented this phase, not even as a stub route — since it belongs to the not-yet-built agency-portal track and isn't in `docs/features/agencies.md`'s checklist. |
-| GET | `/agencies/requests/:id` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Applicant info + documents + (Senior/Commercial only) referral history. |
-| PATCH | `/agencies/requests/:id/approve` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Creates the `AgencyProfile` + backing `User(role=AGENCY)`. |
-| PATCH | `/agencies/requests/:id/reject` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | |
-| PATCH | `/agencies/requests/:id/refer` | SENIOR_MANAGER, COMMERCIAL_MANAGER | `{ referredToId, note? }` — confirmed only in those two panels' request-detail screen. |
-| GET / POST | `/agencies/:id/api-key` | SENIOR_MANAGER only | Issue. |
-| PATCH | `/agencies/:id/api-key/:keyId` | SENIOR_MANAGER only | `{ status: ACTIVE\|SUSPENDED }` or regenerate. Confirmed **exclusive** to Senior Manager's agency detail — Finance/Commercial never show this section. |
-| GET / POST | `/agencies/:id/invoices` | COMMERCIAL_MANAGER (issue), FINANCE_MANAGER + SENIOR_MANAGER (read-only) | "صدور فاکتور" — confirmed only in Commercial Manager's agency detail → مالی sub-tab. |
-| PATCH | `/agencies/:id/invoices/:invoiceId/pay` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Marks `PAID`, writes the `SETTLEMENT` ledger row (see DB_SCHEMA note — never a bare status flip). |
-| POST | `/agencies/:id/invoices/:invoiceId/remind` | COMMERCIAL_MANAGER | "یادآوری" — queues a notification (SmsProvider/email interface, mocked in dev). |
-| GET / POST | `/agencies/:id/messages` | COMMERCIAL_MANAGER only | "مکاتبه‌ها" chat thread — confirmed exclusive to that panel. |
-| POST | `/agencies/debtors/notify-all` | COMMERCIAL_MANAGER | Bulk "ارسال اعلان به همه" on the debtors panel. |
+| Method     | Path                                       | Roles                                                                    | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------- | ------------------------------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET        | `/agencies`                                | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | Query: `q?` (name/license/manager/city search), `debtorsOnly?` (Commercial's "آژانس‌های دارای بدهی" panel). Returns list + the same 4 KPI cards (active count, total credit granted, total used/debt, pending-settlement count) confirmed identical across all three panels.                                                                                                                                                                                               |
+| GET        | `/agencies/:id`                            | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | Detail: profile, computed stats (total sales, tickets issued, passengers), credit summary, recent activity timeline. `activityScore` (see DB_SCHEMA) is only included for FINANCE_MANAGER/COMMERCIAL_MANAGER — Senior Manager's detail view never showed it. For COMMERCIAL_MANAGER and FINANCE_MANAGER, also returns `commercialExtras`: `{ flightsSold[], purchasedServices[], financeSummary, transactions[] }` for the design's overview/finance/history sub-sections. |
+| PATCH      | `/agencies/:id/suspend`                    | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | `{ reason }` (required) → sets `suspendedAt`/`suspendReason`, `AuditLog(category=AGENCY)`.                                                                                                                                                                                                                                                                                                                                                                                 |
+| PATCH      | `/agencies/:id/reactivate`                 | same as suspend                                                          | Clears suspension.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| GET        | `/agencies/:id/credit`                     | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | `{ limitIrr, usedIrr (derived), remainingIrr }`.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| PATCH      | `/agencies/:id/credit`                     | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | `{ limitIrr }` — confirmed present in all three panels' Credit modal. Writes `AuditLog(category=AGENCY)`.                                                                                                                                                                                                                                                                                                                                                                  |
+| POST       | `/agencies/:id/settle`                     | SENIOR_MANAGER, FINANCE_MANAGER                                          | "ثبت تسویه" — creates a `LedgerEntry(type=SETTLEMENT)` for the outstanding balance. **Not** shown in Commercial Manager's UI (which settles via invoices instead — see below), so not authorized for that role.                                                                                                                                                                                                                                                            |
+| GET        | `/agencies/requests`                       | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | List membership requests, `status?` filter. The public **POST** (an agency's own signup form) is deferred entirely — not implemented this phase, not even as a stub route — since it belongs to the not-yet-built agency-portal track and isn't in `docs/features/agencies.md`'s checklist.                                                                                                                                                                                |
+| GET        | `/agencies/requests/:id`                   | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | Applicant info + documents + (Senior/Commercial only) referral history.                                                                                                                                                                                                                                                                                                                                                                                                    |
+| PATCH      | `/agencies/requests/:id/approve`           | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      | Creates the `AgencyProfile` + backing `User(role=AGENCY)`.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| PATCH      | `/agencies/requests/:id/reject`            | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER                      |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| PATCH      | `/agencies/requests/:id/refer`             | SENIOR_MANAGER, COMMERCIAL_MANAGER                                       | `{ referredToId, note? }` — confirmed only in those two panels' request-detail screen.                                                                                                                                                                                                                                                                                                                                                                                     |
+| GET / POST | `/agencies/:id/api-key`                    | SENIOR_MANAGER only                                                      | Issue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| PATCH      | `/agencies/:id/api-key/:keyId`             | SENIOR_MANAGER only                                                      | `{ status: ACTIVE\|SUSPENDED }` or regenerate. Confirmed **exclusive** to Senior Manager's agency detail — Finance/Commercial never show this section.                                                                                                                                                                                                                                                                                                                     |
+| GET / POST | `/agencies/:id/invoices`                   | COMMERCIAL_MANAGER (issue), FINANCE_MANAGER + SENIOR_MANAGER (read-only) | "صدور فاکتور" — confirmed only in Commercial Manager's agency detail → مالی sub-tab.                                                                                                                                                                                                                                                                                                                                                                                       |
+| PATCH      | `/agencies/:id/invoices/:invoiceId/pay`    | FINANCE_MANAGER, COMMERCIAL_MANAGER                                      | Marks `PAID`, writes the `SETTLEMENT` ledger row (see DB_SCHEMA note — never a bare status flip).                                                                                                                                                                                                                                                                                                                                                                          |
+| POST       | `/agencies/:id/invoices/:invoiceId/remind` | COMMERCIAL_MANAGER                                                       | "یادآوری" — queues a notification (SmsProvider/email interface, mocked in dev).                                                                                                                                                                                                                                                                                                                                                                                            |
+| GET / POST | `/agencies/:id/messages`                   | COMMERCIAL_MANAGER only                                                  | "مکاتبه‌ها" chat thread — confirmed exclusive to that panel.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| POST       | `/agencies/debtors/notify-all`             | COMMERCIAL_MANAGER                                                       | Bulk "ارسال اعلان به همه" on the debtors panel.                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ---
 
@@ -153,46 +153,46 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 ### `backend/src/modules/cartable/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/cartable` | EXEC_ROLES | Caller's own tasks. Query: `category?` (ADMIN\|AGENCY\|MANAGER — the 3 KPI filter cards), `date?` (ISO day, the Jalali calendar popover filter), `status?` (default OPEN). Returns rows + per-category counts for the KPI cards + total for the badge. |
-| PATCH | `/cartable/:id/approve` | EXEC_ROLES (assignee only) | `{ note }` — required, per the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.». Resolving a task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED). |
-| PATCH | `/cartable/:id/reject` | EXEC_ROLES (assignee only) | `{ note }` required. The design's red button is labeled «انصراف» but behaves as reject — kept as reject server-side. |
-| PATCH | `/cartable/:id/transfer` | EXEC_ROLES (assignee only) | `{ toId, note }` — creates a new OPEN task for `toId`, marks this one TRANSFERRED. 409 on already-resolved tasks (no double-resolution). |
-| POST | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates one cartable task for every active `BOARD_CHAIR` account. The first valid decision wins atomically and closes the sibling tasks with the same result, so stale duplicate decisions cannot overwrite it. |
-| GET | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Own latest request status — drives the banner's pending/approved state. |
+| Method | Path                         | Roles                               | Notes                                                                                                                                                                                                                                                                                                         |
+| ------ | ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/cartable`                  | EXEC_ROLES                          | Caller's own tasks. Query: `category?` (ADMIN\|AGENCY\|MANAGER — the 3 KPI filter cards), `date?` (ISO day, the Jalali calendar popover filter), `status?` (default OPEN). Returns rows + per-category counts for the KPI cards + total for the badge.                                                        |
+| PATCH  | `/cartable/:id/approve`      | EXEC_ROLES (assignee only)          | `{ note }` — required, per the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.». Resolving a task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED).                                                                                                                      |
+| PATCH  | `/cartable/:id/reject`       | EXEC_ROLES (assignee only)          | `{ note }` required. The design's red button is labeled «انصراف» but behaves as reject — kept as reject server-side.                                                                                                                                                                                          |
+| PATCH  | `/cartable/:id/transfer`     | EXEC_ROLES (assignee only)          | `{ toId, note }` — creates a new OPEN task for `toId`, marks this one TRANSFERRED. 409 on already-resolved tasks (no double-resolution).                                                                                                                                                                      |
+| POST   | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates one cartable task for every active `BOARD_CHAIR` account. The first valid decision wins atomically and closes the sibling tasks with the same result, so stale duplicate decisions cannot overwrite it. |
+| GET    | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Own latest request status — drives the banner's pending/approved state.                                                                                                                                                                                                                                       |
 
 ### `backend/src/modules/staff-directory/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/staff-directory` | EXEC_ROLES | Active staff users `{ id, fullName, role, roleLabelFa }` for the transfer picker, referral recipient chips, and Phase 3's deferred agency-request refer UI (wired this phase). |
+| Method | Path               | Roles      | Notes                                                                                                                                                                          |
+| ------ | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/staff-directory` | EXEC_ROLES | Active staff users `{ id, fullName, role, roleLabelFa }` for the transfer picker, referral recipient chips, and Phase 3's deferred agency-request refer UI (wired this phase). |
 
 ### `backend/src/modules/referrals/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/referrals` | SENIOR_MANAGER | Sent referrals («ارجاعات من به مدیران») + the 4 KPI counts (کل/در انتظار گزارش/گزارش دریافت‌شده/بسته‌شده). |
-| POST | `/referrals` | SENIOR_MANAGER | `{ title, body, recipientIds[] (≥1), priority, dueAt?, attachmentIds? }` — validation message per design: موضوع، شرح و حداقل یک مدیر مقصد الزامی است. Creates recipient cartable tasks. |
-| GET | `/referrals/:id` | SENIOR_MANAGER (sender) + recipients | Detail incl. recipients, attachments, reports thread. |
-| POST | `/referrals/:id/reports` | recipients only | `{ body, attachmentIds? }` — flips status to REPORTED. (No mock UI existed for this — see DB_SCHEMA ⚑.) |
-| PATCH | `/referrals/:id/close` | SENIOR_MANAGER (sender) | «تأیید دریافت گزارش و بستن» — only from REPORTED, else 409. |
-| PATCH | `/referrals/:id/request-revision` | SENIOR_MANAGER (sender) | «درخواست اصلاح گزارش» — REPORTED → REVIEWING. |
-| POST | `/referrals/:id/remind` | SENIOR_MANAGER (sender) | «ارسال یادآوری دریافت گزارش» — SENT/REVIEWING → REVIEWING, notifies recipients. |
+| Method | Path                              | Roles                                | Notes                                                                                                                                                                                   |
+| ------ | --------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/referrals`                      | SENIOR_MANAGER                       | Sent referrals («ارجاعات من به مدیران») + the 4 KPI counts (کل/در انتظار گزارش/گزارش دریافت‌شده/بسته‌شده).                                                                              |
+| POST   | `/referrals`                      | SENIOR_MANAGER                       | `{ title, body, recipientIds[] (≥1), priority, dueAt?, attachmentIds? }` — validation message per design: موضوع، شرح و حداقل یک مدیر مقصد الزامی است. Creates recipient cartable tasks. |
+| GET    | `/referrals/:id`                  | SENIOR_MANAGER (sender) + recipients | Detail incl. recipients, attachments, reports thread.                                                                                                                                   |
+| POST   | `/referrals/:id/reports`          | recipients only                      | `{ body, attachmentIds? }` — flips status to REPORTED. (No mock UI existed for this — see DB_SCHEMA ⚑.)                                                                                 |
+| PATCH  | `/referrals/:id/close`            | SENIOR_MANAGER (sender)              | «تأیید دریافت گزارش و بستن» — only from REPORTED, else 409.                                                                                                                             |
+| PATCH  | `/referrals/:id/request-revision` | SENIOR_MANAGER (sender)              | «درخواست اصلاح گزارش» — REPORTED → REVIEWING.                                                                                                                                           |
+| POST   | `/referrals/:id/remind`           | SENIOR_MANAGER (sender)              | «ارسال یادآوری دریافت گزارش» — SENT/REVIEWING → REVIEWING, notifies recipients.                                                                                                         |
 
 ### `backend/src/modules/manager-messages/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| POST | `/manager-messages` | EXEC_ROLES, SITE_ADMIN | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
-| GET | `/manager-messages/sent` | EXEC_ROLES, SITE_ADMIN | Sender's own history (the mocks discard sent messages; the real system keeps the record). |
+| Method | Path                     | Roles                  | Notes                                                                                                                                                                                                                                                                                                                                                                       |
+| ------ | ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/manager-messages`      | EXEC_ROLES, SITE_ADMIN | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
+| GET    | `/manager-messages/sent` | EXEC_ROLES, SITE_ADMIN | Sender's own history (the mocks discard sent messages; the real system keeps the record).                                                                                                                                                                                                                                                                                   |
 
 ### `backend/src/modules/files/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| POST | `/files` | any staff role | multipart upload, PDF/image only, ≤ 5MB; returns `{ id, fileName }` for attaching. |
-| GET | `/files/:id` | owner + participants of the entity it's attached to | Streams the file; 403 otherwise. |
+| Method | Path         | Roles                                               | Notes                                                                              |
+| ------ | ------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| POST   | `/files`     | any staff role                                      | multipart upload, PDF/image only, ≤ 5MB; returns `{ id, fileName }` for attaching. |
+| GET    | `/files/:id` | owner + participants of the entity it's attached to | Streams the file; 403 otherwise.                                                   |
 
 ---
 
@@ -207,43 +207,43 @@ an operation-level `@RequiresPermission` key. See `docs/DB_SCHEMA.md` → Phase
 
 ### `backend/src/modules/it-manager/` — employees ("کاربران و دسترسی‌ها")
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/permissions` | The seeded unit/action catalog (dept → sections → perms) for the IT create-employee form and detail modal. Commercial/sales cover agencies (partners/requests/debtors), routes, aircraft, flight operations, services, passenger reports, club rules and web services; finance covers agencies, credit/settlement, reports/exports and refunds. Legacy umbrella keys remain for backward compatibility. |
-| GET | `/it/employees` | Query: `dept?`, `q?` (name/username). List with `role` label, `dept`, `username`, `lastLoginAt`, `isActive`. |
-| POST | `/it/employees` | `{ fullName, username, phone (Iranian mobile), password (≥6), dept, customDeptLabel?, rank, referralScope, permissionKeys[] }` — creates `User(role=EMPLOYEE)`, normalizes the mobile to E.164, enables mandatory staff 2FA, hashes password (argon2), and grants the listed catalog permissions. A duplicate username or mobile returns 409. The design's `createStaffUser()` also always tags every new employee with `"dashboard"`/`"cartable"` — **not** carried over: neither corresponds to a real gate for `EMPLOYEE` in this backend (not a `REPORTING_ROLES`/`EXEC_ROLES` member), so faking the grant would be cosmetic only. `AuditLog(category=ACCOUNT)`. |
-| GET | `/it/employees/:id` | Detail: profile + last login + granted permissions + the catalog rows not yet granted ("available"). 404 for non-EMPLOYEE / non-existent ids. |
-| PATCH | `/it/employees/:id/status` | `{ isActive }` — suspend/reactivate. `AuditLog(category=ACCOUNT)`. |
-| PATCH | `/it/employees/:id/permissions` | `{ permissionKey, grant }` — single toggle (mirrors the design's per-row switch). `AuditLog(category=ACCESS)`. |
-| POST | `/it/employees/:id/reset-password` | Generates a temporary password, argon2-hashes it onto the account, sets `mustChangePassword=true`, records a `PasswordResetEvent`, `AuditLog(category=ACCOUNT)`. Returns the plaintext temp password **once** in this response only — never stored, never logged (per Security Rules' OTP/secret-at-rest pattern). |
+| Method | Path                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/it/permissions`                  | The seeded unit/action catalog (dept → sections → perms) for the IT create-employee form and detail modal. Commercial/sales cover agencies (partners/requests/debtors), routes, aircraft, flight operations, services, passenger reports, club rules and web services; finance covers agencies, credit/settlement, reports/exports and refunds. Legacy umbrella keys remain for backward compatibility.                                                                                                                                                                                                                                                               |
+| GET    | `/it/employees`                    | Query: `dept?`, `q?` (name/username). List with `role` label, `dept`, `username`, `lastLoginAt`, `isActive`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| POST   | `/it/employees`                    | `{ fullName, username, phone (Iranian mobile), password (≥6), dept, customDeptLabel?, rank, referralScope, permissionKeys[] }` — creates `User(role=EMPLOYEE)`, normalizes the mobile to E.164, enables mandatory staff 2FA, hashes password (argon2), and grants the listed catalog permissions. A duplicate username or mobile returns 409. The design's `createStaffUser()` also always tags every new employee with `"dashboard"`/`"cartable"` — **not** carried over: neither corresponds to a real gate for `EMPLOYEE` in this backend (not a `REPORTING_ROLES`/`EXEC_ROLES` member), so faking the grant would be cosmetic only. `AuditLog(category=ACCOUNT)`. |
+| GET    | `/it/employees/:id`                | Detail: profile + last login + granted permissions + the catalog rows not yet granted ("available"). 404 for non-EMPLOYEE / non-existent ids.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| PATCH  | `/it/employees/:id/status`         | `{ isActive }` — suspend/reactivate. `AuditLog(category=ACCOUNT)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| PATCH  | `/it/employees/:id/permissions`    | `{ permissionKey, grant }` — single toggle (mirrors the design's per-row switch). `AuditLog(category=ACCESS)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| POST   | `/it/employees/:id/reset-password` | Generates a temporary password, argon2-hashes it onto the account, sets `mustChangePassword=true`, records a `PasswordResetEvent`, `AuditLog(category=ACCOUNT)`. Returns the plaintext temp password **once** in this response only — never stored, never logged (per Security Rules' OTP/secret-at-rest pattern).                                                                                                                                                                                                                                                                                                                                                    |
 
 ### `backend/src/modules/it-manager/` — security ("رمزها و امنیت")
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/security/policy` | The singleton `SecurityPolicy` row (auto-created with design's defaults on first read). |
-| PATCH | `/it/security/policy` | Any subset of the toggle/param fields. `AuditLog(category=SECURITY)`. |
-| GET | `/it/security/sessions` | Active (non-revoked, non-expired) `RefreshToken`s joined to their user — "۴۸ کاربر هم‌اکنون وارد سامانه هستند" + per-row device/IP. |
-| POST | `/it/security/sessions/logout-all` | Revokes every active `RefreshToken` site-wide — the design's «خروج همه». `AuditLog(category=SECURITY)`, high-severity by nature so confirmed as IT-only, not delegated. |
+| Method | Path                               | Notes                                                                                                                                                                   |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/it/security/policy`              | The singleton `SecurityPolicy` row (auto-created with design's defaults on first read).                                                                                 |
+| PATCH  | `/it/security/policy`              | Any subset of the toggle/param fields. `AuditLog(category=SECURITY)`.                                                                                                   |
+| GET    | `/it/security/sessions`            | Active (non-revoked, non-expired) `RefreshToken`s joined to their user — "۴۸ کاربر هم‌اکنون وارد سامانه هستند" + per-row device/IP.                                     |
+| POST   | `/it/security/sessions/logout-all` | Revokes every active `RefreshToken` site-wide — the design's «خروج همه». `AuditLog(category=SECURITY)`, high-severity by nature so confirmed as IT-only, not delegated. |
 
 ### `backend/src/modules/it-manager/` — services ("سرویس‌های سایت")
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/services` | `{ internal: InternalService[], external: ExternalServiceConfig[] }` (seeded rows from `site-data.js`'s `svcDefs`/`extDefs`; `apiKeyEncrypted` never returned in plaintext — masked). |
-| PATCH | `/it/services/internal/:key` | `{ enabled }` — toggle, immediate (per design copy "بلافاصله روی سایت اعمال می‌شود"). `AuditLog(category=SYSTEM)`. |
-| POST | `/it/services/external` | Create — `{ nameFa, provider, endpoint, method, timeoutMs, apiKey?, sandbox }`; `apiKey` encrypted at rest (`pii-crypto` AES-256-GCM, reused generically — not a PII field but the same reversible-encryption primitive). |
-| PATCH | `/it/services/external/:id` | Update any field incl. `enabled` toggle. |
-| DELETE | `/it/services/external/:id` | Remove. |
-| POST | `/it/services/external/:id/test` | Real connectivity check — HTTP request to the stored endpoint with the configured method/timeout/key, hard-capped; records `lastTestAt/lastTestOk/lastTestMessage`. Never fakes a result. |
+| Method | Path                             | Notes                                                                                                                                                                                                                     |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/it/services`                   | `{ internal: InternalService[], external: ExternalServiceConfig[] }` (seeded rows from `site-data.js`'s `svcDefs`/`extDefs`; `apiKeyEncrypted` never returned in plaintext — masked).                                     |
+| PATCH  | `/it/services/internal/:key`     | `{ enabled }` — toggle, immediate (per design copy "بلافاصله روی سایت اعمال می‌شود"). `AuditLog(category=SYSTEM)`.                                                                                                        |
+| POST   | `/it/services/external`          | Create — `{ nameFa, provider, endpoint, method, timeoutMs, apiKey?, sandbox }`; `apiKey` encrypted at rest (`pii-crypto` AES-256-GCM, reused generically — not a PII field but the same reversible-encryption primitive). |
+| PATCH  | `/it/services/external/:id`      | Update any field incl. `enabled` toggle.                                                                                                                                                                                  |
+| DELETE | `/it/services/external/:id`      | Remove.                                                                                                                                                                                                                   |
+| POST   | `/it/services/external/:id/test` | Real connectivity check — HTTP request to the stored endpoint with the configured method/timeout/key, hard-capped; records `lastTestAt/lastTestOk/lastTestMessage`. Never fakes a result.                                 |
 
 ### `backend/src/modules/it-manager/` — backups ("پشتیبان‌گیری")
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/backups` | `BackupRecord` list, newest first. |
-| POST | `/it/backups` | Triggers a real `pg_dump` (via `DATABASE_URL`) to the configured backup directory; creates a `RUNNING` row, updates to `SUCCESS`/`FAILED` with size/error when the process exits. Never simulated. The production backend image installs `postgresql-client`, so the runtime always contains the required binary; database/permission failures still produce an honest `FAILED` row. |
-| GET | `/it/backups/schedule` | Static config describing the server-side cron (`scripts/backup-db.sh`, already documented in `docs/RUNBOOK.md`) — informational only, this phase does not add a second, competing scheduler. |
+| Method | Path                   | Notes                                                                                                                                                                                                                                                                                                                                                                                |
+| ------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/it/backups`          | `BackupRecord` list, newest first.                                                                                                                                                                                                                                                                                                                                                   |
+| POST   | `/it/backups`          | Triggers a real `pg_dump` (via `DATABASE_URL`) to the configured backup directory; creates a `RUNNING` row, updates to `SUCCESS`/`FAILED` with size/error when the process exits. Never simulated. The production backend image installs `postgresql-client`, so the runtime always contains the required binary; database/permission failures still produce an honest `FAILED` row. |
+| GET    | `/it/backups/schedule` | Static config describing the server-side cron (`scripts/backup-db.sh`, already documented in `docs/RUNBOOK.md`) — informational only, this phase does not add a second, competing scheduler.                                                                                                                                                                                         |
 
 Restore is intentionally **not** a one-click endpoint: CLAUDE.md's own
 deployment rules treat restore as a manual, RUNBOOK-documented operation
@@ -253,9 +253,9 @@ not implement it faster.
 
 ### `backend/src/modules/it-manager/` — dashboard ("داشبورد فنی")
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `allServicesHealthy` is true only when at least one service is configured and **every internal and external service is enabled**; an empty catalogue or a disabled external dependency is unhealthy. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
+| Method | Path            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `allServicesHealthy` is true only when at least one service is configured and **every internal and external service is enabled**; an empty catalogue or a disabled external dependency is unhealthy. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
 
 ### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
 
@@ -282,21 +282,21 @@ cannot manually lock seats** (view sold-seat passenger details only).
 
 ### `backend/src/modules/reservation/`
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/reservation/seatmap/:flightInstanceId` | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, COMMERCIAL_MANAGER, CEO | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + confirmed sales + unexpired 15-minute checkout holds + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, heldCount, managerLockedCount, blockedCount, lockedCount, freeCount, capacity, occupancyPct }`. Cell status is one of `FREE|HELD|SOLD|LOCKED|BLOCKED`; held cells carry `holdExpiresAt`, sold/held cells carry the authorized passenger shape, and managerial locks carry classification/approval/agency fields. Staff-only; IT is read-only. |
-| POST | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`/`SENIOR_MANAGER`/`COMMERCIAL_MANAGER`) | `{ seatCode, agencyId?, passengerName?, passengerNationalId?, passengerMobile?, reason, classification, discountPct? }` — agencyId must reference an active `AgencyProfile`; passenger/agency/anonymous targets are supported. 409 if sold/locked. PII remains encrypted+hashed. IT_MANAGER → 403. |
-| PATCH | `/reservation/seatmap/locks/:id/release` | canSeatLock only | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403. |
-| GET | `/reservation/pnr` | all 4 reservation roles | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list. |
-| GET | `/reservation/pnr/:pnr` | all 4 | Full detail incl. passenger + boarding-pass fields. 404 if not found. |
-| PATCH | `/reservation/pnr/:pnr/seat` | canLock only | `{ seatCode }` — «تغییر رزرو»; 409 if the target seat is sold/locked by someone else; 409 if the booking is CANCELLED. Audited. |
-| PATCH | `/reservation/pnr/:pnr/cancel` | canLock only | «لغو رزرو» → `BookingStatus.CANCELLED`; releases the seat for resale; 409 if already CANCELLED. Audited. |
-| GET | `/reservation/search` | all 4 | `origin`, `dest`, `date` (Jalali, converted) → matching `SCHEDULED` `FlightInstance`s with a computed price (`FarePricingProposal.registeredPriceIrr` if REGISTERED, else a documented flat fallback — no invented dynamic pricing) and free-seat count. |
-| POST | `/reservation/pnr` | canLock only | «صدور PNR و بلیط» — staff-side **manual/offline** issuance (phone/counter booking): `{ flightInstanceId, seatCode, passengerName, passengerNationalId?, passengerMobile? }` → creates a `TICKETED` `Booking`+`Passenger` directly (no HELD/PAID steps — no payment gateway involved, distinct from the public paid-checkout track) + a `LedgerEntry(type=SALE)`. 409 if the seat is sold/locked. Audited. |
-| GET | `/reservation/dashboard-stats` | all 4 | Real counts (today's bookings, active PNRs, seats sold, revenue) plus `channels[]` (share of non-cancelled bookings by `Booking.channel`) and `services[]` (dependent toggles from `InternalService` + measured DB latencies — no invented uptime). |
-| GET | `/reservation/agency-api-access` | all 4 | Agencies that already have an `AgencyApiKey` — masked key hint (`bjk_••••…`), lifetime `callCount`, ACTIVE/SUSPENDED. Empty list → design empty state. |
-| GET | `/reservation/flights` | all 4 | `q?` — SCHEDULED instances with sold/capacity/occupancy and statusKey `SELLING`/`NEAR_FULL`/`FULL` for the design «پروازها» table. |
-| POST | `/reservation/_test/flight-instance` | all 4 | E2E only — creates a fresh SCHEDULED instance with a randomized far-future date (avoids collisions across repeated test runs); always 404s in production. Same pattern as `club`'s and `pricing`'s own `_test/*` seeding hooks. |
+| Method | Path                                          | Roles                                                                        | Notes                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------ | --------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/reservation/seatmap/:flightInstanceId`      | BOARD_CHAIR, SENIOR_MANAGER, IT_MANAGER, COMMERCIAL_MANAGER, CEO             | Computed from `AircraftSeatMap` (by the instance's `Flight.aircraftType`) + confirmed sales + unexpired 15-minute checkout holds + active `SeatLock`s. Returns `{ flightNo, origin/dest (+ cityFa), departureAt, rows[], cabinLayout, soldCount, heldCount, managerLockedCount, blockedCount, lockedCount, freeCount, capacity, occupancyPct }`. Cell status is one of `FREE                              | HELD | SOLD | LOCKED | BLOCKED`; held cells carry `holdExpiresAt`, sold/held cells carry the authorized passenger shape, and managerial locks carry classification/approval/agency fields. Staff-only; IT is read-only. |
+| POST   | `/reservation/seatmap/:flightInstanceId/lock` | canSeatLock only (`CEO`/`BOARD_CHAIR`/`SENIOR_MANAGER`/`COMMERCIAL_MANAGER`) | `{ seatCode, agencyId?, passengerName?, passengerNationalId?, passengerMobile?, reason, classification, discountPct? }` — agencyId must reference an active `AgencyProfile`; passenger/agency/anonymous targets are supported. 409 if sold/locked. PII remains encrypted+hashed. IT_MANAGER → 403.                                                                                                        |
+| PATCH  | `/reservation/seatmap/locks/:id/release`      | canSeatLock only                                                             | Any canSeatLock role may release any active lock (the design's «×» chip shows no per-locker ownership filter). Sets `releasedAt`; 409 if already released. Audited. IT_MANAGER → 403.                                                                                                                                                                                                                     |
+| GET    | `/reservation/pnr`                            | all 4 reservation roles                                                      | `q?` (PNR or passenger name). Grouped by flight instance, newest first — the design's «مدیریت رزروها» list.                                                                                                                                                                                                                                                                                               |
+| GET    | `/reservation/pnr/:pnr`                       | all 4                                                                        | Full detail incl. passenger + boarding-pass fields. 404 if not found.                                                                                                                                                                                                                                                                                                                                     |
+| PATCH  | `/reservation/pnr/:pnr/seat`                  | canLock only                                                                 | `{ seatCode }` — «تغییر رزرو»; 409 if the target seat is sold/locked by someone else; 409 if the booking is CANCELLED. Audited.                                                                                                                                                                                                                                                                           |
+| PATCH  | `/reservation/pnr/:pnr/cancel`                | canLock only                                                                 | «لغو رزرو» → `BookingStatus.CANCELLED`; releases the seat for resale; 409 if already CANCELLED. Audited.                                                                                                                                                                                                                                                                                                  |
+| GET    | `/reservation/search`                         | all 4                                                                        | `origin`, `dest`, `date` (Jalali, converted) → matching `SCHEDULED` `FlightInstance`s with a computed price (`FarePricingProposal.registeredPriceIrr` if REGISTERED, else a documented flat fallback — no invented dynamic pricing) and free-seat count.                                                                                                                                                  |
+| POST   | `/reservation/pnr`                            | canLock only                                                                 | «صدور PNR و بلیط» — staff-side **manual/offline** issuance (phone/counter booking): `{ flightInstanceId, seatCode, passengerName, passengerNationalId?, passengerMobile? }` → creates a `TICKETED` `Booking`+`Passenger` directly (no HELD/PAID steps — no payment gateway involved, distinct from the public paid-checkout track) + a `LedgerEntry(type=SALE)`. 409 if the seat is sold/locked. Audited. |
+| GET    | `/reservation/dashboard-stats`                | all 4                                                                        | Real counts (today's bookings, active PNRs, seats sold, revenue) plus `channels[]` (share of non-cancelled bookings by `Booking.channel`) and `services[]` (dependent toggles from `InternalService` + measured DB latencies — no invented uptime).                                                                                                                                                       |
+| GET    | `/reservation/agency-api-access`              | all 4                                                                        | Agencies that already have an `AgencyApiKey` — masked key hint (`bjk_••••…`), lifetime `callCount`, ACTIVE/SUSPENDED. Empty list → design empty state.                                                                                                                                                                                                                                                    |
+| GET    | `/reservation/flights`                        | all 4                                                                        | `q?` — SCHEDULED instances with sold/capacity/occupancy and statusKey `SELLING`/`NEAR_FULL`/`FULL` for the design «پروازها» table.                                                                                                                                                                                                                                                                        |
+| POST   | `/reservation/_test/flight-instance`          | all 4                                                                        | E2E only — creates a fresh SCHEDULED instance with a randomized far-future date (avoids collisions across repeated test runs); always 404s in production. Same pattern as `club`'s and `pricing`'s own `_test/*` seeding hooks.                                                                                                                                                                           |
 
 Flight/schedule **creation** stays on Phase 10's `/flights/*` (not this shell).
 
@@ -350,34 +350,34 @@ not a real feature anywhere else in the codebase either).
 
 ### `backend/src/modules/auth/` (new agency login path)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| POST | `/auth/agency/login` | public | `{ phone, password }` → `{ accessToken, user }` directly (no 2FA challenge step, unlike staff login). 401 on bad credentials, 403 if suspended (`AgencyProfile.suspendedAt` set) or inactive. Sets the same httpOnly refresh cookie as staff login; `/auth/refresh`, `/auth/me`, `/auth/logout` are already role-agnostic and work unchanged for AGENCY users. |
+| Method | Path                 | Roles  | Notes                                                                                                                                                                                                                                                                                                                                                          |
+| ------ | -------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/agency/login` | public | `{ phone, password }` → `{ accessToken, user }` directly (no 2FA challenge step, unlike staff login). 401 on bad credentials, 403 if suspended (`AgencyProfile.suspendedAt` set) or inactive. Sets the same httpOnly refresh cookie as staff login; `/auth/refresh`, `/auth/me`, `/auth/logout` are already role-agnostic and work unchanged for AGENCY users. |
 
 ### `backend/src/modules/agencies/` (staff-side additions)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/agencies/:id/credit-requests` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Pending + decided `AgencyCreditRequest` rows for one agency. |
-| PATCH | `/agencies/:id/credit-requests/:reqId/decide` | same as above | `{ approve: boolean }` — approve calls the existing `updateCredit` internally with the requested limit (single audited code path); reject just marks `REJECTED`. 409 on an already-decided request. |
+| Method | Path                                          | Roles                                               | Notes                                                                                                                                                                                               |
+| ------ | --------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/agencies/:id/credit-requests`               | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Pending + decided `AgencyCreditRequest` rows for one agency.                                                                                                                                        |
+| PATCH  | `/agencies/:id/credit-requests/:reqId/decide` | same as above                                       | `{ approve: boolean }` — approve calls the existing `updateCredit` internally with the requested limit (single audited code path); reject just marks `REJECTED`. 409 on an already-decided request. |
 
 ### `backend/src/modules/agency-portal/` — self-scoped to the caller (`actor.id` IS the `AgencyProfile.userId`; no `:id` param anywhere, ownership is implicit)
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/agency-portal/dashboard` | `{ credit, kpis: { salesThisMonthIrr, ticketsIssuedTotal, seatsSoldThisMonth }, monthlySales: [{month,salesIrr}] (last 6 months) }`. The design's «صندلی تخصیص‌یافته» KPI card is replaced with `ticketsIssuedTotal` (real, derived from `Booking`) — CLAUDE.md forbids fabricating a figure for a workflow (seat allocation) that doesn't exist yet, same reasoning as Phase 9's dashboard. |
-| GET | `/agency-portal/credit` | `{ limitIrr, usedIrr, remainingIrr }` — reuses `AgenciesService.getCredit(actor.id)` verbatim. |
-| GET | `/agency-portal/ledger` | Last 20 `LedgerEntry` rows for «گردش حساب اخیر» (recent activity), signed for +/- display. |
-| GET | `/agency-portal/invoices` | Own invoices — reuses `AgenciesService.listInvoices(actor.id)`. |
-| POST | `/agency-portal/invoices/:invoiceId/pay` | «پرداخت از اعتبار» — reuses `AgenciesService.payInvoice` verbatim (same transactional conditional-update + `SETTLEMENT` ledger row as the staff-side pay action); ownership is implicit since the agency can only ever pass its own id. |
-| POST | `/agency-portal/credit-requests` | `{ requestedLimitIrr, note? }` — must exceed the current limit; creates `AgencyCreditRequest(PENDING)`, audited, fans a `CartableTask` out to SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER (no `sourceType` — informational only, the actual decision goes through the dedicated decide endpoint above, not generic cartable resolution). |
-| GET | `/agency-portal/credit-requests` | Own request history + status. |
-| GET | `/agency-portal/sales` | «فروش و گزارش»: own ticket list (`Booking` rows, PAID/TICKETED/REFUNDED) + per-flight aggregation + summary KPIs (کل فروش، بلیط صادرشده، میانگین نرخ، نرخ استرداد — all real, computed server-side per `CLAUDE.md`'s reporting rule). |
-| GET | `/agency-portal/inbox` | «کارتابل و پیام‌ها» — reuses `AgenciesService.listMessages(actor.id)`. |
-| POST | `/agency-portal/inbox` | `{ body }` — reuses a `senderIsAgency`-aware `AgenciesService.postMessage` (the staff-side controller keeps calling it with `senderIsAgency=false`; this path passes `true`). |
-| GET | `/agency-portal/profile` | Own `AgencyProfile` fields — a dedicated lightweight query, NOT a reuse of the staff `detail()` method, since that method also returns internal `AuditLog` rows and an `activityScore` never meant for the agency's own eyes. |
-| GET | `/agency-portal/documents` | Own `AgencyDocument` list. |
-| POST | `/agency-portal/documents` | multipart `{ file, docType }` — reuses `FilesService.store` (PDF/PNG/JPG, ≤5MB), wraps the resulting `StoredFile` in an `AgencyDocument(status=PENDING)`. Staff review is deferred (see above) — status stays `PENDING` until that phase. |
+| Method | Path                                     | Notes                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------ | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/agency-portal/dashboard`               | `{ credit, kpis: { salesThisMonthIrr, ticketsIssuedTotal, seatsSoldThisMonth }, monthlySales: [{month,salesIrr}] (last 6 months) }`. The design's «صندلی تخصیص‌یافته» KPI card is replaced with `ticketsIssuedTotal` (real, derived from `Booking`) — CLAUDE.md forbids fabricating a figure for a workflow (seat allocation) that doesn't exist yet, same reasoning as Phase 9's dashboard. |
+| GET    | `/agency-portal/credit`                  | `{ limitIrr, usedIrr, remainingIrr }` — reuses `AgenciesService.getCredit(actor.id)` verbatim.                                                                                                                                                                                                                                                                                               |
+| GET    | `/agency-portal/ledger`                  | Last 20 `LedgerEntry` rows for «گردش حساب اخیر» (recent activity), signed for +/- display.                                                                                                                                                                                                                                                                                                   |
+| GET    | `/agency-portal/invoices`                | Own invoices — reuses `AgenciesService.listInvoices(actor.id)`.                                                                                                                                                                                                                                                                                                                              |
+| POST   | `/agency-portal/invoices/:invoiceId/pay` | «پرداخت از اعتبار» — reuses `AgenciesService.payInvoice` verbatim (same transactional conditional-update + `SETTLEMENT` ledger row as the staff-side pay action); ownership is implicit since the agency can only ever pass its own id.                                                                                                                                                      |
+| POST   | `/agency-portal/credit-requests`         | `{ requestedLimitIrr, note? }` — must exceed the current limit; creates `AgencyCreditRequest(PENDING)`, audited, fans a `CartableTask` out to SENIOR_MANAGER/FINANCE_MANAGER/COMMERCIAL_MANAGER (no `sourceType` — informational only, the actual decision goes through the dedicated decide endpoint above, not generic cartable resolution).                                               |
+| GET    | `/agency-portal/credit-requests`         | Own request history + status.                                                                                                                                                                                                                                                                                                                                                                |
+| GET    | `/agency-portal/sales`                   | «فروش و گزارش»: own ticket list (`Booking` rows, PAID/TICKETED/REFUNDED) + per-flight aggregation + summary KPIs (کل فروش، بلیط صادرشده، میانگین نرخ، نرخ استرداد — all real, computed server-side per `CLAUDE.md`'s reporting rule).                                                                                                                                                        |
+| GET    | `/agency-portal/inbox`                   | «کارتابل و پیام‌ها» — reuses `AgenciesService.listMessages(actor.id)`.                                                                                                                                                                                                                                                                                                                       |
+| POST   | `/agency-portal/inbox`                   | `{ body }` — reuses a `senderIsAgency`-aware `AgenciesService.postMessage` (the staff-side controller keeps calling it with `senderIsAgency=false`; this path passes `true`).                                                                                                                                                                                                                |
+| GET    | `/agency-portal/profile`                 | Own `AgencyProfile` fields — a dedicated lightweight query, NOT a reuse of the staff `detail()` method, since that method also returns internal `AuditLog` rows and an `activityScore` never meant for the agency's own eyes.                                                                                                                                                                |
+| GET    | `/agency-portal/documents`               | Own `AgencyDocument` list.                                                                                                                                                                                                                                                                                                                                                                   |
+| POST   | `/agency-portal/documents`               | multipart `{ file, docType }` — reuses `FilesService.store` (PDF/PNG/JPG, ≤5MB), wraps the resulting `StoredFile` in an `AgencyDocument(status=PENDING)`. Staff review is deferred (see above) — status stays `PENDING` until that phase.                                                                                                                                                    |
 
 No `_test/*` seeding hook was needed for this feature (unlike club/pricing/reservation) — the seed already provisions two agencies (`+989120000002` gold, `+989120000003` silver, suspended) with the shared dev password, which is deterministic enough for Playwright. A `_test/set-password` endpoint was drafted and then removed: it would have lived under the same `@Roles('AGENCY')`-gated controller it was meant to bootstrap credentials for, which is unreachable before any credentials exist — a real chicken-and-egg gap, not a deliberate deferral.
 
@@ -408,11 +408,11 @@ stays untouched on the same page).
   city name; audited.
 - POST `/flights` — full flight **definition** (Commercial/Senior +
   `fl_manage`): `{ originCode, destCode, flightNo (^\[A-Z\]{2}\d{4}$ —
-  uppercased only, no trim/strip), departureAt (UTC ISO),
-  durationMinutes (arrivalAt = departureAt + duration), capacity,
-  cabinCapacities[{cabin: ECONOMY|COMFORT|BUSINESS, seats}], basePriceIrr
-  (decimal string), aircraftType?, charterSeats?, chargeRules?,
-  competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
+uppercased only, no trim/strip), departureAt (UTC ISO),
+durationMinutes (arrivalAt = departureAt + duration), capacity,
+cabinCapacities[{cabin: ECONOMY|COMFORT|BUSINESS, seats}], basePriceIrr
+(decimal string), aircraftType?, charterSeats?, chargeRules?,
+competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
   (COMFORT requires real comfort rows; never merged into ECONOMY). The flight,
   charge rules and exactly one initial pricing proposal are created in one
   transaction and returned as `definitionStatus=DRAFT`. Commercial then
@@ -555,8 +555,8 @@ screen exists for this yet, so these are backend-only for now.
   price.
 - `POST /flights/:instanceId/fare-rules` — same roles —
   `{ cabin, classCode, priceIrr, seatsAllocated, taxIrr?, refundable?,
-  changeable?, baggageAllowanceKg?, validFrom?, validUntil?,
-  allowedChannels? }`. 400 `VALIDATION_FAILED` if this rule would push the
+changeable?, baggageAllowanceKg?, validFrom?, validUntil?,
+allowedChannels? }`. 400 `VALIDATION_FAILED` if this rule would push the
   cabin's total `seatsAllocated` past its physical seat count, or if
   `validUntil <= validFrom`.
 - `PATCH /flights/:instanceId/fare-rules/:id` — same roles, same body
@@ -607,7 +607,7 @@ All endpoints live in `backend/src/modules/reservation/`, gated
 
 - `POST /reservation/seatmap/:flightInstanceId/lock` (existing endpoint,
   changed body/behavior) — now `{ seatCode, reason, classification,
-  discountPct?, passengerName?, passengerNationalId?, passengerMobile? }`.
+discountPct?, passengerName?, passengerNationalId?, passengerMobile? }`.
   400 `VALIDATION_FAILED` if `discountPct` is given without
   `classification: 'DISCOUNTED'` (or vice versa) or is outside 0–100.
   409 `LOCK_CAP_EXCEEDED` if the requester already has
@@ -629,7 +629,7 @@ All endpoints live in `backend/src/modules/reservation/`, gated
   still works on any not-yet-released lock regardless of approval state
   (a requester or another authorized manager can always stand down early).
 - `POST /reservation/pnr/from-lock/:lockId` (new) — `{ passengerName,
-  passengerNationalId?, passengerMobile? }`. 409 `CONFLICT` if the lock
+passengerNationalId?, passengerMobile? }`. 409 `CONFLICT` if the lock
   isn't `APPROVED` or has expired. Finalizes into a `TICKETED` booking
   priced per the lock's `classification` (see DB_SCHEMA.md), stamps the
   lock `releasedAt`/`bookingId`, records the same `LedgerEntry`+`AuditLog`
@@ -683,8 +683,8 @@ See DB_SCHEMA.md's Phase 14 for full reasoning. Endpoints live in
 (`IT_MANAGER` only, matching that tab's existing role gate).
 
 - `GET /it/services/sms-log` (new) — `{ enabled, todaySuccessCount,
-  todayFailedCount, recent: [{ id, phoneMasked, messageType, status,
-  failureReason, createdAt }] }` (latest 50). `enabled` is read straight
+todayFailedCount, recent: [{ id, phoneMasked, messageType, status,
+failureReason, createdAt }] }` (latest 50). `enabled` is read straight
   from the existing `InternalService(key:"sms")` row — same value the
   existing `PATCH /it/services/internal/:key` toggle already writes; no
   new toggle endpoint needed. No uptime figure of any kind is returned.
@@ -700,6 +700,7 @@ See DB_SCHEMA.md's Phase 14 for full reasoning. Endpoints live in
 
 Grounded in the FINANCE / PASSENGER SEARCH / STAFF REPORTS markup of all 5
 panels that carry these tabs. Design findings that scope this phase:
+
 - The مالی tab has **two distinct layouts**: FINANCE_MANAGER gets the
   finance-ops view (KPI row + low-sales alert + completed-flights box +
   «تراکنش‌های مالی اخیر» + «ترکیب درآمد» donut + «تسویه‌حساب آژانس‌ها»);
@@ -721,24 +722,24 @@ panels that carry these tabs. Design findings that scope this phase:
 
 ### `backend/src/modules/reporting/` (additions)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/reporting/recent-transactions` | FINANCE_MANAGER | Latest 20 `LedgerEntry` rows joined with party context (agency name via `agencyId`, passenger via `booking`) → `{ type, titleFa, party, occurredAt, signedAmountIrr }[]` + total count. Real rows only — the mock's static `txDefs` are replaced by the ledger. |
-| GET | `/reporting/revenue-mix` | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | «ترکیب درآمد» donut: per-channel SALE sums + pct over the same optional `granularity`/`periodKey` window as the KPIs. |
-| GET | `/reporting/agency-settlements` | FINANCE_MANAGER | «تسویه‌حساب آژانس‌های همکار»: per-agency rows derived from Phase 3 invoices (`amount = SUM(invoices in period)`, `paidPct`, `due = earliest unpaid dueAt`, status تسویه شد/در انتظار/معوق + overdue days) + total outstanding. Remind action reuses Phase 3's `POST /agencies/:id/invoices/:invoiceId/remind` (no new write path). |
+| Method | Path                             | Roles                                                                 | Notes                                                                                                                                                                                                                                                                                                                              |
+| ------ | -------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/reporting/recent-transactions` | FINANCE_MANAGER                                                       | Latest 20 `LedgerEntry` rows joined with party context (agency name via `agencyId`, passenger via `booking`) → `{ type, titleFa, party, occurredAt, signedAmountIrr }[]` + total count. Real rows only — the mock's static `txDefs` are replaced by the ledger.                                                                    |
+| GET    | `/reporting/revenue-mix`         | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | «ترکیب درآمد» donut: per-channel SALE sums + pct over the same optional `granularity`/`periodKey` window as the KPIs.                                                                                                                                                                                                              |
+| GET    | `/reporting/agency-settlements`  | FINANCE_MANAGER                                                       | «تسویه‌حساب آژانس‌های همکار»: per-agency rows derived from Phase 3 invoices (`amount = SUM(invoices in period)`, `paidPct`, `due = earliest unpaid dueAt`, status تسویه شد/در انتظار/معوق + overdue days) + total outstanding. Remind action reuses Phase 3's `POST /agencies/:id/invoices/:invoiceId/remind` (no new write path). |
 
 ### `backend/src/modules/passenger-reports/` (new)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/passenger-reports/search` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `q` (passenger full-name substring, or exact national ID via hash — reusing Phase 9's `Passenger.nationalIdHash`) → matching tickets `{ fullName, maskedNationalId, pnr, flightNo, route, departureAt, seatCode, cabin (derived from AircraftSeatMap row bands), priceIrr, status }[]`. PII rule: national ID always masked (`123******7` style) — this surface never decrypts. |
+| Method | Path                        | Roles                                               | Notes                                                                                                                                                                                                                                                                                                                                                                           |
+| ------ | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/passenger-reports/search` | SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | `q` (passenger full-name substring, or exact national ID via hash — reusing Phase 9's `Passenger.nationalIdHash`) → matching tickets `{ fullName, maskedNationalId, pnr, flightNo, route, departureAt, seatCode, cabin (derived from AircraftSeatMap row bands), priceIrr, status }[]`. PII rule: national ID always masked (`123******7` style) — this surface never decrypts. |
 
 ### `backend/src/modules/staff-reports/` (new)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/staff-reports/mine` | EMPLOYEE | «گزارش‌های من» — فید فعالیت خود کارمند از `AuditLog` (`{ items: [{ id, title, detail, category, at }] }`). |
-| GET | `/staff-reports` | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
+| Method | Path                  | Roles                               | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------ | --------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/staff-reports/mine` | EMPLOYEE                            | «گزارش‌های من» — فید فعالیت خود کارمند از `AuditLog` (`{ items: [{ id, title, detail, category, at }] }`).                                                                                                                                                                                                                                                                                                                                  |
+| GET    | `/staff-reports`      | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
 
 The earlier Excel-export deferral is superseded by the finance-manager
 completion section below. PDF
@@ -752,16 +753,16 @@ out of scope.
 All routes in this section are `FINANCE_MANAGER` only and remain protected by
 `JwtAuthGuard`, `RolesGuard`, and `PanelAccessGuard`.
 
-| Method | Path | Request | Response / behavior |
-|---|---|---|---|
-| GET | `/reporting/finance-reports` | `scope=AGENCIES\|CHARTERS\|CUSTOMERS`, `period=flight\|day\|month\|q3\|q6\|year`, `date?`, `month?`, `flightInstanceId?` | Real booking/ledger aggregates for the approved «گزارشات و خروجی» tabs. Returns `{ rows, summary, selectedPeriod }`; empty datasets return empty rows and zero totals. |
-| GET | `/reporting/finance-reports/export` | Same filters plus `format=csv\|excel` | Downloads UTF-8 CSV or SpreadsheetML Excel generated from the exact filtered result. No client-side sample rows are introduced. |
-| GET | `/reporting/finance-flight-search` | `q?`, `date?`, `month?` | Completed/departed flights matching flight number or route, with real capacity, sold-seat and sales totals. |
-| GET | `/reporting/finance-flight-search/:flightInstanceId` | — | Selected flight summary plus per-agency sold seats, paid amount, and outstanding amount derived from bookings and ledger/invoices. |
-| GET | `/financial-integrations` | — | Five supported providers (`HOLO`, `SEPIDAR`, `HESABFA`, `RAHKARAN`, `PARMIS`) with connection status, masked key suffix, last real sync timestamp/status, and connected count. Secrets are never returned. |
-| POST | `/financial-integrations/:provider/connect` | `{ apiKey }` | Encrypts the key at rest and performs a real provider health/auth request against the configured endpoint. Persists connected state only after success; audited. Returns 422 when the provider endpoint is not configured or verification fails. |
-| POST | `/financial-integrations/:provider/sync` | — | Sends a real finance snapshot to the provider adapter, stores the real result/time, and audits it. Returns 409 if disconnected and 502 for upstream failure. |
-| DELETE | `/financial-integrations/:provider` | — | Clears the encrypted credential and connected state; audited. |
+| Method | Path                                                 | Request                                                                                                                  | Response / behavior                                                                                                                                                                                                                              |
+| ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/reporting/finance-reports`                         | `scope=AGENCIES\|CHARTERS\|CUSTOMERS`, `period=flight\|day\|month\|q3\|q6\|year`, `date?`, `month?`, `flightInstanceId?` | Real booking/ledger aggregates for the approved «گزارشات و خروجی» tabs. Returns `{ rows, summary, selectedPeriod }`; empty datasets return empty rows and zero totals.                                                                           |
+| GET    | `/reporting/finance-reports/export`                  | Same filters plus `format=csv\|excel`                                                                                    | Downloads UTF-8 CSV or SpreadsheetML Excel generated from the exact filtered result. No client-side sample rows are introduced.                                                                                                                  |
+| GET    | `/reporting/finance-flight-search`                   | `q?`, `date?`, `month?`                                                                                                  | Completed/departed flights matching flight number or route, with real capacity, sold-seat and sales totals.                                                                                                                                      |
+| GET    | `/reporting/finance-flight-search/:flightInstanceId` | —                                                                                                                        | Selected flight summary plus per-agency sold seats, paid amount, and outstanding amount derived from bookings and ledger/invoices.                                                                                                               |
+| GET    | `/financial-integrations`                            | —                                                                                                                        | Five supported providers (`HOLO`, `SEPIDAR`, `HESABFA`, `RAHKARAN`, `PARMIS`) with connection status, masked key suffix, last real sync timestamp/status, and connected count. Secrets are never returned.                                       |
+| POST   | `/financial-integrations/:provider/connect`          | `{ apiKey }`                                                                                                             | Encrypts the key at rest and performs a real provider health/auth request against the configured endpoint. Persists connected state only after success; audited. Returns 422 when the provider endpoint is not configured or verification fails. |
+| POST   | `/financial-integrations/:provider/sync`             | —                                                                                                                        | Sends a real finance snapshot to the provider adapter, stores the real result/time, and audits it. Returns 409 if disconnected and 502 for upstream failure.                                                                                     |
+| DELETE | `/financial-integrations/:provider`                  | —                                                                                                                        | Clears the encrypted credential and connected state; audited.                                                                                                                                                                                    |
 
 Accounting provider base URLs are supplied through deployment configuration,
 not the browser. Vendor adapters fail closed when their endpoint is absent;
@@ -799,12 +800,12 @@ panels. Key ⚑ decisions:
 
 ### `backend/src/modules/admins/` (new) — CEO, BOARD_CHAIR, SENIOR_MANAGER
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/admins` | Manager/admin accounts in the caller's managed set (+ hierarchy above): fullName, username, email, roleLabelFa, lastLoginAt, isActive, online (real session derivation), managedByCaller flag. |
-| POST | `/admins` | «افزودن مدیر / ادمین» `{ fullName, email, username, role (managed-set enum only), password (min 6), delivery: sms\|email }` — creates the staff `User` (argon2, `mustChangePassword`), audited; credentials delivery goes through the mocked provider path in dev. 409 on duplicate username/email. |
-| PATCH | `/admins/:id/block` / `/unblock` | Toggles `User.isActive` — really enforced (staff login already rejects inactive accounts). Only within the caller's managed set; never self, never CEO/BOARD_CHAIR. Audited. |
-| POST | `/admins/:id/reset-password` | `{ password?, delivery? }` — explicit password (min 6) or a generated temp password (returned exactly once); sets `mustChangePassword`; audited; managed-set only. |
+| Method | Path                             | Notes                                                                                                                                                                                                                                                                                               |
+| ------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/admins`                        | Manager/admin accounts in the caller's managed set (+ hierarchy above): fullName, username, email, roleLabelFa, lastLoginAt, isActive, online (real session derivation), managedByCaller flag.                                                                                                      |
+| POST   | `/admins`                        | «افزودن مدیر / ادمین» `{ fullName, email, username, role (managed-set enum only), password (min 6), delivery: sms\|email }` — creates the staff `User` (argon2, `mustChangePassword`), audited; credentials delivery goes through the mocked provider path in dev. 409 on duplicate username/email. |
+| PATCH  | `/admins/:id/block` / `/unblock` | Toggles `User.isActive` — really enforced (staff login already rejects inactive accounts). Only within the caller's managed set; never self, never CEO/BOARD_CHAIR. Audited.                                                                                                                        |
+| POST   | `/admins/:id/reset-password`     | `{ password?, delivery? }` — explicit password (min 6) or a generated temp password (returned exactly once); sets `mustChangePassword`; audited; managed-set only.                                                                                                                                  |
 
 The `BOARD_CHAIR` navigation exposes both `admins` and `security`: the former
 uses the server-enforced hierarchy above for manager creation/reset, while the
@@ -812,29 +813,30 @@ latter changes the chair's own password through `POST /auth/change-password`.
 
 ### `backend/src/modules/auth/` (addition)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| POST | `/auth/change-password` | any authenticated staff or agency | «تغییر رمز عبور من» `{ currentPassword, newPassword (min 6) }` — verifies the current password (argon2) before updating; 401 on mismatch; sets `mustChangePassword=false` on success; audited (SECURITY, no password material logged). **Always allowed** even when `mustChangePassword=true` (the forced-change gate). |
-| GET | `/auth/me` | any authenticated | Returns `{ id, fullName, role, preferredLocale, mustChangePassword }`. |
-| * | any other JWT-protected staff/agency route | staff + agency | When `mustChangePassword=true`, returns `403` with code `PASSWORD_CHANGE_REQUIRED` and message «قبل از ادامه باید رمز عبور خود را تغییر دهید.» — enforced in `JwtAuthGuard` after token validation. Skipped on `/auth/me`, `/auth/change-password`, `/auth/logout`. |
+| Method | Path                                       | Roles                             | Notes                                                                                                                                                                                                                                                                                                                   |
+| ------ | ------------------------------------------ | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/change-password`                    | any authenticated staff or agency | «تغییر رمز عبور من» `{ currentPassword, newPassword (min 6) }` — verifies the current password (argon2) before updating; 401 on mismatch; sets `mustChangePassword=false` on success; audited (SECURITY, no password material logged). **Always allowed** even when `mustChangePassword=true` (the forced-change gate). |
+| GET    | `/auth/me`                                 | any authenticated                 | Returns `{ id, fullName, role, preferredLocale, mustChangePassword }`.                                                                                                                                                                                                                                                  |
+| *      | any other JWT-protected staff/agency route | staff + agency                    | When `mustChangePassword=true`, returns `403` with code `PASSWORD_CHANGE_REQUIRED` and message «قبل از ادامه باید رمز عبور خود را تغییر دهید.» — enforced in `JwtAuthGuard` after token validation. Skipped on `/auth/me`, `/auth/change-password`, `/auth/logout`.                                                     |
 
 **Forced password change (Phase staff-auth):** IT/admin/agency-approval flows that issue a temporary password set `mustChangePassword=true`. After 2FA (staff) or direct login (agency), the frontend redirects to `/required-password-change` until `POST /auth/change-password` succeeds. This closes the gap where temp passwords could be used indefinitely.
 
 ### `backend/src/modules/audit/` (addition)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/audit/system-events` | CEO | «لاگ‌ها و رویدادهای سامانه» — latest 100 real `AuditLog` rows (all actors incl. CEO itself, unlike `/audit/manager-reports`) with the presentational level mapping above. |
+| Method | Path                   | Roles | Notes                                                                                                                                                                     |
+| ------ | ---------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/audit/system-events` | CEO   | «لاگ‌ها و رویدادهای سامانه» — latest 100 real `AuditLog` rows (all actors incl. CEO itself, unlike `/audit/manager-reports`) with the presentational level mapping above. |
 
 ### `backend/src/modules/settings/` — IT_MANAGER, SITE_ADMIN
+
 (BOARD_CHAIR no longer has the تنظیمات سامانه tab or settings API access.)
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/settings` | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
-| PATCH | `/settings` | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected. |
-| PATCH | `/settings/refund-rules` | IT_MANAGER only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows. |
-| GET | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited. |
+| Method | Path                     | Notes                                                                                                                                                                                                                                                                                                                                                                           |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/settings`              | All `SystemSetting` key-values with server defaults (companyName, supportEmail, supportPhone, gateway toggles mellat/saman/zarin, global toggles maintenance/registration/charterSale/apiPublic/sandbox, brandColor, **socialLinks** — five fixed networks: instagram/telegram/whatsapp/linkedin/x, each `{ id, name, url, enabled }`) + the real `RefundPenaltyRule` brackets. |
+| PATCH  | `/settings`              | Partial key-value update; validated per key; audited (SYSTEM). `socialLinks` patch: array of partial entries; enabled links require non-empty URL (max 500 chars); unknown network ids rejected.                                                                                                                                                                                |
+| PATCH  | `/settings/refund-rules` | IT_MANAGER only — updates the REAL Phase 7 `RefundPenaltyRule.penaltyPct` per bracket (0–100 validated); audited. The refund engine keeps reading these same rows.                                                                                                                                                                                                              |
+| GET    | `/settings/social-links` | **Public** (no auth) — returns `{ links: [{ id, name, url }] }` for enabled networks with non-empty URLs; bare hostnames normalized to `https://`. Rate-limited.                                                                                                                                                                                                                |
 
 ### `backend/src/modules/panels/` (change)
 
@@ -885,7 +887,7 @@ then five existing endpoints gain two required body fields.
 - `POST /auth/step-up/request` (new, any authenticated staff/agency
   actor, `@Throttle` 5/min like OTP) — `{ scope }` where scope is one of
   `ADMIN_ROLE_CHANGE | API_KEY_ROTATE | REFUND_PAYOUT |
-  PRICE_CAPACITY_CHANGE | SESSION_REVOKE`. Returns `{ challengeId }`; the
+PRICE_CAPACITY_CHANGE | SESSION_REVOKE`. Returns `{ challengeId }`; the
   code is delivered through the actor's existing 2FA channel.
 - `POST /admins` (existing) — body gains `stepUpChallengeId`,
   `stepUpCode`; scope `ADMIN_ROLE_CHANGE`. 401 `TWO_FACTOR_INVALID`/
@@ -918,11 +920,11 @@ explicitly out of scope).
   row and sends the code via the existing `TwoFactorProvider`. Returns
   `{ challengeId }`.
 - `POST /agencies/requests` (new, public, `@Throttle` 5/min) — `{
-  applicantName, managerName, licenseNo, phone, challengeId, code }`.
+applicantName, managerName, licenseNo, phone, challengeId, code }`.
   Verifies the OTP (same 401 `TWO_FACTOR_INVALID`/`TWO_FACTOR_EXPIRED`
   codes as every other OTP check in this codebase), then creates an
   `AgencyMembershipRequest(status: PENDING, email: null, city: null,
-  documents: null)`.
+documents: null)`.
 - `GET /agencies/requests`, `GET /agencies/requests/:id` (existing) — role
   gate widened to also allow `SITE_ADMIN` (method-level override; every
   other `/agencies/*` route keeps the original `AGENCY_TAB_ROLES` gate).
@@ -937,8 +939,8 @@ explicitly out of scope).
 - `PATCH /agencies/requests/:id/reject` (existing) — role gate widened to
   add `SITE_ADMIN` alongside the existing gate.
 - `GET /flights/:instanceId/allotments`, `POST
-  /flights/:instanceId/allotments`, `DELETE
-  /flights/:instanceId/allotments/:allotmentId` — **no change**; these
+/flights/:instanceId/allotments`, `DELETE
+/flights/:instanceId/allotments/:allotmentId` — **no change**; these
   already exist (Phase C) and are only gaining a frontend caller this
   phase (a new section in the existing flights panel, same
   `SENIOR_MANAGER`/`COMMERCIAL_MANAGER` gate — no new endpoint).
@@ -969,7 +971,7 @@ See DB_SCHEMA.md's Phase 17 for full reasoning and explicit scope cuts
   5/min) — sends a short-lived code to the account's current `email` via
   the existing `TwoFactorProvider`. 400 if no email is set yet.
 - `POST /my/profile/email/verify` (new, `USER` role) — `{ challengeId,
-  code }`; on success stamps `emailVerifiedAt`.
+code }`; on success stamps `emailVerifiedAt`.
 - No change to any booking/checkout endpoint's validation — national ID
   stays optional there, exactly as today; the checkout banner is a
   frontend-only read of `GET /users/me/profile`'s `completionPct`.
@@ -1046,6 +1048,7 @@ deferred). No schema change — reuses the existing `EmployeePermission`/
   this phase didn't have time for.
 
 ### Explicit deferrals (flagged, not oversights)
+
 - `flightops`, `tickets`, `blog`, `media` — present in
   پنل ادمین سایت.dc.html's `roleDefs.siteAdmin.access` but have **no**
   backend anywhere in the codebase for any role; excluded from
@@ -1069,16 +1072,17 @@ deferred). No schema change — reuses the existing `EmployeePermission`/
 ## Phase 19 — مدیریت رزرو (anonymous PNR self-service)
 
 `ManageBookingPage.tsx` was entirely mock (PLAN.md's earlier note: "any PNR
-+ last name resolves to a hardcoded sample booking... zero calls to the
-real `/my/refunds` endpoint"). Per user decision, the anonymous PNR+last-
-name lookup model wins over requiring login (matches
-مدیریت رزرو.dc.html and standard airline "manage my booking" UX) — the
-existing authenticated `GET /bookings/pnr/:pnr` stays as-is for logged-in
-customers (`AccountPage`/`TicketPage`); this phase adds a **separate,
-public, anonymous** surface reusing the same underlying booking/refund
-logic. No schema change.
 
-- `POST /manage-booking/lookup` (new, public, `@Throttle` 10/min per IP —
+- last name resolves to a hardcoded sample booking... zero calls to the
+  real `/my/refunds` endpoint"). Per user decision, the anonymous PNR+last-
+  name lookup model wins over requiring login (matches
+  مدیریت رزرو.dc.html and standard airline "manage my booking" UX) — the
+  existing authenticated `GET /bookings/pnr/:pnr` stays as-is for logged-in
+  customers (`AccountPage`/`TicketPage`); this phase adds a **separate,
+  public, anonymous** surface reusing the same underlying booking/refund
+  logic. No schema change.
+
+* `POST /manage-booking/lookup` (new, public, `@Throttle` 10/min per IP —
   matches `POST /bookings`'s existing rate) — `{ pnr, lastName }`. Finds
   the booking by PNR, matches `lastName` against the **last
   whitespace-separated token** of any passenger's `fullName` on that
@@ -1089,9 +1093,9 @@ logic. No schema change.
   `BookingService.toDetail()` already returns for the authenticated
   endpoint (passengers exposed as `{ fullName, seatCode }` only — no PII
   decryption on this surface, same as today).
-- `POST /manage-booking/refund` (new, public, `@Throttle` 10/min per IP)
+* `POST /manage-booking/refund` (new, public, `@Throttle` 10/min per IP)
   — `{ pnr, lastName, iban }`. Re-verifies the same PNR+lastName match,
-  then runs the *exact* penalty/eligibility logic `submitFromCustomer`
+  then runs the _exact_ penalty/eligibility logic `submitFromCustomer`
   already uses (TICKETED/PAID only, one request per booking, `RefundPenaltyRule`-driven
   penalty) — refactored into a shared private helper so the anonymous and
   authenticated paths can never compute the penalty differently. Response
@@ -1100,11 +1104,12 @@ logic. No schema change.
   after submission, mirroring `TicketPage.tsx`'s already-built
   authenticated refund flow (enter شبا → submit → see the real computed
   breakdown), not a pre-submission preview.
-- No `AuditService.record` call on the anonymous path (its `actorId` is a
+* No `AuditService.record` call on the anonymous path (its `actorId` is a
   required real `User.id`, which an anonymous caller doesn't have) — same
   precedent as Phase 16's anonymous agency pre-registration.
 
 ### Explicit deferrals (flagged, not oversights)
+
 - **تغییر صندلی (seat change)** and **دانلود بلیط (ticket download)** —
   the mock's buttons for both already had no `onClick` handler at all
   (pure decoration); left disabled with a "به‌زودی" hint this phase
@@ -1136,6 +1141,7 @@ confirmed from `پنل ادمین سایت.dc.html`) has no equivalent on the co
 side anyway.
 
 ### تماس با ما — `ContactMessage`
+
 - `POST /contact` (new, public, `@Throttle` 10/min per IP) —
   `{ name, phone, subject, body }`. The design's own form
   (`design-reference/تماس با ما.dc.html`) requires all four fields
@@ -1151,6 +1157,7 @@ side anyway.
   as Phase 18/19's other explicitly-flagged deferrals.
 
 ### پشتیبانی — `SupportTicket`
+
 - `POST /support-tickets` (new, public, `@Throttle` 10/min per IP) —
   `{ requesterName, requesterPhone, subject, body }`. The design's ticket
   form (`design-reference/پشتیبانی.dc.html`) has **no** name/phone input
@@ -1184,7 +1191,7 @@ side anyway.
   `history` entry.
 - `POST /support-tickets/admin` (`SITE_ADMIN` only) — create from the
   panel «ایجاد تیکت» modal: `{ subject, requesterName, requesterPhone?,
-  dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
+dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
   (sentinel stored when omitted). Audited.
 - Both forward and status-change actions are audit-logged
   (`category: 'SYSTEM'` — no new `AuditCategory` enum value was added for
@@ -1198,6 +1205,7 @@ side anyway.
   role).
 
 ### Explicit deferrals (flagged, not oversights)
+
 - **File attachments and multi-message reply threads** — the design's
   admin ticket system (`پنل ادمین سایت.dc.html`) shows both (`messages[]`
   carrying attachments per message). This phase ships a single
@@ -1213,6 +1221,7 @@ side anyway.
   it.
 
 ### پنل کاربر — پیام به پشتیبانی (`/account` → تب `tickets`)
+
 Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
 `accountNav` (`tickets` / «پیام به پشتیبانی») — the public
 `POST /support-tickets` flow existed from Phase 20 but logged-in customers
@@ -1223,7 +1232,7 @@ had no way to see their submissions inside `/account`.
   submissions whose `requesterPhone` exactly matches the caller's stored
   `User.phone` (covers tickets filed before login with the same number).
   Returns `{ id, trackingCode, subject, body, status, history, createdAt,
-  updatedAt }` only — no admin-only fields (`dept`, `priority`,
+updatedAt }` only — no admin-only fields (`dept`, `priority`,
   `forwardedTo`).
 - `GET /my/support-tickets/:id` (new, `USER` role) — detail for one owned
   ticket; `404` if the row isn't linked to the caller by `userId` or
@@ -1236,6 +1245,7 @@ had no way to see their submissions inside `/account`.
   ticket. No reply thread or attachments (same Phase 20 deferrals).
 
 ### پنل کاربر — باشگاه مشتریان (`/account` → تب `club`)
+
 Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
 `accountNav` (`club` / «باشگاه مشتریان»): tier banner + progress bar,
 membership-card issuance (request, tracker timeline, issued card display),
@@ -1254,10 +1264,10 @@ exercise the real routing workflow. The caller is still excluded and the
 existing role/permission guards remain unchanged.
 
 - `GET /my/club/membership` (new, `USER` role) — returns `{ isMember,
-  level, balance, cardStatus, cardNo, tierRules: { goldMinPoints,
-  platinumMinPoints, cardRequestMinPoints }, cardRequest: { id, status,
-  history, cardNo?, createdAt } | null, canRequestCard,
-  pointsNeededForCard }`. `balance` is the authoritative ledger sum
+level, balance, cardStatus, cardNo, tierRules: { goldMinPoints,
+platinumMinPoints, cardRequestMinPoints }, cardRequest: { id, status,
+history, cardNo?, createdAt } | null, canRequestCard,
+pointsNeededForCard }`. `balance` is the authoritative ledger sum
   (`ClubPointsEntry`), not the staff display cache. `cardRequest` is the
   latest non-REJECTED request (SUBMITTED/REFERRED/APPROVED).
 - `POST /my/club/join` (`USER` role, `@Throttle` 5/min) — self-join as
@@ -1278,6 +1288,7 @@ existing role/permission guards remain unchanged.
   testing works immediately after `prisma db seed`.
 
 ### SITE_ADMIN — ارجاع درخواست‌های کارت SUBMITTED
+
 Completes the member-initiated card-request flow started above: after a
 USER submits via `POST /my/club/card-request`, the request sits in
 `SUBMITTED` until SITE_ADMIN refers it from the پنل ادمین سایت `club` tab.
@@ -1285,8 +1296,8 @@ USER submits via `POST /my/club/card-request`, the request sits in
 - `GET /club/submitted-card-requests` (`SITE_ADMIN` only) — list of **all**
   card-request statuses for the admin queue (SUBMITTED / REFERRED /
   APPROVED / REJECTED) with member detail (incl. decrypted national ID)
-  + history timeline. Refer action still only succeeds on SUBMITTED.
-  Exec panels' `GET /club/card-requests` still excludes SUBMITTED.
+  - history timeline. Refer action still only succeeds on SUBMITTED.
+    Exec panels' `GET /club/card-requests` still excludes SUBMITTED.
 - `PATCH /club/card-requests/:id/refer` (`SITE_ADMIN` only) — body
   `{ assignedTo: 'SENIOR' | 'CHAIR' }`; `SUBMITTED → REFERRED`, appends a
   history step, audited. `409` if not SUBMITTED.
@@ -1297,13 +1308,14 @@ USER submits via `POST /my/club/card-request`, the request sits in
   card-request queue, member profiles, VIP-ready list + Excel download.
 
 ### پنل کاربر — نشان‌شده‌ها (`/account` → تب `saved`)
+
 Closes the «نشان‌شده‌ها» tab in `design-reference-v2/پنل کاربر.dc.html`:
 list saved flight+cabin bookmarks, book (navigate to checkout flow), remove.
 
 - `GET /my/saved-flights` (new, `USER` role) — newest first; each row
   includes `{ id, flightInstanceId, cabin, flightNo, originCode, destCode,
-  originCityFa, destCityFa, departureAt, arrivalAt, priceIrr, bookable,
-  createdAt }`. `priceIrr` is recomputed live via `getCabinPrice`; departed
+originCityFa, destCityFa, departureAt, arrivalAt, priceIrr, bookable,
+createdAt }`. `priceIrr` is recomputed live via `getCabinPrice`; departed
   or non-`SCHEDULED` instances return `bookable: false`.
 - `POST /my/saved-flights` (new, `USER` role, `@Throttle` 30/min) — body
   `{ flightInstanceId, cabin }`; requires a future `SCHEDULED` instance with
@@ -1314,13 +1326,14 @@ list saved flight+cabin bookmarks, book (navigate to checkout flow), remove.
   `ResultsPage.tsx` cabin rows (login-gated, same pattern as price lock).
 
 ### پنل کاربر — مسافران ذخیره‌شده (`/account` → تب `passengers`)
+
 Closes the «مسافران ذخیره‌شده» section in
 `design-reference-v2/پنل کاربر.dc.html`: customer address-book CRUD for
 checkout autofill (autofill wiring on `BookPage` deferred).
 
 - `GET /my/saved-passengers` (new, `USER` role) — newest first; each row
   `{ id, fullName, latinName, gender, birthDate, nationalId, passportNo, mobile, isChild,
-  createdAt, updatedAt }`. PII decrypted for the owner only.
+createdAt, updatedAt }`. PII decrypted for the owner only.
 - `POST /my/saved-passengers` (new, `USER` role, `@Throttle` 30/min) — body
   `{ fullName, latinName, gender, birthDate, nationalId?, passportNo?, mobile?, isChild? }`;
   `gender` is `male`|`female`; `birthDate` is Gregorian `YYYY-MM-DD`. At least one of
@@ -1337,13 +1350,14 @@ checkout autofill (autofill wiring on `BookPage` deferred).
   and identity document fields on the passenger form.
 
 ### پنل کاربر — نشست‌های فعال (`/account` → تب `security`)
+
 Closes the «نشست‌های فعال / دستگاه‌های متصل» block in
 `design-reference-v2/پنل کاربر.dc.html`. Reuses existing `RefreshToken`
 rows — no schema change.
 
 - `GET /my/sessions` (new, `USER` role) — non-revoked, non-expired refresh
   tokens for the caller only; each row `{ id, deviceLabel, ip, userAgent,
-  createdAt, expiresAt, isCurrent }`. `isCurrent` is true when the
+createdAt, expiresAt, isCurrent }`. `isCurrent` is true when the
   request's `blujet_refresh` cookie matches that row's hash.
 - `DELETE /my/sessions/:id` (new, `USER` role) — revokes one other-device
   session; `403` if targeting the current cookie's session (use logout
@@ -1352,13 +1366,14 @@ rows — no schema change.
   (device list, «دستگاه فعلی» badge, «پایان نشست» for others).
 
 ### پنل کاربر — حساب‌های بانکی (`/account` → تب `banks`)
+
 Closes the «حساب‌های بانکی» section in
 `design-reference-v2/پنل کاربر.dc.html`: saved card + sheba for refund
 payouts.
 
 - `GET /my/bank-accounts` (new, `USER` role) — default first, then newest;
   each row `{ id, bankName, bankShort, brandColor, cardMasked, sheba,
-  shebaMasked, isDefault, createdAt, updatedAt }`. PAN/sheba decrypted for
+shebaMasked, isDefault, createdAt, updatedAt }`. PAN/sheba decrypted for
   owner only; list UI uses masked fields.
 - `POST /my/bank-accounts` (new, `USER` role, `@Throttle` 20/min) — body
   `{ cardNo, sheba, bankName? }`; 16-digit card + ISO13616 sheba checksum;
@@ -1372,12 +1387,13 @@ payouts.
   list with brand chip + «پیش‌فرض» badge, inline add form).
 
 ### پنل کاربر — معرفی دوستان (`/account` → تب `referral`)
+
 Closes the «معرفی دوستان» section in
 `design-reference-v2/پنل کاربر.dc.html`.
 
 - `GET /my/referral` (new, `USER` role) — `{ referralCode, sharePath,
-  stats: { invitedCount, pointsEarned, successfulBookings }, invites:
-  [{ id, fullName, joinedAt, status, pointsAwarded }] }`. Code is
+stats: { invitedCount, pointsEarned, successfulBookings }, invites:
+[{ id, fullName, joinedAt, status, pointsAwarded }] }`. Code is
   lazily generated on first read (`NAME-####` shape).
 - `POST /auth/otp/request` — optional `referralCode` in body; applied only
   when the phone number is registering for the first time (ignored for
@@ -1388,13 +1404,14 @@ Closes the «معرفی دوستان» section in
   (hero banner, copy/share, KPI cards, invited-friends list).
 
 ### پنل کاربر — احراز هویت (`/account` → تب `identity`)
+
 Closes the «احراز هویت» section in `design-reference-v2/پنل کاربر.dc.html`
 **without the selfie step** (explicit CLAUDE.md cut — national ID card
 upload only).
 
 - `GET /my/identity` (new, `USER` role) — `{ status, isComplete,
-  canSubmit, submittedAt, rejectReason, steps: [{ key, done }],
-  idCardFile? }`. Step `profile` is derived from User identity fields;
+canSubmit, submittedAt, rejectReason, steps: [{ key, done }],
+idCardFile? }`. Step `profile` is derived from User identity fields;
   step `id_card` from an uploaded StoredFile id.
 - `POST /my/identity/id-card` (new, `USER` role, `@Throttle` 10/min,
   multipart) — PDF/PNG/JPG ≤5MB via `FilesService`; blocked when status is
@@ -1405,6 +1422,7 @@ upload only).
   selfie), upload + submit matching the design layout.
 
 ### پنل ادمین سایت — احراز هویت مشتریان (`/panel/kyc`)
+
 Staff side of the flow above — the `APPROVED`/`REJECTED` transitions have
 to be reachable somewhere; no design tab exists for it, so it follows the
 `jobapps` review-queue pattern (new `kyc` tab in `PANEL_NAV.SITE_ADMIN`).
@@ -1419,7 +1437,7 @@ All endpoints: `JwtAuthGuard` + `RolesGuard` + `PanelAccessGuard`,
   file. Dedicated staff surface (careers-resume style) instead of
   loosening the general `/files` ACL for all staff.
 - `PATCH /identity-verifications/:id/approve` (new) — `SUBMITTED →
-  APPROVED`, sets `reviewedAt`, audit (`ACCOUNT`). 409 otherwise.
+APPROVED`, sets `reviewedAt`, audit (`ACCOUNT`). 409 otherwise.
 - `PATCH /identity-verifications/:id/reject` (new) — body
   `{ rejectReason }` (required, ≤500 chars); `SUBMITTED → REJECTED`, sets
   `reviewedAt` + `rejectReason` (shown to the customer, who can re-upload
@@ -1429,6 +1447,7 @@ All endpoints: `JwtAuthGuard` + `RolesGuard` + `PanelAccessGuard`,
   required reason.
 
 ### پنل کاربر — استرداد بلیط (`/account` → تب `refunds`)
+
 Closes the gap between `design-reference-v2/پنل کاربر.dc.html`'s full
 refund tab and the current amount/status-only list. The same
 `RefundPenaltyRule` rows and `computePenalty` function remain authoritative
@@ -1441,7 +1460,7 @@ All endpoints below are `JwtAuthGuard` + `RolesGuard`,
   whose status is `TICKETED|PAID`, which have no prior refund request, and
   whose current rule is refundable (`penaltyPct < 100`). Each row:
   `{ bookingId, pnr, flightNo, originCode, destCode, departureAt,
-  totalPaidIrr, hoursLeft, penaltyPct, penaltyAmountIrr, refundableIrr }`.
+totalPaidIrr, hoursLeft, penaltyPct, penaltyAmountIrr, refundableIrr }`.
   The amounts are a server-computed preview at response time.
 - `GET /my/refunds/rules` (new) — the current four customer-readable
   brackets sorted by `minHoursBeforeDeparture DESC`:
@@ -1451,7 +1470,7 @@ All endpoints below are `JwtAuthGuard` + `RolesGuard`,
 - `POST /my/refunds/preview` (new) — body `{ bookingId }`; repeats
   ownership/status/no-prior-request checks and returns
   `{ bookingId, totalPaidIrr, hoursLeft, penaltyPct, penaltyAmountIrr,
-  refundableIrr, refundable }`. This is called when opening the confirm
+refundableIrr, refundable }`. This is called when opening the confirm
   modal so a stale list cannot display an old time bracket. 404 for
   unknown/not-owned booking; 409 when ineligible.
 - `POST /my/refunds` (existing, enriched response) — body
@@ -1461,8 +1480,8 @@ All endpoints below are `JwtAuthGuard` + `RolesGuard`,
   remains. Response uses the enriched customer row below.
 - `GET /my/refunds` (existing, enriched) — customer rows:
   `{ id, trackingCode, bookingId, pnr, flightNo, originCode, destCode,
-  departureAt, status, totalPaidIrr, penaltyPct, penaltyAmountIrr,
-  refundableIrr, history: [{ step, labelFa, at }], createdAt, paidAt }`.
+departureAt, status, totalPaidIrr, penaltyPct, penaltyAmountIrr,
+refundableIrr, history: [{ step, labelFa, at }], createdAt, paidAt }`.
   No IBAN or other passenger PII is returned.
 - `GET /my/refunds/:id` (existing, enriched) — same shape; 404 for another
   user's request. Static routes (`eligible-bookings`, `rules`, `preview`)
@@ -1720,7 +1739,7 @@ exposes the tab).
   `saleStartsAt`/`saleEndsAt` window (Phase 13) — the two are independent
   and this phase does not touch the latter.
 - **نیرا submission**: a `NiraProvider` interface (`backend/src/common/
-  nira/`) with a `MockNiraProvider` (dev/test — logs the manifest and
+nira/`) with a `MockNiraProvider` (dev/test — logs the manifest and
   always succeeds, never fabricates a failure rate, same convention as
   `MockSmsProvider`), wrapped by `NiraService` (mirrors `SmsService`).
   Once an instance crosses the 4h threshold, the next `flightops` read
@@ -1761,7 +1780,7 @@ only; no backend/schema changes.
   refunds' شبا), refunds, wallet entries, club membership + points ledger,
   price locks.
 - `DELETE /my/privacy/account` — soft-deletes the account (`isActive:
-  false`, `deletedAt`, phone/email/fullName scrubbed), anonymizes
+false`, `deletedAt`, phone/email/fullName scrubbed), anonymizes
   passenger PII on the customer's own bookings (`fullName` → placeholder,
   `nationalIdEnc`/`nationalIdHash`/`mobileEnc` cleared, `deletedAt` set),
   clears `Booking.contactPhone`, and revokes every active `RefreshToken` —
@@ -1802,7 +1821,7 @@ for the recipient side — not just for EMPLOYEE.
   recipients can each report separately) and `counts.awaitingMyReport`
   (not yet reported by me, and not `CLOSED`).
 - `PANEL_NAV.EMPLOYEE` now always includes `{ key: 'referrals', labelFa:
-  'ارجاعات' }`, matching the design's unconditional formula — no longer
+'ارجاعات' }`, matching the design's unconditional formula — no longer
   gated behind a wired permission key (referrals are personally
   addressed, not section-based access).
 - Frontend: the `referrals` panel tab now renders per-role via a new
@@ -1926,7 +1945,7 @@ worked at the API level, but responses only ever returned the raw
   validated (`assertOwnedAttachments`) on both `POST /referrals` and
   `POST /referrals/:id/reports`.
 - **Bug fix (pre-existing, not introduced this phase)**: `FilesService
-  .store()` used `file.originalname` directly. multer/busboy decode
+.store()` used `file.originalname` directly. multer/busboy decode
   multipart header bytes as latin1 by default; browsers send non-ASCII
   filenames (Persian, in this platform's case) as raw UTF-8 bytes, so the
   undecoded name came out as mojibake. Fixed by re-decoding
@@ -1958,7 +1977,7 @@ aircraft type happens to be business 2-2 / economy 2-3, which matches
 that fixed index by coincidence.
 
 - `SeatmapService.getSeatMap()` now returns `cabinLayout:
-  { BUSINESS: { aisleAfterIndex }, ECONOMY: { aisleAfterIndex } }`,
+{ BUSINESS: { aisleAfterIndex }, ECONOMY: { aisleAfterIndex } }`,
   computed from `map.businessColsLeft.length` /
   `map.economyColsLeft.length` for that flight instance's real aircraft
   type (`resolveAircraftType`, so a `changeAircraftType` override is
@@ -1989,7 +2008,7 @@ slice of its module rather than the raw IT_MANAGER endpoint list:
 
 - **`us_manage`** — the legacy umbrella remains accepted as a bundle for
   the operation-level `us_list` and `us_reset_password` grants. `GET
-  /it/employees` (list) and `GET /it/employees/:id` (detail) are now
+/it/employees` (list) and `GET /it/employees/:id` (detail) are now
   reachable by `EMPLOYEE`, but always scoped server-side
   to the actor's **own dept** (`EmployeesService.deptScopeForEmployee`
   looks up the actor's `dept` fresh from the DB — `AuthenticatedUser`
@@ -2017,7 +2036,7 @@ slice of its module rather than the raw IT_MANAGER endpoint list:
   password/security policy) is reachable. `GET /it/security/sessions`
   is deliberately **excluded** — narrower than the scope originally
   proposed ("policy + own sessions"), because `SecurityService
-  .listSessions()` has no per-actor filter (it returns every active
+.listSessions()` has no per-actor filter (it returns every active
   session company-wide: user, device, IP), and there is no "my sessions
   only" endpoint to scope to. Building one was judged out of scope for
   this narrow phase, so the safer choice was to exclude `/sessions`
@@ -2058,18 +2077,18 @@ the frontend UI closure, and the found-and-fixed bugs are in
 
 ### `backend/src/modules/booking-engine/` — wallet ("کیف پول") — `@Roles('USER')`
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/my/wallet` | `{ balanceIrr }` — always `SUM(WalletEntry.signedAmountIrr)`, never a mutable column. |
-| POST | `/my/wallet/topup` | `{ amountIrr (min 10,000) }` — a sandbox "always succeeds" gateway (no redirect/callback, unlike `POST /bookings/:id/pay`'s `GATEWAY` method): inserts a `WalletEntry(type=TOPUP)` and returns the new `{ balanceIrr }` synchronously. |
+| Method | Path               | Notes                                                                                                                                                                                                                                  |
+| ------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/my/wallet`       | `{ balanceIrr }` — always `SUM(WalletEntry.signedAmountIrr)`, never a mutable column.                                                                                                                                                  |
+| POST   | `/my/wallet/topup` | `{ amountIrr (min 10,000) }` — a sandbox "always succeeds" gateway (no redirect/callback, unlike `POST /bookings/:id/pay`'s `GATEWAY` method): inserts a `WalletEntry(type=TOPUP)` and returns the new `{ balanceIrr }` synchronously. |
 
 ### `backend/src/modules/booking-engine/` — price lock ("قفل قیمت هوشمند") — `@Roles('USER')`
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/my/price-locks` | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin **or wallet balance can't cover the fee**. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT`). **Fee is debited from the wallet** (`PURCHASE` ledger row, `feeCharged=true`) on create and refunded (`TOPUP`) on cancel when previously charged. |
-| GET | `/my/price-locks` | Own locks, newest first. **Phase 34 addition**: each row now also includes `flight: { flightNo, originCode, destCode, departureAt }` (joined via `FlightInstance → Flight → Route`) — previously only raw fields, giving the frontend no way to show which flight a lock is for. |
-| DELETE | `/my/price-locks/:id` | Owner-only; 404 otherwise; 400 if not currently `ACTIVE` → `CANCELLED`. |
+| Method | Path                  | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/my/price-locks`     | `{ flightInstanceId, cabin }` — 403 if the caller isn't a `GOLD`/`PLATINUM` `ClubMember`; 404 if the flight is gone or no longer `SCHEDULED`; 409 if an active, unexpired lock already exists for that user+flight+cabin **or wallet balance can't cover the fee**. Locks the live cabin price for 72h flat (`LOCK_TTL_MS`), fee = flat 3% of that price rounded to the nearest 10,000 IRR (`LOCK_FEE_PCT`). **Fee is debited from the wallet** (`PURCHASE` ledger row, `feeCharged=true`) on create and refunded (`TOPUP`) on cancel when previously charged. |
+| GET    | `/my/price-locks`     | Own locks, newest first. **Phase 34 addition**: each row now also includes `flight: { flightNo, originCode, destCode, departureAt }` (joined via `FlightInstance → Flight → Route`) — previously only raw fields, giving the frontend no way to show which flight a lock is for.                                                                                                                                                                                                                                                                               |
+| DELETE | `/my/price-locks/:id` | Owner-only; 404 otherwise; 400 if not currently `ACTIVE` → `CANCELLED`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Consumption at booking time is **implicit** — `POST /bookings` does not
 take a `priceLockId`. `BookingService.createBooking` looks up any active,
@@ -2141,16 +2160,17 @@ systematic controller-vs-frontend audit as Phases 35–37: fully
 implemented and e2e-tested, no frontend control anywhere. Two small,
 additive backend changes were needed to build a real (not free-text) form
 around it:
+
 - `GET /flights/aircraft-types` (new, `SENIOR_MANAGER` + `COMMERCIAL_MANAGER`
-  + `EMPLOYEE` with `fl_view`, matching the existing `airports` catalog
-  endpoint's role gate) — lists every seeded `AircraftSeatMap` row as
-  `{ aircraftType, capacity }`, capacity computed via the same
-  `enumerateSeats()` helper `changeAircraftType()` already uses for its
-  own capacity check. No such listing existed anywhere: every other
-  `AircraftSeatMap` reader already knows the exact type string it wants
-  (from `Flight.aircraftType` or a `changeAircraftType` override), so this
-  is the first caller that needs the full catalog — needed so the UI can
-  offer a real dropdown instead of an error-prone free-text field.
+  - `EMPLOYEE` with `fl_view`, matching the existing `airports` catalog
+    endpoint's role gate) — lists every seeded `AircraftSeatMap` row as
+    `{ aircraftType, capacity }`, capacity computed via the same
+    `enumerateSeats()` helper `changeAircraftType()` already uses for its
+    own capacity check. No such listing existed anywhere: every other
+    `AircraftSeatMap` reader already knows the exact type string it wants
+    (from `Flight.aircraftType` or a `changeAircraftType` override), so this
+    is the first caller that needs the full catalog — needed so the UI can
+    offer a real dropdown instead of an error-prone free-text field.
 - `GET /flights/:instanceId` (detail) response gains `aircraftType`
   (resolved via the existing `resolveAircraftType()` util —
   `instance.aircraftTypeOverride ?? instance.flight.aircraftType`) so the
@@ -2180,8 +2200,8 @@ unilaterally.
 
 `AgencyDocument` (Agency Portal track, self-service upload) has had a
 real `status` enum (`PENDING`/`APPROVED`/`REJECTED`) since it shipped,
-and its own Prisma comment said so explicitly: *"Staff-side review is
-deferred... every row stays PENDING until that workflow is built."*
+and its own Prisma comment said so explicitly: _"Staff-side review is
+deferred... every row stays PENDING until that workflow is built."_
 `POST /agency-portal/documents` (agency uploads a license/contract) has
 always worked, but no staff endpoint could see or decide on the result —
 every uploaded document sat `PENDING` forever. Found while explaining the
@@ -2440,11 +2460,11 @@ the account actually has verified.
 
 ### `backend/src/modules/auth/` (additions)
 
-| Method | Path | Auth | Notes |
-|---|---|---|---|
-| POST | `/auth/password-reset/email/request` | public, `@Throttle` 5/min | `{ email }` (`@IsEmail`) → looks up a `USER`-role account with that **exact, verified** email (`emailVerifiedAt IS NOT NULL`); 401 `NOT_FOUND` if none matches, 403 `ACCOUNT_SUSPENDED` if inactive. Deliberately does **not** upsert/create an account the way `requestOtp` does for phone — inventing an account for an arbitrary submitted email would let anyone probe or claim an address that isn't theirs. Issues a `TwoFactorChallenge(purpose: PASSWORD_RESET_EMAIL)` and delivers the code via the existing `TwoFactorProvider.sendCode` (same interface Phase 17's email verification already uses with `phone: null`). |
-| POST | `/auth/password-reset/email/verify` | public, `@Throttle` 5/min | `{ challengeId, code }` → same challenge/attempts/expiry rules as `otp/verify`, scoped to `PASSWORD_RESET_EMAIL` only (a `CUSTOMER_OTP_LOGIN` or `EMAIL_VERIFY` challenge id is rejected here, and vice versa). On success, logs the customer in exactly like `otp/verify` does, so the frontend immediately calls the existing `POST /auth/set-password` (no current-password check) — same handoff Phase 21 established for the phone path. |
-| GET | `/auth/_test/last-password-reset-email-code/:email` | E2E only | Non-production escape hatch mirroring `_test/last-otp/:phone`; 404s in production. |
+| Method | Path                                                | Auth                      | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------ | --------------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/auth/password-reset/email/request`                | public, `@Throttle` 5/min | `{ email }` (`@IsEmail`) → looks up a `USER`-role account with that **exact, verified** email (`emailVerifiedAt IS NOT NULL`); 401 `NOT_FOUND` if none matches, 403 `ACCOUNT_SUSPENDED` if inactive. Deliberately does **not** upsert/create an account the way `requestOtp` does for phone — inventing an account for an arbitrary submitted email would let anyone probe or claim an address that isn't theirs. Issues a `TwoFactorChallenge(purpose: PASSWORD_RESET_EMAIL)` and delivers the code via the existing `TwoFactorProvider.sendCode` (same interface Phase 17's email verification already uses with `phone: null`). |
+| POST   | `/auth/password-reset/email/verify`                 | public, `@Throttle` 5/min | `{ challengeId, code }` → same challenge/attempts/expiry rules as `otp/verify`, scoped to `PASSWORD_RESET_EMAIL` only (a `CUSTOMER_OTP_LOGIN` or `EMAIL_VERIFY` challenge id is rejected here, and vice versa). On success, logs the customer in exactly like `otp/verify` does, so the frontend immediately calls the existing `POST /auth/set-password` (no current-password check) — same handoff Phase 21 established for the phone path.                                                                                                                                                                                      |
+| GET    | `/auth/_test/last-password-reset-email-code/:email` | E2E only                  | Non-production escape hatch mirroring `_test/last-otp/:phone`; 404s in production.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ### Frontend
 
@@ -2677,11 +2697,12 @@ balance changes (a real purchase earning points, or a redemption) — not
 just a passive settings screen.
 
 ### New: `GET /club/tier-rules`, `PATCH /club/tier-rules`
+
 - Roles: `COMMERCIAL_MANAGER` only (see access-list note above).
 - `GET` returns the single `ClubTierRule` row (seeded once via
   `prisma/seed.ts`, lazily created on first read if somehow absent):
   `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints, updatedAt,
-  updatedByLabelFa }`.
+updatedByLabelFa }`.
 - `PATCH` body: `{ goldMinPoints, platinumMinPoints, cardRequestMinPoints }`
   (all non-negative integers). Validation, matching the design's implicit
   ordering constraint (`crGoldMin` must leave room below `crPlatMin`):
@@ -2701,6 +2722,7 @@ just a passive settings screen.
   read-only "پیش‌نمایش سطوح" (tier preview) table.
 
 ### `ClubPointsService.syncCache` — real tier auto-recompute
+
 - After writing the new `points` cache value (unchanged from today), it
   now also loads the current `ClubTierRule` row and sets
   `ClubMember.level` to the highest tier whose `minPoints <= points`
@@ -2741,14 +2763,15 @@ CRUD, a stats card, a recent-responses feed) and `پنل مدیر عامل.dc.ht
 own read-only `survey` tab: one row per flight with response count +
 average rating, and a "تحلیل با هوش مصنوعی" button that summarizes that
 flight's comments). The IT file's own subtitle for the tab states the
-split explicitly: *"ایجاد و پیکربندی نظرسنجی رضایت پس از پرواز — نتایج
-نزد مدیران ارشد"*. Confirmed via each file's own `roleDefs.access`
+split explicitly: _"ایجاد و پیکربندی نظرسنجی رضایت پس از پرواز — نتایج
+نزد مدیران ارشد"_. Confirmed via each file's own `roleDefs.access`
 array: `survey` appears for `ceo`, `senior`, and `super` (`super` is
 `BOARD_CHAIR`'s own role key inside `پنل رئیس هیئت مدیره.dc.html`) —
 i.e. `CEO`, `SENIOR_MANAGER`, `BOARD_CHAIR` — and separately for the IT
 manager's own file. No other role's design file mentions a `survey` tab.
 
 ### Scope decisions (read before reviewing the schema)
+
 - **SMS-only delivery.** The design's own copy says "پیامک/ایمیل" in
   passing, but `Passenger` has no email field anywhere in the schema
   (only `mobileEnc`) and no signal anywhere else in the codebase ever
@@ -2769,24 +2792,24 @@ manager's own file. No other role's design file mentions a `survey` tab.
   own reads, not the three originally-drafted call sites.** This
   codebase has zero scheduler infrastructure by design (see
   `flight-lifecycle.util.ts`'s own comments) — every `SCHEDULED →
-  DEPARTED` and `TICKETED → FLOWN` transition is computed on-read. The
+DEPARTED` and `TICKETED → FLOWN` transition is computed on-read. The
   draft above proposed hooking into `materializeFlownBookings`'s three
   existing call sites (`reporting.service.ts`, `flightops.service.ts`,
   `flights.service.ts`); the actual implementation instead adds a new
   `materializeSurveyInvites(prisma, sms)` (in
   `backend/src/modules/survey/survey-lifecycle.util.ts`) that itself
   calls `materializeFlownBookings` first, then creates a `SurveyInvite`
-  + sends the SMS for every `FLOWN` booking that doesn't have one yet
-  (skipped entirely while `SurveySettings.enabled` is false). This is
-  called from `SurveyService.getStats()` and `SurveyService.getResults()`
-  — the IT-manager stats screen and the exec results screen, i.e. the
-  two places this data is actually read — rather than reaching into
-  three unrelated existing services and adding a new `SmsModule`
-  dependency to each. Same lazy, no-cron principle; simpler blast
-  radius. A booking with no contact phone still gets its `SurveyInvite`
-  row (so the token exists), it just never receives the SMS
-  (`SmsInvite.smsSentAt` stays null) — `SmsService.send` already handles
-  a null phone gracefully (logs a `FAILED` `SmsLog` row, never throws).
+  - sends the SMS for every `FLOWN` booking that doesn't have one yet
+    (skipped entirely while `SurveySettings.enabled` is false). This is
+    called from `SurveyService.getStats()` and `SurveyService.getResults()`
+    — the IT-manager stats screen and the exec results screen, i.e. the
+    two places this data is actually read — rather than reaching into
+    three unrelated existing services and adding a new `SmsModule`
+    dependency to each. Same lazy, no-cron principle; simpler blast
+    radius. A booking with no contact phone still gets its `SurveyInvite`
+    row (so the token exists), it just never receives the SMS
+    (`SmsInvite.smsSentAt` stays null) — `SmsService.send` already handles
+    a null phone gracefully (logs a `FAILED` `SmsLog` row, never throws).
 - **New AI provider, not ml-service.** CLAUDE.md's "ML Service Rules"
   scopes the FastAPI `ml-service` to exactly two endpoints
   (`price-suggestion`, `recommendations`) — "nothing else lives here."
@@ -2814,6 +2837,7 @@ manager's own file. No other role's design file mentions a `survey` tab.
   than a fabricated number.
 
 ### New: `SmsMessageType` value `'SURVEY_INVITE'`
+
 Same extension point already used for `'OTP'`/`'TEMP_PASSWORD'` — the
 SMS body is a short Persian message containing the survey link
 (`{FRONTEND_URL}/survey/{token}`). New env var `FRONTEND_URL` (falls
@@ -2826,7 +2850,9 @@ enum (`SmsLog.messageType`), not just the TS union in
 the same migration that added the new tables.
 
 ### New (IT_MANAGER only): `GET /survey/settings`, `PATCH /survey/settings`
+
 ### New (IT_MANAGER only): `GET/POST/DELETE /survey/questions`, `/survey/questions/:id`
+
 - Roles: `IT_MANAGER` only (matches the design's own tab — no other role
   can configure the survey).
 - `GET /survey/settings` → `{ enabled, title, updatedAt, updatedByLabelFa }`.
@@ -2841,11 +2867,12 @@ the same migration that added the new tables.
 - `DELETE /survey/questions/:id` → removes it (matches the design's
   per-row remove button; no edit-in-place action exists in the design).
 - `GET /survey/stats` → `{ flightsWithSurvey, totalResponses, avgRating,
-  recentResponses: { id, flightNo, route, rating, comment, at }[] }`
+recentResponses: { id, flightNo, route, rating, comment, at }[] }`
   (latest 8, matches the design's `.slice(0, 8)`), IT_MANAGER only —
   mirrors the design's `surveyStats` box + recent-responses feed.
 
 ### New (public, no auth): `GET /survey/:token`, `POST /survey/:token`
+
 - `GET` resolves a `SurveyInvite` by its opaque `token`; 404 if unknown,
   409 (`SURVEY_ALREADY_SUBMITTED`) if a `SurveyResponse` already exists
   for it, 409 (`SURVEY_DISABLED`) if `SurveySettings.enabled` is false
@@ -2865,6 +2892,7 @@ the same migration that added the new tables.
   per CLAUDE.md's Security Rules).
 
 ### New (CEO / SENIOR_MANAGER / BOARD_CHAIR, read-only): `GET /survey/results`, `POST /survey/results/:flightInstanceId/analyze`
+
 - Roles: `CEO`, `SENIOR_MANAGER`, `BOARD_CHAIR` only — read-only, no
   config access (matches the design: these three panels render the
   results table but never call anything resembling
@@ -2875,7 +2903,7 @@ the same migration that added the new tables.
   reading of the design's own `getSurveyFlights()`, which only ever
   groups its flat demo data by `flightNo`) that has at least one
   response: `{ flightInstanceId, flightNo, originCityFa, destCityFa,
-  departureAt, count, avgRating }` — count/avgRating computed by a real
+departureAt, count, avgRating }` — count/avgRating computed by a real
   SQL `GROUP BY` (`$queryRaw`, corrected during the post-merge senior
   review from an earlier version that loaded every response row and
   grouped it in a JS `Map`), never in the browser, per CLAUDE.md's
@@ -2957,6 +2985,7 @@ other role's design mentions job postings or applications at all** —
 this stays SITE_ADMIN-only.
 
 ### Scope decisions
+
 - **Job-posting CRUD folds into one new `jobapps` SITE_ADMIN tab**,
   rather than waiting on the much larger, still-entirely-unbuilt
   "تنظیمات سامانه" content tab the design physically places the
@@ -3019,6 +3048,7 @@ this stays SITE_ADMIN-only.
   removal path, matching the design 1:1.
 
 ### New: `CareersSettings` — `GET /careers/settings` (public), `PATCH /careers/settings` (SITE_ADMIN)
+
 - Singleton (same pattern as `ClubTierRule`/`SurveySettings`):
   `{ enabled: boolean }`. Controls only whether the public footer shows
   the "فرصت‌های شغلی" link — matches the design exactly (the careers
@@ -3028,6 +3058,7 @@ this stays SITE_ADMIN-only.
   value (mirrors the design's own `_logReport("content", ...)` calls).
 
 ### New (public, no auth): `GET /careers/jobs`, `GET /careers/jobs/:id`, `POST /careers/jobs/:id/apply`
+
 - `GET /careers/jobs` → active postings only:
   `{ id, title, dept, city, type }[]` (`type` is one of `FULL_TIME` |
   `REMOTE` | `PART_TIME`, mapped to the design's `تمام‌وقت`/`دورکاری`/
@@ -3056,9 +3087,10 @@ this stays SITE_ADMIN-only.
   for the admin search box), same pattern as `Passenger`/`ClubMember`.
 
 ### New (SITE_ADMIN only): `GET/POST/PATCH /careers/postings`
+
 - `GET /careers/postings` → all postings (active + inactive).
 - `POST /careers/postings` body `{ title, dept, city, type,
-  generalReqs, specialReqs, description?, imageFileId? }` → creates,
+generalReqs, specialReqs, description?, imageFileId? }` → creates,
   `active: true` by default. `imageFileId` from `POST /files`.
 - `PATCH /careers/postings/:id` body: any subset of the create fields
   plus `active?` (the design's per-card "غیرفعال کردن آگهی"/"فعال کردن
@@ -3069,10 +3101,11 @@ this stays SITE_ADMIN-only.
 - Both write an audit-log entry (`AuditCategory.CONTENT`).
 
 ### New (SITE_ADMIN only): `GET /careers/applications`, `GET /careers/applications/:id`, `GET /careers/applications/:id/resume`, `PATCH /careers/applications/:id/refer`, `PATCH /careers/applications/:id/hire`, `PATCH /careers/applications/:id/reject`
+
 - `GET /careers/applications` → list with `q` (matches design's search
   across name/national-id/phone/email) and `jobTitle` filters, each row:
   `{ id, name, jobTitle, nationalIdMasked, phone, email, at, status,
-  hasResume, eduCount, workCount, assigneeLabelFa }`.
+hasResume, eduCount, workCount, assigneeLabelFa }`.
 - `GET /careers/applications/:id` → full detail incl. decrypted-for-
   display fields, `eduEntries`/`workEntries`/`langEntries`,
   `history: { step, label, at }[]`, and the computed referral-target
@@ -3106,22 +3139,22 @@ the tab when either key is granted.
 
 ### `backend/src/modules/cartable/` (EMPLOYEE additions)
 
-| Method | Path | Access | Notes |
-|--------|------|--------|-------|
-| GET | `/cartable` | EMPLOYEE + `ct_list` | Same self-scoped list as exec roles. |
-| PATCH | `/cartable/:id/approve` | EMPLOYEE + `ct_process` | Employee UI «انجام شد ✓» maps here (note required server-side; frontend sends `انجام شد`). |
-| GET | `/cartable/manager-recipients` | EMPLOYEE + `ct_process` | Exec managers (+ IT_MANAGER, SITE_ADMIN) with `isOwnManager` for the employee's dept. |
-| POST | `/cartable/manager-message` | EMPLOYEE + `ct_process` | `{ toId, body }` → cartable task for target manager (`sourceType: EMPLOYEE_MESSAGE`). |
-| GET | `/cartable/manager-message/sent` | EMPLOYEE + `ct_process` | Caller's last 20 sent messages. |
+| Method | Path                             | Access                  | Notes                                                                                      |
+| ------ | -------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| GET    | `/cartable`                      | EMPLOYEE + `ct_list`    | Same self-scoped list as exec roles.                                                       |
+| PATCH  | `/cartable/:id/approve`          | EMPLOYEE + `ct_process` | Employee UI «انجام شد ✓» maps here (note required server-side; frontend sends `انجام شد`). |
+| GET    | `/cartable/manager-recipients`   | EMPLOYEE + `ct_process` | Exec managers (+ IT_MANAGER, SITE_ADMIN) with `isOwnManager` for the employee's dept.      |
+| POST   | `/cartable/manager-message`      | EMPLOYEE + `ct_process` | `{ toId, body }` → cartable task for target manager (`sourceType: EMPLOYEE_MESSAGE`).      |
+| GET    | `/cartable/manager-message/sent` | EMPLOYEE + `ct_process` | Caller's last 20 sent messages.                                                            |
 
 Reject/transfer/chair-permission endpoints stay exec-only (class-level
 `@Roles(...EXEC_ROLES, 'SITE_ADMIN')` unchanged on those handlers).
 
 ### `backend/src/modules/panels/`
 
-| Method | Path | Access | Notes |
-|--------|------|--------|-------|
-| GET | `/panels/employee-context` | EMPLOYEE | `{ dept, deptLabelFa, rank, permissionLabelsFa[], permissionKeys[] }` for dashboard chips and permission-aware employee surfaces. |
+| Method | Path                       | Access   | Notes                                                                                                                             |
+| ------ | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/panels/employee-context` | EMPLOYEE | `{ dept, deptLabelFa, rank, permissionLabelsFa[], permissionKeys[] }` for dashboard chips and permission-aware employee surfaces. |
 
 The employee cartable loads its self-scoped task list independently from the
 manager messaging endpoints. `ct_list` therefore remains a usable read-only
@@ -3142,25 +3175,25 @@ deferred to a later sub-phase.
 
 ### Admin (`SITE_ADMIN`, `blog` tab)
 
-| Method | Path | Access | Notes |
-|--------|------|--------|-------|
-| GET | `/blog/admin/stats` | SITE_ADMIN | KPI row: `{ publishedCount, draftCount, totalViews, commentCount }` — `commentCount` is always `0` until a comments feature exists. |
-| GET | `/blog/admin/posts` | SITE_ADMIN | All non-deleted posts; optional `?category=NEWS\|GUIDE\|DEST\|OFFERS\|all`. |
-| GET | `/blog/admin/posts/:id` | SITE_ADMIN | Full row for edit modal. |
-| POST | `/blog/admin/posts` | SITE_ADMIN | Create — `{ title, body, category, status?, coverFileId?, scheduledAt?, slug? }`. |
-| PATCH | `/blog/admin/posts/:id` | SITE_ADMIN | Update any field; status transitions set/clear `publishedAt`/`scheduledAt`. |
-| DELETE | `/blog/admin/posts/:id` | SITE_ADMIN | Soft-delete (`deletedAt`). |
+| Method | Path                    | Access     | Notes                                                                                                                               |
+| ------ | ----------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/blog/admin/stats`     | SITE_ADMIN | KPI row: `{ publishedCount, draftCount, totalViews, commentCount }` — `commentCount` is always `0` until a comments feature exists. |
+| GET    | `/blog/admin/posts`     | SITE_ADMIN | All non-deleted posts; optional `?category=NEWS\|GUIDE\|DEST\|OFFERS\|all`.                                                         |
+| GET    | `/blog/admin/posts/:id` | SITE_ADMIN | Full row for edit modal.                                                                                                            |
+| POST   | `/blog/admin/posts`     | SITE_ADMIN | Create — `{ title, body, category, status?, coverFileId?, scheduledAt?, slug? }`.                                                   |
+| PATCH  | `/blog/admin/posts/:id` | SITE_ADMIN | Update any field; status transitions set/clear `publishedAt`/`scheduledAt`.                                                         |
+| DELETE | `/blog/admin/posts/:id` | SITE_ADMIN | Soft-delete (`deletedAt`).                                                                                                          |
 
 Cover images reuse existing `POST /files` (`StoredFile` FK on `BlogPost`).
 Audit log category `CONTENT` on create/update/delete.
 
 ### Public (no auth)
 
-| Method | Path | Access | Notes |
-|--------|------|--------|-------|
-| GET | `/blog/posts` | public | Published + due scheduled posts only; optional `?category=`. |
-| GET | `/blog/posts/:slug` | public | Detail; increments `viewCount`. Draft/future-scheduled → 404. |
-| GET | `/blog/covers/:fileId` | public | Serves cover bytes only when attached to a visible post. |
+| Method | Path                   | Access | Notes                                                         |
+| ------ | ---------------------- | ------ | ------------------------------------------------------------- |
+| GET    | `/blog/posts`          | public | Published + due scheduled posts only; optional `?category=`.  |
+| GET    | `/blog/posts/:slug`    | public | Detail; increments `viewCount`. Draft/future-scheduled → 404. |
+| GET    | `/blog/covers/:fileId` | public | Serves cover bytes only when attached to a visible post.      |
 
 ### Explicit deferrals
 
@@ -3177,22 +3210,22 @@ support contact, job postings block, static site pages list.
 
 ### Admin (`SITE_ADMIN`, `media` tab)
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/site-content/admin/library` | SITE_ADMIN | Image library rows (linked `StoredFile`). |
-| POST | `/site-content/admin/library` | SITE_ADMIN | Add — `{ storedFileId, label? }` from `POST /files`. |
-| DELETE | `/site-content/admin/library/:id` | SITE_ADMIN | Soft-delete library asset. |
-| GET | `/site-content/admin/blocks` | SITE_ADMIN | Hero, announcement, promo blocks (auto-seeded defaults). |
-| PATCH | `/site-content/admin/blocks/:key` | SITE_ADMIN | Update block — `HERO_BANNER` \| `ANNOUNCEMENT_BAR` \| `PROMO_BANNER`. |
-| GET/POST/PATCH/DELETE | `/site-content/admin/destinations` | SITE_ADMIN | Popular destination cards CRUD. |
-| GET/POST/PATCH/DELETE | `/site-content/admin/routes` | SITE_ADMIN | Popular route chips CRUD. |
+| Method                | Path                               | Auth       | Description                                                           |
+| --------------------- | ---------------------------------- | ---------- | --------------------------------------------------------------------- |
+| GET                   | `/site-content/admin/library`      | SITE_ADMIN | Image library rows (linked `StoredFile`).                             |
+| POST                  | `/site-content/admin/library`      | SITE_ADMIN | Add — `{ storedFileId, label? }` from `POST /files`.                  |
+| DELETE                | `/site-content/admin/library/:id`  | SITE_ADMIN | Soft-delete library asset.                                            |
+| GET                   | `/site-content/admin/blocks`       | SITE_ADMIN | Hero, announcement, promo blocks (auto-seeded defaults).              |
+| PATCH                 | `/site-content/admin/blocks/:key`  | SITE_ADMIN | Update block — `HERO_BANNER` \| `ANNOUNCEMENT_BAR` \| `PROMO_BANNER`. |
+| GET/POST/PATCH/DELETE | `/site-content/admin/destinations` | SITE_ADMIN | Popular destination cards CRUD.                                       |
+| GET/POST/PATCH/DELETE | `/site-content/admin/routes`       | SITE_ADMIN | Popular route chips CRUD.                                             |
 
 ### Public
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/site-content/home` | public | Blocks + destinations + routes for home page wiring. |
-| GET | `/site-content/media/:fileId` | public | Serves bytes when file is in library, a block, destination, or published blog cover. |
+| Method | Path                          | Auth   | Description                                                                          |
+| ------ | ----------------------------- | ------ | ------------------------------------------------------------------------------------ |
+| GET    | `/site-content/home`          | public | Blocks + destinations + routes for home page wiring.                                 |
+| GET    | `/site-content/media/:fileId` | public | Serves bytes when file is in library, a block, destination, or published blog cover. |
 
 Home page reads `GET /site-content/home` for announcement/hero/promo/routes/destinations.
 See `docs/features/site-admin-media.md` for the acceptance checklist.
@@ -3211,10 +3244,10 @@ SITE_ADMIN may PATCH only: `socialLinks`, `supportEmail`, `supportPhone`,
 
 ### Public
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/settings/app-links` | public | Store links with non-empty URLs (https-normalized). |
-| GET | `/settings/support-contact` | public | `{ phone, email }` from system settings. |
+| Method | Path                        | Auth   | Description                                         |
+| ------ | --------------------------- | ------ | --------------------------------------------------- |
+| GET    | `/settings/app-links`       | public | Store links with non-empty URLs (https-normalized). |
+| GET    | `/settings/support-contact` | public | `{ phone, email }` from system settings.            |
 
 Home page app band reads `GET /settings/app-links`.
 Contact page phone/email cards read `GET /settings/support-contact`.
@@ -3238,11 +3271,12 @@ Reuses `SystemSetting` keys (`aboutUsText`, `contactAddress`, `termsText`,
 `homeHeroTitle`, `homeHeroSubtitle`). SITE_ADMIN may PATCH these from the
 media tab «صفحات سایت» section.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/settings/site-content` | public | Static page copy for public rendering. |
+| Method | Path                     | Auth   | Description                            |
+| ------ | ------------------------ | ------ | -------------------------------------- |
+| GET    | `/settings/site-content` | public | Static page copy for public rendering. |
 
 See `docs/features/site-admin-static-pages.md`.
+
 # Operational account bootstrap (2026-08-05)
 
 Initial management-panel accounts are created only through the offline
@@ -3304,14 +3338,15 @@ unchanged. Starting the preview is recorded as a `SECURITY` audit event. The
 UI shows a persistent Sandbox banner and returns to the owner by refreshing
 the unchanged owner session.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/auth/sandbox/tenant-accounts` | owner super-admin + Sandbox flag | Lists up to 200 active `USER`/`AGENCY` accounts available for preview. |
-| POST | `/auth/sandbox/impersonate` | owner super-admin + Sandbox flag | Accepts `{ targetUserId }` and returns a 15-minute preview access token. |
+| Method | Path                            | Auth                             | Description                                                              |
+| ------ | ------------------------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| GET    | `/auth/sandbox/tenant-accounts` | owner super-admin + Sandbox flag | Lists up to 200 active `USER`/`AGENCY` accounts available for preview.   |
+| POST   | `/auth/sandbox/impersonate`     | owner super-admin + Sandbox flag | Accepts `{ targetUserId }` and returns a 15-minute preview access token. |
 
 This switch defaults to `false` in Compose and must be set back to `false`
 before go-live. Turning it off immediately blocks creation of new preview
 tokens; already-issued preview tokens expire within 15 minutes.
+
 ## Phase 68 — complete multi-role sandbox UAT
 
 ### Canonical customer completion
@@ -3408,9 +3443,9 @@ booking unchanged). A commitment reserves seats out of a cabin's
   rows are enriched with `agencyName`/`agencyLicenseNo`.
 - `GET /flights/:instanceId/commitments/summary` — `fl_view`. Per-cabin
   `{ cabin, totalCapacity, charterCommitted, agencyCommitted, sold,
-  availableOnline }` plus an instance-wide aggregate row.
+availableOnline }` plus an instance-wide aggregate row.
   `availableOnline = totalCapacity - charterCommitted - agencyCommitted -
-  sold`, floored at 0.
+sold`, floored at 0.
 - `POST /flights/:instanceId/commitments/charter` — `fl_manage`. Body:
   `{ cabin, seats, amountIrr, periodStart?, periodEnd?, idempotencyKey? }`.
   Row-locks the flight instance; rejects with 400 if the cabin isn't
@@ -3528,7 +3563,7 @@ first when wiring up the frontend.** Summary of what changed:
   just on manual referral; new `GET /cartable/:id` (detail + history,
   marks read) and `GET /cartable/unread-count`; migration
   `CartableTaskReadAt` adds the `readAt` column; `PATCH
-  /agencies/requests/:id/{refer,reject}` are now transaction+lock
+/agencies/requests/:id/{refer,reject}` are now transaction+lock
   concurrency-safe (previously a plain read-then-write race) and `refer`
   now also notifies the target.
 - **Careers**: `generalReqs`/`specialReqs` are now guaranteed real arrays
@@ -3539,7 +3574,7 @@ first when wiring up the frontend.** Summary of what changed:
   `JobPosting.imageFileId` via `ON DELETE SET NULL`).
 - **Sandbox active-flight purge**: new local/CI-only maintenance script
   (`backend/src/database/sandbox-active-flight-purge.ts`, `npm run
-  data:purge:sandbox-flights[:execute]`) — deletes a specific flight (by
+data:purge:sandbox-flights[:execute]`) — deletes a specific flight (by
   `flightNo`) or all flights and every dependent row (instances, bookings,
   passengers, seat locks, cabin fares/fare rules, commitments, allotments,
   survey rows) in the correct FK-safe order inside one transaction. Refuses
@@ -3588,6 +3623,7 @@ See `docs/features/flight-approval-workflow.md`.
   module, transactional outbox for domain events
   (`flight.submitted_to_operations`, …).
 - Migration: `1786953600000-FlightApprovalWorkflow`.
+
 # 2026-08 management panel hardening
 
 - `GET /panels/access-flags` includes `OPERATIONS` for CEO and senior-manager
@@ -3615,14 +3651,14 @@ panel or MD-80 seat maps. Commercial → CEO pricing register path unchanged.
 
 ### Seasonal schedule templates
 
-| Method | Path | Roles | Notes |
-|--------|------|-------|-------|
-| POST | `/flights/schedule-templates/preview` | COMMERCIAL/SENIOR/EMPLOYEE+`fl_manage` | Preview occurrences (no persist) |
-| POST | `/flights/schedule-templates` | same | Create + materialize; `idempotencyKey` required |
-| GET | `/flights/schedule-templates` | + `fl_view` | Paginated list |
-| GET | `/flights/schedule-templates/resolve?flightNo=XY1234` | + `fl_view` | Resolve the active route template plus all future non-cancelled dated occurrences for Add Flight selection. `occurrences[]` contains `{ id, departureAt, arrivalAt, definitionStatus, publicSaleEnabled, version }`; `nextFlightInstanceId` / `nextDepartureAt` remain for backward compatibility. |
-| GET | `/flights/schedule-templates/:id` | + `fl_view` | Detail + instanceCount |
-| POST | `/flights/schedule-templates/:id/deactivate` | + `fl_manage` | Cancel future unsold instances; keep sold history |
+| Method | Path                                                  | Roles                                  | Notes                                                                                                                                                                                                                                                                                              |
+| ------ | ----------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/flights/schedule-templates/preview`                 | COMMERCIAL/SENIOR/EMPLOYEE+`fl_manage` | Preview occurrences (no persist)                                                                                                                                                                                                                                                                   |
+| POST   | `/flights/schedule-templates`                         | same                                   | Create + materialize; `idempotencyKey` required                                                                                                                                                                                                                                                    |
+| GET    | `/flights/schedule-templates`                         | + `fl_view`                            | Paginated list                                                                                                                                                                                                                                                                                     |
+| GET    | `/flights/schedule-templates/resolve?flightNo=XY1234` | + `fl_view`                            | Resolve the active route template plus all future non-cancelled dated occurrences for Add Flight selection. `occurrences[]` contains `{ id, departureAt, arrivalAt, definitionStatus, publicSaleEnabled, version }`; `nextFlightInstanceId` / `nextDepartureAt` remain for backward compatibility. |
+| GET    | `/flights/schedule-templates/:id`                     | + `fl_view`                            | Detail + instanceCount                                                                                                                                                                                                                                                                             |
+| POST   | `/flights/schedule-templates/:id/deactivate`          | + `fl_manage`                          | Cancel future unsold instances; keep sold history                                                                                                                                                                                                                                                  |
 
 Amounts are IRR integer strings. Cabin capacities are read from the aircraft
 definition (MD-80 maps are never rewritten).
@@ -3633,15 +3669,15 @@ the existing approval/publication workflow explicitly enables the instance.
 
 ### Bank loans (adapter only)
 
-| Method | Path | Roles | Notes |
-|--------|------|-------|-------|
-| POST | `/me/loan-applications` | USER | Create via bank API; idempotent |
-| GET | `/me/loan-applications` | USER | Own list |
-| GET | `/me/loan-applications/:id` | USER | Own detail + `displayStatus` |
-| POST | `/me/loan-applications/:id/sync` | USER | Poll bank status |
-| GET | `/admin/loan-applications` | SITE_ADMIN | Read-only list |
-| GET | `/admin/loan-applications/:id` | SITE_ADMIN | Read-only detail |
-| POST | `/webhooks/bank-loans` | public + HMAC | Header `X-Bank-Signature: sha256=<hex>` |
+| Method | Path                             | Roles         | Notes                                   |
+| ------ | -------------------------------- | ------------- | --------------------------------------- |
+| POST   | `/me/loan-applications`          | USER          | Create via bank API; idempotent         |
+| GET    | `/me/loan-applications`          | USER          | Own list                                |
+| GET    | `/me/loan-applications/:id`      | USER          | Own detail + `displayStatus`            |
+| POST   | `/me/loan-applications/:id/sync` | USER          | Poll bank status                        |
+| GET    | `/admin/loan-applications`       | SITE_ADMIN    | Read-only list                          |
+| GET    | `/admin/loan-applications/:id`   | SITE_ADMIN    | Read-only detail                        |
+| POST   | `/webhooks/bank-loans`           | public + HMAC | Header `X-Bank-Signature: sha256=<hex>` |
 
 Env: `BANK_LOAN_API_BASE_URL`, `BANK_LOAN_API_KEY`, `BANK_LOAN_WEBHOOK_SECRET`,
 `BANK_LOAN_TIMEOUT_MS`. No hard-coded bank name/URL. No local mock bank
@@ -3653,10 +3689,10 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 
 ### Destination stats
 
-| Method | Path | Auth | Notes |
-|--------|------|------|-------|
-| GET | `/site-content/destination-stats` | public | `{ activeDestinations, domesticDestinations, internationalDestinations }` from catalog ∩ published flights; zeros valid |
-| GET | `/site-content/home` | public | Also includes `destinationStats` |
+| Method | Path                              | Auth   | Notes                                                                                                                   |
+| ------ | --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/site-content/destination-stats` | public | `{ activeDestinations, domesticDestinations, internationalDestinations }` from catalog ∩ published flights; zeros valid |
+| GET    | `/site-content/home`              | public | Also includes `destinationStats`                                                                                        |
 
 ## Passenger-aware public booking (2026-08-10)
 
@@ -3664,6 +3700,7 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 - `POST /bookings` passengers additionally send `passengerType: ADULT|CHILD|INFANT`, ISO `birthDate`, optional `gender: male|female`, optional `passportNo`, and optional `seatCode`. `nationalId` remains optional for passport-based travellers. A seat is required for adults/children and omitted for lap infants. `gender` and encrypted `passportNo` are persisted on the resulting `Passenger` row.
 - The server classifies age at `FlightInstance.departureAt`: infant `<2`, child `2..11`, adult `>=12`. A type mismatch and more lap infants than adults return `VALIDATION_FAILED`.
 - Public SYSTEM fares use adult 100%, child 50%, infant 10%; CHARTER child fares use 100%. Payment re-price repeats the same passenger-aware calculation.
+
 ## Manager panel permission restrictions
 
 - `POST /admins` accepts `permissions` as an optional list of manager-panel permission keys.
@@ -3725,16 +3762,16 @@ All routes require an active `X-API-Key`. A suspended/expired key or a disabled
 agency fails closed. `SEARCH_ONLY` can search; `SEARCH_BOOK` and `FULL` can use
 agency allotments, reserve, retrieve ticketed reservations, and read credit.
 
-| Method | Path | Scope | Notes |
-|---|---|---|---|
-| POST | `/api/v2/accounting/getAuthorizeToken` | any active key | Validate API key; no secondary token |
-| POST | `/api/v2/flight/FlightSearch` | any active key | Published internal inventory only |
-| GET | `/api/v2/flight/:flightInstanceId/SeatMap` | any active key | Live internal seat map |
-| GET | `/api/v2/flight/Allotments` | SEARCH_BOOK/FULL | Caller-owned allotment IDs and remaining capacity |
-| POST | `/api/v2/flight/Book` | SEARCH_BOOK/FULL | Requires `Idempotency-Key`; transactional credit/inventory lock |
-| GET | `/api/v2/flight/Bookings/:bookingReference` | SEARCH_BOOK/FULL | Caller-owned booking only |
-| POST | `/api/v2/flight/AirDemandTicket` | SEARCH_BOOK/FULL | Returns the already-ticketed allotment booking |
-| GET/POST | `/api/v2/accounting/myCredit` | SEARCH_BOOK/FULL | Real agency limit, usage, and remaining credit |
+| Method   | Path                                        | Scope            | Notes                                                           |
+| -------- | ------------------------------------------- | ---------------- | --------------------------------------------------------------- |
+| POST     | `/api/v2/accounting/getAuthorizeToken`      | any active key   | Validate API key; no secondary token                            |
+| POST     | `/api/v2/flight/FlightSearch`               | any active key   | Published internal inventory only                               |
+| GET      | `/api/v2/flight/:flightInstanceId/SeatMap`  | any active key   | Live internal seat map                                          |
+| GET      | `/api/v2/flight/Allotments`                 | SEARCH_BOOK/FULL | Caller-owned allotment IDs and remaining capacity               |
+| POST     | `/api/v2/flight/Book`                       | SEARCH_BOOK/FULL | Requires `Idempotency-Key`; transactional credit/inventory lock |
+| GET      | `/api/v2/flight/Bookings/:bookingReference` | SEARCH_BOOK/FULL | Caller-owned booking only                                       |
+| POST     | `/api/v2/flight/AirDemandTicket`            | SEARCH_BOOK/FULL | Returns the already-ticketed allotment booking                  |
+| GET/POST | `/api/v2/accounting/myCredit`               | SEARCH_BOOK/FULL | Real agency limit, usage, and remaining credit                  |
 
 Booking input uses `{ allotmentId, cabin, passengers[] }`. Each passenger has
 `fullName`, `passengerType`, `birthDate`, and a `seatCode` except lap infants.
@@ -3750,6 +3787,7 @@ for a repeated idempotency key.
 a Persian reason. This server decision is separate from the persisted advisory
 `aiSuggestion`; the browser must not recompute weak-sale eligibility from its
 own clock.
+
 # Senior Manager panel completion (2026-08)
 
 - `GET /panels/nav` returns the approved Senior Manager sidebar without `customers`, `reservation`, or `aircraft`.
@@ -3777,9 +3815,9 @@ used.
 
 ## Cross-agency invoice aggregate (used by: AgenciesListPage "همه فاکتورها")
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Server-side `SELECT` over existing `agency_invoices` (no new table). Optional `?status=UNPAID\|PAID\|VOIDED`. Amounts are decimal strings. |
+| Method | Path                 | Roles                | Notes                                                                                                                                      |
+| ------ | -------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/agencies/invoices` | `COMMERCIAL_MANAGER` | Server-side `SELECT` over existing `agency_invoices` (no new table). Optional `?status=UNPAID\|PAID\|VOIDED`. Amounts are decimal strings. |
 
 **OVERDUE vs VOIDED:** `AgencyInvoiceStatus` is `UNPAID | PAID | OVERDUE | VOIDED`.
 OVERDUE is **never** mapped to VOIDED. The UNPAID filter/response includes both
@@ -3798,10 +3836,10 @@ one week. The legacy
 portal contract was `3|6|12`; the commercial UI uses `1|3|12`. `6` remains
 valid. Omitted term is stored as null and listed as `1` (تک‌پرواز).
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/agencies/seat-requests` | `COMMERCIAL_MANAGER`, `FINANCE_MANAGER` | Read-only structured queue for finance; decision remains commercial-only. Money fields are decimal strings. |
-| PATCH | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER` | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` may be decided; repeats return `409 CONFLICT`. CREDIT approval validates credit + class quota and creates the class-bound allotments immediately. INVOICE approval creates exactly one `AgencyInvoice`, links it, and moves to `PENDING_FINANCE`; allotments are created only by successful payment. Rejection creates no invoice/allotment. Cartable tasks for that `sourceId` are closed and audit records the transition. Missing `dueAt` defaults to +7 days. |
+| Method | Path                                 | Roles                                   | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ------------------------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/agencies/seat-requests`            | `COMMERCIAL_MANAGER`, `FINANCE_MANAGER` | Read-only structured queue for finance; decision remains commercial-only. Money fields are decimal strings.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| PATCH  | `/agencies/seat-requests/:id/decide` | `COMMERCIAL_MANAGER`                    | `{ approve: boolean, dueAt?: string }`. Runs in a transaction with `SELECT … FOR UPDATE`. Only `PENDING` may be decided; repeats return `409 CONFLICT`. CREDIT approval validates credit + class quota and creates the class-bound allotments immediately. INVOICE approval creates exactly one `AgencyInvoice`, links it, and moves to `PENDING_FINANCE`; allotments are created only by successful payment. Rejection creates no invoice/allotment. Cartable tasks for that `sourceId` are closed and audit records the transition. Missing `dueAt` defaults to +7 days. |
 
 ### Flight lifecycle and aircraft-derived capacity (2026-08-21)
 
@@ -3832,14 +3870,14 @@ Wheelchair and custom OTHER rows appear on the public ancillary list. Product
 policy keeps `seat-selection` and `pet` enabled and purchasable; attempts to
 disable/delete either rule return `VALIDATION_FAILED`.
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ seatServices, otherServices }`. |
-| PATCH | `/ancillary-services/:key/price` | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (≥ 0 decimal string). |
-| PATCH | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`; `seat-selection` and `pet` cannot be disabled. |
-| POST | `/ancillary-services` | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`. |
-| DELETE | `/ancillary-services/:key` | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`. |
-| GET | `/public/ancillary-services` | public | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |
+| Method | Path                               | Roles                | Notes                                                                                                                                                                                             |
+| ------ | ---------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/ancillary-services`              | `COMMERCIAL_MANAGER` | `{ seatServices, otherServices }`.                                                                                                                                                                |
+| PATCH  | `/ancillary-services/:key/price`   | `COMMERCIAL_MANAGER` | `{ priceIrr: string }` (≥ 0 decimal string).                                                                                                                                                      |
+| PATCH  | `/ancillary-services/:key/enabled` | `COMMERCIAL_MANAGER` | `{ enabled: boolean }`; `seat-selection` and `pet` cannot be disabled.                                                                                                                            |
+| POST   | `/ancillary-services`              | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`.                                                                                                                                |
+| DELETE | `/ancillary-services/:key`         | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`.                                                                                                                                                |
+| GET    | `/public/ancillary-services`       | public               | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |
 
 ## Panel nav
 
@@ -3848,11 +3886,11 @@ disable/delete either rule return `VALIDATION_FAILED`.
 
 ## Site-admin rules editor and loan projection (2026-08-20)
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/settings/site-rules` | `SITE_ADMIN` | Returns the seven ordered rule categories from the server-owned `siteRules` setting. |
-| PATCH | `/settings/site-rules` | `SITE_ADMIN` | Accepts `{ categories: [{ id, title, text }] }`; requires each fixed id exactly once, persists atomically, and audits the update. |
-| GET | `/settings/site-rules/public?locale=fa` | public | Returns the saved Persian rules. Non-Persian locales return no editable override so the client retains its approved translated fallback. |
+| Method | Path                                    | Roles        | Notes                                                                                                                                    |
+| ------ | --------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/settings/site-rules`                  | `SITE_ADMIN` | Returns the seven ordered rule categories from the server-owned `siteRules` setting.                                                     |
+| PATCH  | `/settings/site-rules`                  | `SITE_ADMIN` | Accepts `{ categories: [{ id, title, text }] }`; requires each fixed id exactly once, persists atomically, and audits the update.        |
+| GET    | `/settings/site-rules/public?locale=fa` | public       | Returns the saved Persian rules. Non-Persian locales return no editable override so the client retains its approved translated fallback. |
 
 `GET /admin/loan-applications` and
 `GET /admin/loan-applications/:id` remain read-only and additionally return
@@ -3866,12 +3904,12 @@ Extends `AgencyApiKey` with `capabilities`, `environment`, `flightDomain`,
 per-key Redis rate limit. Coarse `scope` remains the partner-route gate;
 capabilities drive the IT UI and availability tester.
 
-| Method | Path | Roles | Notes |
-|---|---|---|---|
-| GET | `/it/webservices` | `IT_MANAGER` | Overview includes policy fields; `errorRatePct` is always `null` (no invented rate). |
-| POST | `/it/webservices/clients` | `IT_MANAGER` | Issue key with optional environment/domain/capabilities/IP/rate/expiry. One ACTIVE/SUSPENDED key per agency+environment. |
-| PATCH | `/it/webservices/clients/:id` | `IT_MANAGER` | Status/rotate **or** policy fields (capabilities sync coarse scope). |
-| POST | `/it/webservices/clients/:id/test-availability` | `IT_MANAGER` | `{ flightNo }`. Requires `AVAILABILITY` capability; returns real seatsLeft for next SCHEDULED instance. |
+| Method | Path                                            | Roles        | Notes                                                                                                                    |
+| ------ | ----------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/it/webservices`                               | `IT_MANAGER` | Overview includes policy fields; `errorRatePct` is always `null` (no invented rate).                                     |
+| POST   | `/it/webservices/clients`                       | `IT_MANAGER` | Issue key with optional environment/domain/capabilities/IP/rate/expiry. One ACTIVE/SUSPENDED key per agency+environment. |
+| PATCH  | `/it/webservices/clients/:id`                   | `IT_MANAGER` | Status/rotate **or** policy fields (capabilities sync coarse scope).                                                     |
+| POST   | `/it/webservices/clients/:id/test-availability` | `IT_MANAGER` | `{ flightNo }`. Requires `AVAILABILITY` capability; returns real seatsLeft for next SCHEDULED instance.                  |
 
 ## Phase 32 — granular employee permissions wired to operational endpoints
 
@@ -3926,3 +3964,33 @@ prerequisite is expanded. No reservation seat-lock permission is added for
   entitlement. Booking detail returns `extraSeatCode` and `extraSeatFareIrr`.
   Capacity, fare-bucket usage, seat maps, agency allotments, and the two-seats-
   per-national-ID rule all count the EXST as an occupied seat.
+
+## Customer loan eligibility and agency seat-order workflow (2026-08-25)
+
+### Customer bank profile — `USER`
+
+| Method | Path                                    | Behavior                                                                                                       |
+| ------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| GET    | `/me/loan-profile`                      | Returns the user's account-opening and credit-assessment state, masked customer number and eligible IRR limit. |
+| POST   | `/me/loan-profile/account-opening`      | Creates an idempotent account-opening request through the configured bank adapter.                             |
+| POST   | `/me/loan-profile/account-opening/sync` | Polls the bank; stores an encrypted customer number only when returned by the bank.                            |
+| POST   | `/me/loan-profile/eligibility`          | Starts credit assessment for a validated bank customer number.                                                 |
+| POST   | `/me/loan-profile/eligibility/sync`     | Polls the bank assessment and exposes the real eligible IRR limit when decided.                                |
+
+`POST /me/loan-applications` now requires an `ELIGIBLE` loan profile and rejects
+an amount above `eligibleAmountIrr`. The bank customer number is decrypted only
+at the adapter boundary. A `DISBURSED` bank event continues to credit the wallet
+exactly once through `bank_loan_wallet_credits` and `wallet_entries`.
+
+### Agency seat order — `AGENCY`
+
+`GET /agency-portal/seat-request-options` returns only future, scheduled,
+CEO-approved occurrences that are present in commercial Active Flights and
+have an active agency fare release. The client groups these rows by exact flight
+number/route/aircraft/cabin/fare class; therefore the month/day boxes for a
+flight such as `XY1235` are derived exclusively from the approved Add Flight
+occurrences of `XY1235`. `POST /agency-portal/seat-inquiry` is the
+reservation source of truth. `POST /agency-portal/seat-requests` additionally
+accepts `selectedFlightInstanceIds`; every id must belong to the confirmed
+route/class series and have enough live request capacity. `CREDIT` is accepted
+only when the active agency credit line covers the server-computed total.

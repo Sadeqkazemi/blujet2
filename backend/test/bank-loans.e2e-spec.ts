@@ -22,7 +22,10 @@ import {
 } from '../src/modules/loans/bank-loan.http.adapter';
 import type { BankLoanProvider } from '../src/modules/loans/bank-loan.types';
 import { bankScopedIdempotencyKey } from '../src/modules/loans/loan-idempotency';
-import { loginAs, loginAsCustomer } from './helpers/login.helper';
+import {
+  loginAs,
+  loginAsCustomer as loginAsCustomerRaw,
+} from './helpers/login.helper';
 
 class FakeBank implements BankLoanProvider {
   created = 0;
@@ -30,6 +33,26 @@ class FakeBank implements BankLoanProvider {
   /** Fail this many create calls with retryable bank errors. */
   failTimes = 0;
   keysSeen: string[] = [];
+  requestAccountOpening() {
+    return Promise.resolve({
+      referenceId: 'OPEN-E2E',
+      status: 'COMPLETED' as const,
+      customerNumber: '1234567890',
+    });
+  }
+  getAccountOpeningStatus() {
+    return this.requestAccountOpening();
+  }
+  requestEligibility() {
+    return Promise.resolve({
+      referenceId: `ELIGIBLE-${randomUUID()}`,
+      status: 'ELIGIBLE' as const,
+      eligibleAmountIrr: '10000000000',
+    });
+  }
+  getEligibilityStatus() {
+    return this.requestEligibility();
+  }
   createApplication(req: {
     idempotencyKey: string;
     requestedAmountIrr: string;
@@ -77,6 +100,23 @@ describe('Bank loans adapter (e2e)', () => {
   let app: INestApplication<App>;
   let fake: FakeBank;
   let dataSource: DataSource;
+
+  async function loginAsCustomer(
+    appInstance: INestApplication<App>,
+    phone: string,
+  ) {
+    const login = await loginAsCustomerRaw(appInstance, phone);
+    const response = await request(appInstance.getHttpServer())
+      .post('/me/loan-profile/eligibility')
+      .set('Authorization', `Bearer ${login.accessToken}`)
+      .send({
+        customerNumber: '1234567890',
+        idempotencyKey: `eligibility-${phone}-${randomUUID()}`,
+      });
+    expect(response.status).toBe(201);
+    expect(response.body.data.eligibilityStatus).toBe('ELIGIBLE');
+    return login;
+  }
 
   beforeEach(async () => {
     fake = new FakeBank();

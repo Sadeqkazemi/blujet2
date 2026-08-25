@@ -27,6 +27,7 @@ import { AgenciesService } from '../agencies/agencies.service';
 import { FilesService } from '../files/files.service';
 import { WebservicePricingService } from '../webservice-pricing/webservice-pricing.service';
 import { SearchService } from '../booking-engine/search.service';
+import { isSellableDefinitionStatus } from '../flights/definition-sellability';
 import { ErrorCode } from '../../common/errors';
 import { AgencySeatRequest } from '../../database/entities/agency-seat-request.entity';
 import { AgencySeatRequestFlight } from '../../database/entities/agency-seat-request-flight.entity';
@@ -47,6 +48,30 @@ const CREDIT_REVIEW_ROLES = [
 ] as const;
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
+
+export function isAgencySeatRequestOccurrence(
+  instance: Pick<
+    FlightInstance,
+    | 'status'
+    | 'definitionStatus'
+    | 'approvedSnapshot'
+    | 'departureAt'
+    | 'saleStartsAt'
+    | 'saleEndsAt'
+  >,
+  now = new Date(),
+): boolean {
+  return (
+    instance.status === FlightInstanceStatus.SCHEDULED &&
+    instance.departureAt >= now &&
+    isSellableDefinitionStatus(
+      instance.definitionStatus,
+      instance.approvedSnapshot != null,
+    ) &&
+    (!instance.saleStartsAt || instance.saleStartsAt <= now) &&
+    (!instance.saleEndsAt || instance.saleEndsAt >= now)
+  );
+}
 
 // Phase 23: server-computed prices from the commercial-manager plan catalog
 // (stored in SystemSetting, editable via PATCH /webservice/pricing).
@@ -604,16 +629,18 @@ export class AgencyPortalService {
     if (!(await this.isUatSandboxAgencyActor(actor))) {
       await this.getOwnProfileOrThrow(actor);
     }
-    const instances = await this.flightInstanceRepo.find({
+    const now = new Date();
+    const instances = (
+      await this.flightInstanceRepo.find({
       where: {
-        departureAt: MoreThanOrEqual(new Date()),
+        departureAt: MoreThanOrEqual(now),
         status: FlightInstanceStatus.SCHEDULED,
-        definitionStatus: 'PUBLISHED',
       },
       relations: { flight: { route: true } },
       order: { departureAt: 'ASC' },
       take: 200,
-    });
+      })
+    ).filter((instance) => isAgencySeatRequestOccurrence(instance, now));
 
     const instanceIds = instances.map((instance) => instance.id);
     if (instanceIds.length === 0) return [];
@@ -668,7 +695,12 @@ export class AgencyPortalService {
 
     return fareRules.flatMap((rule) => {
       const instance = instanceById.get(rule.flightInstanceId);
-      if (!instance) return [];
+      if (
+        !instance ||
+        rule.agencySeatsReleased < 1 ||
+        rule.agencyReleasePriceIrr == null
+      )
+        return [];
       const key = `${instance.id}:${rule.cabin}:${rule.classCode}`;
       const allotment = allotmentByClass.get(key);
       const allocated = Number(allotment?.total ?? 0);
@@ -690,7 +722,10 @@ export class AgencyPortalService {
         availableToRequest: Math.max(rule.agencySeatsReleased - allocated, 0),
         pricePerSeatIrr: rule.agencyReleasePriceIrr,
         specialOffer: rule.agencySpecialOffer,
-        definitionStatus: instance.definitionStatus,
+        // Every returned row has already passed the same CEO-approved active
+        // inventory gate used above; the portal does not expose revision
+        // workflow internals to an agency.
+        definitionStatus: 'PUBLISHED' as const,
       };
     });
   }
@@ -991,6 +1026,7 @@ export class AgencyPortalService {
       cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
       fareClassCode: string;
       seats: number;
+      selectedFlightInstanceIds?: string[];
       preferredWeekdays?: number[];
       termMonths?: 0 | 1 | 3 | 6 | 12;
       payMethod?: 'INVOICE' | 'CREDIT';
@@ -1024,6 +1060,30 @@ export class AgencyPortalService {
       });
     }
 
+    const sameSeries = options.filter(
+      (candidate) =>
+        candidate.originCode === option.originCode &&
+        candidate.destCode === option.destCode &&
+        candidate.flightNo === option.flightNo &&
+        candidate.aircraftType === option.aircraftType &&
+        candidate.cabin === option.cabin &&
+        candidate.fareClassCode === option.fareClassCode,
+    );
+    const selectedIds = new Set(dto.selectedFlightInstanceIds ?? []);
+    if (
+      selectedIds.size > 0 &&
+      [...selectedIds].some(
+        (id) =>
+          !sameSeries.some((candidate) => candidate.flightInstanceId === id),
+      )
+    ) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message:
+          'یکی از تاریخ‌های انتخاب‌شده متعلق به این مسیر و کلاس پروازی نیست.',
+      });
+    }
+
     const selectedDeparture = new Date(option.departureAt);
     const periodEnd = new Date(selectedDeparture);
     if (dto.termMonths === 0) {
@@ -1033,23 +1093,27 @@ export class AgencyPortalService {
     }
     const requestedWeekdays = new Set(dto.preferredWeekdays ?? []);
     const eligibleOptions =
-      dto.termMonths == null
-        ? [option]
-        : options.filter((candidate) => {
-            const departure = new Date(candidate.departureAt);
-            return (
-              candidate.originCode === option.originCode &&
-              candidate.destCode === option.destCode &&
-              candidate.flightNo === option.flightNo &&
-              candidate.aircraftType === option.aircraftType &&
-              candidate.cabin === option.cabin &&
-              candidate.fareClassCode === option.fareClassCode &&
-              departure >= selectedDeparture &&
-              departure <= periodEnd &&
-              (requestedWeekdays.size === 0 ||
-                requestedWeekdays.has(departure.getUTCDay()))
-            );
-          });
+      selectedIds.size > 0
+        ? sameSeries.filter((candidate) =>
+            selectedIds.has(candidate.flightInstanceId),
+          )
+        : dto.termMonths == null
+          ? [option]
+          : options.filter((candidate) => {
+              const departure = new Date(candidate.departureAt);
+              return (
+                candidate.originCode === option.originCode &&
+                candidate.destCode === option.destCode &&
+                candidate.flightNo === option.flightNo &&
+                candidate.aircraftType === option.aircraftType &&
+                candidate.cabin === option.cabin &&
+                candidate.fareClassCode === option.fareClassCode &&
+                departure >= selectedDeparture &&
+                departure <= periodEnd &&
+                (requestedWeekdays.size === 0 ||
+                  requestedWeekdays.has(departure.getUTCDay()))
+              );
+            });
     const requestOptions =
       eligibleOptions.length > 0 ? eligibleOptions : [option];
     const unavailableOccurrence = requestOptions.find(
@@ -1060,6 +1124,21 @@ export class AgencyPortalService {
         code: ErrorCode.VALIDATION_FAILED,
         message: `ظرفیت آزاد پرواز ${unavailableOccurrence.flightNo} در یکی از تاریخ‌های دوره کمتر از تعداد درخواستی است.`,
       });
+    }
+    for (const candidate of requestOptions) {
+      const candidateInstance = await this.flightInstanceRepo.findOne({
+        where: { id: candidate.flightInstanceId },
+        relations: { flight: { route: true } },
+      });
+      const liveAvailability = candidateInstance
+        ? await this.search.cabinAvailability(candidateInstance, dto.cabin)
+        : null;
+      if (!liveAvailability || liveAvailability.seatsLeft < dto.seats) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `ظرفیت واقعی رزرواسیون برای پرواز ${candidate.flightNo} در یکی از تاریخ‌های انتخاب‌شده کافی نیست.`,
+        });
+      }
     }
 
     const instance = await this.flightInstanceRepo.findOne({
@@ -1079,6 +1158,17 @@ export class AgencyPortalService {
         code: ErrorCode.VALIDATION_FAILED,
         message: 'قیمت صندلی نامعتبر است.',
       });
+    }
+    const totalPriceIrr =
+      unitPriceIrr * BigInt(dto.seats) * BigInt(requestOptions.length);
+    if ((dto.payMethod ?? 'INVOICE') === 'CREDIT') {
+      const availableCredit = await this.credit(actor);
+      if (availableCredit.remainingIrr < totalPriceIrr) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'اعتبار فعال آژانس برای پرداخت این سفارش کافی نیست.',
+        });
+      }
     }
 
     const requestId = randomUUID();
@@ -1108,7 +1198,9 @@ export class AgencyPortalService {
       );
     });
 
-    const weekdays = dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
+    const weekdays = dto.selectedFlightInstanceIds?.length
+      ? 'تاریخ‌های انتخاب‌شده آژانس'
+      : dto.preferredWeekdays?.join(', ') || 'بدون محدودیت';
     const term =
       dto.termMonths === 0
         ? 'یک هفته'

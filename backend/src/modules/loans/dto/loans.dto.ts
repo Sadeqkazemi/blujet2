@@ -21,6 +21,27 @@ export class CreateLoanApplicationDto {
   idempotencyKey!: string;
 }
 
+export class StartAccountOpeningDto {
+  @ApiProperty({ example: 'opening-550e8400-e29b-41d4-a716-446655440000' })
+  @IsString()
+  @MinLength(8)
+  idempotencyKey!: string;
+}
+
+export class StartEligibilityDto {
+  @ApiProperty({
+    example: '1234567890',
+    description: 'شماره مشتری بانک سامان؛ فقط رقم و بین ۶ تا ۲۰ کاراکتر',
+  })
+  @Matches(/^\d{6,20}$/)
+  customerNumber!: string;
+
+  @ApiProperty({ example: 'eligibility-550e8400-e29b-41d4-a716-446655440000' })
+  @IsString()
+  @MinLength(8)
+  idempotencyKey!: string;
+}
+
 export class ListLoansQueryDto {
   @ApiPropertyOptional()
   @IsOptional()

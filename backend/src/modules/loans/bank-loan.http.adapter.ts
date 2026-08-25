@@ -10,6 +10,8 @@ import {
   parseBankStatus,
   type BankCreateLoanRequest,
   type BankCreateLoanResponse,
+  type BankAccountOpeningResponse,
+  type BankEligibilityResponse,
   type BankLoanProvider,
   type BankLoanStatusResponse,
 } from './bank-loan.types';
@@ -141,6 +143,7 @@ export class BankLoanHttpAdapter implements BankLoanProvider {
       body: JSON.stringify({
         amountIrr: req.requestedAmountIrr,
         customerId: req.customerExternalId,
+        customerNumber: req.customerNumber,
         currency: 'IRR',
       }),
     });
@@ -171,6 +174,120 @@ export class BankLoanHttpAdapter implements BankLoanProvider {
         updatedAt: asScalarString(o.updatedAt),
       },
     };
+  }
+
+  private accountOpeningResponse(body: unknown): BankAccountOpeningResponse {
+    const o = body as Record<string, unknown>;
+    const referenceId = asScalarString(o.referenceId ?? o.requestId);
+    if (!referenceId) {
+      throw new ServiceUnavailableException({
+        code: ErrorCode.INTERNAL_ERROR,
+        message: 'پاسخ افتتاح حساب بانک ناقص بود.',
+      });
+    }
+    const raw = asScalarString(o.status, 'SUBMITTED').toUpperCase();
+    const status = [
+      'SUBMITTED',
+      'UNDER_REVIEW',
+      'COMPLETED',
+      'REJECTED',
+      'FAILED',
+    ].includes(raw)
+      ? (raw as BankAccountOpeningResponse['status'])
+      : 'UNDER_REVIEW';
+    return {
+      referenceId,
+      status,
+      customerNumber: asScalarString(o.customerNumber) || null,
+      summary: { status, updatedAt: asScalarString(o.updatedAt) },
+    };
+  }
+
+  async requestAccountOpening(req: {
+    correlationId: string;
+    idempotencyKey: string;
+    customerExternalId: string;
+  }): Promise<BankAccountOpeningResponse> {
+    const body = await this.requestJson('/v1/account-opening-requests', {
+      method: 'POST',
+      correlationId: req.correlationId,
+      headers: { 'idempotency-key': req.idempotencyKey },
+      body: JSON.stringify({ customerId: req.customerExternalId }),
+    });
+    return this.accountOpeningResponse(body);
+  }
+
+  async getAccountOpeningStatus(
+    referenceId: string,
+    correlationId: string,
+  ): Promise<BankAccountOpeningResponse> {
+    const body = await this.requestJson(
+      `/v1/account-opening-requests/${encodeURIComponent(referenceId)}`,
+      { method: 'GET', correlationId },
+    );
+    return this.accountOpeningResponse(body);
+  }
+
+  private eligibilityResponse(body: unknown): BankEligibilityResponse {
+    const o = body as Record<string, unknown>;
+    const referenceId = asScalarString(o.referenceId ?? o.assessmentId);
+    if (!referenceId) {
+      throw new ServiceUnavailableException({
+        code: ErrorCode.INTERNAL_ERROR,
+        message: 'پاسخ اعتبارسنجی بانک ناقص بود.',
+      });
+    }
+    const raw = asScalarString(o.status, 'SUBMITTED').toUpperCase();
+    const status = [
+      'SUBMITTED',
+      'UNDER_REVIEW',
+      'ELIGIBLE',
+      'INELIGIBLE',
+      'FAILED',
+    ].includes(raw)
+      ? (raw as BankEligibilityResponse['status'])
+      : 'UNDER_REVIEW';
+    const eligibleAmountIrr = asScalarString(
+      o.eligibleAmountIrr ?? o.maxEligibleAmountIrr,
+    );
+    return {
+      referenceId,
+      status,
+      eligibleAmountIrr: /^\d+$/.test(eligibleAmountIrr)
+        ? eligibleAmountIrr
+        : null,
+      summary: { status, updatedAt: asScalarString(o.updatedAt) },
+    };
+  }
+
+  async requestEligibility(req: {
+    correlationId: string;
+    idempotencyKey: string;
+    customerExternalId: string;
+    customerNumber: string;
+  }): Promise<BankEligibilityResponse> {
+    const body = await this.requestJson('/v1/credit-assessments', {
+      method: 'POST',
+      correlationId: req.correlationId,
+      headers: { 'idempotency-key': req.idempotencyKey },
+      body: JSON.stringify({
+        customerId: req.customerExternalId,
+        customerNumber: req.customerNumber,
+        currency: 'IRR',
+      }),
+    });
+    return this.eligibilityResponse(body);
+  }
+
+  async getEligibilityStatus(
+    referenceId: string,
+    correlationId: string,
+  ): Promise<BankEligibilityResponse> {
+    const body = await this.requestJson(
+      `/v1/credit-assessments/${encodeURIComponent(referenceId)}`,
+      { method: 'GET', correlationId },
+    );
+    return this.eligibilityResponse(body);
   }
 
   async getStatus(

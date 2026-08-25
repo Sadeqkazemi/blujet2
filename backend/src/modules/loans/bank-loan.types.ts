@@ -61,6 +61,21 @@ export interface BankCreateLoanRequest {
   idempotencyKey: string;
   requestedAmountIrr: string;
   customerExternalId: string;
+  customerNumber: string;
+}
+
+export interface BankAccountOpeningResponse {
+  referenceId: string;
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'COMPLETED' | 'REJECTED' | 'FAILED';
+  customerNumber?: string | null;
+  summary?: Record<string, unknown>;
+}
+
+export interface BankEligibilityResponse {
+  referenceId: string;
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'ELIGIBLE' | 'INELIGIBLE' | 'FAILED';
+  eligibleAmountIrr?: string | null;
+  summary?: Record<string, unknown>;
 }
 
 export interface BankCreateLoanResponse {
@@ -81,6 +96,25 @@ export interface BankLoanStatusResponse {
 }
 
 export interface BankLoanProvider {
+  requestAccountOpening(req: {
+    correlationId: string;
+    idempotencyKey: string;
+    customerExternalId: string;
+  }): Promise<BankAccountOpeningResponse>;
+  getAccountOpeningStatus(
+    referenceId: string,
+    correlationId: string,
+  ): Promise<BankAccountOpeningResponse>;
+  requestEligibility(req: {
+    correlationId: string;
+    idempotencyKey: string;
+    customerExternalId: string;
+    customerNumber: string;
+  }): Promise<BankEligibilityResponse>;
+  getEligibilityStatus(
+    referenceId: string,
+    correlationId: string,
+  ): Promise<BankEligibilityResponse>;
   createApplication(
     req: BankCreateLoanRequest,
   ): Promise<BankCreateLoanResponse>;

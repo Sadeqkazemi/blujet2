@@ -14,6 +14,7 @@ describe('LoansService webhook signature', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
     const raw = Buffer.from('{"eventId":"e1"}');
     const sig = createHmac('sha256', secret).update(raw).digest('hex');

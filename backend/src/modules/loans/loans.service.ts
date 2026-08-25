@@ -13,11 +13,13 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, type EntityManager, Repository } from 'typeorm';
 import { BankLoanApplication } from '../../database/entities/bank-loan-application.entity';
+import { BankLoanCustomerProfile } from '../../database/entities/bank-loan-customer-profile.entity';
 import { BankLoanWalletCredit } from '../../database/entities/bank-loan-wallet-credit.entity';
 import { WalletEntry } from '../../database/entities/wallet-entry.entity';
 import { BankLoanStatus } from '../../database/enums';
 import type { JsonValue } from '../../database/json-types';
 import { ErrorCode } from '../../common/errors';
+import { decryptPii, encryptPii } from '../../common/pii-crypto';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { AuditService } from '../audit/audit.service';
 import { BANK_LOAN_PROVIDER } from './bank-loan.http.adapter';
@@ -53,10 +55,258 @@ export class LoansService {
     private readonly config: ConfigService,
     @InjectRepository(BankLoanApplication)
     private readonly loanRepo: Repository<BankLoanApplication>,
+    @InjectRepository(BankLoanCustomerProfile)
+    private readonly profileRepo: Repository<BankLoanCustomerProfile>,
     @Inject(BANK_LOAN_PROVIDER)
     private readonly bank: BankLoanProvider,
     private readonly audit: AuditService,
   ) {}
+
+  private async profileRow(userId: string): Promise<BankLoanCustomerProfile> {
+    const current = await this.profileRepo.findOne({ where: { userId } });
+    if (current) return current;
+    return this.profileRepo.save(
+      this.profileRepo.create({
+        userId,
+        membershipStatus: 'UNDECLARED',
+        customerNumberEnc: null,
+        customerNumberLast4: null,
+        accountOpeningStatus: 'NOT_STARTED',
+        accountOpeningReferenceId: null,
+        accountOpeningSummary: null,
+        eligibilityStatus: 'NOT_STARTED',
+        eligibilityReferenceId: null,
+        eligibleAmountIrr: null,
+        eligibilitySummary: null,
+        lastSyncedAt: null,
+      }),
+    );
+  }
+
+  private serializeProfile(row: BankLoanCustomerProfile) {
+    return {
+      membershipStatus: row.membershipStatus,
+      maskedCustomerNumber: row.customerNumberLast4
+        ? `••••${row.customerNumberLast4}`
+        : null,
+      accountOpeningStatus: row.accountOpeningStatus,
+      accountOpeningReferenceId: row.accountOpeningReferenceId,
+      eligibilityStatus: row.eligibilityStatus,
+      eligibilityReferenceId: row.eligibilityReferenceId,
+      eligibleAmountIrr: row.eligibleAmountIrr?.toString() ?? null,
+      lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  async getProfile(actor: AuthenticatedUser) {
+    return this.serializeProfile(await this.profileRow(actor.id));
+  }
+
+  async startAccountOpening(actor: AuthenticatedUser, idempotencyKey: string) {
+    const row = await this.profileRow(actor.id);
+    if (
+      row.accountOpeningReferenceId &&
+      ['SUBMITTED', 'UNDER_REVIEW', 'COMPLETED'].includes(
+        row.accountOpeningStatus,
+      )
+    ) {
+      return this.serializeProfile(row);
+    }
+    const response = await this.bank.requestAccountOpening({
+      correlationId: randomUUID(),
+      idempotencyKey: bankScopedIdempotencyKey(actor.id, idempotencyKey),
+      customerExternalId: actor.id,
+    });
+    row.membershipStatus =
+      response.status === 'COMPLETED'
+        ? 'ACCOUNT_OPENED'
+        : 'ACCOUNT_OPENING_REQUESTED';
+    row.accountOpeningStatus = response.status;
+    row.accountOpeningReferenceId = response.referenceId;
+    row.accountOpeningSummary = asJsonSummary(response.summary);
+    row.lastSyncedAt = new Date();
+    if (response.status === 'COMPLETED' && response.customerNumber) {
+      this.storeCustomerNumber(row, response.customerNumber);
+    }
+    await this.profileRepo.save(row);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'FINANCE',
+      action: 'ارسال درخواست افتتاح حساب بانک سامان',
+      detail: 'درخواست افتتاح حساب بانکی مشتری ارسال شد.',
+      entityType: 'BankLoanCustomerProfile',
+      entityId: actor.id,
+      metadata: { referenceId: response.referenceId, status: response.status },
+    });
+    return this.serializeProfile(row);
+  }
+
+  async syncAccountOpening(actor: AuthenticatedUser) {
+    const row = await this.profileRow(actor.id);
+    if (!row.accountOpeningReferenceId) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'ابتدا درخواست افتتاح حساب را ثبت کنید.',
+      });
+    }
+    const response = await this.bank.getAccountOpeningStatus(
+      row.accountOpeningReferenceId,
+      randomUUID(),
+    );
+    row.accountOpeningStatus = response.status;
+    row.membershipStatus =
+      response.status === 'COMPLETED'
+        ? 'ACCOUNT_OPENED'
+        : 'ACCOUNT_OPENING_REQUESTED';
+    row.accountOpeningSummary = asJsonSummary(response.summary);
+    row.lastSyncedAt = new Date();
+    if (response.status === 'COMPLETED') {
+      if (!response.customerNumber) {
+        throw new ServiceUnavailableException({
+          code: ErrorCode.LOAN_BANK_RETRYABLE,
+          message:
+            'افتتاح حساب تأیید شد اما شماره مشتری هنوز از بانک دریافت نشده است.',
+        });
+      }
+      this.storeCustomerNumber(row, response.customerNumber);
+    }
+    await this.profileRepo.save(row);
+    return this.serializeProfile(row);
+  }
+
+  private storeCustomerNumber(
+    row: BankLoanCustomerProfile,
+    customerNumber: string,
+  ) {
+    const normalized = customerNumber.trim();
+    if (!/^\d{6,20}$/.test(normalized)) {
+      throw new ServiceUnavailableException({
+        code: ErrorCode.LOAN_BANK_RETRYABLE,
+        message: 'شماره مشتری دریافت‌شده از بانک معتبر نیست.',
+      });
+    }
+    row.customerNumberEnc = encryptPii(normalized);
+    row.customerNumberLast4 = normalized.slice(-4);
+  }
+
+  async startEligibility(
+    actor: AuthenticatedUser,
+    customerNumber: string,
+    idempotencyKey: string,
+  ) {
+    const normalized = customerNumber.trim();
+    if (!/^\d{6,20}$/.test(normalized)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'شماره مشتری بانک معتبر نیست.',
+      });
+    }
+    const row = await this.profileRow(actor.id);
+    if (
+      row.eligibilityReferenceId &&
+      ['SUBMITTED', 'UNDER_REVIEW', 'ELIGIBLE'].includes(
+        row.eligibilityStatus,
+      ) &&
+      row.customerNumberLast4 === normalized.slice(-4)
+    ) {
+      return this.serializeProfile(row);
+    }
+    const response = await this.bank.requestEligibility({
+      correlationId: randomUUID(),
+      idempotencyKey: bankScopedIdempotencyKey(actor.id, idempotencyKey),
+      customerExternalId: actor.id,
+      customerNumber: normalized,
+    });
+    row.membershipStatus = 'BANK_CUSTOMER';
+    this.storeCustomerNumber(row, normalized);
+    row.eligibilityReferenceId = response.referenceId;
+    row.eligibilityStatus = response.status;
+    row.eligibilitySummary = asJsonSummary(response.summary);
+    row.eligibleAmountIrr = this.eligibleAmount(
+      response.status,
+      response.eligibleAmountIrr,
+    );
+    row.lastSyncedAt = new Date();
+    await this.profileRepo.save(row);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'FINANCE',
+      action: 'ارسال درخواست اعتبارسنجی بانک سامان',
+      detail: 'شماره مشتری به شکل رمز‌شده برای اعتبارسنجی بانکی ثبت شد.',
+      entityType: 'BankLoanCustomerProfile',
+      entityId: actor.id,
+      metadata: { referenceId: response.referenceId, status: response.status },
+    });
+    return this.serializeProfile(row);
+  }
+
+  private eligibleAmount(
+    status: string,
+    raw: string | null | undefined,
+  ): bigint | null {
+    if (status !== 'ELIGIBLE') return null;
+    if (!raw || !/^\d+$/.test(raw) || BigInt(raw) <= 0n) {
+      throw new ServiceUnavailableException({
+        code: ErrorCode.LOAN_BANK_RETRYABLE,
+        message: 'سقف اعتبار در پاسخ بانک معتبر نیست.',
+      });
+    }
+    return BigInt(raw);
+  }
+
+  async syncEligibility(actor: AuthenticatedUser) {
+    const row = await this.profileRow(actor.id);
+    if (!row.eligibilityReferenceId) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'ابتدا درخواست اعتبارسنجی را ثبت کنید.',
+      });
+    }
+    const response = await this.bank.getEligibilityStatus(
+      row.eligibilityReferenceId,
+      randomUUID(),
+    );
+    row.eligibilityStatus = response.status;
+    row.eligibilitySummary = asJsonSummary(response.summary);
+    row.eligibleAmountIrr = this.eligibleAmount(
+      response.status,
+      response.eligibleAmountIrr,
+    );
+    row.lastSyncedAt = new Date();
+    await this.profileRepo.save(row);
+    return this.serializeProfile(row);
+  }
+
+  private async eligibleProfile(
+    userId: string,
+    requestedAmountIrr: string,
+  ): Promise<{ customerNumber: string; eligibleAmountIrr: bigint }> {
+    const row = await this.profileRepo.findOne({ where: { userId } });
+    if (
+      !row ||
+      row.eligibilityStatus !== 'ELIGIBLE' ||
+      row.eligibleAmountIrr == null ||
+      !row.customerNumberEnc
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'ابتدا اعتبارسنجی بانکی را تکمیل کنید.',
+      });
+    }
+    if (BigInt(requestedAmountIrr) > row.eligibleAmountIrr) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مبلغ درخواستی بیشتر از سقف اعتبار تأییدشده بانک است.',
+      });
+    }
+    return {
+      customerNumber: decryptPii(row.customerNumberEnc),
+      eligibleAmountIrr: row.eligibleAmountIrr,
+    };
+  }
 
   private providerKey(): string {
     const fromEnv = this.config.get<string>('BANK_LOAN_PROVIDER')?.trim();
@@ -267,6 +517,7 @@ export class LoansService {
     actor: AuthenticatedUser,
     dto: { requestedAmountIrr: string; idempotencyKey: string },
     bankKey: string,
+    customerNumber: string,
   ): Promise<LoanCreateResult> {
     const correlationId = randomUUID();
     let bankRes: Awaited<ReturnType<BankLoanProvider['createApplication']>>;
@@ -276,6 +527,7 @@ export class LoansService {
         idempotencyKey: bankKey,
         requestedAmountIrr: dto.requestedAmountIrr,
         customerExternalId: actor.id,
+        customerNumber,
       });
     } catch (err) {
       // Keep INITIATING + expired lease so the same bankScoped key can retry.
@@ -359,6 +611,10 @@ export class LoansService {
     }
 
     const bankKey = bankScopedIdempotencyKey(actor.id, dto.idempotencyKey);
+    const profile = await this.eligibleProfile(
+      actor.id,
+      dto.requestedAmountIrr,
+    );
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const existing = await this.loanRepo.findOne({
@@ -407,6 +663,7 @@ export class LoansService {
               actor,
               dto,
               bankKey,
+              profile.customerNumber,
             );
           }
           continue;
@@ -426,7 +683,13 @@ export class LoansService {
       if (!reservedId) {
         continue;
       }
-      return this.completeBankInitiation(reservedId, actor, dto, bankKey);
+      return this.completeBankInitiation(
+        reservedId,
+        actor,
+        dto,
+        bankKey,
+        profile.customerNumber,
+      );
     }
 
     throw new ServiceUnavailableException({
