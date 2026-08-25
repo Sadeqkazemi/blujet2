@@ -115,6 +115,7 @@ function GenericSeatMap({
   onToggleSeat,
   businessLocked,
   bookedCabin,
+  selectionLimitReached,
 }: {
   locale: StoredLocale;
   seats: SeatMapCell[];
@@ -122,6 +123,7 @@ function GenericSeatMap({
   onToggleSeat: (seatCode: string) => void;
   businessLocked: boolean;
   bookedCabin: CabinClass;
+  selectionLimitReached: boolean;
 }) {
   const rows = (() => {
     const byRow = new Map<number, SeatMapCell[]>();
@@ -152,7 +154,10 @@ function GenericSeatMap({
             const selected = selectedSeats.includes(st.seatCode);
             const taken = st.status === 'TAKEN';
             const biz = st.cabin === 'BUSINESS';
-            const locked = (biz && businessLocked) || st.cabin !== bookedCabin;
+            const locked =
+              (biz && businessLocked) ||
+              st.cabin !== bookedCabin ||
+              (selectionLimitReached && !selected);
             let bg = biz ? '#fff6e3' : '#eaf4ff';
             let border = biz ? '#e6c368' : '#bcd9f5';
             let color = biz ? '#a9781a' : '#1668c4';
@@ -200,6 +205,7 @@ export default function ExtrasStep({
   onToggleExtra,
   onExtraQuantityChange,
   passengerCount,
+  seatSelectionLimit = passengerCount,
   seats,
   selectedSeats,
   onToggleSeat,
@@ -213,6 +219,7 @@ export default function ExtrasStep({
   onToggleExtra: (id: ExtraServiceState['id']) => void;
   onExtraQuantityChange: (id: ExtraServiceState['id'], quantity: number) => void;
   passengerCount: number;
+  seatSelectionLimit?: number;
   seats: SeatMapCell[] | null;
   selectedSeats: string[];
   onToggleSeat: (seatCode: string) => void;
@@ -232,6 +239,9 @@ export default function ExtrasStep({
   const loyaltySeatAccess = clubBalance >= 15_000;
   const paidSeatAccess = Boolean(seatSelectionExtra?.selected);
   const seatAccessGranted = loyaltySeatAccess || paidSeatAccess;
+  const normalizedSeatLimit = Math.max(0, seatSelectionLimit);
+  const remainingSeatCount = Math.max(0, normalizedSeatLimit - selectedSeats.length);
+  const selectionLimitReached = selectedSeats.length >= normalizedSeatLimit;
   const aircraft = aircraftType.trim() || 'MD-80';
   const rawSeats = seats ?? [];
   const useMd80 = shouldUseMd80SeatMap(aircraft, rawSeats);
@@ -267,6 +277,16 @@ export default function ExtrasStep({
     };
   }, [locale]);
 
+  useEffect(() => {
+    if (!seatAccessGranted) setSeatOpen(false);
+  }, [seatAccessGranted]);
+
+  const handleSeatToggle = (seatCode: string) => {
+    if (selectedSeats.includes(seatCode) || !selectionLimitReached) {
+      onToggleSeat(seatCode);
+    }
+  };
+
   const toggleExtra = (extra: ExtraServiceState) => {
     if (extra.code === 'PET' && !extra.selected && !petRulesAccepted) {
       setPetRulesOpen(true);
@@ -282,17 +302,23 @@ export default function ExtrasStep({
           locked: 'Seat selection is available after paying its fee or with at least 15,000 club points.',
           pay: 'Accept seat-selection fee',
           loyalty: 'Unlocked with club points',
+          limit: (maximum: string, remaining: string) =>
+            `You may select up to ${maximum} seats; ${remaining} remaining.`,
         }
       : locale === 'ar'
         ? {
             locked: 'يتاح اختيار المقعد بعد دفع الرسوم أو بامتلاك ١٥٬٠٠٠ نقطة نادي على الأقل.',
             pay: 'قبول رسوم اختيار المقعد',
             loyalty: 'مفتوح بنقاط النادي',
+            limit: (maximum: string, remaining: string) =>
+              `يمكنك اختيار ${maximum} مقعد كحد أقصى؛ المتبقي ${remaining}.`,
           }
         : {
             locked: 'برای باز کردن نقشه، هزینه انتخاب صندلی را بپذیرید یا حداقل ۱۵٬۰۰۰ امتیاز باشگاه داشته باشید.',
             pay: 'پذیرش هزینه انتخاب صندلی',
             loyalty: 'بازشده با امتیاز باشگاه',
+            limit: (maximum: string, remaining: string) =>
+              `حداکثر ${maximum} صندلی مجاز است؛ ${remaining} صندلی باقی مانده.`,
           };
 
   return (
@@ -477,6 +503,15 @@ export default function ExtrasStep({
 
         {seatOpen && seatAccessGranted && (
           <>
+            <div
+              data-testid="checkout-seat-instructions"
+              className="mb-2.5 rounded-xl border border-[#cfe0f5] bg-[#f6faff] px-3.5 py-2.5 text-[11px] font-bold text-[#1668c4]"
+            >
+              {seatAccessCopy.limit(
+                localeDigits(normalizedSeatLimit, locale),
+                localeDigits(remainingSeatCount, locale),
+              )}
+            </div>
             <div className="mb-2.5 flex gap-[11px] text-[10.5px] text-[#5a6678]">
               <span className="flex items-center gap-1">
                 <span className="h-[13px] w-[13px] rounded border-[1.5px] border-[#e6c368] bg-[#fff6e3]" />
@@ -498,18 +533,20 @@ export default function ExtrasStep({
                 locale={locale}
                 seats={displaySeats}
                 selectedSeats={selectedSeats}
-                onToggleSeat={onToggleSeat}
+                onToggleSeat={handleSeatToggle}
                 businessLocked={businessLocked}
                 bookedCabin={bookedCabin}
+                selectionLimitReached={selectionLimitReached}
               />
             ) : (
               <GenericSeatMap
                 locale={locale}
                 seats={displaySeats}
                 selectedSeats={selectedSeats}
-                onToggleSeat={onToggleSeat}
+                onToggleSeat={handleSeatToggle}
                 businessLocked={businessLocked}
                 bookedCabin={bookedCabin}
+                selectionLimitReached={selectionLimitReached}
               />
             )}
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2.5 text-[11px] text-[#5a6678]">

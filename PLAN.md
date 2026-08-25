@@ -3793,3 +3793,14 @@ contracts and retires the production mock adapters.
 - [x] Re-run the combined guest-checkout, site-admin cartable, career upload,
   IT, commercial, full unit, integration, lint, and production-build checks.
 - [ ] Commit/push and deploy only after explicit user instruction.
+
+# Agency search identity and customer seat policy (2026-08-25)
+
+- [x] Preserve authenticated agency identity across public results/booking pages.
+- [x] Populate homepage and agency cabin selectors from sellable configured cabins.
+- [x] Gate seat instructions/map together and show/enforce the ticket-based limit.
+- [x] Assign unselected seats atomically using family, child, gender, infant-block,
+      and exit-row rules while preserving valid manual choices.
+- [x] Keep `GALLEY` English and localize the rest of the Persian/Arabic seat map.
+- [x] Verify focused regressions, builds, semantic lint, and the local browser flow.
+- [ ] Commit/push; merge/deploy only after explicit user approval.

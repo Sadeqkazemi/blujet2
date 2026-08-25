@@ -24,6 +24,7 @@ describe('AgencyTicketPage', () => {
       { code: 'THR', nameFa: 'مهرآباد', cityFa: 'تهران', countryFa: 'ایران', active: true },
       { code: 'MHD', nameFa: 'شهید هاشمی‌نژاد', cityFa: 'مشهد', countryFa: 'ایران', active: true },
     ]);
+    vi.spyOn(publicApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST']);
     const user = userEvent.setup();
 
     render(
@@ -42,14 +43,16 @@ describe('AgencyTicketPage', () => {
     await user.click(screen.getByTestId('agency-ticket-pax-adults-inc'));
     await user.click(screen.getByTestId('agency-ticket-pax-children-inc'));
     await user.click(screen.getByTestId('agency-ticket-pax-confirm'));
+    await user.selectOptions(screen.getByTestId('agency-ticket-cabin'), 'COMFORT');
     await user.click(screen.getByTestId('agency-ticket-search'));
 
     const location = await screen.findByTestId('results-location');
-    expect(location).toHaveTextContent('/results?origin=THR&dest=MHD&date=2026-09-10&adults=2&children=1&infants=0&cabin=ECONOMY');
+    expect(location).toHaveTextContent('/results?origin=THR&dest=MHD&date=2026-09-10&adults=2&children=1&infants=0&cabin=COMFORT');
   });
 
   it('does not navigate until origin, destination, and date are complete', async () => {
     vi.spyOn(publicApi, 'fetchAirports').mockResolvedValue([]);
+    vi.spyOn(publicApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY']);
     const user = userEvent.setup();
     render(<MemoryRouter><AgencyTicketPage /></MemoryRouter>);
 

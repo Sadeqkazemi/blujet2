@@ -66,12 +66,6 @@ export function validatePassengerManifest(
         message: 'برای نوزاد بدون صندلی امکان افزودن صندلی اضافه وجود ندارد.',
       });
     }
-    if (type !== 'INFANT' && !passenger.seatCode) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: `انتخاب صندلی برای «${passenger.fullName}» الزامی است.`,
-      });
-    }
   }
 }
 

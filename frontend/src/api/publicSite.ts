@@ -35,6 +35,10 @@ export function searchFlights(origin: string, dest: string, date: string) {
   return apiGet<SearchFlightResult[]>(`/search/flights?${q.toString()}`);
 }
 
+export function fetchSearchCabins() {
+  return apiGet<CabinClass[]>('/search/cabins');
+}
+
 export function fetchSearchAdvisory(
   origin: string,
   dest: string,

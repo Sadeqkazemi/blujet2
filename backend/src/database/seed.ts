@@ -1836,6 +1836,7 @@ async function main() {
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['C', 'D', 'E'],
+      exitRows: [],
       updatedAt: new Date(),
     },
   );
@@ -1857,6 +1858,7 @@ async function main() {
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],
       excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
+      exitRows: [19, 20],
       updatedAt: new Date(),
     },
     {
@@ -1869,6 +1871,7 @@ async function main() {
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],
       excludedSeatCodes: ['28A', '28B', '29A', '29B', '30A', '30B'],
+      exitRows: [19, 20],
       updatedAt: new Date(),
     },
   );

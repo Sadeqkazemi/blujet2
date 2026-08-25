@@ -31,6 +31,7 @@ export interface AircraftSeatMap {
   aircraftDefinitionId: string;
   cabinLayout: Partial<Record<AircraftCabinType, AircraftCabinLayoutBand | null>>;
   excludedSeatCodes: string[];
+  exitRows?: number[];
   seats: AircraftSeat[];
 }
 
@@ -74,6 +75,7 @@ export interface UpsertAircraftDefinitionPayload {
   economyColsLeft?: string[] | null;
   economyColsRight?: string[] | null;
   excludedSeatCodes?: string[];
+  exitRows?: number[];
 }
 
 /** UI draft band used by the seat-map editor before mapping to Upsert DTO. */

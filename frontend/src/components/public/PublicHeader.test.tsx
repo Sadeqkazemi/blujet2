@@ -75,6 +75,24 @@ function renderHeader(initialPath = '/') {
 }
 
 describe('PublicHeader — logged-in user', () => {
+  it('keeps an authenticated agency identity on the public results header', () => {
+    mockLocale();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'a1', fullName: 'UAT Agency', role: 'AGENCY' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+
+    renderHeader('/results?origin=THR&dest=MHD');
+
+    expect(screen.getByTestId('public-agency-identity')).toHaveTextContent('UAT Agency');
+    expect(screen.getByTestId('public-agency-identity')).toHaveAttribute('href', '/agency');
+    expect(screen.queryByRole('link', { name: /ورود|ثبت‌نام/ })).not.toBeInTheDocument();
+  });
+
   it('requires confirmation before signing a customer out', async () => {
     mockLocale();
     mockCustomerNotifications();

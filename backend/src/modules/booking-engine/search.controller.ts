@@ -24,6 +24,14 @@ export class SearchController {
     return { success: true, data: await this.search.airports() };
   }
 
+  @Get('cabins')
+  @ApiOperation({
+    summary: 'کابین‌های فعال برای جعبه‌های جستجوی عمومی و آژانس',
+  })
+  async cabins() {
+    return { success: true, data: await this.search.cabins() };
+  }
+
   @Get('flights')
   @ApiOperation({ summary: 'جستجوی پرواز بین دو فرودگاه در یک روز مشخص' })
   async flights(@Query() query: SearchFlightsDto) {

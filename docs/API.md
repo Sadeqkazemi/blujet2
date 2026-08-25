@@ -511,6 +511,9 @@ a separate task, not bundled into this one so this phase's diff stays
 reviewable. Only what Phase 13 actually changes is documented below.
 
 - `GET /search/flights` and `POST /bookings` (`booking-engine` module):
+  - `GET /search/cabins` returns the ordered distinct `CabinClass` values
+    backed by currently sellable public flight instances. Homepage and agency
+    searches use this catalogue instead of assuming only Economy/Business.
   - Both now respect `FlightInstance.saleStartsAt/saleEndsAt` — an instance
     outside its window is excluded from search results, and `POST /bookings`
     against one 409s `SALE_WINDOW_CLOSED`.
@@ -518,6 +521,14 @@ reviewable. Only what Phase 13 actually changes is documented below.
     per-seat conflict check — 409 `POOL_EXHAUSTED` (with which pool:
     `AGENCY` | `CHARTER` | `SYSTEM`) when the requested channel's pool is
     full, even if physical seats remain (they belong to a different pool).
+  - A seat-bearing passenger may omit `seatCode`; under the same locked
+    booking transaction the server assigns a free seat according to the
+    documented family/gender/child/infant/exit-row policy. Supplied seat codes
+    remain manual preselection and the server rejects more supplied seats than
+    seat-bearing passengers.
+  - `GET /search/flights/:id/seatmap` also returns the aircraft definition's
+    `exitRows`, allowing clients and booking policy to share one DB-backed
+    source of truth.
   - `seatsLeft` in search results is unchanged (still physical vacancy per
     cabin) — see DB_SCHEMA's ⚑ scope-cut note; the enforced guarantee is the
     409 above, not the display number.

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchAirports } from '../../api/publicSite';
+import { fetchAirports, fetchSearchCabins } from '../../api/publicSite';
 import { fetchPublicHomeContent } from '../../api/site-content';
 import { fetchPublicAppLinks } from '../../api/settings';
 import type { AppLinkId } from '../../types/app-links';
-import type { Airport } from '../../types/public-site';
+import type { Airport, CabinClass } from '../../types/public-site';
 import type { PublicHomeContent } from '../../types/site-content';
 import PublicPageShell from '../../components/public/PublicPageShell';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -303,6 +303,7 @@ export default function HomeSearchPage() {
   const extra = HOME_EXTRA[locale];
   const e = ERR[locale];
   const [airports, setAirports] = useState<Airport[]>([]);
+  const [cabins, setCabins] = useState<CabinClass[]>(['ECONOMY']);
   const [loadError, setLoadError] = useState(false);
   const [annClosed, setAnnClosed] = useState(false);
   const [homeContent, setHomeContent] = useState<PublicHomeContent | null>(null);
@@ -318,6 +319,9 @@ export default function HomeSearchPage() {
         setAirports(FALLBACK_AIRPORTS);
         setLoadError(true);
       });
+    fetchSearchCabins()
+      .then((rows) => setCabins(rows.length > 0 ? rows : ['ECONOMY']))
+      .catch(() => setCabins(['ECONOMY']));
     fetchPublicHomeContent(locale)
       .then(setHomeContent)
       .catch(() => {
@@ -487,7 +491,7 @@ export default function HomeSearchPage() {
           </div>
         </div>
 
-        <HomeSearchCard locale={locale} isMobile={isMobile} isRTL={isRTL} copy={searchCopy} airports={airports} cityName={cityName} popularRoutes={popularRoutes} />
+        <HomeSearchCard locale={locale} isMobile={isMobile} isRTL={isRTL} copy={searchCopy} airports={airports} availableCabins={cabins} cityName={cityName} popularRoutes={popularRoutes} />
       </section>
 
       <section style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '20px 26px 10px' : '28px 26px 14px' }}>

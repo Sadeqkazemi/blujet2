@@ -78,6 +78,7 @@ export class AircraftService {
       economyColsLeft: dto.economyColsLeft ?? null,
       economyColsRight: dto.economyColsRight ?? null,
       excludedSeatCodes: dto.excludedSeatCodes ?? [],
+      exitRows: dto.exitRows ?? [],
     };
   }
 
@@ -203,6 +204,7 @@ export class AircraftService {
         },
       },
       excludedSeatCodes: map.excludedSeatCodes ?? [],
+      exitRows: map.exitRows ?? [],
       seats: seats.map((s) => ({
         row: s.row,
         column: s.column,
@@ -351,6 +353,7 @@ export class AircraftService {
         economyColsLeft: dto.economyColsLeft ?? null,
         economyColsRight: dto.economyColsRight ?? null,
         excludedSeatCodes: dto.excludedSeatCodes ?? [],
+        exitRows: dto.exitRows ?? existingSeatMap?.exitRows ?? [],
         aircraftDefinitionId: aircraft.id,
         updatedAt: now,
       };
