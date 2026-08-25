@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -34,6 +35,22 @@ export type BankEligibilityStatus =
   | 'FAILED';
 
 @Entity('bank_loan_customer_profiles')
+@Check(
+  'bank_loan_customer_profiles_membership_check',
+  `"membershipStatus" IN ('UNDECLARED','BANK_CUSTOMER','ACCOUNT_OPENING_REQUESTED','ACCOUNT_OPENED')`,
+)
+@Check(
+  'bank_loan_customer_profiles_opening_check',
+  `"accountOpeningStatus" IN ('NOT_STARTED','SUBMITTED','UNDER_REVIEW','COMPLETED','REJECTED','FAILED')`,
+)
+@Check(
+  'bank_loan_customer_profiles_eligibility_check',
+  `"eligibilityStatus" IN ('NOT_STARTED','SUBMITTED','UNDER_REVIEW','ELIGIBLE','INELIGIBLE','FAILED')`,
+)
+@Check(
+  'bank_loan_customer_profiles_eligible_amount_check',
+  `"eligibleAmountIrr" IS NULL OR "eligibleAmountIrr" > 0`,
+)
 export class BankLoanCustomerProfile {
   @PrimaryColumn({
     type: 'text',
