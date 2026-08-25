@@ -145,6 +145,54 @@ describe('Booking engine (e2e)', () => {
     ).toBe(2);
   });
 
+  it('lists cabin choices activated on currently sellable flight inventory', async () => {
+    const instance = await freshInstance();
+    instance.cabinCapacities = [
+      { cabin: 'ECONOMY', seats: 6 },
+      { cabin: 'BUSINESS', seats: 2 },
+    ];
+    await dataSource.getRepository(FlightInstance).save(instance);
+
+    const res = await request(app.getHttpServer()).get('/search/cabins');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(
+      expect.arrayContaining(['ECONOMY', 'BUSINESS']),
+    );
+  });
+
+  it('atomically assigns adjacent seats when a family omits manual preselection', async () => {
+    const instance = await freshInstance();
+    const { accessToken } = await loginAsCustomer(app, '09130000221');
+
+    const res = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          {
+            fullName: 'مادر خانواده',
+            passengerType: 'ADULT',
+            birthDate: '1988-03-10',
+            gender: 'female',
+          },
+          {
+            fullName: 'همراه خانواده',
+            passengerType: 'ADULT',
+            birthDate: '1987-03-10',
+            gender: 'male',
+          },
+        ],
+      });
+
+    expect(res.status).toBe(201);
+    expect(
+      res.body.data.passengers.map((row: { seatCode: string }) => row.seatCode),
+    ).toEqual(['2A', '2B']);
+  });
+
   it('rejects booking creation without login', async () => {
     const instance = await freshInstance();
     const res = await request(app.getHttpServer())

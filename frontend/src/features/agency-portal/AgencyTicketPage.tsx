@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
-import { fetchAirports } from '../../api/publicSite';
+import { fetchAirports, fetchSearchCabins } from '../../api/publicSite';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { airportCityLabel, airportCityName, FALLBACK_AIRPORTS } from '../../lib/airport-cities';
 import { localeDigits } from '../../lib/locale-format';
-import type { Airport } from '../../types/public-site';
+import type { Airport, CabinClass } from '../../types/public-site';
 
 type TripType = 'one' | 'round';
 
@@ -33,6 +33,7 @@ const COPY: Record<StoredLocale, {
   infant: string;
   infantHint: string;
   confirm: string;
+  cabin: string;
 }> = {
   fa: {
     one: 'یک طرفه', round: 'رفت و برگشت', origin: 'مبدا', destination: 'مقصد',
@@ -42,7 +43,7 @@ const COPY: Record<StoredLocale, {
     missing: 'مبدا، مقصد و تاریخ رفت را کامل کنید.', sameCity: 'مبدا و مقصد نمی‌توانند یکسان باشند.',
     invalidReturn: 'تاریخ برگشت باید پس از تاریخ رفت باشد.',
     adult: 'بزرگسال', adultHint: '۱۲ سال به بالا', child: 'کودک', childHint: '۲ تا ۱۲ سال',
-    infant: 'نوزاد', infantHint: 'زیر ۲ سال', confirm: 'تأیید',
+    infant: 'نوزاد', infantHint: 'زیر ۲ سال', confirm: 'تأیید', cabin: 'نوع پرواز',
   },
   en: {
     one: 'One-way', round: 'Round-trip', origin: 'From', destination: 'To',
@@ -52,7 +53,7 @@ const COPY: Record<StoredLocale, {
     missing: 'Complete origin, destination, and departure date.', sameCity: 'Origin and destination must differ.',
     invalidReturn: 'Return date must be after departure.',
     adult: 'Adult', adultHint: '12 years and over', child: 'Child', childHint: '2 to 12 years',
-    infant: 'Infant', infantHint: 'Under 2 years', confirm: 'Confirm',
+    infant: 'Infant', infantHint: 'Under 2 years', confirm: 'Confirm', cabin: 'Cabin',
   },
   ar: {
     one: 'ذهاب فقط', round: 'ذهاب وعودة', origin: 'من', destination: 'إلى',
@@ -62,7 +63,7 @@ const COPY: Record<StoredLocale, {
     missing: 'أكمل نقطة الانطلاق والوجهة وتاريخ المغادرة.', sameCity: 'يجب أن تختلف نقطة الانطلاق عن الوجهة.',
     invalidReturn: 'يجب أن يكون تاريخ العودة بعد المغادرة.',
     adult: 'بالغ', adultHint: '12 سنة فأكثر', child: 'طفل', childHint: 'من 2 إلى 12 سنة',
-    infant: 'رضيع', infantHint: 'أقل من سنتين', confirm: 'تأكيد',
+    infant: 'رضيع', infantHint: 'أقل من سنتين', confirm: 'تأكيد', cabin: 'درجة السفر',
   },
 };
 
@@ -81,6 +82,8 @@ export default function AgencyTicketPage() {
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
+  const [cabins, setCabins] = useState<CabinClass[]>(['ECONOMY']);
+  const [cabin, setCabin] = useState<CabinClass>('ECONOMY');
   const [passengerOpen, setPassengerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,6 +96,19 @@ export default function AgencyTicketPage() {
       .catch(() => {
         setAirports(FALLBACK_AIRPORTS);
         setLoadError(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    fetchSearchCabins()
+      .then((rows) => {
+        const available = rows.length > 0 ? rows : ['ECONOMY' as CabinClass];
+        setCabins(available);
+        setCabin((current) => available.includes(current) ? current : available[0]!);
+      })
+      .catch(() => {
+        setCabins(['ECONOMY']);
+        setCabin('ECONOMY');
       });
   }, []);
 
@@ -121,7 +137,7 @@ export default function AgencyTicketPage() {
       adults: String(adults),
       children: String(children),
       infants: String(infants),
-      cabin: 'ECONOMY',
+      cabin,
     });
     if (tripType === 'round' && returnDate) query.set('returnDate', returnDate.slice(0, 10));
     navigate(`/results?${query.toString()}`);
@@ -154,7 +170,7 @@ export default function AgencyTicketPage() {
             {error ?? t.loadError}
           </p>
         )}
-        <div className={`relative grid grid-cols-2 gap-2.5 sm:gap-3 ${tripType === 'round' ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
+        <div className={`relative grid grid-cols-2 gap-2.5 sm:gap-3 ${tripType === 'round' ? 'xl:grid-cols-6' : 'xl:grid-cols-5'}`}>
           <label className="relative">
             <span className="pointer-events-none absolute top-3 z-10 px-3 text-[10px] font-bold text-[#8a96a6] sm:px-5 sm:text-[11px]">⌖ {t.origin}</span>
             <select data-testid="agency-ticket-origin" value={origin} onChange={(e) => setOrigin(e.target.value)} className={selectClass}>
@@ -214,6 +230,27 @@ export default function AgencyTicketPage() {
               </div>
             )}
           </div>
+          <label className="relative">
+            <span className="pointer-events-none absolute top-3 z-10 px-3 text-[10px] font-bold text-[#8a96a6] sm:px-5 sm:text-[11px]">✦ {t.cabin}</span>
+            <select
+              data-testid="agency-ticket-cabin"
+              value={cabin}
+              onChange={(event) => setCabin(event.target.value as CabinClass)}
+              className={selectClass}
+            >
+              {cabins.map((value) => (
+                <option key={value} value={value}>
+                  {value === 'ECONOMY'
+                    ? locale === 'en' ? 'Economy' : locale === 'ar' ? 'اقتصادية' : 'اکونومی'
+                    : value === 'COMFORT'
+                      ? locale === 'en' ? 'Comfort' : locale === 'ar' ? 'راحة' : 'کامفورت'
+                      : value === 'BUSINESS'
+                        ? locale === 'en' ? 'Business' : locale === 'ar' ? 'أعمال' : 'بیزینس'
+                        : locale === 'en' ? 'First Class' : locale === 'ar' ? 'الدرجة الأولى' : 'فرست کلاس'}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <button type="button" data-testid="agency-ticket-search" onClick={submit} className="mt-4 flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#1668c4] text-sm font-black text-white transition hover:brightness-105">
           <span aria-hidden>⌕</span> {t.search}

@@ -207,6 +207,7 @@ export default function PublicHeader() {
   const [markAllBusy, setMarkAllBusy] = useState(false);
 
   const loggedIn = status === 'authenticated' && user?.role === 'USER';
+  const agencyLoggedIn = status === 'authenticated' && user?.role === 'AGENCY';
   const notifCountLabel = localeDigits(unreadCount, locale);
   const logoutCopy = LOGOUT_COPY[locale];
 
@@ -946,7 +947,7 @@ export default function PublicHeader() {
                 </span>
                 {langOpen && langDropdown}
               </div>
-              {!loggedIn && (
+              {!loggedIn && !agencyLoggedIn && (
                 <>
                   <Link
                     to="/signin"
@@ -983,6 +984,42 @@ export default function PublicHeader() {
                     {t('btnJoinClub')}
                   </Link>
                 </>
+              )}
+
+              {agencyLoggedIn && user && (
+                <Link
+                  to="/agency"
+                  data-testid="public-agency-identity"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '5px 9px 5px 13px',
+                    border: '1px solid #dbe5f1',
+                    borderRadius: 26,
+                    color: '#0d2640',
+                    textDecoration: 'none',
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <span>{user.fullName}</span>
+                  <span
+                    style={{
+                      display: 'grid',
+                      width: 36,
+                      height: 36,
+                      placeItems: 'center',
+                      borderRadius: 10,
+                      background: '#1668c4',
+                      color: '#fff',
+                      fontSize: 11,
+                    }}
+                  >
+                    AG
+                  </span>
+                </Link>
               )}
 
               {loggedIn && user && (
@@ -1233,6 +1270,26 @@ export default function PublicHeader() {
                   )}
                 </div>
                 </>
+              ) : agencyLoggedIn && user ? (
+                <Link
+                  to="/agency"
+                  data-testid="public-agency-identity-mobile"
+                  aria-label={user.fullName}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    display: 'grid',
+                    placeItems: 'center',
+                    background: '#fff',
+                    color: '#1668c4',
+                    textDecoration: 'none',
+                    fontSize: 10,
+                    fontWeight: 900,
+                  }}
+                >
+                  AG
+                </Link>
               ) : (
                 <span
                   data-testid="public-signin-mobile"
@@ -1447,7 +1504,7 @@ export default function PublicHeader() {
             ))}
           </div>
           <div style={{ marginTop: 'auto', padding: '14px 24px 32px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {!loggedIn && (
+            {!loggedIn && !agencyLoggedIn && (
               <span
                 data-testid="public-login-drawer-open"
                 onClick={() => {

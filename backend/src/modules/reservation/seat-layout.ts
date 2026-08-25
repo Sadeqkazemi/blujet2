@@ -23,6 +23,7 @@ export interface AircraftSeatMapLike {
   economyColsLeft: string[] | null;
   economyColsRight: string[] | null;
   excludedSeatCodes?: string[] | null;
+  exitRows?: number[] | null;
 }
 
 function pushCabinRows(

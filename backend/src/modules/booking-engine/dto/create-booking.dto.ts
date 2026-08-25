@@ -15,7 +15,6 @@ import {
   Min,
   MinLength,
   ValidateNested,
-  ValidateIf,
 } from 'class-validator';
 import { CabinClass } from '../../../database/enums';
 
@@ -81,7 +80,7 @@ export class BookingPassengerDto {
     required: false,
     description: 'Required for adults/children; omitted for a lap infant',
   })
-  @ValidateIf((value: BookingPassengerDto) => value.passengerType !== 'INFANT')
+  @IsOptional()
   @IsString()
   seatCode?: string;
 

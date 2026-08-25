@@ -105,7 +105,7 @@ export default function ResultsBuyModal({
         return prev.filter((s) => s !== seatCode);
       }
       if (prev.length >= seatNeed) {
-        return [...prev.slice(1), seatCode];
+        return prev;
       }
       return [...prev, seatCode];
     });
@@ -176,6 +176,7 @@ export default function ResultsBuyModal({
                 onToggleSeat={toggleSeat}
                 businessLocked={businessLocked}
                 bookedCabin={cabin}
+                selectionLimitReached={selectedSeats.length >= seatNeed}
               />
             ) : (
               <p className="text-xs text-[#8a96a6]">{checkoutCopy.loading}</p>

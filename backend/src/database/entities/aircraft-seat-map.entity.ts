@@ -78,6 +78,9 @@ export class AircraftSeatMap {
   @Column({ type: 'text', array: true, nullable: true, default: [] })
   excludedSeatCodes!: string[] | null;
 
+  @Column({ type: 'int', array: true, default: [] })
+  exitRows!: number[];
+
   /** Links to the normalized aircraft catalog (nullable: legacy rows
    * predate AircraftDefinition; backfilled by migration for existing
    * types). No relation mapping here — plain FK column only, to avoid the

@@ -30,6 +30,7 @@ function mockMobile() {
 
 function mockHomeApis(priceCenterIso = new Date().toISOString().slice(0, 10)) {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+  vi.spyOn(publicSiteApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST']);
   vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue([
     { date: priceCenterIso, minPriceIrr: '38000000', dateLabelFa: priceCenterIso, isCenter: true },
     { date: '2026-08-02', minPriceIrr: '0', dateLabelFa: '2026-08-02', isCenter: false },
@@ -115,6 +116,20 @@ const CMS_HOME = {
 };
 
 describe('HomeSearchPage', () => {
+  it('shows every cabin currently activated by Commercial flight inventory', async () => {
+    mockDesktop();
+    vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(publicSiteApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY', 'COMFORT', 'FIRST']);
+    vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
+    vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({ links: [] });
+
+    renderPage();
+
+    expect(await screen.findByTestId('home-cabin-COMFORT')).toHaveTextContent('کامفورت');
+    expect(screen.getByTestId('home-cabin-FIRST')).toHaveTextContent('فرست کلاس');
+    expect(screen.queryByTestId('home-cabin-BUSINESS')).not.toBeInTheDocument();
+  });
+
   it('renders RTL search form with airports loaded', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);

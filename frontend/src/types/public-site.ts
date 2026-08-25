@@ -86,6 +86,7 @@ export interface SeatMapResult {
   aircraftType?: string;
   cabinLayout?: Partial<Record<CabinClass, SeatMapCabinLayout>>;
   excludedSeatCodes?: string[];
+  exitRows?: number[];
   seats: SeatMapCell[];
 }
 

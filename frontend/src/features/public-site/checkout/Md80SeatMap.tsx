@@ -96,18 +96,22 @@ function AmenityIcon({
     kind === 'exit'
       ? locale === 'en'
         ? 'EXIT'
-        : 'خروج'
+        : locale === 'ar'
+          ? 'مخرج'
+          : 'خروج'
       : kind === 'galley'
-        ? locale === 'en'
-          ? 'GALLEY'
-          : 'گالی'
+        ? 'GALLEY'
         : kind === 'lav'
           ? locale === 'en'
             ? 'LAV'
-            : 'سرویس'
+            : locale === 'ar'
+              ? 'دورة مياه'
+              : 'سرویس'
           : locale === 'en'
             ? 'CLOSET'
-            : 'کمد';
+            : locale === 'ar'
+              ? 'خزانة'
+              : 'کمد';
   return (
     <div
       className="flex h-9 min-w-[62px] flex-col items-center justify-center gap-0.5 rounded-md border border-[#b9c9dc] bg-[#eef4fb] px-1 text-[8px] font-bold text-[#4a6a8a]"
@@ -248,6 +252,7 @@ export default function Md80SeatMap({
   onToggleSeat,
   businessLocked,
   bookedCabin,
+  selectionLimitReached,
 }: {
   locale: StoredLocale;
   seats: SeatMapCell[];
@@ -255,6 +260,7 @@ export default function Md80SeatMap({
   onToggleSeat: (seatCode: string) => void;
   businessLocked: boolean;
   bookedCabin: CabinClass;
+  selectionLimitReached: boolean;
 }) {
   const takenFromApi = seats.filter((s) => s.status === 'TAKEN').map((s) => s.seatCode);
   const inventory = buildMd80Seats(takenFromApi);
@@ -280,10 +286,11 @@ export default function Md80SeatMap({
     return byCode.get(code)?.status === 'TAKEN' ? 'TAKEN' : 'FREE';
   }
 
-  function isLocked(cabin: CabinClass, status: 'FREE' | 'TAKEN') {
+  function isLocked(cabin: CabinClass, status: 'FREE' | 'TAKEN', code: string) {
     if (status === 'TAKEN') return true;
     if (cabin !== bookedCabin) return true;
     if (cabin === 'BUSINESS' && businessLocked) return true;
+    if (selectionLimitReached && !selectedSeats.includes(code)) return true;
     return false;
   }
 
@@ -378,7 +385,7 @@ export default function Md80SeatMap({
                         cabin={cabin}
                         status={status}
                         selected={selectedSeats.includes(code)}
-                        locked={isLocked(cabin, status)}
+                        locked={isLocked(cabin, status, code)}
                         exitRow={exitRow}
                         onToggle={onToggleSeat}
                       />
@@ -401,7 +408,7 @@ export default function Md80SeatMap({
                       cabin={cabin}
                       status={status}
                       selected={selectedSeats.includes(code)}
-                      locked={isLocked(cabin, status)}
+                      locked={isLocked(cabin, status, code)}
                       exitRow={exitRow}
                       onToggle={onToggleSeat}
                     />

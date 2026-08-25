@@ -35,6 +35,7 @@ const SEARCH_CABINS: readonly CabinClass[] = [
 // queries Postgres directly) at seat-map/booking time, never from this cache.
 const AIRPORTS_TTL_SECONDS = 600;
 const SEARCH_TTL_SECONDS = 300;
+const CABINS_TTL_SECONDS = 300;
 
 @Injectable()
 export class SearchService {
@@ -63,6 +64,32 @@ export class SearchService {
     });
     await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);
     return airports;
+  }
+
+  async cabins(): Promise<CabinClass[]> {
+    const cacheKey = 'search:cabins';
+    const cached = await this.redis.get<CabinClass[]>(cacheKey);
+    if (cached) return cached;
+
+    const now = new Date();
+    const qb = this.flightInstanceRepo
+      .createQueryBuilder('fi')
+      .where('fi.status = :status', { status: 'SCHEDULED' })
+      .andWhere('fi.publicSaleEnabled = true')
+      .andWhere('fi.departureAt >= :now', { now });
+    this.applySaleWindowOpen(qb, 'fi', now);
+    applySellableDefinitionFilter(qb, 'fi');
+    const instances = await qb.getMany();
+    const found = new Set<CabinClass>();
+    for (const instance of instances) {
+      for (const row of serializeCabinCapacities(instance.cabinCapacities)) {
+        if (row.seats > 0) found.add(row.cabin);
+      }
+    }
+    const ordered = SEARCH_CABINS.filter((cabin) => found.has(cabin));
+    const result: CabinClass[] = ordered.length > 0 ? ordered : ['ECONOMY'];
+    await this.redis.set(cacheKey, result, CABINS_TTL_SECONDS);
+    return result;
   }
 
   /** Public flight search — same SCHEDULED/day-window semantics as the
@@ -516,6 +543,11 @@ export class SearchService {
       flightInstanceId,
       aircraftType: resolveAircraftType(instance),
       cabinLayout: {
+        FIRST: {
+          colsLeft: map.firstColsLeft,
+          colsRight: map.firstColsRight,
+          aisleAfterIndex: map.firstColsLeft?.length ?? 0,
+        },
         BUSINESS: {
           colsLeft: map.businessColsLeft,
           colsRight: map.businessColsRight,
@@ -533,6 +565,7 @@ export class SearchService {
         },
       },
       excludedSeatCodes: map.excludedSeatCodes ?? [],
+      exitRows: map.exitRows ?? [],
       seats: seats.map((s) => ({
         ...s,
         status: taken.has(s.seatCode) ? 'TAKEN' : 'FREE',

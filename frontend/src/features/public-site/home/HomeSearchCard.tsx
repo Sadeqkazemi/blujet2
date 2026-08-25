@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import JalaliDatePicker from '../../../components/JalaliDatePicker';
-import type { Airport } from '../../../types/public-site';
+import type { Airport, CabinClass } from '../../../types/public-site';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import {
   airportCityLabel,
@@ -27,7 +27,7 @@ const TODAY_ISO = new Date().toISOString().slice(0, 10);
 type TopTab = 'book' | 'manage' | 'checkin';
 type TripType = 'one' | 'round' | 'multi';
 type ServiceType = 'domestic' | 'intl';
-type Cabin = 'economy' | 'business';
+type Cabin = CabinClass;
 
 export type HomeSearchCopy = {
   tabBook: string;
@@ -705,6 +705,7 @@ export default function HomeSearchCard({
   isRTL,
   copy: t,
   airports,
+  availableCabins,
   cityName,
   popularRoutes,
 }: {
@@ -713,6 +714,7 @@ export default function HomeSearchCard({
   isRTL: boolean;
   copy: HomeSearchCopy;
   airports: Airport[];
+  availableCabins: CabinClass[];
   cityName: (code: string, cityFa?: string) => string;
   popularRoutes: RouteItem[];
 }) {
@@ -728,7 +730,7 @@ export default function HomeSearchCard({
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
-  const [cabin, setCabin] = useState<Cabin>('economy');
+  const [cabin, setCabin] = useState<Cabin>('ECONOMY');
   const [paxOpen, setPaxOpen] = useState(false);
   const [classBoxOpen, setClassBoxOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -768,7 +770,22 @@ export default function HomeSearchCard({
       ? '13px 0 0 13px'
       : '0 13px 13px 0';
 
-  const cabinLabel = cabin === 'economy' ? t.cabinEconomy : t.cabinBusiness;
+  const cabinLabelFor = (value: Cabin) =>
+    value === 'ECONOMY'
+      ? t.cabinEconomy
+      : value === 'BUSINESS'
+        ? t.cabinBusiness
+        : value === 'COMFORT'
+          ? locale === 'en' ? 'Comfort' : locale === 'ar' ? 'راحة' : 'کامفورت'
+          : locale === 'en' ? 'First Class' : locale === 'ar' ? 'الدرجة الأولى' : 'فرست کلاس';
+  const cabinChoices = availableCabins.length > 0 ? availableCabins : ['ECONOMY' as Cabin];
+  const cabinLabel = cabinLabelFor(cabin);
+
+  useEffect(() => {
+    if (availableCabins.length > 0 && !availableCabins.includes(cabin)) {
+      setCabin(availableCabins[0]!);
+    }
+  }, [availableCabins, cabin]);
   const paxParts = [
     `${formatToman(adults, locale)} ${t.lblAdults}`,
     ...(children ? [`${formatToman(children, locale)} ${t.lblChildren}`] : []),
@@ -817,7 +834,7 @@ export default function HomeSearchCard({
       adults: String(adults),
       children: String(children),
       infants: String(infants),
-      cabin: cabin === 'business' ? 'BUSINESS' : 'ECONOMY',
+      cabin,
     });
     if (tripType === 'round' && returnIso) {
       query.set('returnDate', returnIso.slice(0, 10));
@@ -1424,9 +1441,10 @@ export default function HomeSearchCard({
                             {t.lblCabinClass}
                           </div>
                           <div style={{ display: 'flex', gap: 7 }}>
-                            {(['economy', 'business'] as Cabin[]).map((c) => (
+                            {cabinChoices.map((c) => (
                               <span
                                 key={c}
+                                data-testid={`home-cabin-${c}`}
                                 onClick={() => setCabin(c)}
                                 style={{
                                   flex: 1,
@@ -1444,9 +1462,7 @@ export default function HomeSearchCard({
                                   cursor: 'pointer',
                                 }}
                               >
-                                {c === 'economy'
-                                  ? t.cabinEconomy
-                                  : t.cabinBusiness}
+                                {cabinLabelFor(c)}
                               </span>
                             ))}
                           </div>
@@ -1551,9 +1567,10 @@ export default function HomeSearchCard({
                             gap: 6,
                           }}
                         >
-                          {(['economy', 'business'] as Cabin[]).map((c) => (
+                          {cabinChoices.map((c) => (
                             <span
                               key={c}
+                              data-testid={`home-cabin-${c}`}
                               onClick={() => {
                                 setCabin(c);
                                 setClassBoxOpen(false);
@@ -1572,9 +1589,7 @@ export default function HomeSearchCard({
                                 cursor: 'pointer',
                               }}
                             >
-                              {c === 'economy'
-                                ? t.cabinEconomy
-                                : t.cabinBusiness}
+                              {cabinLabelFor(c)}
                             </span>
                           ))}
                         </div>
@@ -1639,9 +1654,10 @@ export default function HomeSearchCard({
                       padding: 3,
                     }}
                   >
-                    {(['economy', 'business'] as Cabin[]).map((c) => (
+                    {cabinChoices.map((c) => (
                       <span
                         key={c}
+                        data-testid={`home-cabin-${c}`}
                         onClick={() => setCabin(c)}
                         style={{
                           padding: '7px 17px',
@@ -1657,7 +1673,7 @@ export default function HomeSearchCard({
                           cursor: 'pointer',
                         }}
                       >
-                        {c === 'economy' ? t.cabinEconomy : t.cabinBusiness}
+                        {cabinLabelFor(c)}
                       </span>
                     ))}
                   </div>

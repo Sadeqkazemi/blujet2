@@ -152,7 +152,7 @@ describe('ExtrasStep — design parity', () => {
     expect(screen.getByText('بیزینس')).toBeInTheDocument();
     expect(screen.getByText('اکونومی')).toBeInTheDocument();
     expect(screen.getAllByText('خروج').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('گالی').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('GALLEY').length).toBeGreaterThan(0);
     expect(screen.getByTestId('checkout-seat-7D')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3F')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3A')).toBeInTheDocument();
@@ -326,11 +326,67 @@ describe('ExtrasStep — design parity', () => {
     );
 
     expect(screen.getByTestId('checkout-seat-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('checkout-seat-instructions')).not.toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('checkout-seat-toggle'));
     expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('checkout-seat-accept-fee'));
     expect(onToggleExtra).toHaveBeenCalledWith('extra-seat');
+  });
+
+  it('shows the ticket-based selection limit with the map and blocks an additional seat', async () => {
+    const user = userEvent.setup();
+    const onToggleSeat = vi.fn();
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={testExtras()}
+        onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={2}
+        seatSelectionLimit={1}
+        seats={SEATS}
+        selectedSeats={['12A']}
+        onToggleSeat={onToggleSeat}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={15_000}
+      />,
+    );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
+    expect(screen.getByTestId('checkout-seat-instructions')).toHaveTextContent('۱ صندلی');
+    expect(screen.getByTestId('checkout-seat-instructions')).toHaveTextContent('۰');
+    await user.click(screen.getByTestId('checkout-seat-12B'));
+    expect(onToggleSeat).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('checkout-seat-12A'));
+    expect(onToggleSeat).toHaveBeenCalledWith('12A');
+  });
+
+  it('localizes Arabic map labels while keeping GALLEY in English', async () => {
+    const user = userEvent.setup();
+    render(
+      <ExtrasStep
+        locale="ar"
+        extras={testExtras()}
+        onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={15_000}
+      />,
+    );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
+    expect(screen.getAllByText('GALLEY').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('خروج')).toHaveLength(0);
+    expect(screen.getAllByText('مخرج').length).toBeGreaterThan(0);
   });
 
   it('lets a high-point customer open the seat map without selecting the paid extra', async () => {

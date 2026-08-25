@@ -171,4 +171,14 @@ export class UpsertAircraftDto {
   @IsArray()
   @IsString({ each: true })
   excludedSeatCodes?: string[];
+
+  @ApiPropertyOptional({
+    type: [Number],
+    description: 'ردیف‌های خروج اضطراری؛ فقط بزرگسال بدون نوزاد قابل تخصیص است',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  exitRows?: number[];
 }

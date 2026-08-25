@@ -234,16 +234,14 @@ export default function CheckoutPage() {
     setLoadError(t.notFound);
   }, [isWizard, location.state, params, t.notFound]);
 
+  const passengerMix = draft?.passengerMix;
+
   useEffect(() => {
-    if (!draft) return;
+    if (!passengerMix) return;
     setPassengers((previous) =>
-      buildPassengersFromMix(draft.passengerMix, previous),
+      buildPassengersFromMix(passengerMix, previous),
     );
-  }, [
-    draft?.passengerMix.adults,
-    draft?.passengerMix.children,
-    draft?.passengerMix.infants,
-  ]);
+  }, [passengerMix]);
 
   useEffect(() => {
     if (!isWizard) return;
@@ -322,6 +320,12 @@ export default function CheckoutPage() {
 
   function toggleSeat(seatCode: string) {
     setSelectedSeats((prev) => {
+      const seatSelectionLimit = passengers.filter(
+        (passenger) => passenger.passengerType !== 'INFANT',
+      ).length;
+      if (!prev.includes(seatCode) && prev.length >= seatSelectionLimit) {
+        return prev;
+      }
       const next = prev.includes(seatCode)
         ? prev.filter((s) => s !== seatCode)
         : [...prev, seatCode];
@@ -416,31 +420,15 @@ export default function CheckoutPage() {
     if (idx > 0) setStep(STEP_ORDER[idx - 1]!);
   }
 
-  function resolveSeatCodesForBooking(): string[] | null {
-    if (!draft) return null;
+  function resolveSeatCodesForBooking(): string[] {
+    if (!draft) return [];
     const needed = passengers.filter(
       (p) => p.passengerType !== 'INFANT',
     ).length;
-    const picked = selectedSeats.filter((code) => {
+    return selectedSeats.filter((code) => {
       const cell = seats?.find((s) => s.seatCode === code);
       return cell?.cabin === draft.cabin && cell.status === 'FREE';
-    });
-    if (picked.length >= needed) return picked.slice(0, needed);
-    const used = new Set(picked);
-    const free = (seats ?? [])
-      .filter(
-        (s) =>
-          s.cabin === draft.cabin &&
-          s.status === 'FREE' &&
-          !used.has(s.seatCode),
-      )
-      .map((s) => s.seatCode);
-    const result = [...picked];
-    for (const code of free) {
-      if (result.length >= needed) break;
-      result.push(code);
-    }
-    return result.length >= needed ? result : null;
+    }).slice(0, needed);
   }
 
   async function submitBooking() {
@@ -487,15 +475,6 @@ export default function CheckoutPage() {
       return;
     }
     const seatCodes = resolveSeatCodesForBooking();
-    if (!seatCodes) {
-      setError(
-        locale === 'en'
-          ? 'No free seats left for this cabin.'
-          : 'صندلی خالی برای این کلاس باقی نمانده است.',
-      );
-      setStep('extras');
-      return;
-    }
     setBusy(true);
     setError(null);
     try {
@@ -825,6 +804,7 @@ export default function CheckoutPage() {
           onToggleExtra={toggleExtra}
           onExtraQuantityChange={changeExtraQuantity}
           passengerCount={passengerCount}
+          seatSelectionLimit={passengers.filter((passenger) => passenger.passengerType !== 'INFANT').length}
           seats={seats}
           selectedSeats={selectedSeats}
           onToggleSeat={toggleSeat}

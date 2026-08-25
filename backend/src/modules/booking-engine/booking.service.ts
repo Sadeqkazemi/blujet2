@@ -72,6 +72,11 @@ import {
   passengerFareRows,
   validatePassengerManifest,
 } from './passenger-fares';
+import {
+  assignPassengerSeats,
+  SeatAssignmentPolicyError,
+  type OccupiedSeatContext,
+} from './seat-assignment-policy';
 
 export type PaymentMethod = 'GATEWAY' | 'WALLET' | 'POINTS';
 
@@ -98,13 +103,16 @@ function allocateAdjacentExtraSeats(
   cabin: CabinClass,
   passengers: CreateBookingDto['passengers'],
   taken: ReadonlySet<string>,
+  assignedPrimarySeatCodes?: Array<string | null>,
 ): {
   primarySeatCodes: Array<string | null>;
   extraSeatCodes: Array<string | null>;
 } {
-  const primarySeatCodes = passengers.map((passenger) =>
-    passenger.seatCode ? passenger.seatCode : null,
-  );
+  const primarySeatCodes = assignedPrimarySeatCodes
+    ? [...assignedPrimarySeatCodes]
+    : passengers.map((passenger) =>
+        passenger.seatCode ? passenger.seatCode : null,
+      );
   const unavailable = new Set([
     ...taken,
     ...primarySeatCodes.filter((code): code is string => Boolean(code)),
@@ -191,6 +199,67 @@ export class BookingService {
       .leftJoinAndSelect('b.flightInstance', 'flightInstance')
       .leftJoinAndSelect('flightInstance.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route');
+  }
+
+  private async occupiedSeatContext(
+    manager: EntityManager,
+    flightInstanceId: string,
+  ): Promise<OccupiedSeatContext[]> {
+    const rows = await manager
+      .createQueryBuilder(Passenger, 'p')
+      .innerJoin('p.booking', 'b')
+      .select([
+        'p.bookingId',
+        'p.seatCode',
+        'p.extraSeatCode',
+        'p.gender',
+        'p.passengerType',
+      ])
+      .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+      })
+      .andWhere('(b.status != :held OR b.holdExpiresAt > :now)', {
+        held: 'HELD',
+        now: new Date(),
+      })
+      .getMany();
+    const byBooking = new Map<string, Passenger[]>();
+    for (const row of rows) {
+      const list = byBooking.get(row.bookingId) ?? [];
+      list.push(row);
+      byBooking.set(row.bookingId, list);
+    }
+    const context: OccupiedSeatContext[] = [];
+    for (const passengers of byBooking.values()) {
+      const infantCount = passengers.filter(
+        (passenger) => passenger.passengerType === 'INFANT',
+      ).length;
+      const adultSeats = passengers.filter(
+        (passenger) =>
+          passenger.passengerType === 'ADULT' && Boolean(passenger.seatCode),
+      );
+      const infantCarriers = new Set(
+        adultSeats.slice(0, infantCount).map((passenger) => passenger.seatCode),
+      );
+      for (const passenger of passengers) {
+        if (passenger.seatCode) {
+          context.push({
+            seatCode: passenger.seatCode,
+            gender: passenger.gender,
+            hasLapInfant: infantCarriers.has(passenger.seatCode),
+          });
+        }
+        if (passenger.extraSeatCode) {
+          context.push({
+            seatCode: passenger.extraSeatCode,
+            gender: null,
+            hasLapInfant: false,
+          });
+        }
+      }
+    }
+    return context;
   }
 
   /** Booking has no inverse relation to Passenger/PriceLock — both are
@@ -360,6 +429,16 @@ export class BookingService {
     const requestedCodes = dto.passengers.flatMap((p) =>
       p.seatCode ? [p.seatCode] : [],
     );
+    const seatBearingCount = dto.passengers.filter(
+      (passenger) => passenger.passengerType !== 'INFANT',
+    ).length;
+    if (requestedCodes.length > seatBearingCount) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message:
+          'تعداد صندلی‌های انتخابی از تعداد بلیط‌های دارای صندلی بیشتر است.',
+      });
+    }
     if (new Set(requestedCodes).size !== requestedCodes.length) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -520,11 +599,41 @@ export class BookingService {
         });
       }
 
+      const occupied = await this.occupiedSeatContext(tx, instance.id);
+      const occupiedCodes = new Set(occupied.map((row) => row.seatCode));
+      for (const seatCode of taken) {
+        if (!occupiedCodes.has(seatCode)) {
+          occupied.push({ seatCode, gender: null, hasLapInfant: false });
+        }
+      }
+      let assignedPrimarySeatCodes: Array<string | null>;
+      try {
+        assignedPrimarySeatCodes = assignPassengerSeats({
+          map,
+          cabin: dto.cabin,
+          passengers: dto.passengers,
+          occupied,
+        });
+      } catch (error) {
+        if (!(error instanceof SeatAssignmentPolicyError)) throw error;
+        if (error.message.startsWith('No policy-compliant')) {
+          throw new ConflictException({
+            code: ErrorCode.POOL_EXHAUSTED,
+            message: 'ظرفیت صندلی مطابق قوانین تخصیص تکمیل است.',
+          });
+        }
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'صندلی انتخابی با قوانین ایمنی و تخصیص مسافر سازگار نیست.',
+        });
+      }
+
       const { primarySeatCodes, extraSeatCodes } = allocateAdjacentExtraSeats(
         map,
         dto.cabin,
         dto.passengers,
         taken,
+        assignedPrimarySeatCodes,
       );
 
       // Charter/agency seat commitments aren't tied to specific seat codes,
