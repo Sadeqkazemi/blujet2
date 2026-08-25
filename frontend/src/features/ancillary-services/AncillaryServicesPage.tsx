@@ -20,6 +20,8 @@ import { expandPermissionSelection } from '../it-manager/employee-permission-dep
 const inputClass =
   'font-num h-[38px] w-[140px] rounded-[9px] border border-[#28344c] bg-[#0f1623] px-[11px] text-left text-xs text-[#e7ecf3] outline-none focus:border-[#3b82f6]';
 
+const COMMERCIAL_HIDDEN_SERVICE_KEYS = new Set(['refund-fee']);
+
 function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
   return (
     <button
@@ -346,7 +348,7 @@ export default function AncillaryServicesPage() {
           </div>
         )}
 
-        {otherServices.map((sv) => (
+        {otherServices.filter((sv) => !COMMERCIAL_HIDDEN_SERVICE_KEYS.has(sv.key)).map((sv) => (
           <ServiceRow
             key={sv.key}
             titleFa={sv.titleFa}

@@ -17,6 +17,15 @@ const OTHER_SERVICES: AncillaryServiceRow[] = [
   { key: 'custom-1', titleFa: 'اینترنت پروازی', descriptionFa: '', priceIrr: '1000000', enabled: true, isCustom: true },
 ];
 
+const LEGACY_REFUND_SERVICE: AncillaryServiceRow = {
+  key: 'refund-fee',
+  titleFa: 'هزینه استرداد بلیط',
+  descriptionFa: 'کسر از مبلغ استرداد طبق قوانین بلیط',
+  priceIrr: '500000',
+  enabled: true,
+  isCustom: false,
+};
+
 function mockRole(role: Role) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
     status: 'authenticated',
@@ -42,6 +51,17 @@ describe('AncillaryServicesPage', () => {
     expect(screen.getByText('بار اضافه')).toBeInTheDocument();
     // Custom service has a delete button, built-in does not
     expect(screen.getByText('اینترنت پروازی')).toBeInTheDocument();
+  });
+
+  it('hides the legacy refund fee from Commercial Manager services', async () => {
+    mockRole('COMMERCIAL_MANAGER');
+    vi.spyOn(mockApi, 'fetchSeatServices').mockResolvedValue(SEAT_SERVICES);
+    vi.spyOn(mockApi, 'fetchOtherServices').mockResolvedValue([...OTHER_SERVICES, LEGACY_REFUND_SERVICE]);
+
+    render(<AncillaryServicesPage />);
+
+    expect(await screen.findByText('بار اضافه')).toBeInTheDocument();
+    expect(screen.queryByText('هزینه استرداد بلیط')).not.toBeInTheDocument();
   });
 
   it('shows the coming-soon placeholder for a non-Commercial role (temp client-side guard)', async () => {

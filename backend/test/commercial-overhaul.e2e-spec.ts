@@ -464,7 +464,12 @@ describe('Commercial manager overhaul (e2e)', () => {
         .set('Authorization', auth(commercial.accessToken))
         .expect(200);
       expect(listed.body.data.seatServices.length).toBeGreaterThanOrEqual(3);
-      expect(listed.body.data.otherServices.length).toBeGreaterThanOrEqual(8);
+      expect(listed.body.data.otherServices.length).toBeGreaterThanOrEqual(7);
+      expect(
+        listed.body.data.otherServices.some(
+          (service: { key: string }) => service.key === 'refund-fee',
+        ),
+      ).toBe(false);
       expect(listed.body.data.seatServices[0].priceIrr).toEqual(
         expect.any(String),
       );

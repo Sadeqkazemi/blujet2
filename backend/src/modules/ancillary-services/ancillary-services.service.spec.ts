@@ -48,4 +48,39 @@ describe('AncillaryServicesService fixed checkout mirrors', () => {
       expect.objectContaining({ code: 'SEAT_SELECTION' }),
     );
   });
+
+  it('omits the refund fee from the commercial ancillary-services list', async () => {
+    const rows = [
+      {
+        key: 'refund-fee',
+        category: 'OTHER',
+        titleFa: 'هزینه استرداد بلیط',
+        descriptionFa: 'کسر از مبلغ استرداد طبق قوانین بلیط',
+        priceIrr: 500_000n,
+        enabled: true,
+        isCustom: false,
+      },
+      {
+        key: 'baggage',
+        category: 'OTHER',
+        titleFa: 'بار اضافه',
+        descriptionFa: 'هر ۵ کیلوگرم بار اضافه بر مجاز',
+        priceIrr: 2_000_000n,
+        enabled: true,
+        isCustom: false,
+      },
+    ];
+    const service = new AncillaryServicesService(
+      { find: jest.fn().mockResolvedValue(rows) } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(service.listManager()).resolves.toEqual({
+      seatServices: [],
+      otherServices: [
+        expect.objectContaining({ key: 'baggage', titleFa: 'بار اضافه' }),
+      ],
+    });
+  });
 });

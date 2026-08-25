@@ -231,7 +231,7 @@ describe('Flights (e2e)', () => {
     );
   });
 
-  it('overview: KPI figures reconcile with the rows; statuses derived from real state; future rows split off', async () => {
+  it('overview: KPI figures reconcile while every published future flight remains active', async () => {
     const near = await createInstance({
       departureAt: new Date(Date.now() + 2 * 24 * 3_600_000),
     });
@@ -258,7 +258,7 @@ describe('Flights (e2e)', () => {
     );
     expect(activeById.get(near.id)?.derivedStatus).toBe('SELLING');
     expect(activeById.get(cancelled.id)?.derivedStatus).toBe('CANCELLED');
-    expect(activeById.has(future.id)).toBe(false);
+    expect(activeById.has(future.id)).toBe(true);
     expect(
       (futureRows as { id: string }[]).some((r) => r.id === future.id),
     ).toBe(true);
