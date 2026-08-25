@@ -38,6 +38,8 @@ describe('AgencyTicketPage', () => {
 
     await user.selectOptions(await screen.findByTestId('agency-ticket-origin'), 'THR');
     await user.selectOptions(screen.getByTestId('agency-ticket-destination'), 'MHD');
+    expect(screen.getByTestId('agency-ticket-route-fields')).toContainElement(screen.getByTestId('agency-ticket-swap'));
+    expect(screen.getByTestId('agency-ticket-route-fields')).not.toContainElement(screen.getByTestId('agency-ticket-date'));
     await user.click(screen.getByTestId('agency-ticket-date'));
     await user.click(screen.getByTestId('agency-ticket-passengers'));
     await user.click(screen.getByTestId('agency-ticket-pax-adults-inc'));

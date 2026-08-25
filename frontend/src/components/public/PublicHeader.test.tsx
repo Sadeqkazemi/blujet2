@@ -9,6 +9,7 @@ import * as useLocaleModule from '../../hooks/useLocale';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as publicSiteApi from '../../api/publicSite';
 import * as notificationsApi from '../../api/notifications';
+import * as agencyApi from '../../api/agency-portal';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -75,7 +76,7 @@ function renderHeader(initialPath = '/') {
 }
 
 describe('PublicHeader — logged-in user', () => {
-  it('keeps an authenticated agency identity on the public results header', () => {
+  it('keeps an authenticated agency identity and profile menu on the public results header', async () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'authenticated',
@@ -85,12 +86,21 @@ describe('PublicHeader — logged-in user', () => {
       agencyLogin: vi.fn(),
       signOut: vi.fn(),
     });
+    vi.spyOn(agencyApi, 'fetchProfile').mockResolvedValue({
+      fullName: 'UAT Agency', managerName: null, licenseNo: 'B2B-42', phone: '09120000000',
+      email: null, city: null, address: null, tier: null, isActive: true,
+      suspendedAt: null, suspendReason: null, joinedAt: '2026-01-01T00:00:00.000Z', isTemporaryReadOnly: true,
+    });
+    vi.spyOn(agencyApi, 'fetchCredit').mockResolvedValue({ limitIrr: '1000000', usedIrr: '250000', remainingIrr: '750000' });
 
     renderHeader('/results?origin=THR&dest=MHD');
 
     expect(screen.getByTestId('public-agency-identity')).toHaveTextContent('UAT Agency');
-    expect(screen.getByTestId('public-agency-identity')).toHaveAttribute('href', '/agency');
     expect(screen.queryByRole('link', { name: /ورود|ثبت‌نام/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('public-agency-identity'));
+    expect(await screen.findByTestId('public-agency-menu')).toHaveTextContent('B2B-42');
+    expect(screen.getByRole('link', { name: 'پنل آژانس' })).toHaveAttribute('href', '/agency');
+    expect(screen.getByRole('link', { name: 'پروازهای خریداری‌شده' })).toHaveAttribute('href', '/agency/sales');
   });
 
   it('requires confirmation before signing a customer out', async () => {

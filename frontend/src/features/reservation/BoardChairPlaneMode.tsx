@@ -396,62 +396,7 @@ export default function BoardChairPlaneMode() {
             />
           </div>
 
-          <div className="grid grid-cols-1 items-start gap-[13px] lg:grid-cols-[1.3fr_1fr]">
-            <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
-              <div className="mb-1 flex items-center justify-between">
-                <h3 className="m-0 text-[13.5px] font-extrabold text-white">وضعیت سرویس‌های سامانه</h3>
-                <span
-                  className={`rounded-[14px] px-2.5 py-1 text-[10px] font-bold ${
-                    stats?.servicesStable
-                      ? 'bg-[rgba(16,185,129,.14)] text-[#34d399]'
-                      : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
-                  }`}
-                >
-                  {stats ? (stats.servicesStable ? 'پایدار' : 'نیازمند بررسی') : 'بدون داده'}
-                </span>
-              </div>
-              <div className="mb-4 text-[11px] text-[#6b7b94]">
-                معماری میکروسرویس رزرواسیون — از API Gateway تا پلتفرم API شرکا
-              </div>
-              <div className="flex flex-col gap-1.5">
-                {(stats?.services ?? []).map((s) => (
-                  <div
-                    key={s.name}
-                    className="flex items-center gap-2.5 rounded-[11px] border border-[#22304a] bg-[#0f1623] px-[11px] py-[9px]"
-                  >
-                    <span
-                      className={`h-[9px] w-[9px] shrink-0 rounded-full ${
-                        s.ok
-                          ? 'bg-[#34d399] shadow-[0_0_0_3px_rgba(16,185,129,.18)]'
-                          : 'bg-[#f87171] shadow-[0_0_0_3px_rgba(248,113,113,.18)]'
-                      }`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-bold text-[#e7ecf3]" dir="ltr">
-                        {s.name}
-                      </div>
-                      <div className="text-[10px] text-[#6b7b94]">{s.fa}</div>
-                    </div>
-                    <span className="font-num text-[10px] text-[#7d8aa0]" dir="ltr">
-                      {s.latencyMs === null ? '—' : `${faDigits(s.latencyMs)}ms`}
-                    </span>
-                    <span
-                      className={`w-16 text-left text-[10px] font-bold ${
-                        s.ok ? 'text-[#34d399]' : 'text-[#f87171]'
-                      }`}
-                    >
-                      {s.statusLabel}
-                    </span>
-                  </div>
-                ))}
-                {stats && stats.services.length === 0 && (
-                  <div className="rounded-[11px] border border-dashed border-[#28344c] px-4 py-6 text-center text-[11px] text-[#6b7b94]">
-                    داده‌ای از وضعیت سرویس‌ها دریافت نشده است.
-                  </div>
-                )}
-              </div>
-            </section>
-
+          <div className="grid grid-cols-1 items-start gap-[13px]">
             <section className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
               <h3 className="mb-4 text-[13.5px] font-extrabold text-white">تفکیک کانال رزرو</h3>
               <div className="flex flex-col gap-[11px]">

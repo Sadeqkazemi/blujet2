@@ -26,7 +26,7 @@ function formatPhoneDisplay(value: string): string {
 }
 
 const TIER_LABEL: Record<string, Record<StoredLocale, string>> = {
-  SILVER: { fa: 'عضو نقره‌ای باشگاه', en: 'Silver Club Member', ar: 'عضو فضية النادي' },
+  SILVER: { fa: 'عضو باشگاه', en: 'Club Member', ar: 'عضو النادي' },
   GOLD: { fa: 'عضو طلایی باشگاه', en: 'Gold Club Member', ar: 'عضو ذهبية النادي' },
   PLATINUM: { fa: 'عضو پلاتین باشگاه', en: 'Platinum Club Member', ar: 'عضو بلاتينية النادي' },
 };

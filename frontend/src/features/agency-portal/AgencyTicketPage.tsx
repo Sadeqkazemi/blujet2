@@ -170,7 +170,8 @@ export default function AgencyTicketPage() {
             {error ?? t.loadError}
           </p>
         )}
-        <div className={`relative grid grid-cols-2 gap-2.5 sm:gap-3 ${tripType === 'round' ? 'xl:grid-cols-6' : 'xl:grid-cols-5'}`}>
+        <div className={`grid grid-cols-2 gap-2.5 sm:gap-3 ${tripType === 'round' ? 'xl:grid-cols-6' : 'xl:grid-cols-5'}`}>
+          <div data-testid="agency-ticket-route-fields" className="relative col-span-2 grid grid-cols-2 gap-2.5 sm:gap-3">
           <label className="relative">
             <span className="pointer-events-none absolute top-3 z-10 px-3 text-[10px] font-bold text-[#8a96a6] sm:px-5 sm:text-[11px]">⌖ {t.origin}</span>
             <select data-testid="agency-ticket-origin" value={origin} onChange={(e) => setOrigin(e.target.value)} className={selectClass}>
@@ -197,6 +198,7 @@ export default function AgencyTicketPage() {
           >
             ⇄
           </button>
+          </div>
           <div className="h-[72px] rounded-xl border border-[#e5eaf1] bg-white px-1 sm:h-[76px] sm:px-2">
             <JalaliDatePicker label={t.departure} value={departureDate} onChange={setDepartureDate} minDate={new Date().toISOString().slice(0, 10)} placeholder={t.chooseDate} subLabel=" " locale={locale} isRTL={isRtl} testId="agency-ticket-date" />
           </div>

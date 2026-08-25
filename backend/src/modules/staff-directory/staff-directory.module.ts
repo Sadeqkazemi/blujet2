@@ -18,6 +18,7 @@ import {
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
 import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
+import { isSandboxAuthEnabled } from '../../common/sandbox-auth';
 
 @Injectable()
 export class StaffDirectoryService {
@@ -44,7 +45,10 @@ export class StaffDirectoryService {
       order: { fullName: 'ASC' },
     });
     return users
-      .filter((user) => !isTemporaryPanelUsername(user.username))
+      .filter(
+        (user) =>
+          isSandboxAuthEnabled() || !isTemporaryPanelUsername(user.username),
+      )
       .map((u) => ({
         id: u.id,
         fullName: u.fullName,
