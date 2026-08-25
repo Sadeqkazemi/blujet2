@@ -16,6 +16,9 @@ import { Schedule } from './schedule.entity';
 import { User } from './user.entity';
 
 @Index('flight_instances_departureAt_idx', ['departureAt'])
+@Index('flight_instances_cancelledAt_idx', ['cancelledAt'], {
+  where: '"status" = \'CANCELLED\'',
+})
 @Index(
   'flight_instances_scheduleId_departureAt_key',
   ['scheduleId', 'departureAt'],
@@ -162,6 +165,26 @@ export class FlightInstance {
 
   @Column({ type: 'text', nullable: true })
   rejectionReason!: string | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  cancelledAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  cancellationReason!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  cancelledByUserId!: string | null;
+
+  @ManyToOne(() => User, {
+    nullable: true,
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn({
+    name: 'cancelledByUserId',
+    foreignKeyConstraintName: 'flight_instances_cancelledByUserId_fkey',
+  })
+  cancelledBy!: User | null;
 
   /** Last CEO-approved definition snapshot (immutable until next approval). */
   @Column({ type: 'jsonb', nullable: true })

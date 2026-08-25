@@ -4,7 +4,7 @@ import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { Airport } from '../src/database/entities/airport.entity';
@@ -164,7 +164,7 @@ describe('Seasonal schedule templates (e2e)', () => {
     });
   });
 
-  it('completes one materialized occurrence atomically and rolls back invalid fare rules', async () => {
+  it('completes a materialized series atomically and rolls back invalid fare rules', async () => {
     const { accessToken } = await loginAs(app, 'comm');
     const { accessToken: financeToken } = await loginAs(app, 'finance');
     const { origin, dest, aircraft } = await airportsAndAircraft();
@@ -198,7 +198,7 @@ describe('Seasonal schedule templates (e2e)', () => {
       order: { departureAt: 'ASC' },
     });
     expect(occurrences.length).toBeGreaterThan(1);
-    const [validOccurrence, rollbackOccurrence] = occurrences;
+    const [validOccurrence] = occurrences;
     const cabinRows = validOccurrence.cabinCapacities as Array<{
       cabin: 'FIRST' | 'BUSINESS' | 'COMFORT' | 'ECONOMY';
       seats: number;
@@ -236,6 +236,27 @@ describe('Seasonal schedule templates (e2e)', () => {
     expect(completed.status).toBe(200);
     expect(completed.body.data.definitionStatus).toBe('PENDING_OPERATIONS');
     expect(completed.body.data.version).toBe(validOccurrence.version + 1);
+    expect(completed.body.data.scheduleGroup.occurrenceCount).toBe(
+      occurrences.length,
+    );
+    const submittedOccurrences = await dataSource
+      .getRepository(FlightInstance)
+      .find({
+        where: { scheduleTemplateId: created.body.data.id },
+        order: { departureAt: 'ASC' },
+      });
+    expect(
+      submittedOccurrences.every(
+        (row) => row.definitionStatus === 'PENDING_OPERATIONS',
+      ),
+    ).toBe(true);
+    expect(
+      await dataSource.getRepository(FareRule).count({
+        where: {
+          flightInstanceId: In(submittedOccurrences.map((row) => row.id)),
+        },
+      }),
+    ).toBe(submittedOccurrences.length);
     expect(
       await dataSource.getRepository(FareRule).count({
         where: { flightInstanceId: validOccurrence.id },
@@ -246,6 +267,35 @@ describe('Seasonal schedule templates (e2e)', () => {
         flightInstanceId: validOccurrence.id,
       }),
     ).toMatchObject({ proposedPriceIrr: 39_000_000n });
+
+    const rollbackStamp = stamp + 19;
+    const rollbackSlot = uniqueSlot(rollbackStamp);
+    const rollbackSchedule = await request(app.getHttpServer())
+      .post('/flights/schedule-templates')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        originAirportId: origin.id,
+        destinationAirportId: dest.id,
+        flightNoBase: `RB${String(rollbackStamp % 10000).padStart(4, '0')}`,
+        aircraftDefinitionId: aircraft.id,
+        departureTime: rollbackSlot.departureTime,
+        durationMinutes: 95,
+        startDate: rollbackSlot.startDate,
+        endDate: rollbackSlot.endDate,
+        weekdays: [1, 2, 3, 4, 5, 6, 7],
+        agencyPriceIrr: '38000000',
+        legalCeilingIrr: '42000000',
+        idempotencyKey: `rollback-${rollbackStamp}`,
+      });
+    expect(rollbackSchedule.status).toBe(201);
+    const rollbackOccurrences = await dataSource
+      .getRepository(FlightInstance)
+      .find({
+        where: { scheduleTemplateId: rollbackSchedule.body.data.id },
+        order: { departureAt: 'ASC' },
+      });
+    expect(rollbackOccurrences.length).toBeGreaterThan(0);
+    const rollbackOccurrence = rollbackOccurrences[0];
 
     const forbidden = await request(app.getHttpServer())
       .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)

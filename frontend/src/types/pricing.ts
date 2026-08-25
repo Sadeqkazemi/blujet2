@@ -4,6 +4,7 @@ import type {
   ChargeRule,
   FlightDefinitionSnapshot,
   AllotmentSummary,
+  ScheduleGroup,
 } from "./flights";
 import type { FlightApprovalStatus } from "../lib/flight-definition";
 
@@ -24,6 +25,7 @@ export interface AiSuggestion {
 }
 
 export interface PricingProposal {
+  scheduleGroup?: ScheduleGroup;
   id: string;
   flightInstanceId: string;
   // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON

@@ -195,9 +195,24 @@ export class FlightWorkflowService {
   }
 
   private async shapeOperationsRows(rows: FlightInstance[]) {
-    const proposals = rows.length
+    const grouped = new Map<string, FlightInstance[]>();
+    for (const row of rows) {
+      const key = row.scheduleTemplateId ?? row.id;
+      const current = grouped.get(key) ?? [];
+      current.push(row);
+      grouped.set(key, current);
+    }
+    const groups = [...grouped.values()].map((items) =>
+      [...items].sort(
+        (left, right) => left.departureAt.getTime() - right.departureAt.getTime(),
+      ),
+    );
+    const representatives = groups.map((items) => items[0]!);
+    const proposals = representatives.length
       ? await this.proposalRepo.find({
-          where: { flightInstanceId: In(rows.map((row) => row.id)) },
+          where: {
+            flightInstanceId: In(representatives.map((row) => row.id)),
+          },
           relations: { proposedBy: true },
         })
       : [];
@@ -205,7 +220,8 @@ export class FlightWorkflowService {
       proposals.map((proposal) => [proposal.flightInstanceId, proposal]),
     );
 
-    return rows.map((inst) => {
+    return groups.map((items) => {
+      const inst = items[0]!;
       const proposal = proposalByFlight.get(inst.id);
       return {
         id: inst.id,
@@ -254,6 +270,12 @@ export class FlightWorkflowService {
         ),
         version: inst.version,
         rejectionReason: inst.rejectionReason,
+        scheduleGroup: {
+          occurrenceCount: items.length,
+          startAt: items[0]!.departureAt.toISOString(),
+          endAt: items.at(-1)!.departureAt.toISOString(),
+          departures: items.map((item) => item.departureAt.toISOString()),
+        },
       };
     });
   }
@@ -303,48 +325,69 @@ export class FlightWorkflowService {
         });
       }
 
-      const fromStatus = instance.definitionStatus;
       const approved = dto.decision === 'APPROVED';
-      instance.definitionStatus = approved
-        ? FlightDefinitionStatus.PENDING_CEO
-        : FlightDefinitionStatus.OPERATIONS_REJECTED;
-      instance.rejectionReason = approved ? null : comment;
-      instance.version += 1;
-      await manager.save(instance);
+      const targets = instance.scheduleTemplateId
+        ? await manager
+            .getRepository(FlightInstance)
+            .createQueryBuilder('target')
+            .setLock('pessimistic_write')
+            .where('target.scheduleTemplateId = :templateId', {
+              templateId: instance.scheduleTemplateId,
+            })
+            .andWhere('target.definitionStatus = :status', {
+              status: FlightDefinitionStatus.PENDING_OPERATIONS,
+            })
+            .orderBy('target.departureAt', 'ASC')
+            .getMany()
+        : [instance];
 
-      const review = manager.create(FlightReview, {
-        flightInstanceId: id,
-        stage: FlightReviewStage.OPERATIONS,
-        decision: approved
-          ? FlightReviewDecision.APPROVED
-          : FlightReviewDecision.REJECTED,
-        comment,
-        reviewedByUserId: actor.id,
-        reviewedAt: new Date(),
-        expectedVersion: dto.expectedVersion ?? null,
-      });
-      await manager.save(review);
+      for (const target of targets) {
+        const fromStatus = target.definitionStatus;
+        target.definitionStatus = approved
+          ? FlightDefinitionStatus.PENDING_CEO
+          : FlightDefinitionStatus.OPERATIONS_REJECTED;
+        target.rejectionReason = approved ? null : comment;
+        target.version += 1;
+        await manager.save(target);
 
-      await manager.save(
-        manager.create(AuditLog, {
-          actorId: actor.id,
-          actorRole: actor.role,
-          category: 'SYSTEM',
-          action: approved
-            ? 'تأیید تعریف پرواز توسط عملیات'
-            : 'رد تعریف پرواز توسط عملیات',
-          detail: comment,
-          entityType: 'FlightInstance',
-          entityId: id,
-          metadata: {
-            fromStatus,
-            toStatus: instance.definitionStatus,
-            decision: dto.decision,
-            version: instance.version,
-            reviewId: review.id,
-          },
-        }),
-      );
+        const review = await manager.save(
+          manager.create(FlightReview, {
+            flightInstanceId: target.id,
+            stage: FlightReviewStage.OPERATIONS,
+            decision: approved
+              ? FlightReviewDecision.APPROVED
+              : FlightReviewDecision.REJECTED,
+            comment,
+            reviewedByUserId: actor.id,
+            reviewedAt: new Date(),
+            expectedVersion:
+              target.id === instance.id ? (dto.expectedVersion ?? null) : null,
+          }),
+        );
+
+        await manager.save(
+          manager.create(AuditLog, {
+            actorId: actor.id,
+            actorRole: actor.role,
+            category: 'SYSTEM',
+            action: approved
+              ? 'تأیید تعریف پرواز توسط عملیات'
+              : 'رد تعریف پرواز توسط عملیات',
+            detail: comment,
+            entityType: 'FlightInstance',
+            entityId: target.id,
+            metadata: {
+              fromStatus,
+              toStatus: target.definitionStatus,
+              decision: dto.decision,
+              version: target.version,
+              reviewId: review.id,
+              scheduleTemplateId: target.scheduleTemplateId,
+              occurrenceCount: targets.length,
+            },
+          }),
+        );
+      }
 
       return instance.id;
     });

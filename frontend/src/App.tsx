@@ -96,6 +96,7 @@ import IdentityAdminPage from './features/identity-admin/IdentityAdminPage';
 import AdminLoansPage from './features/loans/AdminLoansPage';
 import SiteRulesPage from './features/site-content/SiteRulesPage';
 import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
+import FlightCancellationsPage from './features/flights/FlightCancellationsPage';
 
 export default function App() {
   return (
@@ -212,6 +213,9 @@ export default function App() {
               </Route>
               <Route path="flights" element={<TabGate tabKey="flights" />}>
                 <Route index element={<FlightsRouter />} />
+              </Route>
+              <Route path="cancellations" element={<TabGate tabKey="cancellations" />}>
+                <Route index element={<FlightCancellationsPage />} />
               </Route>
               <Route path="routes" element={<TabGate tabKey="routes" />}>
                 <Route index element={<FlightRoutesPage />} />

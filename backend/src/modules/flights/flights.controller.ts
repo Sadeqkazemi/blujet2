@@ -25,6 +25,7 @@ import {
   Matches,
   Max,
   Min,
+  MinLength,
 } from 'class-validator';
 import type { Request } from 'express';
 import { FlightsService } from './flights.service';
@@ -136,6 +137,16 @@ class CreateScheduleDto {
   @Min(1)
   @Max(90)
   daysAhead?: number;
+}
+
+class CancelFlightDto {
+  @ApiProperty({
+    description: 'علت کنسلی که در سوابق بازرگانی و مالی نگهداری می‌شود',
+    example: 'محدودیت عملیاتی فرودگاه مقصد',
+  })
+  @IsString()
+  @MinLength(3)
+  reason!: string;
 }
 
 class PlanFlightDto {
@@ -859,6 +870,50 @@ export class FlightsController {
     const data = await this.flights.runAiAnalysis(
       actor,
       req.headers['x-request-id'] as string | undefined,
+    );
+    return { success: true, data };
+  }
+
+  @Get('cancellations')
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'FINANCE_MANAGER')
+  @ApiOperation({
+    summary: 'فهرست پروازهای کنسل‌شده و وضعیت استرداد مسافران',
+  })
+  async listCancellations() {
+    const data = await this.flights.listCancellations();
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/cancel')
+  @HttpCode(200)
+  @Roles('COMMERCIAL_MANAGER')
+  @ApiOperation({
+    summary: 'کنسل کردن پرواز، توقف فروش و ارسال پیامک به خریداران',
+  })
+  async cancelFlight(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Body() dto: CancelFlightDto,
+  ) {
+    const data = await this.flights.cancelFlight(actor, instanceId, dto.reason);
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/cancellations/:bookingId/refund')
+  @HttpCode(200)
+  @Roles('FINANCE_MANAGER')
+  @ApiOperation({
+    summary: 'بازگشت وجه بلیط پرواز کنسل‌شده به حساب مسافر',
+  })
+  async refundCancelledBooking(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
+  ) {
+    const data = await this.flights.refundCancelledBooking(
+      actor,
+      instanceId,
+      bookingId,
     );
     return { success: true, data };
   }

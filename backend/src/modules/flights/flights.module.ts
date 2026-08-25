@@ -24,6 +24,8 @@ import { FlightReview } from '../../database/entities/flight-review.entity';
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User } from '../../database/entities/user.entity';
+import { WalletEntry } from '../../database/entities/wallet-entry.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { FlightsController } from './flights.controller';
 import { FlightsService } from './flights.service';
 import { FlightDefinitionService } from './flight-definition.service';
@@ -36,6 +38,7 @@ import { AuditModule } from '../audit/audit.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
 import { AuthModule } from '../auth/auth.module';
+import { SmsModule } from '../sms/sms.module';
 
 @Module({
   imports: [
@@ -64,12 +67,15 @@ import { AuthModule } from '../auth/auth.module';
       FlightScheduleTemplate,
       AuditLog,
       User,
+      WalletEntry,
+      LedgerEntry,
     ]),
     PanelsModule,
     AuditModule,
     NotificationsModule,
     AiModule,
     AuthModule,
+    SmsModule,
   ],
   controllers: [FlightsController],
   providers: [

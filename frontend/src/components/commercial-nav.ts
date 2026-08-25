@@ -6,6 +6,7 @@ const COMMERCIAL_NAV_ORDER = [
   'routes',
   'aircraft',
   'flights',
+  'cancellations',
   'services',
   'ancillary-services',
   'reports',

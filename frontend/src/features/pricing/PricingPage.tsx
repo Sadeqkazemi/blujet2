@@ -435,6 +435,14 @@ function CeoPricing() {
                         ? ` · ${formatDurationFa(durationMin)}`
                         : ""}
                     </div>
+                    {p.scheduleGroup && p.scheduleGroup.occurrenceCount > 1 && (
+                      <div className="mt-2 rounded-lg border border-[#3b82f655] bg-[#3b82f612] p-2.5 text-[10.5px] leading-6 text-[#bfdbfe]">
+                        تأیید این پیشنهاد، هر {faDigits(p.scheduleGroup.occurrenceCount)} پرواز با شماره یکسان را فعال می‌کند.
+                        <div className="font-num text-[#93c5fd]">
+                          از {p.scheduleGroup.startAt ? formatJalaliDate(p.scheduleGroup.startAt) : '—'} تا {p.scheduleGroup.endAt ? formatJalaliDate(p.scheduleGroup.endAt) : '—'}
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-1 text-[11px] leading-6 text-[#9fb0c7]">
                       {aircraft ? (
                         <span>

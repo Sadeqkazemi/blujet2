@@ -103,7 +103,7 @@ export class PricingService {
     )
       .orderBy('p.createdAt', 'DESC')
       .getMany();
-    const pending = proposals.filter(
+    const pendingRows = proposals.filter(
       (p) =>
         p.status === PricingProposalStatus.PENDING &&
         (p.flightInstance.definitionStatus ===
@@ -111,24 +111,55 @@ export class PricingService {
           p.flightInstance.definitionStatus ===
             FlightDefinitionStatus.PENDING_REVISION),
     );
+    const groupRows = (rows: FarePricingProposal[]) => {
+      const groups = new Map<string, FarePricingProposal[]>();
+      for (const row of rows) {
+        const key = row.flightInstance.scheduleTemplateId ?? row.id;
+        const current = groups.get(key) ?? [];
+        current.push(row);
+        groups.set(key, current);
+      }
+      return [...groups.values()].map((items) => {
+        const sorted = [...items].sort(
+          (left, right) =>
+            left.flightInstance.departureAt.getTime() -
+            right.flightInstance.departureAt.getTime(),
+        );
+        return {
+          ...sorted[0]!,
+          scheduleGroup: {
+            occurrenceCount: sorted.length,
+            startAt: sorted[0]!.flightInstance.departureAt.toISOString(),
+            endAt: sorted.at(-1)!.flightInstance.departureAt.toISOString(),
+            departures: sorted.map((item) =>
+              item.flightInstance.departureAt.toISOString(),
+            ),
+          },
+        };
+      });
+    };
+    const pending = groupRows(pendingRows);
     return {
       pending,
-      registered: proposals.filter(
-        (p) =>
-          p.status === PricingProposalStatus.REGISTERED &&
-          isCeoRegisteredProposalVisible(p),
+      registered: groupRows(
+        proposals.filter(
+          (p) =>
+            p.status === PricingProposalStatus.REGISTERED &&
+            isCeoRegisteredProposalVisible(p),
+        ),
       ),
-      rejected: proposals.filter(
-        (p) => p.status === PricingProposalStatus.REJECTED,
+      rejected: groupRows(
+        proposals.filter((p) => p.status === PricingProposalStatus.REJECTED),
       ),
       pendingApprovalsCount: pending.length,
     };
   }
 
   async pendingApprovalsCount(): Promise<{ pendingApprovalsCount: number }> {
-    const count = await this.proposalRepo
+    const row = await this.proposalRepo
       .createQueryBuilder('p')
       .innerJoin('p.flightInstance', 'fi')
+      .select('COUNT(DISTINCT COALESCE(fi."scheduleTemplateId", fi.id))', 'count')
       .where('p.status = :status', { status: PricingProposalStatus.PENDING })
       .andWhere('fi.definitionStatus IN (:...statuses)', {
         statuses: [
@@ -136,8 +167,8 @@ export class PricingService {
           FlightDefinitionStatus.PENDING_REVISION,
         ],
       })
-      .getCount();
-    return { pendingApprovalsCount: count };
+      .getRawOne<{ count: string }>();
+    return { pendingApprovalsCount: Number(row?.count ?? 0) };
   }
 
   /** Commercial view: upcoming SCHEDULED instances joined with their proposal. */
@@ -491,14 +522,10 @@ export class PricingService {
       });
     }
 
-    // Conditional update + definition approval in one transaction.
+    // Conditional update + definition approval in one transaction. A
+    // seasonal route is one commercial decision but remains one independent
+    // FlightInstance per operating date after publication.
     const registered = await this.dataSource.transaction(async (manager) => {
-      await manager
-        .createQueryBuilder(FlightInstance, 'fi')
-        .setLock('pessimistic_write')
-        .where('fi.id = :id', { id: proposal.flightInstanceId })
-        .getOne();
-
       const lockedProposal = await manager.findOne(FarePricingProposal, {
         where: { id },
         lock: { mode: 'pessimistic_write' },
@@ -544,79 +571,111 @@ export class PricingService {
           message: 'این پیشنهاد رد شده است؛ ابتدا پیشنهاد جدید ارسال کنید.',
         });
       }
-
-      const updated = await manager.update(
-        FarePricingProposal,
-        { id, status: PricingProposalStatus.PENDING },
-        {
-          status: PricingProposalStatus.REGISTERED,
-          registeredPriceIrr: price,
-          approvedById: actor.id,
-          approvedAt: new Date(),
-          updatedAt: new Date(),
-          rejectionReason: null,
-          rejectedAt: null,
-          rejectedById: null,
-        },
-      );
-      if ((updated.affected ?? 0) === 0) {
-        const raced = await manager.findOne(FarePricingProposal, {
-          where: { id },
-        });
-        if (raced?.status === PricingProposalStatus.REGISTERED) {
-          return {
-            alreadyRegistered: true as const,
-            price: raced.registeredPriceIrr,
-          };
-        }
-        throw new ConflictException({
-          code: ErrorCode.CONFLICT,
-          message: LOCKED_MESSAGE,
-        });
-      }
-
-      const { previousLocation } = await this.definitions.applyCeoApprovalInTx(
-        manager,
-        lockedProposal.flightInstanceId,
-        actor.id,
-      );
-
       const reviewComment =
         comment?.trim() ||
         (source === 'AI'
           ? 'قیمت پیشنهادی هوش مصنوعی و انتشار پرواز تأیید شد.'
           : 'قیمت پیشنهادی بازرگانی و انتشار پرواز تأیید شد.');
-      const review = await manager.save(
-        manager.create(FlightReview, {
-          flightInstanceId: lockedProposal.flightInstanceId,
-          stage: FlightReviewStage.CEO,
-          decision: FlightReviewDecision.APPROVED,
-          comment: reviewComment,
-          reviewedByUserId: actor.id,
-          reviewedAt: new Date(),
-          expectedVersion: null,
-        }),
-      );
-      await manager.save(
-        manager.create(AuditLog, {
-          actorId: actor.id,
-          actorRole: actor.role,
-          category: 'PRICING',
-          action:
-            source === 'AI'
-              ? 'ثبت قیمت پرواز با پیشنهاد AI'
-              : 'تأیید قیمت پیشنهادی بازرگانی',
-          detail: `قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} تأیید و منتشر شد.`,
-          entityType: 'FarePricingProposal',
-          entityId: id,
-          metadata: {
-            registeredPriceIrr: String(price),
-            source,
-            reviewId: review.id,
-          },
-        }),
-      );
-      return { alreadyRegistered: false as const, price, previousLocation };
+      const templateId = proposal.flightInstance.scheduleTemplateId;
+      const instances = templateId
+        ? await manager
+            .getRepository(FlightInstance)
+            .createQueryBuilder('instance')
+            .setLock('pessimistic_write')
+            .where('instance.scheduleTemplateId = :templateId', { templateId })
+            .andWhere('instance.definitionStatus = :status', {
+              status: FlightDefinitionStatus.PENDING_CEO,
+            })
+            .orderBy('instance.departureAt', 'ASC')
+            .getMany()
+        : await manager.find(FlightInstance, {
+            where: { id: lockedProposal.flightInstanceId },
+          });
+      if (instances.length === 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'رخدادی در انتظار تأیید مدیرعامل یافت نشد.',
+        });
+      }
+      const instanceIds = instances.map((instance) => instance.id);
+      const targetProposals = await manager
+        .getRepository(FarePricingProposal)
+        .createQueryBuilder('target')
+        .setLock('pessimistic_write')
+        .where('target.flightInstanceId IN (:...instanceIds)', { instanceIds })
+        .andWhere('target.status = :status', {
+          status: PricingProposalStatus.PENDING,
+        })
+        .getMany();
+      if (targetProposals.length !== instances.length) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'پیشنهاد قیمت همه روزهای این شماره پرواز آماده تأیید نیست.',
+        });
+      }
+
+      const previousLocations: Array<{
+        originCode: string;
+        destCode: string;
+        departureAt: Date;
+      }> = [];
+      for (const target of targetProposals) {
+        target.status = PricingProposalStatus.REGISTERED;
+        target.registeredPriceIrr = price;
+        target.approvedById = actor.id;
+        target.approvedAt = new Date();
+        target.updatedAt = new Date();
+        target.rejectionReason = null;
+        target.rejectedAt = null;
+        target.rejectedById = null;
+        await manager.save(target);
+
+        const { previousLocation } =
+          await this.definitions.applyCeoApprovalInTx(
+            manager,
+            target.flightInstanceId,
+            actor.id,
+          );
+        if (previousLocation) previousLocations.push(previousLocation);
+        const review = await manager.save(
+          manager.create(FlightReview, {
+            flightInstanceId: target.flightInstanceId,
+            stage: FlightReviewStage.CEO,
+            decision: FlightReviewDecision.APPROVED,
+            comment: reviewComment,
+            reviewedByUserId: actor.id,
+            reviewedAt: new Date(),
+            expectedVersion: null,
+          }),
+        );
+        await manager.save(
+          manager.create(AuditLog, {
+            actorId: actor.id,
+            actorRole: actor.role,
+            category: 'PRICING',
+            action:
+              source === 'AI'
+                ? 'ثبت قیمت پرواز با پیشنهاد AI'
+                : 'تأیید قیمت پیشنهادی بازرگانی',
+            detail: `قیمت پرواز ${proposal.flightInstance.flight.flightNo} توسط ${actor.fullName} تأیید و منتشر شد.`,
+            entityType: 'FarePricingProposal',
+            entityId: target.id,
+            metadata: {
+              registeredPriceIrr: String(price),
+              source,
+              reviewId: review.id,
+              scheduleTemplateId: templateId,
+              occurrenceCount: instances.length,
+            },
+          }),
+        );
+      }
+      return {
+        alreadyRegistered: false as const,
+        price,
+        previousLocations,
+        instanceIds,
+      };
     });
 
     if (registered.alreadyRegistered) {
@@ -639,18 +698,24 @@ export class PricingService {
     });
 
     // Newly APPROVED inventory must appear in search immediately.
-    await this.search.invalidateForInstance(proposal.flightInstanceId);
+    await Promise.all(
+      registered.instanceIds.map((instanceId) =>
+        this.search.invalidateForInstance(instanceId),
+      ),
+    );
     // A revision may have moved the flight to a different route/date — the
     // OLD listing's cache entry is a separate key and must be busted too,
     // or the flight keeps appearing under its stale former date/route for
     // the rest of the cache TTL.
-    if (registered.previousLocation) {
-      await this.search.invalidateForRouteDate(
-        registered.previousLocation.originCode,
-        registered.previousLocation.destCode,
-        registered.previousLocation.departureAt,
-      );
-    }
+    await Promise.all(
+      registered.previousLocations.map((previousLocation) =>
+        this.search.invalidateForRouteDate(
+          previousLocation.originCode,
+          previousLocation.destCode,
+          previousLocation.departureAt,
+        ),
+      ),
+    );
 
     return this.withProposalRelations(this.proposalRepo.createQueryBuilder('p'))
       .where('p.id = :id', { id })

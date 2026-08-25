@@ -29,6 +29,16 @@ const ROW: OperationsFlightRow = {
   uiStatus: "pending_ops",
   version: 3,
   rejectionReason: null,
+  scheduleGroup: {
+    occurrenceCount: 3,
+    startAt: "2026-08-20T08:30:00.000Z",
+    endAt: "2026-09-03T08:30:00.000Z",
+    departures: [
+      "2026-08-20T08:30:00.000Z",
+      "2026-08-27T08:30:00.000Z",
+      "2026-09-03T08:30:00.000Z",
+    ],
+  },
 };
 
 describe("OperationsCartablePage", () => {
@@ -46,6 +56,7 @@ describe("OperationsCartablePage", () => {
 
     expect(await screen.findByText(/XY1234/)).toBeInTheDocument();
     expect(screen.getByText("پیشنهاد آزمایشی بازرگانی", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/این تصمیم برای هر ۳ روز پرواز/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "تأیید و ارسال به مدیر عامل" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "ثبت نظر مدیر عملیات",
