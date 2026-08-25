@@ -23,6 +23,7 @@ import {
   BookingChannel,
   CabinClass,
   FlightDefinitionStatus,
+  FlightInstanceStatus,
   PricingProposalStatus,
 } from '../../database/enums';
 import { ErrorCode } from '../../common/errors';
@@ -481,6 +482,7 @@ export class FlightDefinitionService {
     id: string,
     dto: CompleteScheduledFlightDto,
   ) {
+    let submittedIds: string[] = [];
     await this.dataSource.transaction(async (manager) => {
       const instance = await manager.findOne(FlightInstance, {
         where: { id },
@@ -526,6 +528,34 @@ export class FlightDefinitionService {
           message: 'رخداد گذشته قابل تکمیل و ارسال نیست.',
         });
       }
+
+      const targets = await manager
+        .getRepository(FlightInstance)
+        .createQueryBuilder('target')
+        .setLock('pessimistic_write')
+        .where('target.scheduleTemplateId = :templateId', {
+          templateId: instance.scheduleTemplateId,
+        })
+        .andWhere('target.status = :scheduled', {
+          scheduled: FlightInstanceStatus.SCHEDULED,
+        })
+        .andWhere('target.departureAt > :now', { now: new Date() })
+        .andWhere('target.definitionStatus IN (:...statuses)', {
+          statuses: [
+            FlightDefinitionStatus.DRAFT,
+            FlightDefinitionStatus.OPERATIONS_REJECTED,
+            FlightDefinitionStatus.REJECTED,
+          ],
+        })
+        .orderBy('target.departureAt', 'ASC')
+        .getMany();
+      if (targets.length === 0) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'رخداد آینده‌ای برای تکمیل این شماره پرواز وجود ندارد.',
+        });
+      }
+      submittedIds = targets.map((target) => target.id);
 
       const cabinCapacities = serializeCabinCapacities(
         instance.cabinCapacities,
@@ -608,7 +638,7 @@ export class FlightDefinitionService {
 
       const sold = await manager.count(Booking, {
         where: {
-          flightInstanceId: id,
+          flightInstanceId: In(submittedIds),
           status: In([...SOLD_STATUSES]),
         },
       });
@@ -621,98 +651,138 @@ export class FlightDefinitionService {
       }
 
       const chargeInputs = this.validateChargeRules(dto.chargeRules);
-      await this.replaceChargeRules(manager, id, chargeInputs, false);
-      await manager.delete(FareRule, { flightInstanceId: id });
-      await manager.save(
-        dto.fareRules.map((fare) =>
-          manager.create(FareRule, {
-            flightInstanceId: id,
-            cabin: fare.cabin,
-            classCode: fare.classCode,
-            priceIrr: fare.priceIrr,
-            sitePriceIrr: null,
-            seatsAllocated: fare.seatsAllocated,
-            agencySeatsReleased: 0,
-            agencyReleasePriceIrr: null,
-            agencySpecialOffer: false,
-            taxIrr: fare.taxIrr ?? 0n,
-            refundable: fare.refundable ?? true,
-            changeable: fare.changeable ?? true,
-            baggageAllowanceKg: fare.baggageAllowanceKg ?? null,
-            validFrom: fare.validFrom ? new Date(fare.validFrom) : null,
-            validUntil: fare.validUntil ? new Date(fare.validUntil) : null,
-            allowedChannels:
-              fare.allowedChannels ??
-              ([BookingChannel.SYSTEM] as BookingChannel[]),
+      for (const target of targets) {
+        const targetCapacities = serializeCabinCapacities(
+          target.cabinCapacities,
+        );
+        if (
+          target.capacity !== physicalTotal ||
+          JSON.stringify(targetCapacities) !== JSON.stringify(cabinCapacities)
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message:
+              'ظرفیت یکی از رخدادهای این شماره پرواز با تعریف هواپیما سازگار نیست.',
+          });
+        }
+
+        await this.replaceChargeRules(
+          manager,
+          target.id,
+          chargeInputs,
+          false,
+        );
+        await manager.delete(FareRule, { flightInstanceId: target.id });
+        await manager.save(
+          dto.fareRules.map((fare) =>
+            manager.create(FareRule, {
+              flightInstanceId: target.id,
+              cabin: fare.cabin,
+              classCode: fare.classCode,
+              priceIrr: fare.priceIrr,
+              sitePriceIrr: null,
+              seatsAllocated: fare.seatsAllocated,
+              agencySeatsReleased: 0,
+              agencyReleasePriceIrr: null,
+              agencySpecialOffer: false,
+              taxIrr: fare.taxIrr ?? 0n,
+              refundable: fare.refundable ?? true,
+              changeable: fare.changeable ?? true,
+              baggageAllowanceKg: fare.baggageAllowanceKg ?? null,
+              validFrom: fare.validFrom ? new Date(fare.validFrom) : null,
+              validUntil: fare.validUntil ? new Date(fare.validUntil) : null,
+              allowedChannels:
+                fare.allowedChannels ??
+                ([BookingChannel.SYSTEM] as BookingChannel[]),
+            }),
+          ),
+        );
+
+        let proposal = await manager
+          .getRepository(FarePricingProposal)
+          .createQueryBuilder('proposal')
+          .where('proposal.flightInstanceId = :id', { id: target.id })
+          .getOne();
+        if (!proposal) {
+          proposal = manager.create(FarePricingProposal, {
+            flightInstanceId: target.id,
+            proposedById: actor.id,
+            createdAt: new Date(),
+          });
+        }
+        proposal.basePriceIrr = dto.basePriceIrr;
+        proposal.competitorPriceIrr = dto.competitorPriceIrr ?? null;
+        proposal.proposedPriceIrr = dto.pricingProposal.proposedPriceIrr;
+        proposal.legalRateIrr = dto.pricingProposal.legalRateIrr ?? null;
+        proposal.commercialNote =
+          dto.pricingProposal.commercialNote?.trim() || null;
+        proposal.operationsNote =
+          dto.pricingProposal.operationsNote?.trim() || null;
+        proposal.ceoNote = dto.pricingProposal.ceoNote?.trim() || null;
+        proposal.note = null;
+        proposal.proposedById = actor.id;
+        proposal.status = PricingProposalStatus.PENDING;
+        proposal.registeredPriceIrr = null;
+        proposal.approvedById = null;
+        proposal.approvedAt = null;
+        proposal.rejectionReason = null;
+        proposal.rejectedById = null;
+        proposal.rejectedAt = null;
+        proposal.aiSuggestion = null;
+        proposal.updatedAt = new Date();
+        await manager.save(proposal);
+
+        const fromStatus = target.definitionStatus;
+        target.basePriceIrr = dto.basePriceIrr;
+        target.competitorPriceIrr = dto.competitorPriceIrr ?? null;
+        target.charterSeats = charterSeats;
+        target.definitionStatus = FlightDefinitionStatus.PENDING_OPERATIONS;
+        target.publicSaleEnabled = false;
+        target.commercialPanelSettings = {
+          ...((target.commercialPanelSettings ?? {}) as Record<string, unknown>),
+          siteVisible: false,
+        } as typeof target.commercialPanelSettings;
+        target.rejectionReason = null;
+        target.version += 1;
+        await manager.save(target);
+
+        await manager.save(
+          manager.create(AuditLog, {
+            actorId: actor.id,
+            actorRole: actor.role,
+            category: 'SYSTEM',
+            action: 'تکمیل اتمیک رخداد برنامه پروازی',
+            detail: `رخداد ${flight.flightNo} تکمیل و همراه مجموعه ${targets.length} پروازی برای بررسی مدیر عملیات ارسال شد.`,
+            entityType: 'FlightInstance',
+            entityId: target.id,
+            metadata: {
+              fromStatus,
+              toStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
+              version: target.version,
+              fareRuleCount: dto.fareRules.length,
+              physicalCapacity: physicalTotal,
+              scheduleTemplateId: target.scheduleTemplateId,
+              occurrenceCount: targets.length,
+            },
           }),
-        ),
-      );
-
-      let proposal = await manager
-        .getRepository(FarePricingProposal)
-        .createQueryBuilder('proposal')
-        .where('proposal.flightInstanceId = :id', { id })
-        .getOne();
-      if (!proposal) {
-        proposal = manager.create(FarePricingProposal, {
-          flightInstanceId: id,
-          proposedById: actor.id,
-          createdAt: new Date(),
-        });
+        );
       }
-      proposal.basePriceIrr = dto.basePriceIrr;
-      proposal.competitorPriceIrr = dto.competitorPriceIrr ?? null;
-      proposal.proposedPriceIrr = dto.pricingProposal.proposedPriceIrr;
-      proposal.legalRateIrr = dto.pricingProposal.legalRateIrr ?? null;
-      proposal.commercialNote =
-        dto.pricingProposal.commercialNote?.trim() || null;
-      proposal.operationsNote =
-        dto.pricingProposal.operationsNote?.trim() || null;
-      proposal.ceoNote = dto.pricingProposal.ceoNote?.trim() || null;
-      proposal.note = null;
-      proposal.proposedById = actor.id;
-      proposal.status = PricingProposalStatus.PENDING;
-      proposal.registeredPriceIrr = null;
-      proposal.approvedById = null;
-      proposal.approvedAt = null;
-      proposal.rejectionReason = null;
-      proposal.rejectedById = null;
-      proposal.rejectedAt = null;
-      proposal.aiSuggestion = null;
-      proposal.updatedAt = new Date();
-      await manager.save(proposal);
-
-      const fromStatus = instance.definitionStatus;
-      instance.basePriceIrr = dto.basePriceIrr;
-      instance.competitorPriceIrr = dto.competitorPriceIrr ?? null;
-      instance.charterSeats = charterSeats;
-      instance.definitionStatus = FlightDefinitionStatus.PENDING_OPERATIONS;
-      instance.publicSaleEnabled = false;
-      instance.rejectionReason = null;
-      instance.version += 1;
-      await manager.save(instance);
-
-      await manager.save(
-        manager.create(AuditLog, {
-          actorId: actor.id,
-          actorRole: actor.role,
-          category: 'SYSTEM',
-          action: 'تکمیل اتمیک رخداد برنامه پروازی',
-          detail: `رخداد ${flight.flightNo} تکمیل و برای بررسی مدیر عملیات ارسال شد.`,
-          entityType: 'FlightInstance',
-          entityId: id,
-          metadata: {
-            fromStatus,
-            toStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
-            version: instance.version,
-            fareRuleCount: dto.fareRules.length,
-            physicalCapacity: physicalTotal,
-          },
-        }),
-      );
     });
 
-    return this.getDefinition(id);
+    const definition = await this.getDefinition(id);
+    const occurrences = await this.instanceRepo.find({
+      where: { id: In(submittedIds) },
+      order: { departureAt: 'ASC' },
+    });
+    return {
+      ...definition,
+      scheduleGroup: {
+        occurrenceCount: occurrences.length,
+        startAt: occurrences[0]?.departureAt.toISOString() ?? null,
+        endAt: occurrences.at(-1)?.departureAt.toISOString() ?? null,
+        departures: occurrences.map((row) => row.departureAt.toISOString()),
+      },
+    };
   }
 
   async createDefinition(
@@ -1289,6 +1359,10 @@ export class FlightDefinitionService {
     // approvals from overriding a later manual commercial pause, but make a
     // newly approved flight immediately discoverable by the public search.
     instance.publicSaleEnabled = true;
+    instance.commercialPanelSettings = {
+      ...((instance.commercialPanelSettings ?? {}) as Record<string, unknown>),
+      siteVisible: true,
+    } as typeof instance.commercialPanelSettings;
     instance.rejectionReason = null;
     instance.publishedAt = new Date();
     instance.publishedByUserId = publishedByUserId ?? null;

@@ -432,25 +432,39 @@ stays untouched on the same page).
   `PENDING_OPERATIONS`. Body `{ expectedVersion? }`. 409 on illegal state /
   version mismatch.
 - PUT `/flights/:id/complete-and-submit` — Commercial/Senior/Employee+`fl_manage`
-  — completes an existing occurrence materialized by a schedule template and
-  submits it to operations in one transaction. Body contains
+  — completes every eligible future occurrence materialized by the selected
+  schedule template and submits the series to operations in one transaction.
+  Body contains
   `{ expectedVersion?, basePriceIrr, competitorPriceIrr?, charterSeats?, chargeRules?, fareRules[], pricingProposal }`. Route,
   departure, aircraft and physical cabin capacities are checked against the
   locked occurrence/aircraft definition; the client may define fare-class and
   channel capacity but cannot rewrite physical capacity. Success returns the
-  complete definition in `PENDING_OPERATIONS`. Any error rolls back definition,
-  charges, fares, proposal and status together. This is the canonical Add
+  representative definition in `PENDING_OPERATIONS` plus `scheduleGroup`
+  (`occurrenceCount`, `startAt`, `endAt`, `departures`). Any error rolls back
+  every occurrence's definition, charges, fares, proposal and status together. This is the canonical Add
   Flight command; `POST /flights` remains a compatibility endpoint and is not
   used by the commercial Add Flight UI.
 - GET `/flights/operations-queue` — `OPERATIONS_MANAGER` (+ Senior) —
   list instances awaiting ops (`status` defaults `PENDING_OPERATIONS`).
+  Schedule-backed instances are grouped into one review row and include
+  `scheduleGroup` with every operating date and the first/last date.
 - GET `/flights/operations-overview` — `OPERATIONS_MANAGER` (+ Senior) —
   dashboard counters plus pending/recent workflow rows. Each row includes
   proposal prices/note, aircraft/capacity, status and optimistic-lock version.
 - POST `/flights/:id/operations-decision` — ops only —
   `{ decision: APPROVED|REJECTED, comment, expectedVersion? }`. Comment
   required. Approve → `PENDING_CEO`; reject → `OPERATIONS_REJECTED`.
-  Writes append-only `FlightReview`.
+  Writes append-only `FlightReview`. For a schedule-backed representative the
+  decision is atomic across every sibling occurrence in the same pending state.
+- POST `/flights/:instanceId/cancel` — Commercial Manager — body `{ reason }`;
+  cancels one scheduled occurrence, disables public sale, stores actor/reason/time,
+  invalidates search, creates customer notifications, and attempts booking-contact SMS.
+- GET `/flights/cancellations` — Commercial/Finance/Senior — cancelled occurrences
+  with route, reason, actor/time, affected bookings, passengers and refund status.
+- POST `/flights/:instanceId/cancellations/:bookingId/refund` — Finance Manager —
+  idempotent full flight-cancellation refund. Writes an immutable ledger reversal,
+  credits the owning customer wallet when present, and transitions the booking to
+  `REFUNDED`.
 - GET `/flights/:id/history` — reviews + audit trail for the instance
   (Commercial/Ops/CEO/Senior as permitted by role), including CEO decisions
   and every post-publication price change.

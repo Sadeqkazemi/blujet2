@@ -9,6 +9,13 @@ export type DerivedFlightStatus = "ACTIVE" | "SELLING" | "FULL" | "CANCELLED";
 
 export type { CabinKind, ChargeKind, ChargeMethod, FlightApprovalStatus };
 
+export interface ScheduleGroup {
+  occurrenceCount: number;
+  startAt: string | null;
+  endAt: string | null;
+  departures: string[];
+}
+
 export interface CabinCapacity {
   cabin: CabinKind;
   seats: number;
@@ -151,6 +158,8 @@ export interface FlightRow {
   };
   siteVisible?: boolean;
   publicSaleEnabled?: boolean;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
   classBreakdown?: CommercialClassBreakdownRow[];
   agencyReleaseSeats?: number;
   lockedSeats?: number;
@@ -336,6 +345,7 @@ export interface CompleteScheduledFlightPayload {
 }
 
 export interface FlightDefinitionDetail extends FlightRow {
+  scheduleGroup?: ScheduleGroup;
   aircraftType: string;
   durationMinutes: number;
   cabinCapacities: CabinCapacity[];
@@ -370,6 +380,7 @@ export type OperationsFlightStatus =
   | "PUBLISHED";
 
 export interface OperationsFlightRow {
+  scheduleGroup?: ScheduleGroup;
   id: string;
   flightNo: string;
   originCode: string;

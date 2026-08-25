@@ -25,6 +25,8 @@ import { FarePricingProposal } from '../../database/entities/fare-pricing-propos
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { User } from '../../database/entities/user.entity';
+import { WalletEntry } from '../../database/entities/wallet-entry.entity';
+import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import { enumerateSeats } from '../reservation/seat-layout';
@@ -48,9 +50,14 @@ import {
 import type { Irr } from '../../common/money';
 import { RedisService } from '../../redis/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SmsService } from '../sms/sms.service';
 import {
+  BookingStatus,
   FlightDefinitionStatus,
   FlightInstanceStatus,
+  LedgerEntryType,
+  NotificationCategory,
+  WalletEntryType,
   type CabinClass,
 } from '../../database/enums';
 import { isSellableDefinitionStatus } from './definition-sellability';
@@ -179,6 +186,7 @@ export class FlightsService {
     private readonly stepUp: StepUpService,
     private readonly redis: RedisService,
     private readonly notifications: NotificationsService,
+    private readonly sms: SmsService,
   ) {}
 
   private async emitWeakSalesAlerts(
@@ -330,12 +338,18 @@ export class FlightsService {
         seatsAllocated: r.seatsAllocated,
       })),
     });
-    return commercialRowExtras({
+    return {
+      ...commercialRowExtras({
       settings,
       classBreakdown,
       lockedSeats,
       routeAgencyPriceIrr,
-    });
+      }),
+      // publicSaleEnabled is the canonical sellability flag. Keeping the
+      // legacy panel value aligned prevents the list and detail views from
+      // contradicting one another.
+      siteVisible: instance.publicSaleEnabled,
+    };
   }
 
   private async priceChangeHistory(flightInstanceId: string) {
@@ -407,6 +421,8 @@ export class FlightsService {
       sold,
       basePriceIrr: i.basePriceIrr,
       publicSaleEnabled: i.publicSaleEnabled,
+      cancelledAt: i.cancelledAt?.toISOString() ?? null,
+      cancellationReason: i.cancellationReason,
     };
   }
 
@@ -430,7 +446,9 @@ export class FlightsService {
       isCommercialInventoryVisible(instance, now),
     );
     const activeRows = scheduled.filter(
-      (i) => i.departureAt <= futureCutoff || (sold.get(i.id) ?? 0) > 0,
+      (i) =>
+        i.status !== FlightInstanceStatus.CANCELLED &&
+        (i.departureAt <= futureCutoff || (sold.get(i.id) ?? 0) > 0),
     );
     const futureRows = scheduled.filter(
       (i) =>
@@ -1427,6 +1445,13 @@ export class FlightsService {
     }
     const previous = instance.publicSaleEnabled;
     instance.publicSaleEnabled = enabled;
+    const settings = parseCommercialPanelSettings(
+      instance.commercialPanelSettings,
+    );
+    instance.commercialPanelSettings = {
+      ...settings,
+      siteVisible: enabled,
+    } as unknown as typeof instance.commercialPanelSettings;
     instance.version += 1;
     const saved = await this.instanceRepo.save(instance);
     await this.audit.record({
@@ -2169,6 +2194,232 @@ export class FlightsService {
     return { success: true };
   }
 
+  async cancelFlight(actor: AuthenticatedUser, instanceId: string, reasonInput: string) {
+    const reason = reasonInput.trim();
+    if (reason.length < 3) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'علت کنسلی را کامل وارد کنید.',
+      });
+    }
+    const result = await this.dataSource.transaction(async (manager) => {
+      const instance = await manager
+        .getRepository(FlightInstance)
+        .createQueryBuilder('fi')
+        .setLock('pessimistic_write')
+        .leftJoinAndSelect('fi.flight', 'flight')
+        .leftJoinAndSelect('flight.route', 'route')
+        .where('fi.id = :instanceId', { instanceId })
+        .getOne();
+      if (!instance) {
+        throw new NotFoundException({ code: ErrorCode.NOT_FOUND, message: 'پرواز یافت نشد.' });
+      }
+      if (instance.status === FlightInstanceStatus.CANCELLED) {
+        return { instance, alreadyCancelled: true as const, bookings: [] as Booking[] };
+      }
+      if (instance.status !== FlightInstanceStatus.SCHEDULED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'فقط پرواز زمان‌بندی‌شده قابل کنسل کردن است.',
+        });
+      }
+      instance.status = FlightInstanceStatus.CANCELLED;
+      instance.publicSaleEnabled = false;
+      instance.commercialPanelSettings = {
+        ...parseCommercialPanelSettings(instance.commercialPanelSettings),
+        siteVisible: false,
+      } as unknown as typeof instance.commercialPanelSettings;
+      instance.cancelledAt = new Date();
+      instance.cancellationReason = reason;
+      instance.cancelledByUserId = actor.id;
+      instance.version += 1;
+      await manager.save(instance);
+      const bookings = await manager.getRepository(Booking).find({
+        where: {
+          flightInstanceId: instance.id,
+          status: In([BookingStatus.PAID, BookingStatus.TICKETED]),
+        },
+      });
+      await manager.save(manager.create(AuditLog, {
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'RESERVATION',
+        action: 'کنسلی پرواز',
+        detail: `پرواز ${instance.flight.flightNo} توسط ${actor.fullName} کنسل شد: ${reason}`,
+        entityType: 'FlightInstance',
+        entityId: instance.id,
+        metadata: { reason, affectedBookings: bookings.length },
+      }));
+      return { instance, alreadyCancelled: false as const, bookings };
+    });
+
+    if (!result.alreadyCancelled) {
+      await this.invalidateFlightSearch(result.instance);
+      const route = `${result.instance.flight.route.originCode} به ${result.instance.flight.route.destCode}`;
+      await Promise.allSettled(result.bookings.flatMap((booking) => {
+        const jobs: Promise<unknown>[] = [this.sms.send(
+          booking.contactPhone,
+          `مسافر گرامی، پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد. استرداد وجه توسط واحد مالی انجام می‌شود.`,
+          'FLIGHT_CANCELLED',
+        )];
+        if (booking.userId) {
+          jobs.push(this.notifications.notify({
+            recipientId: booking.userId,
+            category: NotificationCategory.SYSTEM,
+            action: 'FLIGHT_CANCELLED',
+            title: 'پرواز شما کنسل شد',
+            body: `پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد.`,
+            entityType: 'Booking',
+            entityId: booking.id,
+            dedupeKey: `Booking:${booking.id}:FLIGHT_CANCELLED`,
+          }));
+        }
+        return jobs;
+      }));
+    }
+    return {
+      flightInstanceId: result.instance.id,
+      status: result.instance.status,
+      cancelledAt: result.instance.cancelledAt?.toISOString() ?? null,
+      cancellationReason: result.instance.cancellationReason,
+      affectedBookings: result.bookings.length,
+      alreadyCancelled: result.alreadyCancelled,
+    };
+  }
+
+  async listCancellations() {
+    const instances = await this.instanceRepo
+      .createQueryBuilder('fi')
+      .leftJoinAndSelect('fi.flight', 'flight')
+      .leftJoinAndSelect('flight.route', 'route')
+      .leftJoinAndSelect('fi.cancelledBy', 'cancelledBy')
+      .where('fi.status = :status', { status: FlightInstanceStatus.CANCELLED })
+      .orderBy('fi.cancelledAt', 'DESC')
+      .addOrderBy('fi.departureAt', 'ASC')
+      .getMany();
+    if (instances.length === 0) return [];
+    const bookings = await this.bookingRepo.find({
+      where: {
+        flightInstanceId: In(instances.map((instance) => instance.id)),
+        status: In([BookingStatus.PAID, BookingStatus.TICKETED, BookingStatus.REFUNDED]),
+      },
+      order: { createdAt: 'ASC' },
+    });
+    const passengers = bookings.length
+      ? await this.passengerRepo.find({
+          where: { bookingId: In(bookings.map((booking) => booking.id)), deletedAt: IsNull() },
+        })
+      : [];
+    const namesByBooking = new Map<string, string[]>();
+    for (const passenger of passengers) {
+      const names = namesByBooking.get(passenger.bookingId) ?? [];
+      names.push(passenger.fullName);
+      namesByBooking.set(passenger.bookingId, names);
+    }
+    return instances.map((instance) => {
+      const affected = bookings.filter((booking) => booking.flightInstanceId === instance.id);
+      return {
+        id: instance.id,
+        flightNo: instance.flight.flightNo,
+        originCode: instance.flight.route.originCode,
+        destCode: instance.flight.route.destCode,
+        departureAt: instance.departureAt.toISOString(),
+        cancelledAt: instance.cancelledAt?.toISOString() ?? null,
+        cancellationReason: instance.cancellationReason,
+        cancelledBy: instance.cancelledBy
+          ? { id: instance.cancelledBy.id, fullName: instance.cancelledBy.fullName }
+          : null,
+        refundSummary: {
+          total: affected.length,
+          pending: affected.filter((booking) => booking.status !== BookingStatus.REFUNDED).length,
+          refunded: affected.filter((booking) => booking.status === BookingStatus.REFUNDED).length,
+        },
+        bookings: affected.map((booking) => ({
+          id: booking.id,
+          pnr: booking.pnr,
+          status: booking.status,
+          priceIrr: booking.priceIrr,
+          contactPhone: booking.contactPhone,
+          passengerNames: namesByBooking.get(booking.id) ?? [],
+        })),
+      };
+    });
+  }
+
+  async refundCancelledBooking(actor: AuthenticatedUser, instanceId: string, bookingId: string) {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const instance = await manager.getRepository(FlightInstance)
+        .createQueryBuilder('fi').setLock('pessimistic_read')
+        .where('fi.id = :instanceId', { instanceId }).getOne();
+      if (!instance || instance.status !== FlightInstanceStatus.CANCELLED) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این پرواز در فهرست پروازهای کنسل‌شده نیست.',
+        });
+      }
+      const booking = await manager.getRepository(Booking)
+        .createQueryBuilder('booking').setLock('pessimistic_write')
+        .where('booking.id = :bookingId', { bookingId })
+        .andWhere('booking.flightInstanceId = :instanceId', { instanceId }).getOne();
+      if (!booking) {
+        throw new NotFoundException({ code: ErrorCode.NOT_FOUND, message: 'رزرو مرتبط با این پرواز یافت نشد.' });
+      }
+      if (booking.status === BookingStatus.REFUNDED) {
+        return { booking, alreadyRefunded: true as const };
+      }
+      if (booking.status !== BookingStatus.PAID && booking.status !== BookingStatus.TICKETED) {
+        throw new ConflictException({ code: ErrorCode.CONFLICT, message: 'این رزرو وجه قابل استرداد ندارد.' });
+      }
+      booking.status = BookingStatus.REFUNDED;
+      await manager.save(booking);
+      await manager.save(manager.create(LedgerEntry, {
+        bookingId: booking.id,
+        type: LedgerEntryType.REFUND,
+        signedAmountIrr: -booking.priceIrr,
+        createdById: actor.id,
+        agencyId: booking.agencyId,
+      }));
+      if (booking.userId) {
+        await manager.save(manager.create(WalletEntry, {
+          userId: booking.userId,
+          type: WalletEntryType.REFUND,
+          signedAmountIrr: booking.priceIrr,
+          bookingId: booking.id,
+        }));
+      }
+      await manager.save(manager.create(AuditLog, {
+        actorId: actor.id,
+        actorRole: actor.role,
+        category: 'REFUND',
+        action: 'استرداد پرواز کنسل‌شده',
+        detail: `مبلغ رزرو ${booking.pnr} توسط ${actor.fullName} به حساب مسافر بازگشت داده شد.`,
+        entityType: 'Booking',
+        entityId: booking.id,
+        metadata: { flightInstanceId: instanceId, amountIrr: booking.priceIrr.toString() },
+      }));
+      return { booking, alreadyRefunded: false as const };
+    });
+    if (!result.alreadyRefunded && result.booking.userId) {
+      await this.notifications.notify({
+        recipientId: result.booking.userId,
+        category: NotificationCategory.SYSTEM,
+        action: 'CANCELLED_FLIGHT_REFUNDED',
+        title: 'وجه بلیط به حساب شما بازگشت داده شد',
+        body: `مبلغ رزرو ${result.booking.pnr} به حساب شما بازگشت داده شد.`,
+        entityType: 'Booking',
+        entityId: result.booking.id,
+        dedupeKey: `Booking:${result.booking.id}:CANCELLED_FLIGHT_REFUNDED`,
+      });
+    }
+    return {
+      bookingId: result.booking.id,
+      pnr: result.booking.pnr,
+      status: result.booking.status,
+      refundedIrr: result.booking.priceIrr,
+      alreadyRefunded: result.alreadyRefunded,
+    };
+  }
+
   async patchCommercialPanelSettings(
     actor: AuthenticatedUser,
     instanceId: string,
@@ -2193,6 +2444,22 @@ export class FlightsService {
       instance.commercialPanelSettings,
       dto,
     );
+    if (typeof dto.siteVisible === 'boolean') {
+      if (
+        dto.siteVisible &&
+        (instance.status !== FlightInstanceStatus.SCHEDULED ||
+          !isSellableDefinitionStatus(
+            instance.definitionStatus,
+            instance.approvedSnapshot != null,
+          ))
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'فقط پرواز تأییدشده و زمان‌بندی‌شده قابل نمایش در سایت است.',
+        });
+      }
+      instance.publicSaleEnabled = dto.siteVisible;
+    }
     instance.commercialPanelSettings = merged as unknown as typeof instance.commercialPanelSettings;
     instance.version += 1;
     await this.instanceRepo.save(instance);

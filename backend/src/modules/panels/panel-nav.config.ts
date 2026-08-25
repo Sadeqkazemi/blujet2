@@ -100,6 +100,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'finance', labelFa: 'مالی', implemented: true },
     { key: 'exports', labelFa: 'گزارشات و خروجی', implemented: true },
     { key: 'refund', labelFa: 'استرداد بلیط', implemented: true },
+    { key: 'cancellations', labelFa: 'کنسلی پرواز', implemented: true },
     { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     {
       key: 'integrations',
@@ -113,6 +114,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     { key: 'routes', labelFa: 'مسیرهای پروازی', implemented: true },
     { key: 'aircraft', labelFa: 'تعریف هواپیما', implemented: true },
     { key: 'flights', labelFa: 'مدیریت پروازها', implemented: true },
+    { key: 'cancellations', labelFa: 'کنسلی پرواز', implemented: true },
     { key: 'ancillary-services', labelFa: 'خدمات', implemented: true },
     { key: 'reports', labelFa: 'گزارش مسافران', implemented: true },
     { key: 'staff', labelFa: 'گزارش کارمندان', implemented: true },

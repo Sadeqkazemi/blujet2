@@ -317,6 +317,13 @@ export default function AddFlightPage({
       ),
     [cabinRows],
   );
+  const availableFareCabins = useMemo(
+    () =>
+      cabinRows
+        .filter((row) => (Number(latinDigits(row.seats)) || 0) > 0)
+        .map((row) => row.cabin),
+    [cabinRows],
+  );
   const agencyCommittedSeats = useMemo(
     () =>
       agencyCommitments
@@ -707,7 +714,10 @@ export default function AddFlightPage({
 
   function openFareCreate() {
     setFareEditingId(null);
-    setFareForm(emptyFareForm());
+    setFareForm({
+      ...emptyFareForm(),
+      cabin: availableFareCabins[0] ?? "ECONOMY",
+    });
     setFareError(null);
     setFareFormOpen(true);
   }
@@ -973,8 +983,11 @@ export default function AddFlightPage({
           },
         });
         const route = `${cityByCode.get(originCode) ?? originCode} ← ${cityByCode.get(destCode) ?? destCode}`;
+        const occurrenceCount = resolvedTemplate?.occurrences.filter((occurrence) =>
+          COMPLETABLE_OCCURRENCE_STATUSES.has(occurrence.definitionStatus),
+        ).length ?? 1;
         onSuccess(
-          `رخداد زمان‌بندی‌شده در یک عملیات تکمیل و برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
+          `هر ${faDigits(occurrenceCount)} روز پرواز این شماره در یک عملیات برای بررسی مدیر عملیات ارسال شد ✓ — ${route}`,
         );
         return;
       }
@@ -1387,7 +1400,7 @@ export default function AddFlightPage({
                       مسیر زمان‌بندی‌شده پیدا شد و اطلاعات خودکار تکمیل شد
                     </strong>
                     <span className="rounded-full bg-blue-300/15 px-2.5 py-1 text-[10px] text-blue-200">
-                      تکمیل همان رخداد؛ بدون ساخت پرواز تکراری
+                      همه روزهای این شماره در یک درخواست
                     </span>
                   </div>
                   <div className="mt-3 grid gap-2 rounded-lg border border-blue-300/15 bg-[#0f1726]/60 p-2 text-[10.5px] sm:grid-cols-2">
@@ -1420,7 +1433,7 @@ export default function AddFlightPage({
                   </div>
                   <div className="mt-3">
                     <div className="mb-2 text-[10.5px] font-bold text-blue-100">
-                      روز پرواز را برای تکمیل مشخصات انتخاب کنید
+                      یک روز را به‌عنوان نمونه انتخاب کنید؛ تصمیم برای همه روزهای زیر اعمال می‌شود
                     </div>
                     <div
                       className="flex max-h-36 flex-wrap gap-2 overflow-y-auto pl-1"
@@ -1591,9 +1604,11 @@ export default function AddFlightPage({
                         }
                         className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#141d2e] px-[9px] text-[11.5px] text-[#e7ecf3]"
                       >
-                        <option value="ECONOMY">اکونومی</option>
-                        <option value="COMFORT">کامفورت</option>
-                        <option value="BUSINESS">بیزنس</option>
+                        {availableFareCabins.map((cabin) => (
+                          <option key={cabin} value={cabin}>
+                            {cabinLabel(cabin)}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>

@@ -480,6 +480,7 @@ export const SmsMessageType = {
   OTP: 'OTP',
   TEMP_PASSWORD: 'TEMP_PASSWORD',
   SURVEY_INVITE: 'SURVEY_INVITE',
+  FLIGHT_CANCELLED: 'FLIGHT_CANCELLED',
 } as const;
 export type SmsMessageType =
   (typeof SmsMessageType)[keyof typeof SmsMessageType];

@@ -18,6 +18,7 @@ import type {
   CommercialFlightControl,
   FlightDetail,
 } from "../../../types/flights";
+import { cancelFlight } from "../../../api/flight-cancellations";
 
 interface Props {
   detail: FlightDetail;
@@ -66,6 +67,8 @@ export default function CommercialFlightDetailContent({
   const [specialOffers, setSpecialOffers] = useState<Record<string, boolean>>({});
   const [sitePrices, setSitePrices] = useState<Record<string, string>>({});
   const [priceReasons, setPriceReasons] = useState<Record<string, string>>({});
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -183,6 +186,25 @@ export default function CommercialFlightDetailContent({
       onNotice(`قیمت فروش سایت کلاس ${classTitle(row)} اصلاح شد.`);
     } catch (error) {
       onError(error instanceof Error ? error.message : "اصلاح قیمت ناموفق بود.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function submitCancellation() {
+    const reason = cancelReason.trim();
+    if (reason.length < 3) {
+      onError("علت کنسلی را کامل وارد کنید.");
+      return;
+    }
+    setBusyKey("cancel");
+    try {
+      const result = await cancelFlight(detail.id, reason);
+      onNotice(`پرواز کنسل شد و برای ${faDigits(result.affectedBookings)} رزرو پیامک کنسلی ثبت شد.`);
+      await Promise.resolve(onChanged());
+      onConfirm();
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "کنسل کردن پرواز ناموفق بود.");
     } finally {
       setBusyKey(null);
     }
@@ -481,6 +503,39 @@ export default function CommercialFlightDetailContent({
           </div>
         )}
       </section>
+
+      {canManage && detail.derivedStatus !== "CANCELLED" && (
+        <section className="rounded-lg border border-red-500/35 bg-red-500/5 p-2.5">
+          {!cancelOpen ? (
+            <button
+              type="button"
+              onClick={() => setCancelOpen(true)}
+              className="w-full rounded-md border border-red-500/60 px-4 py-2 text-[11px] font-black text-red-300"
+            >
+              کنسل کردن پرواز
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-[10px] font-bold text-red-200">
+                علت کنسلی
+                <textarea
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-md border border-red-500/40 bg-[#101827] p-2 text-[10px] text-white outline-none"
+                  placeholder="علت کنسلی برای پیام‌رسانی و سوابق مالی"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setCancelOpen(false)} className="rounded-md border border-[#34415a] py-2 text-[10px]">انصراف</button>
+                <button type="button" disabled={busyKey === "cancel"} onClick={() => void submitCancellation()} className="rounded-md bg-red-600 py-2 text-[10px] font-black disabled:opacity-50">
+                  {busyKey === "cancel" ? "در حال ثبت…" : "تأیید کنسلی"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <button
         type="button"

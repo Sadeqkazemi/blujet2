@@ -72,6 +72,24 @@ export default function OperationsCartablePage() {
               <span className="rounded-full bg-amber-400/15 px-3 py-1 text-[10px] font-bold text-amber-300">در انتظار بررسی من</span>
             </div>
 
+            {row.scheduleGroup && row.scheduleGroup.occurrenceCount > 1 && (
+              <div className="mt-4 rounded-xl border border-blue-400/25 bg-blue-400/5 p-3">
+                <p className="text-xs font-black text-blue-200">
+                  این تصمیم برای هر {faDigits(row.scheduleGroup.occurrenceCount)} روز پرواز اعمال می‌شود
+                </p>
+                <p className="mt-1 text-[10px] text-[#9fb0c7]">
+                  شروع {row.scheduleGroup.startAt ? formatJalaliDate(row.scheduleGroup.startAt) : '—'} · پایان {row.scheduleGroup.endAt ? formatJalaliDate(row.scheduleGroup.endAt) : '—'}
+                </p>
+                <div className="mt-2 flex max-h-24 flex-wrap gap-1.5 overflow-auto">
+                  {row.scheduleGroup.departures.map((departure) => (
+                    <span key={departure} className="rounded-md bg-[#1d2b45] px-2 py-1 text-[10px] text-blue-100">
+                      {formatJalaliDate(departure)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
               <Metric label="هواپیما" value={row.aircraftType} />
               <Metric label="ظرفیت کل" value={faDigits(row.capacity)} />

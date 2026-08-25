@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as flightsApi from "../../../api/flights";
 import type { CommercialFlightControl, FlightDetail } from "../../../types/flights";
 import CommercialFlightDetailContent from "./CommercialFlightDetailContent";
+import * as cancellationApi from "../../../api/flight-cancellations";
 
 const detail: FlightDetail = {
   id: "fi-1",
@@ -119,6 +120,26 @@ describe("CommercialFlightDetailContent", () => {
         priceIrr: "42000000",
         reason: "تقاضای آخر هفته",
       }),
+    );
+  });
+
+  it("requires a reason and cancels the flight through the governed endpoint", async () => {
+    const cancelSpy = vi.spyOn(cancellationApi, "cancelFlight").mockResolvedValue({
+      flightInstanceId: "fi-1",
+      status: "CANCELLED",
+      affectedBookings: 3,
+    });
+    renderContent();
+
+    await screen.findByText("تفکیک کانال فروش صندلی");
+    fireEvent.click(screen.getByRole("button", { name: "کنسل کردن پرواز" }));
+    fireEvent.change(screen.getByLabelText("علت کنسلی"), {
+      target: { value: "محدودیت عملیاتی فرودگاه" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "تأیید کنسلی" }));
+
+    await waitFor(() =>
+      expect(cancelSpy).toHaveBeenCalledWith("fi-1", "محدودیت عملیاتی فرودگاه"),
     );
   });
 });

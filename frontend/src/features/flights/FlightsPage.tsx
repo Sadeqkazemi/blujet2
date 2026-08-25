@@ -413,7 +413,7 @@ export default function FlightsPage() {
     event?: MouseEvent,
   ) {
     event?.stopPropagation();
-    const nextVisible = !(flight.siteVisible ?? true);
+    const nextVisible = !(flight.publicSaleEnabled ?? flight.siteVisible ?? false);
     setCommercialBusy(true);
     setError(null);
     try {
@@ -1032,13 +1032,20 @@ export default function FlightsPage() {
                             0,
                             f.capacity - f.sold - relSeats - locked,
                           );
-                          const pubOn = f.siteVisible ?? true;
+                          const pubOn = f.publicSaleEnabled ?? f.siteVisible ?? false;
                           const expanded = expandedActiveId === f.id;
                           return (
                             <li key={f.id}>
-                              <button
-                                type="button"
+                              <div
+                                role="button"
+                                tabIndex={0}
                                 onClick={() => void openDetail(f.id)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    void openDetail(f.id);
+                                  }
+                                }}
                                 className={`grid w-full grid-cols-[1.6fr_1.4fr_1.5fr_1fr] items-start gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50 ${f.salesHealth?.isWeak ? "bg-[#f8717112]" : ""}`}
                               >
                                 <span>
@@ -1136,7 +1143,7 @@ export default function FlightsPage() {
                                     </span>
                                   )}
                                 </span>
-                              </button>
+                              </div>
                             </li>
                           );
                         })}
@@ -2065,12 +2072,12 @@ export default function FlightsPage() {
           {isCommercial && (
             <div className="mt-3 flex flex-col gap-3" data-testid="commercial-flight-detail">
               <div
-                className={`rounded-xl border p-3 ${detail.siteVisible ?? true ? "border-[#34d39955] bg-[#34d39910]" : "border-[#f59e0b55] bg-[#f59e0b10]"}`}
+                className={`rounded-xl border p-3 ${detail.publicSaleEnabled ?? detail.siteVisible ?? false ? "border-[#34d39955] bg-[#34d39910]" : "border-[#f59e0b55] bg-[#f59e0b10]"}`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-extrabold text-panel-ink">
-                      {detail.siteVisible ?? true
+                      {detail.publicSaleEnabled ?? detail.siteVisible ?? false
                         ? "مجوز نمایش و فروش در سایت فعال است"
                         : "پرواز در سایت مخفی است"}
                     </div>
@@ -2083,9 +2090,9 @@ export default function FlightsPage() {
                       type="button"
                       disabled={commercialBusy}
                       onClick={() => void onToggleSiteVisible(detail)}
-                      className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white ${detail.siteVisible ?? true ? "bg-[#f59e0b]" : "bg-[#34d399]"}`}
+                      className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white ${detail.publicSaleEnabled ?? detail.siteVisible ?? false ? "bg-[#f59e0b]" : "bg-[#34d399]"}`}
                     >
-                      {detail.siteVisible ?? true ? "مخفی از سایت" : "نمایش در سایت"}
+                      {detail.publicSaleEnabled ?? detail.siteVisible ?? false ? "مخفی از سایت" : "نمایش در سایت"}
                     </button>
                   )}
                 </div>
