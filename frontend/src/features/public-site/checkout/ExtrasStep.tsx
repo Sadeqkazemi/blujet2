@@ -460,14 +460,17 @@ export default function ExtrasStep({
           }}
           aria-expanded={seatOpen}
           aria-disabled={!seatAccessGranted}
+          disabled={!seatAccessGranted}
           className="mb-2.5 flex w-full items-center justify-between gap-2 text-start"
           data-testid="checkout-seat-toggle"
         >
           <div>
             <div className="text-[13px] font-extrabold text-[#0d2640]">
-              {t.seatMapCaption(useMd80 ? 'MD-80' : aircraft)}
+              {seatAccessGranted
+                ? t.seatMapCaption(useMd80 ? 'MD-80' : aircraft)
+                : (locale === 'en' ? 'Seat selection' : locale === 'ar' ? 'اختيار المقعد' : 'انتخاب صندلی')}
             </div>
-            {businessLocked && <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>}
+            {seatAccessGranted && businessLocked && <div className="mt-1 text-[10.5px] text-[#96701a]">🔒 {t.bizLockedHint}</div>}
             {loyaltySeatAccess && (
               <div className="mt-1 text-[10.5px] font-bold text-[#258b6a]" data-testid="checkout-seat-loyalty-access">
                 {seatAccessCopy.loyalty}
@@ -478,7 +481,7 @@ export default function ExtrasStep({
             className="flex-none text-sm text-[#8a96a6] transition-transform"
             style={{ transform: seatOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
           >
-            ⌄
+            {seatAccessGranted ? '⌄' : '🔒'}
           </span>
         </button>
 

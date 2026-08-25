@@ -66,6 +66,15 @@ const CLUB_STR: Record<StoredLocale, {
   cardStatus: Record<string, string>;
   stepLabels: Record<string, string>;
   hdrTierBenefits: string;
+  bankTitle: string;
+  bankSubtitle: string;
+  bankStep: string;
+  bankCustomer: string;
+  bankNotCustomer: string;
+  bankCustomerHint: string;
+  bankNotCustomerHint: string;
+  bankCustomerCta: string;
+  bankNotCustomerCta: string;
   benefits: { title: string; desc: string }[];
   btnFullClubIntro: string;
   requestSuccess: string;
@@ -102,6 +111,15 @@ const CLUB_STR: Record<StoredLocale, {
       rejected: 'رد درخواست',
     },
     hdrTierBenefits: 'مزایای سطح عضویت',
+    bankTitle: 'بلو بانک و وام باشگاه مشتریان',
+    bankSubtitle: 'برای استفاده از وام باشگاه، وضعیت مشتری بانک را مشخص کنید و سپس از مسیر رسمی درخواست اقدام کنید.',
+    bankStep: 'اتصال به بلو بانک',
+    bankCustomer: 'مشتری بانک سامان هستم',
+    bankNotCustomer: 'مشتری بانک سامان نیستم',
+    bankCustomerHint: 'درخواست وام از صفحه وام و اعتبارات مستقیماً برای API بانک ارسال می‌شود.',
+    bankNotCustomerHint: 'برای افتتاح حساب و صدور کارت، درخواست عضویت را برای پشتیبانی ارسال کنید.',
+    bankCustomerCta: 'ورود به درخواست وام',
+    bankNotCustomerCta: 'ارسال درخواست عضویت',
     benefits: [
       { title: 'ارتقای رایگان به بیزینس', desc: 'در پروازهای منتخب' },
       { title: 'تا ۵٪ کش‌بک بیشتر', desc: 'روی هر خرید بلیط' },
@@ -143,6 +161,15 @@ const CLUB_STR: Record<StoredLocale, {
       rejected: 'Request rejected',
     },
     hdrTierBenefits: 'Tier Benefits',
+    bankTitle: 'Blu Bank & Club Loans',
+    bankSubtitle: 'Choose your bank-customer status, then continue through the official application flow.',
+    bankStep: 'Connect to Blu Bank',
+    bankCustomer: 'I am a Saman Bank customer',
+    bankNotCustomer: 'I am not a Saman Bank customer',
+    bankCustomerHint: 'Loan applications are sent directly to the bank API from the Loans & Credit page.',
+    bankNotCustomerHint: 'Send a membership request to support for account opening and card issuance.',
+    bankCustomerCta: 'Open loan application',
+    bankNotCustomerCta: 'Send membership request',
     benefits: [
       { title: 'Free upgrade to Business', desc: 'On select flights' },
       { title: 'Up to 5% extra cashback', desc: 'On every ticket purchase' },
@@ -184,6 +211,15 @@ const CLUB_STR: Record<StoredLocale, {
       rejected: 'رفض الطلب',
     },
     hdrTierBenefits: 'مزايا المستوى',
+    bankTitle: 'بلو بنك وقروض النادي',
+    bankSubtitle: 'حدد حالة عميل البنك ثم تابع عبر مسار الطلب الرسمي.',
+    bankStep: 'الاتصال ببلو بنك',
+    bankCustomer: 'أنا عميل بنك سامان',
+    bankNotCustomer: 'لست عميلاً في بنك سامان',
+    bankCustomerHint: 'تُرسل طلبات القرض مباشرة إلى واجهة البنك من صفحة القروض والائتمان.',
+    bankNotCustomerHint: 'أرسل طلب عضوية إلى الدعم لفتح الحساب وإصدار البطاقة.',
+    bankCustomerCta: 'فتح طلب القرض',
+    bankNotCustomerCta: 'إرسال طلب العضوية',
     benefits: [
       { title: 'ترقية مجانية إلى درجة الأعمال', desc: 'في رحلات مختارة' },
       { title: 'حتى 5٪ استرداد إضافي', desc: 'على كل شراء تذكرة' },
@@ -262,6 +298,7 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
   const [notice, setNotice] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [bankCustomer, setBankCustomer] = useState(true);
 
   async function onJoinClub() {
     setJoinBusy(true);
@@ -377,6 +414,40 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
             <div style={{ width: `${tierInfo.progressPct}%`, height: '100%', background: '#fff', borderRadius: 18 }} />
           </div>
         </div>
+      </div>
+
+      <div data-testid="club-bank-loan-section" style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ fontSize: 15.5, fontWeight: 800, margin: 0 }}>{t.bankTitle}</h3>
+            <p style={{ fontSize: 11.5, color: '#8a96a6', lineHeight: 1.9, margin: '5px 0 0' }}>{t.bankSubtitle}</p>
+          </div>
+          <span style={{ width: 30, height: 30, borderRadius: '50%', display: 'grid', placeItems: 'center', background: '#1668c4', color: '#fff', fontSize: 12, fontWeight: 900 }}>۱</span>
+        </div>
+        <div style={{ marginTop: 16, fontSize: 13, fontWeight: 800, color: '#0d2640' }}>{t.bankStep}</div>
+        <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', borderRadius: 12, background: '#f3f5f8', padding: 4, gap: 4 }}>
+          {[true, false].map((value) => (
+            <button
+              key={String(value)}
+              type="button"
+              data-testid={value ? 'club-bank-customer' : 'club-bank-non-customer'}
+              onClick={() => setBankCustomer(value)}
+              style={{ minHeight: 44, border: bankCustomer === value ? '1px solid #e0e6ee' : '1px solid transparent', borderRadius: 10, background: bankCustomer === value ? '#fff' : 'transparent', color: bankCustomer === value ? '#0d2640' : '#8a96a6', boxShadow: bankCustomer === value ? '0 2px 8px rgba(13,38,64,.07)' : 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
+            >
+              {value ? t.bankCustomer : t.bankNotCustomer}
+            </button>
+          ))}
+        </div>
+        <p style={{ margin: '12px 0', color: '#718096', fontSize: 11.5, lineHeight: 1.9 }}>
+          {bankCustomer ? t.bankCustomerHint : t.bankNotCustomerHint}
+        </p>
+        <Link
+          to={bankCustomer ? '/account?tab=loans' : '/account?tab=tickets'}
+          data-testid="club-bank-action"
+          style={{ display: 'flex', minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 12, background: '#1668c4', color: '#fff', textDecoration: 'none', fontSize: 13, fontWeight: 900 }}
+        >
+          {bankCustomer ? t.bankCustomerCta : t.bankNotCustomerCta}
+        </Link>
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>

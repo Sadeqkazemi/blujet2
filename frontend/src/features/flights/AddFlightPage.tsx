@@ -318,11 +318,19 @@ export default function AddFlightPage({
     [cabinRows],
   );
   const availableFareCabins = useMemo(
-    () =>
-      cabinRows
+    () => {
+      const definedCabins = new Set(
+        aircraftCabinLimits
+          .filter((row) => row.capacity > 0)
+          .map((row) => toFlightCabinKind(row.cabinType))
+          .filter((row): row is CabinKind => row !== null),
+      );
+      return cabinRows
         .filter((row) => (Number(latinDigits(row.seats)) || 0) > 0)
-        .map((row) => row.cabin),
-    [cabinRows],
+        .filter((row) => definedCabins.size === 0 || definedCabins.has(row.cabin))
+        .map((row) => row.cabin);
+    },
+    [aircraftCabinLimits, cabinRows],
   );
   const agencyCommittedSeats = useMemo(
     () =>
@@ -571,15 +579,26 @@ export default function AddFlightPage({
             setTime(departure.format("HH:mm"));
           }
           if (initialOccurrence) {
-            const [summary, definition] = await Promise.all([
+            const [summary, definition, aircraftDefinition] = await Promise.all([
               fetchAllotmentsSummary(initialOccurrence.id).catch(
                 () => null,
               ),
               fetchFlightDefinition(initialOccurrence.id),
+              fetchAircraftDefinition(template.aircraftDefinitionId).catch(() => null),
             ]);
             if (!cancelled) {
               setAgencySummary(summary);
               setResolvedOccurrenceVersion(definition.version);
+              if (aircraftDefinition) {
+                setAircraftCabinLimits(
+                  aircraftDefinition.cabins
+                    .filter((row) => row.capacity > 0)
+                    .map((row) => ({
+                      cabinType: row.cabinType,
+                      capacity: row.capacity,
+                    })),
+                );
+              }
             }
           } else {
             setAgencySummary(null);

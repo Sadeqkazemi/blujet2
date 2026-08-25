@@ -326,6 +326,8 @@ describe('ExtrasStep — design parity', () => {
     );
 
     expect(screen.getByTestId('checkout-seat-toggle')).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('checkout-seat-toggle')).toBeDisabled();
+    expect(screen.getByTestId('checkout-seat-toggle')).not.toHaveTextContent('MD-80');
     expect(screen.queryByTestId('checkout-seat-instructions')).not.toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-map')).not.toBeInTheDocument();
     await user.click(screen.getByTestId('checkout-seat-toggle'));

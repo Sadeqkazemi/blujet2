@@ -108,7 +108,7 @@ function mockRole(role: Role) {
 }
 
 describe('ReservationPage', () => {
-  it('BOARD_CHAIR uses API service health and shows an honest empty state', async () => {
+  it('BOARD_CHAIR dashboard hides operational service health', async () => {
     mockRole('BOARD_CHAIR');
     vi.spyOn(reservationApi, 'fetchReservationDashboardStats').mockResolvedValue({
       ...STATS,
@@ -119,11 +119,10 @@ describe('ReservationPage', () => {
 
     renderPage();
 
-    expect(
-      await screen.findByText('داده‌ای از وضعیت سرویس‌ها دریافت نشده است.'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('تفکیک کانال رزرو')).toBeInTheDocument();
+    expect(screen.queryByText('وضعیت سرویس‌های سامانه')).not.toBeInTheDocument();
+    expect(screen.queryByText('داده‌ای از وضعیت سرویس‌ها دریافت نشده است.')).not.toBeInTheDocument();
     expect(screen.queryByText('reservation-api')).not.toBeInTheDocument();
-    expect(screen.getByText('نیازمند بررسی')).toBeInTheDocument();
   });
 
   it('BOARD_CHAIR loads agency access from the reservation API', async () => {

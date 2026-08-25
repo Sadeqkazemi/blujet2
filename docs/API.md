@@ -1241,6 +1241,18 @@ Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
 membership-card issuance (request, tracker timeline, issued card display),
 and tier-benefits grid. BluBank block deferred (no backing schema).
 
+The later bank-loan adapter phase supersedes that display-only deferral. The
+customer club surface may now link to the real `/me/loan-applications` workflow;
+it must not simulate a bank-account connection or a loan decision in the UI.
+
+### UAT staff-directory recipients (2026-08-25)
+
+`GET /staff-directory` keeps temporary `uat.*` panel accounts hidden in normal
+production operation. When `AUTH_SANDBOX_ENABLED=true`, active temporary UAT
+staff accounts are included so CEO and board-chair cartable transfer pickers can
+exercise the real routing workflow. The caller is still excluded and the
+existing role/permission guards remain unchanged.
+
 - `GET /my/club/membership` (new, `USER` role) — returns `{ isMember,
   level, balance, cardStatus, cardNo, tierRules: { goldMinPoints,
   platinumMinPoints, cardRequestMinPoints }, cardRequest: { id, status,

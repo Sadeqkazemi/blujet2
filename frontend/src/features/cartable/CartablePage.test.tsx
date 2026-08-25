@@ -111,6 +111,7 @@ describe('CartablePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
     await waitFor(() => expect(approve).toHaveBeenCalledWith('t1', 'تأیید می‌شود'));
     expect(await screen.findByText('درخواست تأیید شد ✓')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'بررسی درخواست' })).not.toBeInTheDocument());
   });
 
   it('the transfer button stays disabled until a target manager is picked', async () => {

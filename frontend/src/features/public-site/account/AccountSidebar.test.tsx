@@ -7,6 +7,22 @@ import * as useLocaleModule from '../../../hooks/useLocale';
 afterEach(() => vi.restoreAllMocks());
 
 describe('AccountSidebar logout', () => {
+  it('does not label the base club membership as silver in the profile box', () => {
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    render(
+      <AccountSidebar
+        tab="profile"
+        onTabChange={vi.fn()}
+        user={{ id: 'u1', fullName: 'نگار رضایی', role: 'USER', preferredLocale: 'FA' }}
+        club={{ isMember: true, level: 'SILVER', balance: 1200 }}
+        onSignOut={vi.fn()}
+        isMobile={false}
+      />,
+    );
+    expect(screen.getByText('عضو باشگاه')).toBeInTheDocument();
+    expect(screen.queryByText(/نقره/)).not.toBeInTheDocument();
+  });
+
   it('opens the localized confirmation instead of immediately signing out', async () => {
     vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
     const onSignOut = vi.fn().mockResolvedValue(undefined);

@@ -276,6 +276,18 @@ describe("AddFlightPage", () => {
 
   it("completes the resolved scheduled occurrence instead of creating a duplicate", async () => {
     const onSuccess = vi.fn();
+    vi.spyOn(aircraftApi, "fetchAircraftDefinition").mockResolvedValue({
+      id: "aircraft-1",
+      code: "A320",
+      model: "Airbus A320",
+      title: "ایرباس ۳۲۰",
+      status: "ACTIVE",
+      totalCapacity: 180,
+      version: 1,
+      cabins: [{ cabinType: "ECONOMY", capacity: 180 }],
+      seats: [],
+      seatMap: { aircraftDefinitionId: "aircraft-1", cabinLayout: {}, excludedSeatCodes: [], seats: [] },
+    });
     vi.mocked(flightsApi.resolveScheduleTemplate).mockResolvedValue({
       id: "template-1",
       originAirportId: "a1",
@@ -292,7 +304,10 @@ describe("AddFlightPage", () => {
       originCode: "THR",
       destCode: "DXB",
       aircraftCode: "Airbus A320",
-      cabinCapacities: [{ cabin: "ECONOMY", seats: 180 }],
+      cabinCapacities: [
+        { cabin: "ECONOMY", seats: 180 },
+        { cabin: "COMFORT", seats: 10 },
+      ],
       capacity: 180,
       status: "ACTIVE",
       createdAt: new Date().toISOString(),
@@ -379,6 +394,10 @@ describe("AddFlightPage", () => {
       screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
     );
     await user.click(screen.getByRole("button", { name: "افزودن کلاس نرخی" }));
+    const fareCabinSelect = screen
+      .getByText("نام کابین")
+      .parentElement!.querySelector("select")!;
+    expect(Array.from(fareCabinSelect.options).map((option) => option.value)).toEqual(["ECONOMY"]);
     await user.type(
       screen
         .getByText("کد کلاس (مثلاً Y)")

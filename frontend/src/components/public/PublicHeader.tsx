@@ -9,6 +9,10 @@ import {
   markNotificationRead,
 } from '../../api/notifications';
 import { fetchClubPoints, fetchMyProfile, fetchWallet } from '../../api/publicSite';
+import {
+  fetchCredit as fetchAgencyCredit,
+  fetchProfile as fetchAgencyProfile,
+} from '../../api/agency-portal';
 import { localeMoney } from '../../lib/fa-format';
 import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -44,6 +48,40 @@ const LOGOUT_COPY: Record<StoredLocale, { title: string; message: string; confir
   fa: { title: 'خروج از حساب', message: 'آیا مطمئن هستید که می‌خواهید از حساب کاربری خود خارج شوید؟', confirm: 'بله، خارج شو', cancel: 'انصراف', busy: 'در حال خروج…' },
   en: { title: 'Sign out', message: 'Are you sure you want to sign out of your account?', confirm: 'Yes, sign out', cancel: 'Cancel', busy: 'Signing out…' },
   ar: { title: 'تسجيل الخروج', message: 'هل أنت متأكد من رغبتك في تسجيل الخروج من حسابك؟', confirm: 'نعم، تسجيل الخروج', cancel: 'إلغاء', busy: 'جارٍ تسجيل الخروج…' },
+};
+
+const AGENCY_MENU_COPY: Record<StoredLocale, {
+  usableCredit: string;
+  portal: string;
+  purchasedFlights: string;
+  webservice: string;
+  profile: string;
+  logout: string;
+}> = {
+  fa: {
+    usableCredit: 'اعتبار قابل استفاده',
+    portal: 'پنل آژانس',
+    purchasedFlights: 'پروازهای خریداری‌شده',
+    webservice: 'وب‌سرویس',
+    profile: 'مدارک و پروفایل',
+    logout: 'خروج از حساب',
+  },
+  en: {
+    usableCredit: 'Available credit',
+    portal: 'Agency portal',
+    purchasedFlights: 'Purchased flights',
+    webservice: 'Web service',
+    profile: 'Profile & documents',
+    logout: 'Sign out',
+  },
+  ar: {
+    usableCredit: 'الرصيد المتاح',
+    portal: 'بوابة الوكالة',
+    purchasedFlights: 'الرحلات المشتراة',
+    webservice: 'خدمة الويب',
+    profile: 'الملف والمستندات',
+    logout: 'تسجيل الخروج',
+  },
 };
 
 function GlobeIcon({ size = 15 }: { size?: number }) {
@@ -188,6 +226,7 @@ export default function PublicHeader() {
   const navigate = useNavigate();
   const isRTL = locale !== 'en';
   const [menuOpen, setMenuOpen] = useState(false);
+  const [agencyMenuOpen, setAgencyMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -198,6 +237,9 @@ export default function PublicHeader() {
   const [walletBalanceIrr, setWalletBalanceIrr] = useState<string | null>(null);
   const [profileName, setProfileName] = useState<string | null>(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [agencyProfileName, setAgencyProfileName] = useState<string | null>(null);
+  const [agencyLicenseNo, setAgencyLicenseNo] = useState<string | null>(null);
+  const [agencyRemainingIrr, setAgencyRemainingIrr] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
@@ -213,6 +255,7 @@ export default function PublicHeader() {
 
   function requestSignOut() {
     setMenuOpen(false);
+    setAgencyMenuOpen(false);
     setMobileMenuOpen(false);
     setNotifOpen(false);
     setLogoutConfirmOpen(true);
@@ -267,6 +310,24 @@ export default function PublicHeader() {
       setNotifications(rows);
     });
   }, [loggedIn]);
+
+  useEffect(() => {
+    if (!agencyLoggedIn) {
+      setAgencyProfileName(null);
+      setAgencyLicenseNo(null);
+      setAgencyRemainingIrr(null);
+      setAgencyMenuOpen(false);
+      return;
+    }
+    void Promise.all([
+      fetchAgencyProfile().catch(() => null),
+      fetchAgencyCredit().catch(() => null),
+    ]).then(([profile, credit]) => {
+      setAgencyProfileName(profile?.fullName?.trim() || user?.fullName?.trim() || null);
+      setAgencyLicenseNo(profile?.licenseNo ?? null);
+      setAgencyRemainingIrr(credit?.remainingIrr ?? null);
+    });
+  }, [agencyLoggedIn, user?.fullName]);
 
   async function openNotification(n: NotificationRow) {
     if (notifBusyId) return;
@@ -444,6 +505,68 @@ export default function PublicHeader() {
     club?.isMember && club.level && TIER_KEY[club.level]
       ? t(TIER_KEY[club.level])
       : null;
+  const agencyCopy = AGENCY_MENU_COPY[locale];
+  const agencyName = agencyProfileName ?? user?.fullName ?? '';
+  const agencyInitials = agencyName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join('')
+    .toUpperCase() || 'AG';
+
+  function agencyMenuPanel(mobile = false): ReactNode {
+    const links = [
+      { to: '/agency', label: agencyCopy.portal, icon: '♟' },
+      { to: '/agency/sales', label: agencyCopy.purchasedFlights, icon: '♜' },
+      { to: '/agency/webservice', label: agencyCopy.webservice, icon: '</>' },
+      { to: '/agency/profile', label: agencyCopy.profile, icon: '▣' },
+    ];
+    return (
+      <div data-testid={mobile ? 'public-agency-menu-mobile' : 'public-agency-menu'}>
+        <div style={{ padding: '17px 18px 13px', borderBottom: '1px solid #eef1f5' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+            <span style={{ width: 48, height: 48, borderRadius: 12, display: 'grid', placeItems: 'center', background: '#4d7fd1', color: '#fff', fontSize: 12, fontWeight: 900 }}>
+              {agencyInitials}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ color: '#16202e', fontSize: 14, fontWeight: 900 }}>{agencyName}</div>
+              <div dir="ltr" style={{ marginTop: 2, color: '#98a3b1', fontSize: 11, textAlign: isRTL ? 'right' : 'left' }}>
+                {agencyLicenseNo || '—'}
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 12, background: '#f5f8fc', padding: '10px 12px' }}>
+            <span style={{ color: '#8090a3', fontSize: 10.5 }}>{agencyCopy.usableCredit}</span>
+            <strong style={{ color: '#0d2640', fontSize: 12.5 }}>
+              {agencyRemainingIrr === null ? '—' : localeMoney(agencyRemainingIrr, locale)}
+            </strong>
+          </div>
+        </div>
+        <div style={{ padding: '7px 0' }}>
+          {links.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              onClick={() => setAgencyMenuOpen(false)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 17px', color: '#1f2937', textDecoration: 'none', fontSize: 12.5, fontWeight: 750 }}
+            >
+              <span aria-hidden style={{ width: 20, textAlign: 'center', color: '#315fbd', fontSize: 13 }}>{item.icon}</span>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <button
+          type="button"
+          data-testid="public-agency-logout"
+          onClick={requestSignOut}
+          style={{ width: '100%', border: 0, borderTop: '1px solid #eef1f5', background: '#fff', padding: '12px 17px', color: '#e5484d', textAlign: 'start', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer' }}
+        >
+          ↩ {agencyCopy.logout}
+        </button>
+      </div>
+    );
+  }
 
   async function copyWalletBalance() {
     if (walletBalanceIrr === null) return;
@@ -987,9 +1110,17 @@ export default function PublicHeader() {
               )}
 
               {agencyLoggedIn && user && (
-                <Link
-                  to="/agency"
+                <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
                   data-testid="public-agency-identity"
+                  aria-expanded={agencyMenuOpen}
+                  onClick={() => {
+                    setAgencyMenuOpen((open) => !open);
+                    setMenuOpen(false);
+                    setNotifOpen(false);
+                    setLangOpen(false);
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1002,9 +1133,12 @@ export default function PublicHeader() {
                     fontSize: 12.5,
                     fontWeight: 800,
                     whiteSpace: 'nowrap',
+                    background: '#fff',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
                   }}
                 >
-                  <span>{user.fullName}</span>
+                  <span>{agencyName}</span>
                   <span
                     style={{
                       display: 'grid',
@@ -1017,9 +1151,35 @@ export default function PublicHeader() {
                       fontSize: 11,
                     }}
                   >
-                    AG
+                    {agencyInitials}
                   </span>
-                </Link>
+                </button>
+                {agencyMenuOpen && (
+                  <>
+                    <span
+                      aria-hidden
+                      onClick={() => setAgencyMenuOpen(false)}
+                      style={{ position: 'fixed', inset: 0, zIndex: 118 }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 52,
+                        [isRTL ? 'left' : 'right']: 0,
+                        zIndex: 119,
+                        width: 320,
+                        overflow: 'hidden',
+                        border: '1px solid #e1e8f0',
+                        borderRadius: 18,
+                        background: '#fff',
+                        boxShadow: '0 18px 48px rgba(13,38,64,.18)',
+                      }}
+                    >
+                      {agencyMenuPanel()}
+                    </div>
+                  </>
+                )}
+                </div>
               )}
 
               {loggedIn && user && (
@@ -1271,10 +1431,13 @@ export default function PublicHeader() {
                 </div>
                 </>
               ) : agencyLoggedIn && user ? (
-                <Link
-                  to="/agency"
+                <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
                   data-testid="public-agency-identity-mobile"
-                  aria-label={user.fullName}
+                  aria-label={agencyName}
+                  aria-expanded={agencyMenuOpen}
+                  onClick={() => setAgencyMenuOpen((open) => !open)}
                   style={{
                     width: 36,
                     height: 36,
@@ -1283,13 +1446,37 @@ export default function PublicHeader() {
                     placeItems: 'center',
                     background: '#fff',
                     color: '#1668c4',
-                    textDecoration: 'none',
                     fontSize: 10,
                     fontWeight: 900,
+                    border: 0,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
                   }}
                 >
-                  AG
-                </Link>
+                  {agencyInitials}
+                </button>
+                {agencyMenuOpen && (
+                  <>
+                    <span aria-hidden onClick={() => setAgencyMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 218 }} />
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: 68,
+                        left: 12,
+                        right: 12,
+                        zIndex: 219,
+                        overflow: 'hidden',
+                        border: '1px solid #e1e8f0',
+                        borderRadius: 18,
+                        background: '#fff',
+                        boxShadow: '0 18px 48px rgba(13,38,64,.22)',
+                      }}
+                    >
+                      {agencyMenuPanel(true)}
+                    </div>
+                  </>
+                )}
+                </div>
               ) : (
                 <span
                   data-testid="public-signin-mobile"
@@ -1524,6 +1711,16 @@ export default function PublicHeader() {
                 style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'transparent', width: '100%', textAlign: 'inherit' }}
               >
                 ↩ {t('logoutLabel')}
+              </button>
+            )}
+            {agencyLoggedIn && user && (
+              <button
+                type="button"
+                data-testid="public-agency-logout-mobile"
+                onClick={requestSignOut}
+                style={{ padding: '10px 0', color: '#e5484d', fontSize: 14, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'transparent', width: '100%', textAlign: 'inherit' }}
+              >
+                ↩ {agencyCopy.logout}
               </button>
             )}
           </div>
