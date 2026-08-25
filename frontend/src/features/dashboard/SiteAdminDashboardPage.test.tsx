@@ -126,6 +126,28 @@ describe('SiteAdminDashboardPage', () => {
     expect(screen.getByText('آژانس فعال')).toBeInTheDocument();
   });
 
+  it('routes pending actions to tickets when the personal cartable and other queues are empty', async () => {
+    vi.spyOn(reportingApi, 'fetchSiteAdminOverview').mockResolvedValue({
+      ...OVERVIEW,
+      pendingActionCount: 1,
+    });
+    vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockResolvedValue([]);
+    vi.spyOn(refundsApi, 'fetchRefunds').mockResolvedValue({
+      requests: [],
+      kpis: { payoutQueue: 0, paid: 0, awaitingAdmin: 0 },
+    });
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue({
+      tasks: [],
+      counts: { ADMIN: 0, AGENCY: 0, MANAGER: 0 },
+      totalOpen: 0,
+    });
+
+    renderPage();
+
+    const label = await screen.findByText('درخواست در انتظار اقدام');
+    expect(label.closest('a')).toHaveAttribute('href', '/panel/tickets');
+  });
+
   it('shows an error message when all endpoints fail', async () => {
     vi.spyOn(reportingApi, 'fetchSiteAdminOverview').mockRejectedValue(new Error('x'));
     vi.spyOn(agenciesApi, 'fetchAgencyRequests').mockRejectedValue(new Error('x'));

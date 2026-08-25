@@ -299,30 +299,28 @@ describe("AddFlightPage", () => {
       updatedAt: new Date().toISOString(),
       deactivatedAt: null,
       nextFlightInstanceId: "scheduled-instance-1",
-      nextDepartureAt: new Date(Date.now() + 86_400_000).toISOString(),
+      nextDepartureAt: "2026-08-27T08:30:00.000Z",
       occurrences: [
         {
           id: "scheduled-instance-1",
-          departureAt: new Date(Date.now() + 86_400_000).toISOString(),
-          arrivalAt: new Date(Date.now() + 86_400_000 + 8_100_000).toISOString(),
+          departureAt: "2026-08-27T08:30:00.000Z",
+          arrivalAt: "2026-08-27T10:45:00.000Z",
           definitionStatus: "PUBLISHED",
           publicSaleEnabled: true,
           version: 1,
         },
         {
           id: "scheduled-instance-2",
-          departureAt: new Date(Date.now() + 172_800_000).toISOString(),
-          arrivalAt: new Date(Date.now() + 172_800_000 + 8_100_000).toISOString(),
+          departureAt: "2026-08-30T08:30:00.000Z",
+          arrivalAt: "2026-08-30T10:45:00.000Z",
           definitionStatus: "DRAFT",
           publicSaleEnabled: false,
           version: 1,
         },
         {
           id: "scheduled-instance-3",
-          departureAt: new Date(Date.now() + 259_200_000).toISOString(),
-          arrivalAt: new Date(
-            Date.now() + 259_200_000 + 8_100_000,
-          ).toISOString(),
+          departureAt: "2026-09-01T08:30:00.000Z",
+          arrivalAt: "2026-09-01T10:45:00.000Z",
           definitionStatus: "DRAFT",
           publicSaleEnabled: false,
           version: 1,
@@ -342,6 +340,9 @@ describe("AddFlightPage", () => {
     expect(
       await screen.findByTestId("resolved-schedule-summary"),
     ).toBeInTheDocument();
+    expect(screen.getByText(/شهریور ۱۴۰۵/)).toBeInTheDocument();
+    expect(screen.getByText("پنجشنبه")).toBeInTheDocument();
+    expect(screen.queryByText("Thursday")).not.toBeInTheDocument();
     expect(screen.getByTestId("af-aircraft")).toHaveValue("Airbus A320");
     expect(screen.getByLabelText(/تعداد صندلی اکونومی/)).toHaveValue("180");
     await waitFor(() =>

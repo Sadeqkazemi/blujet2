@@ -44,6 +44,11 @@ describe('production backend artifacts', () => {
     expect(dockerfile).toContain('CMD ["node", "dist/main.js"]');
   });
 
+  it('ships the PostgreSQL client required by the real backup endpoint', () => {
+    expect(dockerfile).toContain('postgresql-client');
+    expect(dockerfile).toContain('pg_dump');
+  });
+
   it('does not reference the stale dist/src layout', () => {
     const productionCommands = [
       packageJson.scripts['migration:run:prod'],

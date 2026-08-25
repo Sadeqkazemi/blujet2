@@ -3765,3 +3765,31 @@ contracts and retires the production mock adapters.
 - [x] Close the customer logout confirmation immediately and tolerate a failed
   best-effort server revoke without trapping the user behind the overlay.
 - [ ] Await user review on the local server before commit/push/deploy.
+
+# Guest checkout and site-admin workflow recovery (2026-08-25)
+
+- [x] Restore the passenger-first checkout for unauthenticated customers and
+  keep the primary action disabled until the complete manifest is valid.
+- [x] Open inline OTP only after a valid guest manifest while preserving
+  localized field-level validation.
+- [x] Route the site-admin pending-action KPI to a real non-empty queue and
+  allow SITE_ADMIN organizational messages from cartable.
+- [x] Verify public-ticket listing/forwarding, high-traffic route creation,
+  and career-image upload with automated regression coverage.
+- [ ] Commit/push, review, merge, and deploy only after explicit user approval.
+
+# Critical panel audit fixes integrated with guest/admin recovery (2026-08-25)
+
+- [x] Make IT aggregate health fail closed for an empty catalogue and include
+  disabled external dependencies in the result.
+- [x] Provision the canonical internal-service catalogue through a
+  production-safe migration that preserves operator state.
+- [x] Install `postgresql-client` in the backend runtime image so the real
+  `pg_dump` backup workflow has its required binary.
+- [x] Update Playwright staff login for the current username → password → OTP
+  flow and verify protected role isolation locally.
+- [x] Render recurring-flight months/weekdays in Persian while preserving the
+  real aircraft-cabin route editor and each route's capacity snapshot.
+- [x] Re-run the combined guest-checkout, site-admin cartable, career upload,
+  IT, commercial, full unit, integration, lint, and production-build checks.
+- [ ] Commit/push and deploy only after explicit user instruction.

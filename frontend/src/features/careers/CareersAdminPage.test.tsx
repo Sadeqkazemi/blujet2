@@ -2,6 +2,7 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import CareersAdminPage from './CareersAdminPage';
 import * as careersApi from '../../api/careers';
+import * as filesApi from '../../api/files';
 import type { JobApplicationDetail, JobApplicationRow, JobPosting } from '../../types/careers';
 
 function posting(overrides: Partial<JobPosting> = {}): JobPosting {
@@ -112,6 +113,37 @@ describe('CareersAdminPage', () => {
         }),
       ),
     );
+  });
+
+  it('uploads an image and links it to the new job posting', async () => {
+    mockLists([]);
+    vi.spyOn(filesApi, 'uploadFile').mockResolvedValue({
+      id: 'job-image-1',
+      fileName: 'job.png',
+      sizeBytes: 4,
+    });
+    const create = vi.spyOn(careersApi, 'createPosting').mockResolvedValue(
+      posting({ id: 'p2', imageFileId: 'job-image-1' }),
+    );
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:job-image');
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const { container } = render(<CareersAdminPage />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'ایجاد فرصت شغلی' }));
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    await userEvent.upload(input!, new File(['png'], 'job.png', { type: 'image/png' }));
+    await userEvent.type(screen.getByPlaceholderText('عنوان شغل *'), 'کارشناس محتوا');
+    await userEvent.type(screen.getByPlaceholderText('واحد *'), 'محتوا');
+    await userEvent.type(screen.getByPlaceholderText('شهر *'), 'تهران');
+    await userEvent.click(screen.getByRole('button', { name: 'ثبت فرصت شغلی' }));
+
+    await waitFor(() => {
+      expect(filesApi.uploadFile).toHaveBeenCalled();
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ imageFileId: 'job-image-1' }),
+      );
+    });
   });
 
   it('toggles footer visibility (نمایش لینک در فوتر)', async () => {

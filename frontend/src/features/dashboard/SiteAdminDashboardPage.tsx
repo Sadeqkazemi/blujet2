@@ -201,6 +201,14 @@ export default function SiteAdminDashboardPage() {
   }
 
   const refundShow = allRefunds.slice(0, 5);
+  const pendingActionHref =
+    cartable.totalOpen > 0
+      ? '/panel/cartable'
+      : requests.length > 0
+        ? '/panel/agencies'
+        : refunds.length > 0
+          ? '/panel/refund'
+          : '/panel/tickets';
 
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
@@ -260,7 +268,7 @@ export default function SiteAdminDashboardPage() {
         <KpiCard
           label="درخواست در انتظار اقدام"
           value={faDigits(overview.pendingActionCount)}
-          to="/panel/cartable"
+          to={pendingActionHref}
           icon={
             <KpiIcon bg="rgba(245,158,11,.16)" color="#f59e0b">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

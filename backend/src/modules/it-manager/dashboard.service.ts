@@ -130,7 +130,10 @@ export class ItDashboardService {
     const memoryUsedPct =
       Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 1000) / 10;
 
-    const allInternalHealthy = internalServices.every((s) => s.enabled);
+    const allServicesHealthy =
+      servicesTotal > 0 &&
+      internalServices.every((service) => service.enabled) &&
+      external.every((service) => service.enabled);
 
     return {
       kpis: {
@@ -139,7 +142,7 @@ export class ItDashboardService {
         uptime30dPct,
         activeSessions,
         securityAlerts,
-        allServicesHealthy: allInternalHealthy,
+        allServicesHealthy,
         lastBackupStatus: lastBackup?.status ?? null,
         lastBackupAt: lastBackup?.startedAt ?? null,
       },

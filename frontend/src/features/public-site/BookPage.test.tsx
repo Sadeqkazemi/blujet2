@@ -35,7 +35,7 @@ describe('BookPage', () => {
     expect(await screen.findByTestId('checkout-wizard')).toBeInTheDocument();
   });
 
-  it('sends unauthenticated users to sign-in first', async () => {
+  it('sends unauthenticated users to the passenger-first checkout wizard', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       status: 'unauthenticated',
       user: null,
@@ -49,13 +49,13 @@ describe('BookPage', () => {
       <MemoryRouter initialEntries={['/book/fi-1?cabin=BUSINESS']}>
         <Routes>
           <Route path="/book/:flightInstanceId" element={<BookPage />} />
-          <Route path="/signin" element={<div data-testid="signin-page">signin</div>} />
+          <Route path="/checkout/new" element={<div data-testid="checkout-wizard">checkout</div>} />
         </Routes>
       </MemoryRouter>,
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('signin-page')).toBeInTheDocument();
+      expect(screen.getByTestId('checkout-wizard')).toBeInTheDocument();
     });
   });
 

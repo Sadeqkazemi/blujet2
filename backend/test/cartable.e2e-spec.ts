@@ -758,6 +758,21 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(delivered!.title).toBe('موضوع تستی');
   });
 
+  it('allows the site admin to send an organizational message from cartable', async () => {
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const res = await request(app.getHttpServer())
+      .post('/manager-messages')
+      .set('Authorization', `Bearer ${siteAdmin.accessToken}`)
+      .send({
+        toDept: 'COMMERCIAL',
+        subject: 'پیام ادمین سایت',
+        body: 'متن تست ادمین سایت',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.deliveredCount).toBeGreaterThan(0);
+  });
+
   it('ALL_MANAGERS fans out to every active exec account except the sender; SUPPORT flags PARTIAL_DELIVERY', async () => {
     const ceo = await loginAs(app, 'ceo');
     const ceoId = await userId('ceo');

@@ -27,15 +27,6 @@ export default function BookPage() {
 
   useEffect(() => {
     if (!flightInstanceId || status === 'loading') return;
-    if (status === 'unauthenticated') {
-      navigate('/signin', {
-        replace: true,
-        state: {
-          from: `/checkout/new?flightInstanceId=${encodeURIComponent(flightInstanceId)}&cabin=${cabin}`,
-        },
-      });
-      return;
-    }
     navigate(
       `/checkout/new?flightInstanceId=${encodeURIComponent(flightInstanceId)}&cabin=${cabin}`,
       { replace: true },
