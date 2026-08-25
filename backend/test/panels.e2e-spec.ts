@@ -38,6 +38,7 @@ describe('Panels (e2e)', () => {
       'finance',
       'exports',
       'refund',
+      'cancellations',
       'cartable',
       'integrations',
     ]);
@@ -60,6 +61,7 @@ describe('Panels (e2e)', () => {
       'routes',
       'aircraft',
       'flights',
+      'cancellations',
       'ancillary-services',
       'reports',
       'staff',

@@ -447,7 +447,6 @@ export class FlightsService {
     );
     const activeRows = scheduled.filter(
       (i) =>
-        i.status !== FlightInstanceStatus.CANCELLED &&
         (i.departureAt <= futureCutoff || (sold.get(i.id) ?? 0) > 0),
     );
     const futureRows = scheduled.filter(
