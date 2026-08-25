@@ -7,7 +7,9 @@ test.setTimeout(300_000);
 test('IT Manager creates an employee, grants a permission, resets their password, then suspends them', async ({ page }) => {
   await loginAs(page, 'itadmin');
   await page.getByRole('link', { name: 'کاربران و دسترسی‌ها' }).click();
-  await expect(page.getByRole('heading', { name: 'کاربران و دسترسی‌ها' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'کاربران و حساب‌های سامانه' }),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'افزودن کاربر' }).click();
   const username = `e2e.${Date.now()}`;

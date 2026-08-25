@@ -355,6 +355,14 @@ export default function CheckoutPage() {
     setExtras((arr) => arr.map((e) => (e.id === id ? { ...e, quantity } : e)));
   }
 
+  function changePassengers(next: PassengerFormDraft[]) {
+    setPassengers(next);
+    // Once the manifest is started, keep incomplete/invalid fields visible
+    // while the primary action remains disabled.
+    setShowPassengerErrors(true);
+    setError(null);
+  }
+
   function goNext() {
     setError(null);
     if (step === 'pax') {
@@ -715,11 +723,13 @@ export default function CheckoutPage() {
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
   const grandIrr = baseTicketIrr + extraSeatIrr + extrasIrr;
   const grandDisplay = localeMoney(grandIrr.toString(), locale);
-  const passengerCompletionNotice =
-    showPassengerErrors && step === 'pax' && passengers.some((p) => !isPassengerValid(p))
-      ? t.completePaxError
-      : null;
-  const nextDisabled = busy;
+  const passengerFormIncomplete =
+    step === 'pax' &&
+    (passengers.some((passenger) => !isPassengerValid(passenger)) ||
+      nationalIdsExceedingSeatLimit(passengers).length > 0 ||
+      passengerAgeError() !== null);
+  const passengerCompletionNotice = passengerFormIncomplete ? t.completePaxError : null;
+  const nextDisabled = busy || passengerFormIncomplete;
 
   const loginModal = loginOpen ? (
     <div
@@ -801,7 +811,7 @@ export default function CheckoutPage() {
         <PassengerStep
           locale={locale}
           passengers={passengers}
-          onChange={setPassengers}
+          onChange={changePassengers}
           savedPassengers={savedPassengers}
           savedPassengersEnabled={isAuthenticated}
           departureAt={draft.flight.departureAt}
@@ -898,7 +908,7 @@ export default function CheckoutPage() {
             canBack={step !== 'pax'}
             busy={busy}
             error={error}
-            disabled={false}
+            disabled={nextDisabled}
             disabledHint={passengerCompletionNotice}
           />
         </div>
@@ -975,7 +985,7 @@ export default function CheckoutPage() {
           canBack={step !== 'pax'}
           busy={busy}
           error={error}
-          disabled={false}
+          disabled={nextDisabled}
           disabledHint={passengerCompletionNotice}
         />
       </div>

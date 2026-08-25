@@ -13,7 +13,7 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 @ApiTags('manager-messages')
 @Controller('manager-messages')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles(...EXEC_ROLES)
+@Roles(...EXEC_ROLES, 'SITE_ADMIN')
 export class ManagerMessagesController {
   constructor(private readonly messages: ManagerMessagesService) {}
 

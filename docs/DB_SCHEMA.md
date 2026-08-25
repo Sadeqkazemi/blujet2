@@ -319,7 +319,10 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   grant; `@@unique([employeeId, permissionId])` makes toggling idempotent.
 - `InternalService { id, key, nameFa, enabled, uptimePct }` — seeded from
   the design's `svcDefs` (search/payment/api/sms/email/club/charter/refund/
-  checkin/cdn/dest/mobile).
+  checkin/cdn/dest/mobile). These rows are production reference data, not
+  demo content: a migration inserts missing canonical keys and refreshes only
+  their Persian labels, while preserving operator-controlled `enabled` and
+  observed `uptimePct` values on conflict.
 - `ExternalServiceConfig { id, key, nameFa, provider, endpoint, method,
   timeoutMs, apiKeyEncrypted, sandbox, enabled, lastTestAt, lastTestOk,
   lastTestMessage }` — seeded from the design's `extDefs`
@@ -1295,9 +1298,9 @@ remaining six get real, conservatively-scoped access:
 - `reports` → existing `PassengerReportsPage` (passenger search).
 - `cartable` → existing `CartablePage`, self-scoped to the actor; added
   directly on `CartableController`'s `@Roles(...)` rather than to the
-  shared `EXEC_ROLES` constant, since that constant also gates
-  `manager-messages`/`staff-directory`, which are **not** in this design's
-  access list.
+  shared `EXEC_ROLES` constant. The compose action shown on this page grants
+  `SITE_ADMIN` independently on `manager-messages`; `staff-directory` remains
+  outside the role's access list.
 - `club` → existing `ClubPage`, `listMembers` + `issueCard` only (no
   `createMember`, `updateLevel`, or the card-request approve/reject
   queue — those stay CEO/BOARD_CHAIR/SENIOR_MANAGER-only). `issueCard`

@@ -245,6 +245,7 @@ describe('CheckoutPage', () => {
     expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
     expect(screen.getByTestId('checkout-from-saved-0')).toBeDisabled();
+    expect(screen.getByTestId('checkout-next')).toBeDisabled();
 
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
@@ -255,6 +256,7 @@ describe('CheckoutPage', () => {
     await user.selectOptions(selects[2]!, '1');
     await user.selectOptions(selects[3]!, '1370');
 
+    expect(screen.getByTestId('checkout-next')).toBeEnabled();
     await user.click(screen.getByTestId('checkout-next'));
     expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
     expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
@@ -285,13 +287,13 @@ describe('CheckoutPage', () => {
     );
 
     await screen.findByTestId('checkout-pax-step');
-    await user.click(screen.getByTestId('checkout-next'));
+    expect(screen.getByTestId('checkout-next')).toBeDisabled();
+    await user.type(screen.getByTestId('checkout-pax-first-0'), 'A');
 
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
-    expect(screen.getByText('نام را وارد کنید.')).toBeInTheDocument();
     expect(screen.getByText('نام خانوادگی را وارد کنید.')).toBeInTheDocument();
     expect(screen.getByText('کد ملی را وارد کنید.')).toBeInTheDocument();
-    expect(screen.getByTestId('checkout-pax-first-0')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('checkout-pax-last-0')).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {

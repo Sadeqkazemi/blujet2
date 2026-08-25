@@ -52,6 +52,7 @@ import {
   latinDigits,
 } from "../../lib/fa-format";
 import { dayjs, isoDateAtNoon, toIsoDateOnly } from "../../lib/jalali";
+import { localeMonthYear, localeWeekdayLong } from "../../lib/locale-format";
 import type {
   AircraftTypeOption,
   AllotmentSummary,
@@ -1405,9 +1406,10 @@ export default function AddFlightPage({
                         {Array.from(
                           new Set(
                             resolvedTemplate.occurrences.map((occurrence) =>
-                              dayjs(occurrence.departureAt)
-                                .calendar("jalali")
-                                .format("MMMM YYYY"),
+                              localeMonthYear(
+                                dayjs(occurrence.departureAt).calendar("jalali"),
+                                "fa",
+                              ),
                             ),
                           ),
                         )
@@ -1447,7 +1449,7 @@ export default function AddFlightPage({
                             }`}
                           >
                             <span className="block text-[10px] font-bold">
-                              {departure.format("dddd")}
+                              {localeWeekdayLong(departure, "fa")}
                             </span>
                             <span className="mt-0.5 block font-num text-[11px]">
                               {faDigits(departure.format("YYYY/MM/DD · HH:mm"))}

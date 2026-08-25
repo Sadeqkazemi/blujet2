@@ -48,20 +48,43 @@ export async function loginAs(page: Page, username: string) {
   for (let attempt = 0; attempt < 6; attempt++) {
     await page.goto('/login');
     await page.fill('#username', username);
+    // The username-mode lookup is deliberately best-effort in the UI: a
+    // network/rate-limit failure still advances established users to the
+    // password phase. Waiting for a response here can therefore deadlock the
+    // test after the UI has already advanced without receiving one.
+    await page.getByRole('button', { name: 'ادامه', exact: true }).click();
+    await page.locator('#password').waitFor({ state: 'visible' });
     await page.fill('#password', STAFF_PASSWORD);
     const [loginRes] = await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/auth/staff/login') && r.request().method() === 'POST'),
-      page.click('button[type=submit]'),
+      page.waitForResponse(
+        (r) =>
+          /\/auth\/staff\/login$/.test(new URL(r.url()).pathname) &&
+          r.request().method() === 'POST',
+        { timeout: 30_000 },
+      ),
+      page.getByRole('button', { name: 'ارسال کد یک‌بارمصرف', exact: true }).click(),
     ]);
     if (loginRes.status() === 429) {
       await page.waitForTimeout(21_000);
       continue;
     }
+    const loginBody = (await loginRes.json()) as {
+      data?: { loginMode?: string };
+    };
+    if (loginBody.data?.loginMode !== 'TWO_FACTOR') {
+      await page.waitForURL('**/panel');
+      return;
+    }
     await page.waitForURL('**/two-factor');
     const code = await getTwoFactorCode(username);
     await page.fill('#code', code);
     const [verifyRes] = await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/auth/staff/login/verify') && r.request().method() === 'POST'),
+      page.waitForResponse(
+        (r) =>
+          /\/auth\/staff\/login\/verify$/.test(new URL(r.url()).pathname) &&
+          r.request().method() === 'POST',
+        { timeout: 30_000 },
+      ),
       page.click('button[type=submit]'),
     ]);
     if (verifyRes.status() === 429) {

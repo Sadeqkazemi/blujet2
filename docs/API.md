@@ -184,8 +184,8 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 | Method | Path | Roles | Notes |
 |---|---|---|---|
-| POST | `/manager-messages` | EXEC_ROLES | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
-| GET | `/manager-messages/sent` | EXEC_ROLES | Sender's own history (the mocks discard sent messages; the real system keeps the record). |
+| POST | `/manager-messages` | EXEC_ROLES, SITE_ADMIN | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
+| GET | `/manager-messages/sent` | EXEC_ROLES, SITE_ADMIN | Sender's own history (the mocks discard sent messages; the real system keeps the record). |
 
 ### `backend/src/modules/files/`
 
@@ -242,7 +242,7 @@ an operation-level `@RequiresPermission` key. See `docs/DB_SCHEMA.md` → Phase
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/it/backups` | `BackupRecord` list, newest first. |
-| POST | `/it/backups` | Triggers a real `pg_dump` (via `DATABASE_URL`) to the configured backup directory; creates a `RUNNING` row, updates to `SUCCESS`/`FAILED` with size/error when the process exits. Never simulated — a missing `pg_dump` binary is a real `FAILED` row, not a fabricated success. |
+| POST | `/it/backups` | Triggers a real `pg_dump` (via `DATABASE_URL`) to the configured backup directory; creates a `RUNNING` row, updates to `SUCCESS`/`FAILED` with size/error when the process exits. Never simulated. The production backend image installs `postgresql-client`, so the runtime always contains the required binary; database/permission failures still produce an honest `FAILED` row. |
 | GET | `/it/backups/schedule` | Static config describing the server-side cron (`scripts/backup-db.sh`, already documented in `docs/RUNBOOK.md`) — informational only, this phase does not add a second, competing scheduler. |
 
 Restore is intentionally **not** a one-click endpoint: CLAUDE.md's own
@@ -255,7 +255,7 @@ not implement it faster.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
+| GET | `/it/dashboard` | `{ kpis, serviceHealth, resources, recentEvents }`. `kpis`: active employees, active sessions, services up/total, last backup status+age. `allServicesHealthy` is true only when at least one service is configured and **every internal and external service is enabled**; an empty catalogue or a disabled external dependency is unhealthy. `serviceHealth`: from `InternalService`+`ExternalServiceConfig`. `resources`: **real** host memory (`os.totalmem/freemem`) + 1-minute load average (`os.loadavg`) — never synthetic/random numbers. `recentEvents`: latest `AuditLog` rows across SYSTEM/ACCOUNT/ACCESS/SECURITY. |
 
 ### Logs ("لاگ و رویدادها") and Panels access ("دسترسی به پنل‌ها")
 
@@ -996,9 +996,9 @@ deferred). No schema change — reuses the existing `EmployeePermission`/
   gets member creation, tier changes, or the referred-card decision.
 - Cartable (`GET/PATCH /cartable/*`) — `SITE_ADMIN` added directly to
   `CartableController`'s class-level `@Roles(...)` (not to the shared
-  `EXEC_ROLES` constant, which also backs `manager-messages`/
-  `staff-directory` — those stay untouched, out of SITE_ADMIN's design
-  access list). Every cartable endpoint is already self-scoped to the
+  `EXEC_ROLES` constant). `manager-messages` independently includes
+  `SITE_ADMIN` because its compose action is exposed in the site-admin
+  cartable; `staff-directory` stays unchanged. Every cartable endpoint is self-scoped to the
   actor, so this is a safe "act on my own items" grant.
 - `GET /refunds`, `GET /refunds/:id`, `PATCH /refunds/:id/refer` — role
   gate widened to add `SITE_ADMIN` and `EMPLOYEE` (+
