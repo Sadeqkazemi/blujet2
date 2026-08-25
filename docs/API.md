@@ -3583,12 +3583,16 @@ panel or MD-80 seat maps. Commercial → CEO pricing register path unchanged.
 | POST | `/flights/schedule-templates/preview` | COMMERCIAL/SENIOR/EMPLOYEE+`fl_manage` | Preview occurrences (no persist) |
 | POST | `/flights/schedule-templates` | same | Create + materialize; `idempotencyKey` required |
 | GET | `/flights/schedule-templates` | + `fl_view` | Paginated list |
-| GET | `/flights/schedule-templates/resolve?flightNo=XY1234` | + `fl_view` | Resolve the active route template and next instance for Add Flight autofill |
+| GET | `/flights/schedule-templates/resolve?flightNo=XY1234` | + `fl_view` | Resolve the active route template plus all future non-cancelled dated occurrences for Add Flight selection. `occurrences[]` contains `{ id, departureAt, arrivalAt, definitionStatus, publicSaleEnabled, version }`; `nextFlightInstanceId` / `nextDepartureAt` remain for backward compatibility. |
 | GET | `/flights/schedule-templates/:id` | + `fl_view` | Detail + instanceCount |
 | POST | `/flights/schedule-templates/:id/deactivate` | + `fl_manage` | Cancel future unsold instances; keep sold history |
 
 Amounts are IRR integer strings. Cabin capacities are read from the aircraft
 definition (MD-80 maps are never rewritten).
+Creation materializes one `FlightInstance` per matching operating date. Every
+new occurrence starts with `definitionStatus=DRAFT` and
+`publicSaleEnabled=false`; public and agency sale surfaces remain closed until
+the existing approval/publication workflow explicitly enables the instance.
 
 ### Bank loans (adapter only)
 

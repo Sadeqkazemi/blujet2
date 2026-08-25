@@ -300,6 +300,34 @@ describe("AddFlightPage", () => {
       deactivatedAt: null,
       nextFlightInstanceId: "scheduled-instance-1",
       nextDepartureAt: new Date(Date.now() + 86_400_000).toISOString(),
+      occurrences: [
+        {
+          id: "scheduled-instance-1",
+          departureAt: new Date(Date.now() + 86_400_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 86_400_000 + 8_100_000).toISOString(),
+          definitionStatus: "PUBLISHED",
+          publicSaleEnabled: true,
+          version: 1,
+        },
+        {
+          id: "scheduled-instance-2",
+          departureAt: new Date(Date.now() + 172_800_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 172_800_000 + 8_100_000).toISOString(),
+          definitionStatus: "DRAFT",
+          publicSaleEnabled: false,
+          version: 1,
+        },
+        {
+          id: "scheduled-instance-3",
+          departureAt: new Date(Date.now() + 259_200_000).toISOString(),
+          arrivalAt: new Date(
+            Date.now() + 259_200_000 + 8_100_000,
+          ).toISOString(),
+          definitionStatus: "DRAFT",
+          publicSaleEnabled: false,
+          version: 1,
+        },
+      ],
     });
     vi.spyOn(flightsApi, "updateFlightDefinition").mockResolvedValue(
       {} as never,
@@ -330,6 +358,21 @@ describe("AddFlightPage", () => {
       "readonly",
     );
     expect(screen.queryByText("افزودن تعهد آژانس")).not.toBeInTheDocument();
+    expect(screen.getByTestId("schedule-occurrence-list")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("schedule-occurrence-scheduled-instance-1"),
+    ).toBeDisabled();
+    expect(
+      screen.getByTestId("schedule-occurrence-scheduled-instance-2"),
+    ).toHaveAttribute("aria-pressed", "true");
+    await user.click(
+      screen.getByTestId("schedule-occurrence-scheduled-instance-3"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("schedule-occurrence-scheduled-instance-3"),
+      ).toHaveAttribute("aria-pressed", "true"),
+    );
 
     await user.click(
       screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
@@ -364,7 +407,7 @@ describe("AddFlightPage", () => {
 
     await waitFor(() =>
       expect(flightsApi.completeScheduledFlight).toHaveBeenCalledWith(
-        "scheduled-instance-1",
+        "scheduled-instance-3",
         expect.objectContaining({
           expectedVersion: 1,
           basePriceIrr: "68000000",

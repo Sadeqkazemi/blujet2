@@ -120,4 +120,78 @@ describe("JalaliDatePicker dark panel", () => {
     expect(monthControls?.firstElementChild).toHaveTextContent("‹");
     expect(monthControls?.lastElementChild).toHaveTextContent("›");
   });
+
+  it("allows direct year, month and day navigation", async () => {
+    const user = userEvent.setup();
+    render(
+      <JalaliDatePicker
+        locale="fa"
+        label="تاریخ"
+        value="2026-08-24T12:00:00.000Z"
+        onChange={() => undefined}
+        testId="three-level-calendar"
+      />,
+    );
+
+    await user.click(screen.getByTestId("three-level-calendar"));
+    await user.click(screen.getByTestId("three-level-calendar-month-label"));
+    expect(screen.getByTestId("three-level-calendar-month-grid")).toBeInTheDocument();
+    await user.click(screen.getByTestId("three-level-calendar-month-label"));
+    const yearGrid = screen.getByTestId("three-level-calendar-year-grid");
+    expect(yearGrid).toBeInTheDocument();
+    await user.click(yearGrid.querySelector("button")!);
+    expect(screen.getByTestId("three-level-calendar-month-grid")).toBeInTheDocument();
+    await user.click(screen.getByTestId("three-level-calendar-month-5"));
+    expect(screen.queryByTestId("three-level-calendar-month-grid")).not.toBeInTheDocument();
+    expect(screen.getByTestId("three-level-calendar-day-1")).toBeInTheDocument();
+  });
+
+  it("keeps month navigation unchanged when granular navigation is disabled", async () => {
+    const user = userEvent.setup();
+    render(
+      <JalaliDatePicker
+        locale="fa"
+        label="تاریخ رفت"
+        value="2026-08-24T12:00:00.000Z"
+        onChange={() => undefined}
+        testId="home-calendar-contract"
+        granularNavigation={false}
+      />,
+    );
+
+    await user.click(screen.getByTestId("home-calendar-contract"));
+    await user.click(screen.getByTestId("home-calendar-contract-month-label"));
+    expect(screen.queryByTestId("home-calendar-contract-month-grid")).not.toBeInTheDocument();
+    expect(screen.getByTestId("home-calendar-contract-day-1")).toBeInTheDocument();
+  });
+
+  it("renders localized Gregorian month names in English and Arabic", async () => {
+    const user = userEvent.setup();
+    const english = render(
+      <JalaliDatePicker
+        locale="en"
+        label="Date"
+        value="2026-08-24T12:00:00.000Z"
+        onChange={() => undefined}
+        testId="english-months"
+      />,
+    );
+    await user.click(screen.getByTestId("english-months"));
+    await user.click(screen.getByTestId("english-months-month-label"));
+    expect(screen.getByTestId("english-months-month-grid")).toHaveTextContent("August");
+    english.unmount();
+
+    render(
+      <JalaliDatePicker
+        locale="ar"
+        label="التاريخ"
+        value="2026-08-24T12:00:00.000Z"
+        onChange={() => undefined}
+        testId="arabic-months"
+      />,
+    );
+    await user.click(screen.getByTestId("arabic-months"));
+    await user.click(screen.getByTestId("arabic-months-month-label"));
+    expect(screen.getByTestId("arabic-months-month-grid")).toHaveTextContent("أغسطس");
+  });
 });

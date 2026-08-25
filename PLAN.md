@@ -19,6 +19,18 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Schedule occurrences, flight-management search and calendar drill-down
+  (2026-08-25)** — seasonal route creation now persists one future flight
+  instance per matching operating day and explicitly starts every instance as
+  `DRAFT` with public sale disabled. Add Flight resolves all occurrences for a
+  recurring flight number, displays operating weekdays/months and completes
+  the selected eligible record. Flight management adds origin/destination/
+  number/date filters plus a one-card low-sales carousel. The shared date
+  picker supports year → month → day selection with Persian Jalali and
+  English/Arabic Gregorian month localization; the public homepage search
+  intentionally keeps its previous month-only navigation. Checklist:
+  `docs/features/schedule-occurrence-flight-management-calendar.md`.
+
 - [x] **Atomic scheduled-flight completion and Add Flight redesign
   (2026-08-22)** — the commercial Add Flight flow now resolves and completes
   one materialized schedule occurrence instead of creating a duplicate

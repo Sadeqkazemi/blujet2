@@ -39,6 +39,16 @@ export interface ScheduleTemplateRow extends ScheduleTemplatePayload {
 export interface ResolvedScheduleTemplate extends ScheduleTemplateRow {
   nextFlightInstanceId: string | null;
   nextDepartureAt: string | null;
+  occurrences: ScheduleOccurrence[];
+}
+
+export interface ScheduleOccurrence {
+  id: string;
+  departureAt: string;
+  arrivalAt: string;
+  definitionStatus: string;
+  publicSaleEnabled: boolean;
+  version: number;
 }
 
 export interface ScheduleTemplateList {

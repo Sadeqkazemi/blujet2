@@ -103,6 +103,22 @@ const CHANNEL_OPTS: { key: Channel; label: string }[] = [
   { key: "AGENCY", label: "آژانس" },
 ];
 
+const ISO_WEEKDAY_LABELS: Record<number, string> = {
+  1: "دوشنبه",
+  2: "سه‌شنبه",
+  3: "چهارشنبه",
+  4: "پنجشنبه",
+  5: "جمعه",
+  6: "شنبه",
+  7: "یکشنبه",
+};
+
+const COMPLETABLE_OCCURRENCE_STATUSES = new Set([
+  "DRAFT",
+  "REJECTED",
+  "OPERATIONS_REJECTED",
+]);
+
 const inputClass =
   "w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none";
 const labelClass = "mb-[7px] block text-[11.5px] text-[#9fb0c7]";
@@ -240,6 +256,9 @@ export default function AddFlightPage({
   const [charter, setCharter] = useState("");
   const [resolvedTemplate, setResolvedTemplate] =
     useState<ResolvedScheduleTemplate | null>(null);
+  const [selectedOccurrenceId, setSelectedOccurrenceId] = useState<
+    string | null
+  >(null);
   const [resolvedOccurrenceVersion, setResolvedOccurrenceVersion] = useState<
     number | null
   >(null);
@@ -312,9 +331,12 @@ export default function AddFlightPage({
   const inheritedOccurrenceLocked =
     !isEdit &&
     Boolean(
-      resolvedTemplate?.nextFlightInstanceId &&
+      selectedOccurrenceId &&
       resolvedOccurrenceVersion != null,
     );
+  const selectedOccurrence = resolvedTemplate?.occurrences.find(
+    (occurrence) => occurrence.id === selectedOccurrenceId,
+  );
   const agencyCommittedRevenueIrr = agencySummary?.agencyRevenueIrr ?? "0";
 
   const basePriceIrr = moneyInputToRialString(baseToman) ?? "0";
@@ -475,6 +497,7 @@ export default function AddFlightPage({
     if (isEdit || !isValidFlightNo(flightNo)) {
       if (!isEdit) {
         setResolvedTemplate(null);
+        setSelectedOccurrenceId(null);
         setResolvedOccurrenceVersion(null);
         setAgencySummary(null);
       }
@@ -520,17 +543,31 @@ export default function AddFlightPage({
               })),
             );
           }
-          if (template.nextDepartureAt) {
-            const departure = dayjs(template.nextDepartureAt);
+          const initialOccurrence =
+            template.occurrences.find(
+              (occurrence) =>
+                occurrence.id === template.nextFlightInstanceId &&
+                COMPLETABLE_OCCURRENCE_STATUSES.has(
+                  occurrence.definitionStatus,
+                ),
+            ) ??
+            template.occurrences.find((occurrence) =>
+              COMPLETABLE_OCCURRENCE_STATUSES.has(
+                occurrence.definitionStatus,
+              ),
+            );
+          setSelectedOccurrenceId(initialOccurrence?.id ?? null);
+          if (initialOccurrence) {
+            const departure = dayjs(initialOccurrence.departureAt);
             setDateIso(isoDateAtNoon(toIsoDateOnly(departure)));
             setTime(departure.format("HH:mm"));
           }
-          if (template.nextFlightInstanceId) {
+          if (initialOccurrence) {
             const [summary, definition] = await Promise.all([
-              fetchAllotmentsSummary(template.nextFlightInstanceId).catch(
+              fetchAllotmentsSummary(initialOccurrence.id).catch(
                 () => null,
               ),
-              fetchFlightDefinition(template.nextFlightInstanceId),
+              fetchFlightDefinition(initialOccurrence.id),
             ]);
             if (!cancelled) {
               setAgencySummary(summary);
@@ -544,6 +581,7 @@ export default function AddFlightPage({
         .catch((cause) => {
           if (cancelled) return;
           setResolvedTemplate(null);
+          setSelectedOccurrenceId(null);
           setResolvedOccurrenceVersion(null);
           setAgencySummary(null);
           if (!(cause instanceof ApiRequestError) || cause.status !== 404) {
@@ -564,6 +602,40 @@ export default function AddFlightPage({
       window.clearTimeout(timer);
     };
   }, [flightNo, isEdit]);
+
+  async function chooseOccurrence(occurrenceId: string) {
+    const occurrence = resolvedTemplate?.occurrences.find(
+      (candidate) => candidate.id === occurrenceId,
+    );
+    if (
+      !occurrence ||
+      !COMPLETABLE_OCCURRENCE_STATUSES.has(occurrence.definitionStatus)
+    ) {
+      return;
+    }
+    setRouteResolving(true);
+    setError(null);
+    try {
+      const [summary, definition] = await Promise.all([
+        fetchAllotmentsSummary(occurrence.id).catch(() => null),
+        fetchFlightDefinition(occurrence.id),
+      ]);
+      const departure = dayjs(occurrence.departureAt);
+      setSelectedOccurrenceId(occurrence.id);
+      setResolvedOccurrenceVersion(definition.version);
+      setAgencySummary(summary);
+      setDateIso(isoDateAtNoon(toIsoDateOnly(departure)));
+      setTime(departure.format("HH:mm"));
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "خطا در دریافت رخداد انتخاب‌شده.",
+      );
+    } finally {
+      setRouteResolving(false);
+    }
+  }
 
   async function applyAircraftDefinition(type: string) {
     setAircraft(type);
@@ -784,7 +856,11 @@ export default function AddFlightPage({
     }
     if (
       !isEdit &&
-      (!resolvedTemplate?.nextFlightInstanceId ||
+      (!selectedOccurrenceId ||
+        !selectedOccurrence ||
+        !COMPLETABLE_OCCURRENCE_STATUSES.has(
+          selectedOccurrence.definitionStatus,
+        ) ||
         resolvedOccurrenceVersion == null)
     ) {
       setError(
@@ -864,7 +940,7 @@ export default function AddFlightPage({
     setSaving(true);
     try {
       if (!isEdit) {
-        const targetFlightId = resolvedTemplate!.nextFlightInstanceId!;
+        const targetFlightId = selectedOccurrenceId!;
         const legalIrr = moneyInputToRialString(legalToman);
         await completeScheduledFlight(targetFlightId, {
           expectedVersion: resolvedOccurrenceVersion!,
@@ -1009,7 +1085,11 @@ export default function AddFlightPage({
     if (wizardStep === 0) {
       if (
         !isValidFlightNo(flightNo) ||
-        !resolvedTemplate?.nextFlightInstanceId ||
+        !selectedOccurrenceId ||
+        !selectedOccurrence ||
+        !COMPLETABLE_OCCURRENCE_STATUSES.has(
+          selectedOccurrence.definitionStatus,
+        ) ||
         resolvedOccurrenceVersion == null
       ) {
         setError(
@@ -1114,6 +1194,7 @@ export default function AddFlightPage({
                       value !== resolvedTemplate.flightNoBase
                     ) {
                       setResolvedTemplate(null);
+                      setSelectedOccurrenceId(null);
                       setResolvedOccurrenceVersion(null);
                       setAgencySummary(null);
                     }
@@ -1308,6 +1389,74 @@ export default function AddFlightPage({
                       تکمیل همان رخداد؛ بدون ساخت پرواز تکراری
                     </span>
                   </div>
+                  <div className="mt-3 grid gap-2 rounded-lg border border-blue-300/15 bg-[#0f1726]/60 p-2 text-[10.5px] sm:grid-cols-2">
+                    <span>
+                      روزهای انجام پرواز: {" "}
+                      <b className="text-white">
+                        {resolvedTemplate.weekdays
+                          .map((weekday) => ISO_WEEKDAY_LABELS[weekday])
+                          .filter(Boolean)
+                          .join("، ") || "—"}
+                      </b>
+                    </span>
+                    <span>
+                      ماه‌های انجام پرواز: {" "}
+                      <b className="text-white">
+                        {Array.from(
+                          new Set(
+                            resolvedTemplate.occurrences.map((occurrence) =>
+                              dayjs(occurrence.departureAt)
+                                .calendar("jalali")
+                                .format("MMMM YYYY"),
+                            ),
+                          ),
+                        )
+                          .map(faDigits)
+                          .join("، ") || "—"}
+                      </b>
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <div className="mb-2 text-[10.5px] font-bold text-blue-100">
+                      روز پرواز را برای تکمیل مشخصات انتخاب کنید
+                    </div>
+                    <div
+                      className="flex max-h-36 flex-wrap gap-2 overflow-y-auto pl-1"
+                      data-testid="schedule-occurrence-list"
+                    >
+                      {resolvedTemplate.occurrences.map((occurrence) => {
+                        const departure = dayjs(occurrence.departureAt).calendar(
+                          "jalali",
+                        );
+                        const selected = occurrence.id === selectedOccurrenceId;
+                        const enabled = COMPLETABLE_OCCURRENCE_STATUSES.has(
+                          occurrence.definitionStatus,
+                        );
+                        return (
+                          <button
+                            type="button"
+                            key={occurrence.id}
+                            disabled={!enabled || routeResolving}
+                            onClick={() => void chooseOccurrence(occurrence.id)}
+                            data-testid={`schedule-occurrence-${occurrence.id}`}
+                            aria-pressed={selected}
+                            className={`rounded-lg border px-3 py-2 text-right transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                              selected
+                                ? "border-blue-300 bg-blue-500 text-white shadow-sm"
+                                : "border-blue-300/20 bg-[#0f1726] text-blue-100 hover:border-blue-300/50"
+                            }`}
+                          >
+                            <span className="block text-[10px] font-bold">
+                              {departure.format("dddd")}
+                            </span>
+                            <span className="mt-0.5 block font-num text-[11px]">
+                              {faDigits(departure.format("YYYY/MM/DD · HH:mm"))}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="mt-2 grid grid-cols-2 gap-2 text-[10.5px] text-blue-200 sm:grid-cols-4">
                     <span>
                       شماره: <b className="font-num text-white">{flightNo}</b>
@@ -1324,9 +1473,9 @@ export default function AddFlightPage({
                     <span>
                       تاریخ و ساعت:{" "}
                       <b className="font-num text-white">
-                        {dateIso
+                        {selectedOccurrence
                           ? faDigits(
-                              dayjs(dateIso)
+                              dayjs(selectedOccurrence.departureAt)
                                 .calendar("jalali")
                                 .format("YYYY/MM/DD"),
                             )
