@@ -18,12 +18,12 @@ export interface AgencyDashboard {
 
 export interface AgencyLedgerEntry {
   id: string;
-  type: 'SALE' | 'REFUND' | 'SETTLEMENT' | 'COMMISSION';
+  type: "SALE" | "REFUND" | "SETTLEMENT" | "COMMISSION";
   signedAmountIrr: string;
   occurredAt: string;
 }
 
-export type AgencyInvoiceStatus = 'UNPAID' | 'PAID' | 'OVERDUE';
+export type AgencyInvoiceStatus = "UNPAID" | "PAID" | "OVERDUE";
 
 export interface AgencyInvoice {
   id: string;
@@ -36,7 +36,7 @@ export interface AgencyInvoice {
   paidAt: string | null;
 }
 
-export type AgencyCreditRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type AgencyCreditRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface AgencyCreditRequest {
   id: string;
@@ -93,7 +93,7 @@ export interface AgencyProfile {
   email: string | null;
   city: string | null;
   address: string | null;
-  tier: 'NORMAL' | 'SILVER' | 'GOLD' | null;
+  tier: "NORMAL" | "SILVER" | "GOLD" | null;
   isActive: boolean;
   suspendedAt: string | null;
   suspendReason: string | null;
@@ -103,8 +103,8 @@ export interface AgencyProfile {
   isTemporaryReadOnly: boolean;
 }
 
-export type AgencyDocumentType = 'LICENSE' | 'CONTRACT' | 'OTHER';
-export type AgencyDocumentStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type AgencyDocumentType = "LICENSE" | "CONTRACT" | "OTHER";
+export type AgencyDocumentStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface AgencyAllotmentRow {
   id: string;
@@ -113,11 +113,11 @@ export interface AgencyAllotmentRow {
   route: string;
   departureAt: string;
   aircraftType: string;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST' | null;
+  cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST" | null;
   fareClassCode: string | null;
   seatsAllocated: number;
   seatsUsed: number;
-  type: 'SOFT' | 'HARD';
+  type: "SOFT" | "HARD";
   releaseAt: string | null;
   contractPriceIrr: string | null;
   active: boolean;
@@ -130,7 +130,7 @@ export interface AgencySeatRequestOption {
   destCode: string;
   departureAt: string;
   aircraftType: string;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST";
   fareClassCode: string;
   capacity: number;
   agencySeatsReleased: number;
@@ -139,14 +139,14 @@ export interface AgencySeatRequestOption {
   availableToRequest: number;
   pricePerSeatIrr: string | null;
   specialOffer: boolean;
-  definitionStatus: 'DRAFT' | 'PENDING_REVISION' | 'PUBLISHED' | 'REJECTED';
+  definitionStatus: "DRAFT" | "PENDING_REVISION" | "PUBLISHED" | "REJECTED";
 }
 
-export type AgencySeatInquiryDemandLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type AgencySeatInquiryDemandLevel = "LOW" | "MEDIUM" | "HIGH";
 
 export interface AgencySeatInquiry {
   flightInstanceId: string;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST";
   fareClassCode: string;
   requestedSeats: number;
   capacity: number;
@@ -171,29 +171,30 @@ export interface AgencySeatInquiry {
 
 export interface AgencySeatRequestResult {
   id: string;
-  status: 'SUBMITTED';
+  status: "SUBMITTED";
   recipientCount: number;
   flightInstanceId: string;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+  cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST";
   fareClassCode: string;
   seats: number;
+  selectedFlightInstanceIds?: string[];
   preferredWeekdays?: number[];
   termMonths?: 0 | 1 | 3 | 6 | 12;
-  payMethod?: 'INVOICE' | 'CREDIT';
+  payMethod?: "INVOICE" | "CREDIT";
 }
 
 export interface AgencySeatRequestHistoryRow {
   id: string;
-  status: 'PENDING' | 'PENDING_FINANCE' | 'APPROVED' | 'REJECTED';
+  status: "PENDING" | "PENDING_FINANCE" | "APPROVED" | "REJECTED";
   route: string | null;
   aircraftType: string;
-  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST' | null;
+  cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST" | null;
   fareClassCode: string | null;
   seats: number;
   termMonths: number | null;
   unitPriceIrr: string;
   totalPriceIrr: string;
-  payMethod: 'INVOICE' | 'CREDIT';
+  payMethod: "INVOICE" | "CREDIT";
   invoice: {
     id: string;
     invoiceNo: string;
@@ -201,7 +202,11 @@ export interface AgencySeatRequestHistoryRow {
     amountIrr: string;
     dueAt: string;
   } | null;
-  flights: { flightInstanceId: string; flightNo: string; departureAt: string }[];
+  flights: {
+    flightInstanceId: string;
+    flightNo: string;
+    departureAt: string;
+  }[];
   decidedAt: string | null;
   createdAt: string;
 }
@@ -214,8 +219,8 @@ export interface AgencyDocument {
   file: { fileName: string; sizeBytes: number; mimeType: string };
 }
 
-export type AgencyApiScope = 'FULL' | 'SEARCH_BOOK';
-export type AgencyWebserviceRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type AgencyApiScope = "FULL" | "SEARCH_BOOK";
+export type AgencyWebserviceRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface AgencyWebserviceRequest {
   id: string;
@@ -238,8 +243,8 @@ export interface AgencyWebserviceQueueRow extends AgencyWebserviceRequest {
 
 export interface AgencyApiKeySummary {
   id: string;
-  scope: AgencyApiScope | 'SEARCH_ONLY';
-  status: 'ACTIVE' | 'SUSPENDED';
+  scope: AgencyApiScope | "SEARCH_ONLY";
+  status: "ACTIVE" | "SUSPENDED";
   activatedAt: string;
   expiresAt: string | null;
   lastUsedAt: string | null;

@@ -7,6 +7,7 @@ import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as agenciesApi from '../../api/agencies';
 import * as authApi from '../../api/auth';
+import { ApiRequestError } from '../../api/envelope';
 
 function mockAuth(agencyLogin = vi.fn(), signOut = vi.fn(), confirmAgencyTwoFactor = vi.fn()) {
   vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
@@ -110,6 +111,41 @@ describe('AgencyLoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'ورود به پنل آژانس' }));
 
     expect(agencyLogin).toHaveBeenCalledWith('+989120000002', 'Blujet@1404');
+  });
+
+  it('fills the working local demo agency credentials in development', async () => {
+    mockAuth();
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    await userEvent.setup().click(screen.getByTestId('agency-demo-login'));
+
+    expect(screen.getByLabelText('شماره تماس آژانس')).toHaveValue('09120000002');
+    expect(screen.getByLabelText('رمز عبور')).toHaveValue('Blujet@1404');
+  });
+
+  it('shows a clear localized message when login attempts are rate limited', async () => {
+    const agencyLogin = vi
+      .fn()
+      .mockRejectedValue(new ApiRequestError('RATE_LIMITED', 'ThrottlerException: Too Many Requests', 429));
+    mockAuth(agencyLogin);
+    render(
+      <MemoryRouter>
+        <AgencyLoginPage />
+      </MemoryRouter>,
+    );
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('شماره تماس آژانس'), '09120000002');
+    await user.type(screen.getByLabelText('رمز عبور'), 'wrong-password');
+    await user.click(screen.getByRole('button', { name: 'ورود به پنل آژانس' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'تعداد تلاش‌های ورود زیاد است؛ ۶۰ ثانیه صبر کنید و دوباره تلاش کنید.',
+    );
   });
 
   it('signup tab: requests OTP, submits the request, shows the pending-review message', async () => {

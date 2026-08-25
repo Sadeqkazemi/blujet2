@@ -16,6 +16,10 @@ import { localeDigits } from '../../lib/locale-format';
 const GOLD = AGENCY_LOGIN_GOLD;
 const NAVY = AGENCY_LOGIN_NAVY;
 const OTP_LEN = 6;
+const LOCAL_DEMO_AGENCY = {
+  phone: '09120000002',
+  password: 'Blujet@1404',
+} as const;
 
 const STR: Record<
   StoredLocale,
@@ -335,7 +339,17 @@ function AgencyLoginForm() {
         navigate(result.mustChangePassword ? '/required-password-change' : '/agency', { replace: true });
       }
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : t.loginFailedFallback);
+      setError(
+        err instanceof ApiRequestError && err.status === 429
+          ? tr(
+              'Too many login attempts. Wait 60 seconds and try again.',
+              'محاولات تسجيل الدخول كثيرة. انتظر ٦٠ ثانية ثم حاول مرة أخرى.',
+              'تعداد تلاش‌های ورود زیاد است؛ ۶۰ ثانیه صبر کنید و دوباره تلاش کنید.',
+            )
+          : err instanceof ApiRequestError
+            ? err.message
+            : t.loginFailedFallback,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -521,24 +535,47 @@ function AgencyLoginForm() {
         </button>
 
         {(import.meta.env.DEV || import.meta.env.VITE_SANDBOX_AUTH === 'true') && (
-          <button
-            type="button"
-            data-testid="agency-first-login"
-            onClick={() => { setPhase('setup'); setPassword(''); setError(null); }}
-            style={{
-              alignSelf: 'flex-start',
-              fontSize: 11.5,
-              fontWeight: 800,
-              color: GOLD,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              padding: 0,
-            }}
-          >
-            {tr('First login / activate account', 'تسجيل الدخول الأول / تفعيل الحساب', 'اولین ورود / فعال‌سازی حساب')}
-          </button>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <button
+              type="button"
+              data-testid="agency-demo-login"
+              onClick={() => {
+                setPhone(LOCAL_DEMO_AGENCY.phone);
+                setPassword(LOCAL_DEMO_AGENCY.password);
+                setError(null);
+              }}
+              style={{
+                fontSize: 11.5,
+                fontWeight: 800,
+                color: NAVY,
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: 9,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                padding: '7px 10px',
+              }}
+            >
+              {tr('Fill local demo account', 'تعبئة حساب العرض المحلي', 'پرکردن حساب آزمایشی لوکال')}
+            </button>
+            <button
+              type="button"
+              data-testid="agency-first-login"
+              onClick={() => { setPhase('setup'); setPassword(''); setError(null); }}
+              style={{
+                fontSize: 11.5,
+                fontWeight: 800,
+                color: GOLD,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                padding: 0,
+              }}
+            >
+              {tr('First login / activate account', 'تسجيل الدخول الأول / تفعيل الحساب', 'اولین ورود / فعال‌سازی حساب')}
+            </button>
+          </div>
         )}
 
         {error && (

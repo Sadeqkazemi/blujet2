@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BankLoanApplication } from '../../database/entities/bank-loan-application.entity';
+import { BankLoanCustomerProfile } from '../../database/entities/bank-loan-customer-profile.entity';
 import { BankLoanWebhookEvent } from '../../database/entities/bank-loan-webhook-event.entity';
 import { BankLoanWalletCredit } from '../../database/entities/bank-loan-wallet-credit.entity';
 import { WalletEntry } from '../../database/entities/wallet-entry.entity';
@@ -17,6 +18,7 @@ import { LoansService } from './loans.service';
   imports: [
     TypeOrmModule.forFeature([
       BankLoanApplication,
+      BankLoanCustomerProfile,
       BankLoanWebhookEvent,
       BankLoanWalletCredit,
       WalletEntry,

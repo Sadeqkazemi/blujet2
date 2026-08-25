@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMinSize,
+  ArrayUnique,
   IsIn,
+  IsArray,
   IsInt,
   IsOptional,
   IsString,
@@ -114,6 +117,18 @@ export class RequestAgencySeatsDto {
   @Min(1)
   @Max(500)
   seats: number;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'شناسه رخدادهای پروازی که آژانس پس از استعلام انتخاب کرده است.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayUnique()
+  @IsString({ each: true })
+  selectedFlightInstanceIds?: string[];
 
   @ApiPropertyOptional({ example: [0, 6], type: [Number] })
   @IsOptional()

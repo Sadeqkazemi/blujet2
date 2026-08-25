@@ -43,34 +43,37 @@ durable contract.
 ## Phase 1 — Auth, RBAC, panel shell, dashboard/reporting core
 
 ### Role (enum)
+
 ```
 USER | AGENCY | EMPLOYEE | IT_MANAGER | COMMERCIAL_MANAGER | FINANCE_MANAGER
 | SENIOR_MANAGER | CEO | BOARD_CHAIR | SITE_ADMIN
 ```
+
 Fixed by `CLAUDE.md`. `EMPLOYEE` covers all department staff (commercial/
 finance/IT/sales); their fine-grained capabilities come from `Permission`
 (Phase 6), not sub-roles.
 
 ### User
+
 One table for every human in the system — customers, agency users, staff,
 and the six manager roles. Two disjoint auth surfaces are enforced at the
 service layer, not by separate tables (simpler migration path, one place to
 enforce "a user has exactly one identity"):
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid pk | |
-| role | Role | |
-| phone | string? unique | customers/agencies — E.164, OTP login |
-| username | string? unique | staff/managers — password + mandatory 2FA login |
-| passwordHash | string? | argon2; **null for OTP-only customers** |
-| email | string? unique | optional for customers, org email for staff |
-| fullName | string | |
-| twoFactorEnabled | bool | forced `true` for all roles except USER/AGENCY |
-| twoFactorSecret | string? | encrypted at rest |
-| isActive | bool default true | suspend/activate (اسکناس تعلیق حساب) toggles this |
-| deletedAt | DateTime? | soft delete (GDPR hard-delete flow is separate) |
-| createdAt / updatedAt | DateTime | |
+| Column                | Type              | Notes                                             |
+| --------------------- | ----------------- | ------------------------------------------------- |
+| id                    | uuid pk           |                                                   |
+| role                  | Role              |                                                   |
+| phone                 | string? unique    | customers/agencies — E.164, OTP login             |
+| username              | string? unique    | staff/managers — password + mandatory 2FA login   |
+| passwordHash          | string?           | argon2; **null for OTP-only customers**           |
+| email                 | string? unique    | optional for customers, org email for staff       |
+| fullName              | string            |                                                   |
+| twoFactorEnabled      | bool              | forced `true` for all roles except USER/AGENCY    |
+| twoFactorSecret       | string?           | encrypted at rest                                 |
+| isActive              | bool default true | suspend/activate (اسکناس تعلیق حساب) toggles this |
+| deletedAt             | DateTime?         | soft delete (GDPR hard-delete flow is separate)   |
+| createdAt / updatedAt | DateTime          |                                                   |
 
 Constraint: exactly one of `phone`/`username` is non-null depending on role
 (`USER`/`AGENCY` → phone; everything else → username). Enforced in the
@@ -83,11 +86,13 @@ is argon2, and every staff/manager role requires a 2FA challenge on login
 (`TwoFactorChallenge` below) — the mock's shortcut is not carried over.
 
 ### RefreshToken
+
 `{ id, userId→User, tokenHash, userAgent, ip, expiresAt, revokedAt? }` —
 revocable sessions per CLAUDE.md security rules. Access tokens are stateless
 JWTs; only refresh tokens are persisted.
 
 ### TwoFactorChallenge
+
 `{ id, userId→User, codeHash, purpose: STAFF_LOGIN_2FA, expiresAt,
 consumedAt?, attempts }` — 6-digit, 2-minute TTL, single-use, hashed at
 rest (shared shape with the customer OTP table introduced when the public
@@ -95,34 +100,38 @@ auth feature is built by the other track; kept separate here so this
 track's migration doesn't collide with theirs).
 
 ### Permission (seed data, not a table with FKs to every row — see Phase 6)
+
 Referenced here because `User.permissions String[]` (Employee only) stores
 keys from this catalog; the catalog itself lands as a Phase 6 seed/enum,
 not a Phase 1 migration.
 
 ### AuditLog
+
 Backs both the security "audit log for every admin action" requirement and
 the six panels' "گزارش مدیران" (manager oversight feed) / "لاگ و رویدادها"
 (IT event log) UIs — those are just filtered views over this one table.
 
-| Column | Type | Notes |
-|---|---|---|
-| id | uuid pk | |
-| actorId | uuid → User | |
-| actorRole | Role | denormalized for fast filtering |
-| category | AuditCategory enum | `AGENCY, PRICING, FINANCE, REFUND, STRATEGY, SYSTEM, CLUB, ACCOUNT, ACCESS, SECURITY, RESERVATION` |
-| action | string | short label, e.g. "تأیید و صدور کارت" |
-| detail | string | Persian sentence, e.g. design's `detail` field |
-| entityType / entityId | string? | polymorphic pointer to the affected row |
-| metadata | Json? | before/after snapshot for the financial log trail |
-| requestId | string? | correlates to the request-id log line |
-| createdAt | DateTime | |
+| Column                | Type               | Notes                                                                                              |
+| --------------------- | ------------------ | -------------------------------------------------------------------------------------------------- |
+| id                    | uuid pk            |                                                                                                    |
+| actorId               | uuid → User        |                                                                                                    |
+| actorRole             | Role               | denormalized for fast filtering                                                                    |
+| category              | AuditCategory enum | `AGENCY, PRICING, FINANCE, REFUND, STRATEGY, SYSTEM, CLUB, ACCOUNT, ACCESS, SECURITY, RESERVATION` |
+| action                | string             | short label, e.g. "تأیید و صدور کارت"                                                              |
+| detail                | string             | Persian sentence, e.g. design's `detail` field                                                     |
+| entityType / entityId | string?            | polymorphic pointer to the affected row                                                            |
+| metadata              | Json?              | before/after snapshot for the financial log trail                                                  |
+| requestId             | string?            | correlates to the request-id log line                                                              |
+| createdAt             | DateTime           |                                                                                                    |
 
 Query patterns confirmed across all 6 panels:
+
 - CEO's "گزارش مدیران" excludes `actorRole IN (SUPER/BOARD_CHAIR, SENIOR_MANAGER, CEO)` — CEO oversees operational managers only.
 - Board Chair's and Senior Manager's "گزارش مدیران" show everyone (read-only for Board Chair — it never appears as `actorRole` writer in any panel).
 - IT's "لاگ و رویدادها" filters `category = SYSTEM` plus account-management entries.
 
 ### Panel access flags (feature, not a new table)
+
 "دسترسی به پنل‌ها" (seen in CEO/Senior Manager/IT panels — each toggles a
 different subset of sibling panels) is a small keyed bool set, modeled as
 `PanelAccessFlag { panelKey, enabled, updatedBy→User, updatedAt }` — one
@@ -152,7 +161,7 @@ migrations doesn't require renaming.
 - `FarePricingProposal.status` — PENDING|REGISTERED|REJECTED; `competitorPriceIrr` nullable.
 - `Booking { id, pnr unique, flightInstanceId→FlightInstance, channel: DIRECT|AGENCY|VIP|MANAGERIAL, agencyId→User?, status: DRAFT|HELD|PAID|TICKETED|CANCELLED|EXPIRED|REFUNDED, priceIrr Int, taxIrr, chargeSnapshot jsonb?, createdAt }` — full state machine per CLAUDE.md; Phase 1 dashboards only read `PAID`/`TICKETED` rows.
 - `Passenger { id, bookingId→Booking, fullName, nationalId(encrypted),
-  passportNo(encrypted), gender (`male`|`female`), mobile(encrypted) }`
+passportNo(encrypted), gender (`male`|`female`), mobile(encrypted) }`
 - `LedgerEntry { id, bookingId→Booking?, agencyId→AgencyProfile?, type: SALE|REFUND|SETTLEMENT|COMMISSION, signedAmountIrr Int, occurredAt, createdBy→User? }` — double-entry, immutable, append-only; refunds/settlements are new rows, never edits. `agencyId` (added in Phase 3) is set on agency-channel `SALE` rows (mirroring `booking.agencyId`) and on every `SETTLEMENT` row, since a settlement (invoice payment or a direct "ثبت تسویه") isn't necessarily tied to one `Booking` — this lets `AgencyCreditLine.usedIrr` derive from a single `agencyId` filter instead of a join through `Booking` that `SETTLEMENT` rows wouldn't have anyway.
 
 Sales-chart/KPI endpoints (`GET /reporting/sales`, etc., Phase 1 API) query
@@ -214,6 +223,7 @@ silently invented.
 - `StoredFile { id, ownerId→User, fileName, mimeType, sizeBytes, path, createdAt }` — minimal upload backing for the referral/message «بارگذاری مستندات (PDF یا تصویر)» chips; PDF/image only, size-capped, local disk in dev behind an interface. Reused later by club-card docs (Phase 5) and refunds (Phase 7).
 
 Out of scope, confirmed dead/unreachable in the design (not built):
+
 - Senior Manager's «اولویت‌های راهبردی» directive list — not reachable from
   the confirmed sidebar (orphaned tab), purely in-memory, never delivered.
 - A standalone received-messages inbox — the cartable IS the inbox
@@ -247,7 +257,7 @@ dedicated pricing tab). Confirmed 3-step flow, verbatim from the CEO
 banner: «۱ پیشنهاد مدیر بازرگانی → ۲ تحلیل هوش مصنوعی → ۳ تأیید و ثبت
 مدیر عامل».
 
-- `FarePricingProposal { id, flightInstanceId→FlightInstance @unique (one live proposal per flight — ⚑ fixes the mocks' broken id scheme where the two panels wrote the same array under incompatible `PP-####` vs `PP-{flightNo}` keys and seeded proposals never matched any flight row), basePriceIrr, competitorPriceIrr, proposedPriceIrr, legalRateIrr?, note?, proposedById→User, status: PENDING|REGISTERED, registeredPriceIrr?, approvedById→User?, approvedAt?, aiSuggestion Json? of { priceIrr, reason, factors[], season, occasion, confidence, modelVersion, generatedAt }, createdAt, updatedAt }`
+- `FarePricingProposal { id, flightInstanceId→FlightInstance @unique (one live proposal per flight — ⚑ fixes the mocks' broken id scheme where the two panels wrote the same array under incompatible `PP-####`vs`PP-{flightNo}` keys and seeded proposals never matched any flight row), basePriceIrr, competitorPriceIrr, proposedPriceIrr, legalRateIrr?, note?, proposedById→User, status: PENDING|REGISTERED, registeredPriceIrr?, approvedById→User?, approvedAt?, aiSuggestion Json? of { priceIrr, reason, factors[], season, occasion, confidence, modelVersion, generatedAt }, createdAt, updatedAt }`
 - ⚑ **AI suggestion is persisted on the proposal** (with the model version, per the ML-service traceability rule) — in the mocks it lives in component state and evaporates on reload, hiding the «ثبت با AI» button. Advisory-only stands: generation never mutates prices; registration is always an explicit CEO click.
 - **Registration** («تأیید بازرگانی» / «ثبت با AI»): CEO picks one of the two computed values — the design has no free-price input at approval. Transitions PENDING→REGISTERED with `registeredPriceIrr`, audited (`category=PRICING`). The original proposal remains immutable, but the Commercial Manager may update the current `registeredPriceIrr` of a `PUBLISHED` flight through the dedicated price endpoint; every change stores previous/new IRR values and reason in append-only `AuditLog`, bumps `FlightInstance.version`, and invalidates search cache.
 - **Legal rate** (نرخ قانونی/مصوب سازمان هواپیمایی): Commercial sends it with the proposal AND the CEO can set/override it independently (both paths exist in the design; last write wins, both audited).
@@ -324,8 +334,8 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   their Persian labels, while preserving operator-controlled `enabled` and
   observed `uptimePct` values on conflict.
 - `ExternalServiceConfig { id, key, nameFa, provider, endpoint, method,
-  timeoutMs, apiKeyEncrypted, sandbox, enabled, lastTestAt, lastTestOk,
-  lastTestMessage }` — seeded from the design's `extDefs`
+timeoutMs, apiKeyEncrypted, sandbox, enabled, lastTestAt, lastTestOk,
+lastTestMessage }` — seeded from the design's `extDefs`
   (zarinpal/amadeus/kavenegar/neshan). `apiKeyEncrypted` reuses
   `pii-crypto`'s AES-256-GCM (a generic reversible-encryption primitive
   despite the file's name, needed here because the value must be sent back
@@ -343,7 +353,7 @@ explicitly listed under Phase 12 in `PLAN.md` — not built, not stubbed.
   (`userAgent`, `ip`, `revokedAt`) from Phase 1 — no new table. «خروج همه»
   revokes every non-revoked row.
 - `BackupRecord { id, fileName, sizeBytes, status: RUNNING|SUCCESS|FAILED,
-  triggeredById→User?, startedAt, completedAt, errorMessage }` — one row per
+triggeredById→User?, startedAt, completedAt, errorMessage }` — one row per
   real `pg_dump` invocation. Restore stays a manual RUNBOOK step (see
   `docs/API.md`'s note) — no destructive one-click endpoint.
 
@@ -429,7 +439,7 @@ modal, future-flight نرخ‌گذاری/allocation modal with the AI hint).
     availability).
   - `agencySeatsAllocated Int?` — the future-flight تخصیص modal's آژانس
     figure; مستقیم is always derived (`capacity − charterSeats −
-    agencySeatsAllocated`), never stored.
+agencySeatsAllocated`), never stored.
 - ⚑ Statuses: the mocks show فعال / در حال فروش / تکمیل / لغو شده as
   hardcoded strings. Real mapping is derived server-side from
   `FlightInstanceStatus` + sales: `CANCELLED`→لغو شده; `DEPARTED` rows
@@ -456,6 +466,7 @@ modal, future-flight نرخ‌گذاری/allocation modal with the AI hint).
 
 **No new tables and no schema changes.** Every figure is derived from
 existing rows at query time, per CLAUDE.md's server-side-aggregates rule:
+
 - مالی analytic view (CEO/Chair/Senior/Commercial): Phase 1 reporting
   queries over `LedgerEntry`/`Booking`/`FlightInstance` — reused unchanged.
 - «تراکنش‌های مالی اخیر»: `LedgerEntry` (SALE/SETTLEMENT/COMMISSION/REFUND)
@@ -532,7 +543,7 @@ UI that was never specified anywhere).
     `FlightsService.changeAircraftType(instanceId, newAircraftType)` that:
     1. Loads the new `AircraftSeatMap`'s total seat count.
     2. Counts currently CONFIRMED-or-later seats (`Booking.status IN
-       (PAID, TICKETED)` for this instance, plus active `SeatLock` rows).
+(PAID, TICKETED)` for this instance, plus active `SeatLock` rows).
     3. If the new capacity is `<` that count, **rejects with 409
        `CAPACITY_BELOW_CONFIRMED`** — the response includes the shortfall
        count so staff can see how many passengers would need manual
@@ -542,7 +553,7 @@ UI that was never specified anywhere).
        product guidance anywhere, so it's surfaced as a blocked action for a
        human to resolve deliberately, not automated.
     4. Otherwise updates `capacity` (from the new seat map's total) and a
-       new `Flight.aircraftType` pointer *for this instance only* — this is
+       new `Flight.aircraftType` pointer _for this instance only_ — this is
        genuinely an instance-level override, so `FlightInstance` gains its
        own nullable `aircraftTypeOverride String?` (falls back to
        `Flight.aircraftType` when null) rather than mutating the shared
@@ -555,8 +566,8 @@ UI that was never specified anywhere).
   or an agency's quota). `SearchService.takenSeatCodes` today returns one
   undifferentiated set of taken seat codes; this phase makes the channel
   pools real without introducing a per-seat-code pool assignment (matching
-  the user's own inventory-vs-seat-map distinction — a pool is a *count*,
-  the seat map is *which physical seat*, and they're deliberately kept
+  the user's own inventory-vs-seat-map distinction — a pool is a _count_,
+  the seat map is _which physical seat_, and they're deliberately kept
   separate):
   - New `SearchService.takenSeatCodesByChannel(flightInstanceId)` — same
     query as today's `takenSeatCodes` but grouped by `Booking.channel`
@@ -568,9 +579,9 @@ UI that was never specified anywhere).
     conflict check: `AGENCY`-channel bookings 409 once
     `takenByChannel.AGENCY >= flightInstance.agencySeatsAllocated`;
     `CHARTER`-channel bookings 409 once `takenByChannel.CHARTER >=
-    flightInstance.charterSeats`; `SYSTEM`-channel (public/direct)
+flightInstance.charterSeats`; `SYSTEM`-channel (public/direct)
     bookings 409 once `takenByChannel.SYSTEM >= capacity − charterSeats −
-    agencySeatsAllocated − takenByChannel.MANAGERIAL` (managerial locks
+agencySeatsAllocated − takenByChannel.MANAGERIAL` (managerial locks
     still physically occupy a seat, so they still count against the public
     pool's remaining count — only the agency/charter split is separated
     out). Error code `POOL_EXHAUSTED`, includes which pool.
@@ -596,8 +607,8 @@ UI that was never specified anywhere).
     immediately or only for a still-configuring flight?) with no grounding
     to build against — flagged here rather than guessed.
   - Full 6-status IATA-style flight lifecycle beyond `SCHEDULED → CLOSED
-    (derived from the sale window, not a stored status) → DEPARTED /
-    CANCELLED` — same reasoning; the user's spec's "بسته" state is covered
+(derived from the sale window, not a stored status) → DEPARTED /
+CANCELLED` — same reasoning; the user's spec's "بسته" state is covered
     by the sale-window fields above without inventing a separate manual
     toggle no design asks for.
 
@@ -730,7 +741,7 @@ across price classes — additive, not a replacement.
     reconciliation rule — same reasoning as Phase 7's refund-penalty
     conflict above.
 - **Capacity-sum validation** (mirrors Phase 13B's fare-class check): the
-  sum of `seatsAllocated` across every *active* allotment (HARD, or SOFT
+  sum of `seatsAllocated` across every _active_ allotment (HARD, or SOFT
   with `releaseAt` still in the future or unset) for an instance, including
   the one being created, must not exceed `FlightInstance.agencySeatsAllocated`
   — 400 if it would, and 400 if `agencySeatsAllocated` is unset (staff must
@@ -822,7 +833,7 @@ because every new field describes that same row's lifecycle.
     `expiresAt` has already passed. This has to be a real write rather
     than a purely-lazy read-time exclusion, unlike Part C's SOFT
     allotments: the DB-level partial unique index (`WHERE releasedAt IS
-    NULL`) that guarantees one active lock per seat can't itself express
+NULL`) that guarantees one active lock per seat can't itself express
     "and not expired" (`now()` isn't allowed in a partial-index
     predicate), so an expired row has to actually be released before a
     new lock on the same seat can be inserted. `approvalStatus`,
@@ -870,7 +881,7 @@ because every new field describes that same row's lifecycle.
 CLAUDE.md specifies a `SmsProvider` interface (OTP, ticket issuance,
 refund notifications; mock in dev). It was never actually built: OTP/2FA
 delivery goes through the generic `TwoFactorProvider` (mock, just logs
-the code — see Phase 1), and two other call sites *claim* SMS delivery in
+the code — see Phase 1), and two other call sites _claim_ SMS delivery in
 their audit-log text with no send behind it at all —
 `AdminsService.create`/`resetPassword`'s own comment says so explicitly
 ("nothing is fabricated as 'sent' beyond the audit note"). Phase 12's IT
@@ -885,12 +896,12 @@ the user's explicit scope (2026-07-22): **management panel only**
 
 - New `SmsProvider` interface (`backend/src/common/sms/`), same pattern
   as `PaymentGateway`/`AiProvider`: `send(phone, message, messageType):
-  Promise<{ success, failureReason? }>`. `MockSmsProvider` logs the
+Promise<{ success, failureReason? }>`. `MockSmsProvider` logs the
   message at `info` level (same reasoning as `MockTwoFactorProvider`:
   it's the only delivery channel until a real vendor is wired) and always
   reports success — it never fabricates a random failure rate.
 - New `SmsLog { id, phone, messageType: SmsMessageType (OTP|TEMP_PASSWORD),
-  status: SmsStatus (SUCCESS|FAILED), failureReason?, createdAt }`. Stores
+status: SmsStatus (SUCCESS|FAILED), failureReason?, createdAt }`. Stores
   the phone number in plaintext (same treatment `User.phone` already gets
   elsewhere in this schema — it isn't encrypted-PII like national ID),
   masked only at the IT panel's read layer (`0912***5678`), never the
@@ -909,7 +920,7 @@ the user's explicit scope (2026-07-22): **management panel only**
   `delivery: 'sms'|'email'` flag but their DTOs never collect a phone
   number for the new/target account — so an `sms` delivery on an account
   with `phone: null` logs a real `FAILED` row (`این حساب شماره موبایل
-  ثبت‌شده ندارد`) instead of a fabricated success. This is an honest
+ثبت‌شده ندارد`) instead of a fabricated success. This is an honest
   reflection of a pre-existing gap (delivery was never real before), not
   a new bug — ⚑ flagged here rather than silently worked around by
   inventing a phone-collection field on the admin-create form, which
@@ -923,14 +934,14 @@ the user's explicit scope (2026-07-22): **management panel only**
   2. `AdminsService.create` — logs `TEMP_PASSWORD` when `delivery: 'sms'`.
   3. `AdminsService.resetPassword` — logs `TEMP_PASSWORD` when
      `delivery !== 'email'` (matches its existing ternary's own default).
-  Employees' own reset-password (`EmployeesService.resetPassword`) makes
-  no delivery claim at all today (returns the plaintext password once,
-  no audit text asserting it was sent) — left untouched, out of scope.
-  Agencies' invoice reminder (`AgenciesService.remindInvoice`) similarly
-  only *comments* that it's "queued via SmsProvider" with no delivery
-  claim in its audit text or DTO — also left untouched; wiring it would
-  mean inventing what an invoice-reminder SMS says, which nothing in the
-  design specifies.
+     Employees' own reset-password (`EmployeesService.resetPassword`) makes
+     no delivery claim at all today (returns the plaintext password once,
+     no audit text asserting it was sent) — left untouched, out of scope.
+     Agencies' invoice reminder (`AgenciesService.remindInvoice`) similarly
+     only _comments_ that it's "queued via SmsProvider" with no delivery
+     claim in its audit text or DTO — also left untouched; wiring it would
+     mean inventing what an invoice-reminder SMS says, which nothing in the
+     design specifies.
 
 **Addendum (post-Phase-67): real `KavenegarSmsProvider`.** The
 `ext_kavenegar` row above was previously decorative (an
@@ -971,10 +982,11 @@ been running against whatever the seed happened to backdate, never a
 real flight that actually departed during a live session. Fixed with the
 same lazy/computed pattern used for `HELD`→`EXPIRED` bookings and Part
 C/D's expiry filters — no cron:
+
 - `materializeDepartedInstances(prisma)` (new shared util,
   `backend/src/modules/flights/flight-lifecycle.util.ts`): one bulk
   `updateMany({ where: { status: 'SCHEDULED', departureAt: { lte: now } },
-  data: { status: 'DEPARTED' } })`. Called at the top of every place that
+data: { status: 'DEPARTED' } })`. Called at the top of every place that
   reads `DEPARTED` for real decisions: the reporting completed-flights
   query, the flight-management پروازهای انجام‌شده list, and the new
   no-show endpoint below.
@@ -992,6 +1004,7 @@ before check-in data exists); **staff can override to `NO_SHOW`** via a
 new manual action once the flight has actually departed — this is a real
 operational action (ops reviewing the manifest after departure), not a
 fabricated automatic flag.
+
 - New enum values: `BookingStatus` gains `NO_SHOW`, `FLOWN`.
 - `materializeFlownBookings(prisma)` (same util file): after
   materializing departed instances, bulk-flips every `TICKETED` booking
@@ -1015,10 +1028,11 @@ crash — the whole transaction rolls back and the booking silently stays
 taken. Today there is **no record anywhere** that this happened; this is
 a real, latent bug this phase closes, not a new feature bolted on for its
 own sake.
+
 - New `PaymentReconciliation { id, bookingId→Booking, gatewayRefId,
-  amountIrr, status: PaymentReconciliationStatus (PENDING|RESOLVED)
-  @default(PENDING), resolvedById?→User, resolvedAt?, resolutionNote?,
-  createdAt }`.
+amountIrr, status: PaymentReconciliationStatus (PENDING|RESOLVED)
+@default(PENDING), resolvedById?→User, resolvedAt?, resolutionNote?,
+createdAt }`.
 - `BookingService.pay()`: right after `gateway.verify()` returns
   `ok: true` (GATEWAY method only — WALLET/POINTS are synchronous
   internal ledger moves fully inside the one transaction, nothing
@@ -1064,7 +1078,7 @@ operation that actually exists in the codebase today.
   challenge issued for one sensitive action can't be replayed against a
   different one.
 - New enum `StepUpScope { ADMIN_ROLE_CHANGE, API_KEY_ROTATE,
-  REFUND_PAYOUT, PRICE_CAPACITY_CHANGE, SESSION_REVOKE }` — exactly the
+REFUND_PAYOUT, PRICE_CAPACITY_CHANGE, SESSION_REVOKE }` — exactly the
   five real call sites found (see API.md); no speculative scopes added.
 - `StepUpService` (new, `backend/src/modules/auth/step-up.service.ts`):
   `request(actor, scope)` creates the challenge and sends the code
@@ -1146,7 +1160,7 @@ separate "get code" step before submit.
   text fields. `AgencyMembershipRequest.documents` stays the existing
   nullable `Json?` and is populated later by staff during review (they
   already have file-upload access via the existing `/files` endpoint);
-  building a new *unauthenticated* multipart upload endpoint is a real
+  building a new _unauthenticated_ multipart upload endpoint is a real
   abuse-surface decision (anonymous file upload) that the design doesn't
   call for and shouldn't be added speculatively.
 - ⚑ **No selfie step anywhere** (explicit user instruction) — not for
@@ -1171,7 +1185,7 @@ separate "get code" step before submit.
   `userId` is a required FK to an existing `User`, and an anonymous
   applicant has no account yet. The existing customer-OTP endpoint
   (`AuthService.requestOtp`) sidesteps this by upserting a `User(role:
-  USER)` row before issuing the challenge — but doing the same here would
+USER)` row before issuing the challenge — but doing the same here would
   create a phone-linked `User` row (with what role? not yet AGENCY, since
   approval is what creates that) before staff have reviewed anything,
   which the existing approval flow doesn't expect and would collide with
@@ -1291,6 +1305,7 @@ SITE_ADMIN-specific gap, so they're excluded from `PANEL_NAV.SITE_ADMIN`
 entirely (per this file's own "exclude coded-but-unreachable tabs"
 convention) rather than shipped as `implemented:false` dead entries. The
 remaining six get real, conservatively-scoped access:
+
 - `agencies` → existing `AgenciesListPage`/`AgencyDetailPage`/
   `RequestDetailPage` (list/detail/requests/refer/reject — all already
   read-only or review-only for this role; **not** suspend, credit,
@@ -1336,13 +1351,13 @@ phase — an employee only sees a tab if they hold at least one of its
 wired keys, so a granted-but-unwired permission never produces a dead
 tab:
 
-| section (nav key) | wired catalog keys | real endpoint(s) |
-|---|---|---|
-| `agencies` | `ag_list`, `ag_requests`, `ag_info` | `GET /agencies`, `GET /agencies/requests(/:id)`, `GET /agencies/:id` |
-| `flights` | `fl_view` | `GET /flights/{overview,airports,schedules,:id,:id/fare-rules,:id/allotments}` |
-| `pricing` | `pr_propose` | `GET /pricing/proposals`, `PUT /pricing/flights/:id/proposal` |
-| `reports` | `rp_sales`, `rp_finance` | `GET /passenger-reports/search` (same tab/endpoint for either dept's report key) |
-| `refund` | `rf_list`, `rf_details`, `rf_process` | `GET /refunds`, `GET /refunds/:id`, `PATCH /refunds/:id/refer` |
+| section (nav key) | wired catalog keys                    | real endpoint(s)                                                                 |
+| ----------------- | ------------------------------------- | -------------------------------------------------------------------------------- |
+| `agencies`        | `ag_list`, `ag_requests`, `ag_info`   | `GET /agencies`, `GET /agencies/requests(/:id)`, `GET /agencies/:id`             |
+| `flights`         | `fl_view`                             | `GET /flights/{overview,airports,schedules,:id,:id/fare-rules,:id/allotments}`   |
+| `pricing`         | `pr_propose`                          | `GET /pricing/proposals`, `PUT /pricing/flights/:id/proposal`                    |
+| `reports`         | `rp_sales`, `rp_finance`              | `GET /passenger-reports/search` (same tab/endpoint for either dept's report key) |
+| `refund`          | `rf_list`, `rf_details`, `rf_process` | `GET /refunds`, `GET /refunds/:id`, `PATCH /refunds/:id/refer`                   |
 
 Enforcement is a new `EmployeePermissionGuard` +
 `@RequiresPermission(...keys)` decorator (`src/common/`) — the guard
@@ -1357,6 +1372,7 @@ PII, `rf_process` refer-only, never `pay`).
 
 ⚑ **Deferred, not wired this phase** (documented so a future phase
 doesn't assume silent inclusion):
+
 - `fl_manage` (flight create/schedule/plan/aircraft/fare-rule/allotment
   writes) — blanket-granting write access across that many endpoints
   needed more individual review than this phase had time for; only
@@ -1722,8 +1738,8 @@ refunds only a previously charged fee. The remaining changes are additive,
 non-breaking response-shape changes:
 
 - `PriceLockService.listMine()` now joins `FlightInstance → Flight →
-  Route` and includes `flight: { flightNo, originCode, destCode,
-  departureAt }` in each returned row (previously only the `PriceLock`
+Route` and includes `flight: { flightNo, originCode, destCode,
+departureAt }` in each returned row (previously only the `PriceLock`
   row's own columns).
 - `BookingService.toDetail()` now includes `isPriceLocked: boolean`
   (`!!booking.priceLock`, correctly resolved from the already-known
@@ -1804,7 +1820,7 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
   can never be used to reset a password, and vice versa.
   Migration: `20260730140342_password_reset_email_purpose`.
 - Lookup for the request step is `User.findFirst({ email, role: 'USER',
-  emailVerifiedAt: { not: null } })` — deliberately NOT an upsert (unlike
+emailVerifiedAt: { not: null } })` — deliberately NOT an upsert (unlike
   `requestOtp`'s phone find-or-create). Phone OTP login/signup is a single
   merged flow by product design (see Phase 2's docs); email-based password
   reset is not a signup path, so inventing a `User` row for an arbitrary
@@ -1816,7 +1832,8 @@ only, reuses the existing `TwoFactorChallenge` table exactly like Phase 2's
 ## پنل کاربر — نشان‌شده‌ها (`SavedFlight`)
 
 See `docs/API.md`'s matching section. Bookmarks a specific flight instance
-+ cabin for the logged-in customer (same granularity as `PriceLock`).
+
+- cabin for the logged-in customer (same granularity as `PriceLock`).
 
 ```prisma
 model SavedFlight {
@@ -2014,11 +2031,11 @@ model ClubTierRule {
 - `SILVER` has no column — its threshold is fixed at `0` in code (never
   stored, never editable), matching the design's disabled `"۰"` input.
 - `prisma/seed.ts` creates the single default row so `GET
-  /club/tier-rules` never has to lazily create one in a normal dev/seed
+/club/tier-rules` never has to lazily create one in a normal dev/seed
   environment (the lazy-create fallback exists only for defense in
   depth, e.g. a fresh DB that skipped seeding).
 - No new enum: reuses the existing `ClubTier` enum (`SILVER | GOLD |
-  PLATINUM`) from Phase 5.
+PLATINUM`) from Phase 5.
 - Migration: `20260730162159_phase65_club_tier_rules`.
 
 ## Phase 66 — نظرسنجی مسافران (Passenger Satisfaction Survey)
@@ -2103,7 +2120,7 @@ as `clubTierRuleEdits` (Phase 65).
 - `SurveyQuestion` — not a singleton; IT manager CRUDs a flat list.
   `prisma/seed.ts` seeds the same 5 default questions the design ships
   with (`رضایت کلی از سفر` / `برخورد و کیفیت خدمه پروازی` / `دقت در
-  زمان پرواز` / `راحتی صندلی و کابین` / `سرعت پذیرش و چک‌این`), in that
+زمان پرواز` / `راحتی صندلی و کابین` / `سرعت پذیرش و چک‌این`), in that
   order. Deleting one is a hard delete (this is configuration, not
   passenger data — no soft-delete requirement applies).
 - `SurveyInvite.bookingId` is `@unique` — at most one invite per booking,
@@ -2319,11 +2336,11 @@ targetIrr - usedIrr, bookingId: null }` row — `signedAmountIrr` can be
 credit-line adjustment, not a ticket sale. `LedgerEntry.type: 'SALE'` is
 legitimately dual-purpose in this schema (`computeUsedIrr()` needs
 `SALE - SETTLEMENT` to include it for agency-debt math), but every
-company-wide *revenue* aggregate elsewhere in the app was treating
+company-wide _revenue_ aggregate elsewhere in the app was treating
 **every** `type: 'SALE'` row as real ticket revenue:
 
 - `ReportingService.kpis()` summed `Math.abs(signedAmountIrr)` for every
-  SALE row with no `bookingId` filter — silently *adding* a negative
+  SALE row with no `bookingId` filter — silently _adding_ a negative
   debt-adjustment as positive revenue.
 - `ReportingService.sumByChannel()` (used by `salesChart()`) happened to
   exclude these rows, but only by accident — it drops any entry whose
@@ -2386,6 +2403,7 @@ databases with existing data present.
 **New shared infrastructure** (CLAUDE.md: "Money is NEVER a float. All
 arithmetic through a single money utility module" — this module didn't
 actually exist yet before this migration; it does now):
+
 - `backend/src/common/money.ts` — `Irr = bigint`, plus `addIrr`/`subIrr`/
   `negateIrr`/`pctOfIrr` (integer-percent, half-away-from-zero rounding)/
   `roundIrrTo` (round to nearest step, e.g. the business-cabin multiplier's
@@ -2532,6 +2550,7 @@ Plus on `StoredFile`: `siteMediaAsset`, `contentBlockImage`, `destHighlightFor`.
 - Blocks auto-created with Persian defaults on first admin/public read if missing.
 - `PANEL_NAV.SITE_ADMIN` gains `{ key: 'media', implemented: true }`.
 - Seed: three blocks + five routes + four destinations matching home mock data.
+
 # Operational account bootstrap (2026-08-05)
 
 The initial production management accounts use the existing `User` model; no
@@ -2578,6 +2597,7 @@ column, stores only an Argon2 password hash, sets `mustChangePassword=true`,
 clears `temporaryPasswordOnlyUntil`, revokes prior refresh sessions on
 rotation, and records an `AuditLog(category=SECURITY)` row without password
 material.
+
 ## Phase 68 — complete multi-role sandbox UAT
 
 ### Customer completion
@@ -2663,17 +2683,18 @@ description):
   `isBlocked`. Unique on `(aircraftDefinitionId, label)`.
 
 `AircraftCabin`/`AircraftSeat`'s `aircraftDefinitionId` DOES carry a real FK
-+ `@ManyToOne` relation (single level of nesting, not the recursive jsonb
-type that triggers TS2589 — safe). `AircraftSeatMap.aircraftDefinitionId`,
-`FlightInstance.aircraftDefinitionId`, and `AircraftDefinition.createdById`/
-`updatedById` are, by contrast, plain columns with **no** relation and
-**no** DB-level FK constraint — the established TS2589-avoidance convention
-in this codebase (adding a relation on an entity that already carries jsonb
-columns risks pushing unrelated `.findOneBy()`/`.update()` calls elsewhere
-in the codebase over the TypeScript compiler's type-recursion limit).
-`schema-parity.e2e-spec.ts` (which asserts the TypeORM entities describe the
-live schema byte-for-byte) is the guard rail that keeps migration DDL and
-entity relation metadata from drifting apart on this point.
+
+- `@ManyToOne` relation (single level of nesting, not the recursive jsonb
+  type that triggers TS2589 — safe). `AircraftSeatMap.aircraftDefinitionId`,
+  `FlightInstance.aircraftDefinitionId`, and `AircraftDefinition.createdById`/
+  `updatedById` are, by contrast, plain columns with **no** relation and
+  **no** DB-level FK constraint — the established TS2589-avoidance convention
+  in this codebase (adding a relation on an entity that already carries jsonb
+  columns risks pushing unrelated `.findOneBy()`/`.update()` calls elsewhere
+  in the codebase over the TypeScript compiler's type-recursion limit).
+  `schema-parity.e2e-spec.ts` (which asserts the TypeORM entities describe the
+  live schema byte-for-byte) is the guard rail that keeps migration DDL and
+  entity relation metadata from drifting apart on this point.
 
 ### `CharterCommitment` / `AgencySeatCommitment` (new tables)
 
@@ -2732,6 +2753,7 @@ section and `docs/api-contract-pr126.md` for the full endpoint contract.
   (both power the unread-count/list queries), unique on `dedupeKey`.
 
 ### `CartableTask.readAt` (new column, migration
+
 `1786867200000-CartableTaskReadAt`)
 
 Nullable `timestamp`, same unread-state semantics as `Notification.readAt`
@@ -2747,6 +2769,7 @@ migration's raw `CREATE TABLE`/`FOREIGN KEY` DDL): both tables'
 their entity declarations — the sandbox purge script (see API.md Phase 70)
 therefore deletes these two tables explicitly by `flightInstanceId` rather
 than relying on any cascade.
+
 # 2026-08 management panel hardening (no migration)
 
 - Panel availability continues to use `panel_access_flags`. The `OPERATIONS`
@@ -2874,6 +2897,7 @@ confirmed paid/ticketed passenger seats, active managerial `seat_locks`, and
 company blocks (`seat_locks.classification=FREE`). The public 15-minute hold
 deadline continues to be stored in `bookings.holdExpiresAt`; immutable financial
 sales continue to be stored in `ledger_entries`.
+
 # Senior Manager permission catalog (2026-08)
 
 Migration `1787644800000-SeniorManagerPermissionCatalog` preserves dashboard and cartable access on existing non-null `users.panelPermissions` arrays. No new table is introduced; `panelPermissions` remains the server-enforced JSONB capability list.
@@ -2930,6 +2954,7 @@ as one JSONB value in the existing `system_settings` row whose key is
 exactly once. `updatedById` and `updatedAt` continue to provide setting-level
 provenance, while `audit_logs` records each save. Public reads expose this
 value only through the allowlisted rules projection.
+
 ## Aircraft cabin capacity and route activation (2026-08-24)
 
 - `AircraftCabin` remains the normalized, authoritative per-aircraft capacity
@@ -2948,3 +2973,24 @@ value only through the allowlisted rules projection.
 - `Passenger.extraSeatFareIrr bigint NOT NULL DEFAULT 0` stores the audited
   base-fare amount charged for that seat. Active inventory and fare-bucket
   queries count a non-null `extraSeatCode` as one additional occupied seat.
+
+## Customer loan bank profile (2026-08-25)
+
+- `bank_loan_customer_profiles` has one row per USER (`userId` primary/FK).
+- `membershipStatus` tracks declared bank membership/account opening without
+  pretending the bank has completed a step.
+- `customerNumberEnc` is AES-256-GCM encrypted; only `customerNumberLast4` is
+  serialized to clients.
+- `accountOpeningReferenceId` and `eligibilityReferenceId` are opaque bank
+  references. Their statuses and non-sensitive summaries are persisted for
+  retryable polling and audit.
+- `eligibleAmountIrr` is nullable bigint IRR and is populated only from the bank
+  eligibility response. It authorizes a maximum request; it is not a wallet
+  balance.
+- Loan disbursement remains an immutable `bank_loan_wallet_credits` claim plus a
+  `wallet_entries` credit; no mutable balance column is introduced.
+
+`agency_seat_request_flights` continues to be the authoritative occurrence list
+for a seat order. The request total is calculated from persisted occurrences,
+seat count and fare rule price. Credit authorization reads the immutable agency
+ledger/credit-line projection and is rechecked transactionally by the server.

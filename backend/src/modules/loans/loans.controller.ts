@@ -15,7 +15,12 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { CreateLoanApplicationDto, ListLoansQueryDto } from './dto/loans.dto';
+import {
+  CreateLoanApplicationDto,
+  ListLoansQueryDto,
+  StartAccountOpeningDto,
+  StartEligibilityDto,
+} from './dto/loans.dto';
 import { LoansService } from './loans.service';
 
 @ApiTags('loans')
@@ -96,5 +101,67 @@ export class LoansController {
   async getAdmin(@Param('id') id: string) {
     const data = await this.loans.getAdmin(id);
     return { success: true, data };
+  }
+
+  @Get('me/loan-profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @ApiOperation({ summary: 'وضعیت عضویت بانک، افتتاح حساب و اعتبارسنجی کاربر' })
+  async profile(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.loans.getProfile(actor) };
+  }
+
+  @Post('me/loan-profile/account-opening')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @ApiOperation({ summary: 'ارسال درخواست افتتاح حساب به بانک سامان' })
+  async startAccountOpening(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: StartAccountOpeningDto,
+  ) {
+    return {
+      success: true,
+      data: await this.loans.startAccountOpening(actor, dto.idempotencyKey),
+    };
+  }
+
+  @Post('me/loan-profile/account-opening/sync')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @ApiOperation({ summary: 'استعلام وضعیت افتتاح حساب از بانک سامان' })
+  async syncAccountOpening(@CurrentUser() actor: AuthenticatedUser) {
+    return {
+      success: true,
+      data: await this.loans.syncAccountOpening(actor),
+    };
+  }
+
+  @Post('me/loan-profile/eligibility')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @ApiOperation({ summary: 'ارسال شماره مشتری و شروع اعتبارسنجی بانکی' })
+  async startEligibility(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: StartEligibilityDto,
+  ) {
+    return {
+      success: true,
+      data: await this.loans.startEligibility(
+        actor,
+        dto.customerNumber,
+        dto.idempotencyKey,
+      ),
+    };
+  }
+
+  @Post('me/loan-profile/eligibility/sync')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('USER')
+  @ApiOperation({ summary: 'استعلام نتیجه و سقف ریالی اعتبار از بانک' })
+  async syncEligibility(@CurrentUser() actor: AuthenticatedUser) {
+    return {
+      success: true,
+      data: await this.loans.syncEligibility(actor),
+    };
   }
 }
