@@ -4,6 +4,7 @@ import * as flightsApi from "../../../api/flights";
 import type { CommercialFlightControl, FlightDetail } from "../../../types/flights";
 import CommercialFlightDetailContent from "./CommercialFlightDetailContent";
 import * as cancellationApi from "../../../api/flight-cancellations";
+import * as agenciesApi from "../../../api/agencies";
 
 const detail: FlightDetail = {
   id: "fi-1",
@@ -64,6 +65,68 @@ describe("CommercialFlightDetailContent", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.spyOn(flightsApi, "fetchCommercialFlightControl").mockResolvedValue(control);
+    vi.spyOn(flightsApi, "fetchAllotmentsSummary").mockResolvedValue({
+      flightInstanceId: "fi-1",
+      totalCapacity: 180,
+      charterSeats: 0,
+      directReserved: 40,
+      agencySeats: 10,
+      freeSeats: 130,
+      agencyRevenueIrr: "350000000",
+      agencies: [],
+    });
+    vi.spyOn(agenciesApi, "fetchAgencies").mockResolvedValue({
+      kpis: {
+        activeCount: 1,
+        totalCreditGrantedIrr: "0",
+        totalUsedIrr: "0",
+        pendingSettlementCount: 0,
+      },
+      agencies: [{
+        id: "agency-1",
+        fullName: "آژانس نمونه",
+        managerName: "مدیر",
+        licenseNo: "A-1",
+        city: "تهران",
+        tier: "NORMAL",
+        isActive: true,
+        limitIrr: "0",
+        usedIrr: "0",
+        remainingIrr: "0",
+        pendingInvoiceCount: 0,
+        monthlyTicketsSold: 0,
+        monthlySalesIrr: "0",
+      }],
+    });
+  });
+
+  it("keeps manual agency locks in the dedicated agency tab", async () => {
+    const createSpy = vi.spyOn(flightsApi, "createAllotment").mockResolvedValue({
+      id: "allot-1",
+      agencyId: "agency-1",
+      agencyName: "آژانس نمونه",
+      seatsAllocated: 12,
+      type: "HARD",
+      releaseAt: null,
+      contractPriceIrr: "36000000",
+      createdAt: "2026-08-26T00:00:00.000Z",
+      active: true,
+    });
+    renderContent();
+
+    await screen.findByText("تفکیک کانال فروش صندلی");
+    fireEvent.click(screen.getByRole("button", { name: "آژانس" }));
+    fireEvent.change(screen.getByLabelText("آژانس"), { target: { value: "agency-1" } });
+    fireEvent.change(screen.getByLabelText("تعداد صندلی"), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText("قیمت هر صندلی (تومان)"), { target: { value: "3600000" } });
+    fireEvent.click(screen.getByRole("button", { name: "قفل صندلی برای آژانس" }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith("fi-1", {
+      agencyId: "agency-1",
+      seatsAllocated: 12,
+      type: "HARD",
+      contractPriceIrr: "36000000",
+    }));
   });
 
   it("renders the real flight controls and updates sales visibility through the canonical endpoint", async () => {

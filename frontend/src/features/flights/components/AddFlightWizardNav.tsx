@@ -1,7 +1,6 @@
 const STEPS = [
   "مشخصات رخداد",
   "کلاس‌های نرخی",
-  "ظرفیت آژانس",
   "قیمت و ارسال",
 ] as const;
 
@@ -15,7 +14,7 @@ export default function AddFlightWizardNav({
   return (
     <nav
       aria-label="مراحل افزودن پرواز"
-      className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-[#1f2a3d] bg-[#111a2b] p-2 sm:grid-cols-4"
+      className="mb-4 grid grid-cols-1 gap-2 rounded-2xl border border-[#1f2a3d] bg-[#111a2b] p-2 sm:grid-cols-3"
       data-testid="add-flight-wizard"
     >
       {STEPS.map((label, index) => (

@@ -1209,6 +1209,7 @@ export default function HomeSearchCard({
                     subLabel={dateIso ? undefined : t.lblDepartDate}
                     isRTL={isRTL}
                     granularNavigation={false}
+                    rtlForwardArrow={false}
                     priceCalendar={
                       isMobile && origin && dest && origin !== dest
                         ? { origin, dest, locale }
@@ -1241,6 +1242,7 @@ export default function HomeSearchCard({
                       subLabel={returnIso ? undefined : t.lblReturnDate}
                       isRTL={isRTL}
                       granularNavigation={false}
+                      rtlForwardArrow={false}
                     />
                   </div>
                 )}
@@ -1827,6 +1829,7 @@ export default function HomeSearchCard({
                     isRTL={isRTL}
                     embedded
                     granularNavigation={false}
+                    rtlForwardArrow={false}
                   />
                 </div>
               </div>

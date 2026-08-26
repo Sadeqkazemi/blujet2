@@ -16,6 +16,7 @@ import {
 } from "../../api/flights";
 import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
+import TimePicker from "../../components/TimePicker";
 import { faDigits, faMoney, latinDigits, parseTomanToRialString } from "../../lib/fa-format";
 import { dayjs, formatJalaliDate, toIsoDateOnly } from "../../lib/jalali";
 import { normalizeTomanInput } from "../../lib/money-input";
@@ -226,7 +227,10 @@ export default function ScheduleTemplatesTab() {
   }
 
   function fieldClass(field: ScheduleField) {
-    return `${INPUT_CLASS} ${invalidFields.has(field) ? "border-red-500 ring-1 ring-red-500/30" : ""}`;
+    const correctedMoneyField =
+      (field === "agencyPriceToman" || field === "legalCeilingToman") &&
+      Boolean(parseTomanToRialString(form[field]));
+    return `${INPUT_CLASS} ${invalidFields.has(field) && !correctedMoneyField ? "border-red-500 ring-1 ring-red-500/30" : ""}`;
   }
 
   function validateFields(): ScheduleField[] {
@@ -550,16 +554,17 @@ export default function ScheduleTemplatesTab() {
               className={`${INPUT_CLASS} cursor-not-allowed opacity-80`}
             />
           </label>
-          <label className="text-xs font-bold text-panel-muted">
-            ساعت پرواز *
-            <input
-              type="time"
+          <div
+            className={`rounded-lg ${invalidFields.has("departureTime") ? "ring-1 ring-red-500" : ""}`}
+          >
+            <TimePicker
+              label="ساعت پرواز *"
               value={form.departureTime}
-              onChange={(e) => updateForm("departureTime", e.target.value)}
-              className={fieldClass("departureTime")}
-              aria-invalid={invalidFields.has("departureTime")}
+              onChange={(value) => updateForm("departureTime", value)}
+              testId="schedule-departure-time"
+              aria-label="ساعت پرواز"
             />
-          </label>
+          </div>
           <label className="text-xs font-bold text-panel-muted">
             مدت پرواز (دقیقه) *
             <input
@@ -643,7 +648,10 @@ export default function ScheduleTemplatesTab() {
                 updateForm("agencyPriceToman", normalizeTomanInput(e.target.value))
               }
               className={fieldClass("agencyPriceToman")}
-              aria-invalid={invalidFields.has("agencyPriceToman")}
+              aria-invalid={
+                invalidFields.has("agencyPriceToman") &&
+                !parseTomanToRialString(form.agencyPriceToman)
+              }
             />
             <span
               aria-live="polite"
@@ -663,7 +671,10 @@ export default function ScheduleTemplatesTab() {
                 updateForm("legalCeilingToman", normalizeTomanInput(e.target.value))
               }
               className={fieldClass("legalCeilingToman")}
-              aria-invalid={invalidFields.has("legalCeilingToman")}
+              aria-invalid={
+                invalidFields.has("legalCeilingToman") &&
+                !parseTomanToRialString(form.legalCeilingToman)
+              }
             />
             <span
               aria-live="polite"
