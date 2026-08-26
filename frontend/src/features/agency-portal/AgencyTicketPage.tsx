@@ -5,6 +5,7 @@ import { fetchAirports, fetchSearchCabins } from '../../api/publicSite';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { airportCityLabel, airportCityName, FALLBACK_AIRPORTS } from '../../lib/airport-cities';
 import { localeDigits } from '../../lib/locale-format';
+import { airportsForSearchScope, type FlightSearchScope } from '../../lib/airport-search-scope';
 import type { Airport, CabinClass } from '../../types/public-site';
 
 type TripType = 'one' | 'round';
@@ -34,6 +35,8 @@ const COPY: Record<StoredLocale, {
   infantHint: string;
   confirm: string;
   cabin: string;
+  domestic: string;
+  international: string;
 }> = {
   fa: {
     one: 'یک طرفه', round: 'رفت و برگشت', origin: 'مبدا', destination: 'مقصد',
@@ -43,7 +46,7 @@ const COPY: Record<StoredLocale, {
     missing: 'مبدا، مقصد و تاریخ رفت را کامل کنید.', sameCity: 'مبدا و مقصد نمی‌توانند یکسان باشند.',
     invalidReturn: 'تاریخ برگشت باید پس از تاریخ رفت باشد.',
     adult: 'بزرگسال', adultHint: '۱۲ سال به بالا', child: 'کودک', childHint: '۲ تا ۱۲ سال',
-    infant: 'نوزاد', infantHint: 'زیر ۲ سال', confirm: 'تأیید', cabin: 'نوع پرواز',
+    infant: 'نوزاد', infantHint: 'زیر ۲ سال', confirm: 'تأیید', cabin: 'نوع پرواز', domestic: 'پرواز داخلی', international: 'پرواز خارجی',
   },
   en: {
     one: 'One-way', round: 'Round-trip', origin: 'From', destination: 'To',
@@ -53,7 +56,7 @@ const COPY: Record<StoredLocale, {
     missing: 'Complete origin, destination, and departure date.', sameCity: 'Origin and destination must differ.',
     invalidReturn: 'Return date must be after departure.',
     adult: 'Adult', adultHint: '12 years and over', child: 'Child', childHint: '2 to 12 years',
-    infant: 'Infant', infantHint: 'Under 2 years', confirm: 'Confirm', cabin: 'Cabin',
+    infant: 'Infant', infantHint: 'Under 2 years', confirm: 'Confirm', cabin: 'Cabin', domestic: 'Domestic', international: 'International',
   },
   ar: {
     one: 'ذهاب فقط', round: 'ذهاب وعودة', origin: 'من', destination: 'إلى',
@@ -63,7 +66,7 @@ const COPY: Record<StoredLocale, {
     missing: 'أكمل نقطة الانطلاق والوجهة وتاريخ المغادرة.', sameCity: 'يجب أن تختلف نقطة الانطلاق عن الوجهة.',
     invalidReturn: 'يجب أن يكون تاريخ العودة بعد المغادرة.',
     adult: 'بالغ', adultHint: '12 سنة فأكثر', child: 'طفل', childHint: 'من 2 إلى 12 سنة',
-    infant: 'رضيع', infantHint: 'أقل من سنتين', confirm: 'تأكيد', cabin: 'درجة السفر',
+    infant: 'رضيع', infantHint: 'أقل من سنتين', confirm: 'تأكيد', cabin: 'درجة السفر', domestic: 'رحلة داخلية', international: 'رحلة دولية',
   },
 };
 
@@ -75,6 +78,7 @@ export default function AgencyTicketPage() {
   const [airports, setAirports] = useState<Airport[]>([]);
   const [loadError, setLoadError] = useState(false);
   const [tripType, setTripType] = useState<TripType>('one');
+  const [service, setService] = useState<FlightSearchScope>('domestic');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [departureDate, setDepartureDate] = useState<string | null>(null);
@@ -113,9 +117,16 @@ export default function AgencyTicketPage() {
   }, []);
 
   const options = useMemo(
-    () => [...airports].sort((a, b) => airportCityName(a.code, locale, a.cityFa).localeCompare(airportCityName(b.code, locale, b.cityFa), locale)),
-    [airports, locale],
+    () => airportsForSearchScope(airports, service).sort((a, b) => airportCityName(a.code, locale, a.cityFa).localeCompare(airportCityName(b.code, locale, b.cityFa), locale)),
+    [airports, locale, service],
   );
+
+  function changeService(next: FlightSearchScope) {
+    setService(next);
+    const allowed = airportsForSearchScope(airports, next);
+    if (!allowed.some((airport) => airport.code === origin)) setOrigin('');
+    if (!allowed.some((airport) => airport.code === destination)) setDestination('');
+  }
 
   function submit() {
     if (!origin || !destination || !departureDate) {
@@ -147,6 +158,19 @@ export default function AgencyTicketPage() {
 
   return (
     <div data-testid="agency-ticket-page" className="space-y-5">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[#edf0f5] bg-white p-1.5">
+        {(['domestic', 'intl'] as FlightSearchScope[]).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            data-testid={`agency-ticket-service-${kind}`}
+            onClick={() => changeService(kind)}
+            className={`h-11 rounded-xl text-xs font-black transition ${service === kind ? 'bg-[#eaf3ff] text-[#1668c4] ring-1 ring-[#1668c4]' : 'text-[#8a96a6]'}`}
+          >
+            {kind === 'domestic' ? t.domestic : t.international}
+          </button>
+        ))}
+      </div>
       <div className="flex h-14 items-center rounded-2xl border border-[#edf0f5] bg-white p-1.5">
         {(['one', 'round'] as const).map((kind) => (
           <button

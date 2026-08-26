@@ -53,6 +53,7 @@ import { calculateActiveCharges } from '../flights/charge-rules';
 import { serializeCabinCapacities } from '../flights/flight-definition.util';
 import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
+import { resolveCommercialCabinCapacity } from './commercial-cabin-capacity';
 import type { Irr } from '../../common/money';
 import type { CabinClass } from '../../database/enums';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
@@ -648,10 +649,16 @@ export class BookingService {
       const configuredCabinCapacity = serializeCabinCapacities(
         instance.cabinCapacities,
       ).find((row) => row.cabin === dto.cabin)?.seats;
-      const cabinCapacity =
+      const physicalCabinCapacity =
         configuredCabinCapacity == null
           ? cabinSeatCount
           : Math.min(configuredCabinCapacity, cabinSeatCount);
+      const cabinCapacity = await resolveCommercialCabinCapacity(
+        tx,
+        instance.id,
+        dto.cabin,
+        physicalCabinCapacity,
+      );
       const takenInCabin = [...taken].filter(
         (code) => seatsByCode.get(code)?.cabin === dto.cabin,
       ).length;

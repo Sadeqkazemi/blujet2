@@ -10,7 +10,7 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import { AgencyDocumentStatus, AgencyDocumentType } from '../enums';
-import { AgencyProfile } from './agency-profile.entity';
+import { User } from './user.entity';
 import { StoredFile } from './stored-file.entity';
 
 @Index('agency_documents_agencyId_idx', ['agencyId'])
@@ -31,12 +31,12 @@ export class AgencyDocument {
   @Column({ type: 'text' })
   agencyId!: string;
 
-  @ManyToOne(() => AgencyProfile, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn({
     name: 'agencyId',
     foreignKeyConstraintName: 'agency_documents_agencyId_fkey',
   })
-  agency!: AgencyProfile;
+  agency!: User;
 
   @Column({ type: 'text' })
   fileId!: string;

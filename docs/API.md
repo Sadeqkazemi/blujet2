@@ -533,9 +533,11 @@ reviewable. Only what Phase 13 actually changes is documented below.
   - `GET /search/flights/:id/seatmap` also returns the aircraft definition's
     `exitRows`, allowing clients and booking policy to share one DB-backed
     source of truth.
-  - `seatsLeft` in search results is unchanged (still physical vacancy per
-    cabin) — see DB_SCHEMA's ⚑ scope-cut note; the enforced guarantee is the
-    409 above, not the display number.
+  - `seatsLeft` in search results uses the sum of Commercial Management's
+    `FareRule.seatsAllocated` rows as the sellable cabin ceiling whenever fare
+    classes exist. Aircraft/configured cabin capacity remains the hard upper
+    bound; occupied seats and active agency/charter commitments are deducted.
+    `POST /bookings` enforces this same ceiling transactionally.
 - PATCH `/flights/:instanceId/aircraft` (new, `backend/src/modules/flights/`,
   `SENIOR_MANAGER` + `COMMERCIAL_MANAGER`, matching Phase 10's existing
   role gate) — `{ aircraftType }`. Re-points the instance at a different

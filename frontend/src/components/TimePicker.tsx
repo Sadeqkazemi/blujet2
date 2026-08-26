@@ -119,9 +119,13 @@ export default function TimePicker({
             data-testid={`${testId}-popup`}
             className="absolute start-0 z-40 mt-1.5 w-[240px] rounded-[12px] border border-[#2a3a55] bg-[#141d2e] p-3 shadow-[0_18px_40px_-18px_rgba(0,0,0,.7)]"
           >
-            <div className="mb-3 grid grid-cols-2 gap-2" dir="rtl">
+            <div
+              className="mb-3 grid grid-cols-2 gap-2"
+              dir="ltr"
+              data-testid="time-picker-columns"
+            >
               <div>
-                <div className="mb-1 text-[10.5px] text-[#6b7b94]">ساعت</div>
+                <div className="mb-1 text-right text-[10.5px] text-[#6b7b94]" dir="rtl">ساعت</div>
                 <select
                   data-testid={`${testId}-hour`}
                   value={hour}
@@ -140,7 +144,7 @@ export default function TimePicker({
                 </select>
               </div>
               <div>
-                <div className="mb-1 text-[10.5px] text-[#6b7b94]">دقیقه</div>
+                <div className="mb-1 text-right text-[10.5px] text-[#6b7b94]" dir="rtl">دقیقه</div>
                 <select
                   data-testid={`${testId}-minute`}
                   value={minute}

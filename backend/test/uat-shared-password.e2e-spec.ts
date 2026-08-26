@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -7,12 +8,14 @@ import { App } from 'supertest/types';
 import { DataSource, In } from 'typeorm';
 import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyDocument } from '../src/database/entities/agency-document.entity';
 import { AgencySeatRequest } from '../src/database/entities/agency-seat-request.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { CartableTask } from '../src/database/entities/cartable-task.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { RefreshToken } from '../src/database/entities/refresh-token.entity';
+import { StoredFile } from '../src/database/entities/stored-file.entity';
 import { User } from '../src/database/entities/user.entity';
 import {
   AgencySeatRequestPayMethod,
@@ -613,6 +616,48 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         expect(apiKeys.body.data).toEqual([]);
 
         await assertNoAgencyBusinessData();
+      });
+
+      it('allows the UAT agency to upload and list its own document without fabricating an agency profile', async () => {
+        const accessToken = await loginUatAgency();
+        const agencyUser = await dataSource
+          .getRepository(User)
+          .findOneByOrFail({ username: 'uat.agency' });
+        const upload = await request(app.getHttpServer())
+          .post('/agency-portal/documents')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .field('docType', 'LICENSE')
+          .attach('file', Buffer.from('test-image'), {
+            filename: 'agency-license.png',
+            contentType: 'image/png',
+          });
+        expect(upload.status).toBe(201);
+        expect(upload.body.data).toMatchObject({
+          agencyId: agencyUser.id,
+          docType: 'LICENSE',
+          status: 'PENDING',
+          file: { fileName: 'agency-license.png' },
+        });
+
+        const list = await request(app.getHttpServer())
+          .get('/agency-portal/documents')
+          .set('Authorization', `Bearer ${accessToken}`);
+        expect(list.status).toBe(200);
+        expect(list.body.data).toHaveLength(1);
+        expect(list.body.data[0].id).toBe(upload.body.data.id);
+        await assertNoAgencyBusinessData();
+
+        const documentRepo = dataSource.getRepository(AgencyDocument);
+        const storedFileRepo = dataSource.getRepository(StoredFile);
+        const document = await documentRepo.findOneByOrFail({
+          id: upload.body.data.id,
+        });
+        const stored = await storedFileRepo.findOneByOrFail({
+          id: document.fileId,
+        });
+        await documentRepo.delete(document.id);
+        await storedFileRepo.delete(stored.id);
+        if (fs.existsSync(stored.path)) fs.unlinkSync(stored.path);
       });
 
       it('a mutating request is refused with 403 UAT_TEMPORARY_ACCOUNT_READ_ONLY and writes nothing', async () => {

@@ -29,8 +29,15 @@ describe('TimePicker', () => {
     await user.click(screen.getByTestId('tp-trigger'));
     expect(screen.getByTestId('tp-popup')).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByTestId('tp-hour'), '8');
-    await user.selectOptions(screen.getByTestId('tp-minute'), '30');
+    const hour = screen.getByTestId('tp-hour');
+    const minute = screen.getByTestId('tp-minute');
+    expect(
+      hour.compareDocumentPosition(minute) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(hour.closest('[data-testid="time-picker-columns"]')).toHaveAttribute('dir', 'ltr');
+
+    await user.selectOptions(hour, '8');
+    await user.selectOptions(minute, '30');
     expect(onChange).not.toHaveBeenCalled();
     await user.click(screen.getByTestId('tp-done'));
     expect(onChange).toHaveBeenCalledWith('08:30');
