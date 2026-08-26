@@ -225,6 +225,8 @@ export interface AirportEntry {
   cityFa: string;
   airportNameFa?: string | null;
   tz: string;
+  /** True means the airport is outside Iran. */
+  isInternational: boolean;
 }
 
 export interface FlightDetail extends FlightRow {

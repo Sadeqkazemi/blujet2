@@ -10,10 +10,7 @@ const IRAN_INTERNATIONAL_IATA = new Set([
 
 export function isIranianInternationalAirport(airport: Airport): boolean {
   if (airport.isInternational) return false;
-  return (
-    IRAN_INTERNATIONAL_IATA.has(airport.code.toUpperCase()) ||
-    (airport.airportNameFa ?? '').includes('بین‌المللی')
-  );
+  return IRAN_INTERNATIONAL_IATA.has(airport.code.toUpperCase());
 }
 
 /** `isInternational` in the persisted catalog means outside Iran. */

@@ -3,7 +3,7 @@ import { airportsForSearchScope } from './airport-search-scope';
 import type { Airport } from '../types/public-site';
 
 const AIRPORTS: Airport[] = [
-  { id: 'thr', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه مهرآباد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'thr', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی مهرآباد', tz: 'Asia/Tehran', isInternational: false },
   { id: 'ika', code: 'IKA', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی امام خمینی', tz: 'Asia/Tehran', isInternational: false },
   { id: 'dxb', code: 'DXB', cityFa: 'دبی', airportNameFa: 'فرودگاه بین‌المللی دبی', tz: 'Asia/Dubai', isInternational: true },
 ];

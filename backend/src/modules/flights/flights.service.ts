@@ -631,6 +631,7 @@ export class FlightsService {
       cityFa: string;
       airportNameFa?: string;
       tz?: string;
+      isInternational: boolean;
     },
   ) {
     const code = dto.code.trim().toUpperCase();
@@ -654,9 +655,11 @@ export class FlightsService {
         existing.cityFa = cityFa;
         existing.airportNameFa = airportNameFa;
         existing.tz = dto.tz?.trim() || existing.tz || 'Asia/Tehran';
+        existing.isInternational = dto.isInternational;
         existing.active = true;
         const restored = await this.airportRepo.save(existing);
         await this.redis.del('search:airports');
+        await this.redis.del('search:airports:v2');
         await this.audit.record({
           actorId: actor.id,
           actorRole: actor.role,
@@ -681,10 +684,12 @@ export class FlightsService {
         cityFa,
         airportNameFa,
         tz: dto.tz?.trim() || 'Asia/Tehran',
+        isInternational: dto.isInternational,
         active: true,
       }),
     );
     await this.redis.del('search:airports');
+    await this.redis.del('search:airports:v2');
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -710,6 +715,7 @@ export class FlightsService {
     airport.active = false;
     await this.airportRepo.save(airport);
     await this.redis.del('search:airports');
+    await this.redis.del('search:airports:v2');
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

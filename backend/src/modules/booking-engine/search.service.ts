@@ -55,7 +55,8 @@ export class SearchService {
   ) {}
 
   async airports() {
-    const cacheKey = 'search:airports';
+    // v2 includes the corrected Iran/foreign classification.
+    const cacheKey = 'search:airports:v2';
     const cached = await this.redis.get<unknown>(cacheKey);
     if (cached) return cached;
 

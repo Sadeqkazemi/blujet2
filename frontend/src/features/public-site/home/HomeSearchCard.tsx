@@ -847,6 +847,7 @@ export default function HomeSearchCard({
       children: String(children),
       infants: String(infants),
       cabin,
+      scope: service,
     });
     if (tripType === 'round' && returnIso) {
       query.set('returnDate', returnIso.slice(0, 10));

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchAirports } from '../../../api/publicSite';
+import { fetchAirports, fetchSearchCabins } from '../../../api/publicSite';
 import type { StoredLocale } from '../../../hooks/useLocale';
 import { airportCityLabel, airportCityName, airportName } from '../../../lib/airport-cities';
 import { dayjs, toIsoDateOnly } from '../../../lib/jalali';
@@ -12,6 +12,10 @@ import {
   localeWeekdays,
 } from '../../../lib/locale-format';
 import type { Airport, CabinClass } from '../../../types/public-site';
+import {
+  airportsForSearchScope,
+  type FlightSearchScope,
+} from '../../../lib/airport-search-scope';
 import {
   normalizePassengerMix,
   type PassengerMix,
@@ -29,6 +33,7 @@ type Props = {
   returnDate?: string;
   passengerMix: PassengerMix;
   cabin: CabinClass;
+  scope: FlightSearchScope;
   onClose: () => void;
   onApply: (
     origin: string,
@@ -183,6 +188,7 @@ function AirportPicker({
                 <button
                   key={a.code}
                   type="button"
+                  data-testid={`edit-airport-option-${a.code}`}
                   onClick={() => {
                     onChange(a.code);
                     setOpen(false);
@@ -250,10 +256,12 @@ export default function ResultsEditSearchModal({
   returnDate = '',
   passengerMix,
   cabin,
+  scope,
   onClose,
   onApply,
 }: Props) {
   const [airports, setAirports] = useState<Airport[]>([]);
+  const [availableCabins, setAvailableCabins] = useState<CabinClass[]>([cabin]);
   const [tripType, setTripType] = useState<'oneway' | 'round'>('oneway');
   const [draftOrigin, setDraftOrigin] = useState(origin);
   const [draftDest, setDraftDest] = useState(dest);
@@ -273,7 +281,11 @@ export default function ResultsEditSearchModal({
 
   useEffect(() => {
     if (!open) return;
-    const mix = normalizePassengerMix(passengerMix);
+    const mix = normalizePassengerMix({
+      adults: passengerMix.adults,
+      children: passengerMix.children,
+      infants: passengerMix.infants,
+    });
     setDraftOrigin(origin);
     setDraftDest(dest);
     setDraftDate(date);
@@ -287,6 +299,13 @@ export default function ResultsEditSearchModal({
     setApplying(false);
     setViewMonth(dayjs(`${date}T12:00:00Z`).calendar(calendarForLocale(locale)));
     fetchAirports().then(setAirports).catch(() => setAirports([]));
+    fetchSearchCabins()
+      .then((rows) => {
+        const cabins = rows.length > 0 ? rows : [cabin];
+        setAvailableCabins(cabins);
+        setDraftClass(cabins.includes(cabin) ? cabin : cabins[0]);
+      })
+      .catch(() => setAvailableCabins([cabin]));
   }, [
     open,
     origin,
@@ -300,6 +319,11 @@ export default function ResultsEditSearchModal({
     locale,
   ]);
 
+  const scopedAirports = useMemo(
+    () => airportsForSearchScope(airports, scope),
+    [airports, scope],
+  );
+
   const weekdays = localeWeekdays[locale];
   const calTitle = localeMonthYear(viewMonth, locale);
   const selectedIso = calTarget === 'departure' ? draftDate : draftReturnDate || draftDate;
@@ -307,20 +331,26 @@ export default function ResultsEditSearchModal({
   const calTargetLabel = calTarget === 'departure' ? copy.departureDateLabel : copy.returnDateLabel;
 
   const classOptions = useMemo(
-    () => [
-      { value: 'ECONOMY' as const, label: copy.economyLabel },
-      { value: 'COMFORT' as const, label: copy.comfortLabel },
-      {
-        value: 'BUSINESS' as const,
-        label:
-          locale === 'en'
-            ? 'Business'
-            : locale === 'ar'
-              ? 'رجال الأعمال'
-              : 'بیزنس',
-      },
-    ],
-    [copy.comfortLabel, copy.economyLabel, locale],
+    () => availableCabins.map((value) => ({
+      value,
+      label:
+        value === 'ECONOMY'
+          ? copy.economyLabel
+          : value === 'COMFORT'
+            ? copy.comfortLabel
+            : value === 'BUSINESS'
+              ? locale === 'en'
+                ? 'Business'
+                : locale === 'ar'
+                  ? 'رجال الأعمال'
+                  : 'بیزنس'
+              : locale === 'en'
+                ? 'First class'
+                : locale === 'ar'
+                  ? 'الدرجة الأولى'
+                  : 'فرست کلاس',
+    })),
+    [availableCabins, copy.comfortLabel, copy.economyLabel, locale],
   );
 
   const paxRows = useMemo(
@@ -472,7 +502,7 @@ export default function ResultsEditSearchModal({
             <AirportPicker
               label={copy.fromLabel}
               value={draftOrigin}
-              airports={airports}
+              airports={scopedAirports}
               locale={locale}
               copy={copy}
               onChange={setDraftOrigin}
@@ -502,7 +532,7 @@ export default function ResultsEditSearchModal({
             <AirportPicker
               label={copy.toLabel}
               value={draftDest}
-              airports={airports}
+              airports={scopedAirports}
               locale={locale}
               copy={copy}
               onChange={setDraftDest}

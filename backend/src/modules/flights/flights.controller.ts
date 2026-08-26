@@ -95,6 +95,13 @@ class CreateAirportDto {
   @IsOptional()
   @IsString()
   tz?: string;
+
+  @ApiProperty({
+    description: 'True when the airport is outside Iran',
+    example: true,
+  })
+  @IsBoolean()
+  isInternational: boolean;
 }
 
 class CreateScheduleDto {

@@ -11,9 +11,11 @@ import * as useIsMobileModule from '../../hooks/useIsMobile';
 import * as useLocaleModule from '../../hooks/useLocale';
 
 const AIRPORTS = [
-  { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی مهرآباد', tz: 'Asia/Tehran' },
-  { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی شهید هاشمی‌نژاد', tz: 'Asia/Tehran' },
-  { id: 'a3', code: 'KIH', cityFa: 'کیش', airportNameFa: 'فرودگاه بین‌المللی کیش', tz: 'Asia/Tehran' },
+  { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی مهرآباد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی شهید هاشمی‌نژاد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a3', code: 'KIH', cityFa: 'کیش', airportNameFa: 'فرودگاه بین‌المللی کیش', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a4', code: 'IKA', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی امام خمینی', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a5', code: 'DXB', cityFa: 'دبی', airportNameFa: 'فرودگاه بین‌المللی دبی', tz: 'Asia/Dubai', isInternational: true },
 ];
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -116,6 +118,26 @@ const CMS_HOME = {
 };
 
 describe('HomeSearchPage', () => {
+  it('separates domestic airports from international search airports', async () => {
+    mockLocale('fa');
+    mockDesktop();
+    mockHomeApis();
+    renderPage();
+    await screen.findByTestId('home-origin');
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-IKA')).toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-DXB')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('home-origin'));
+    await userEvent.click(screen.getByRole('button', { name: 'پرواز خارجی' }));
+    await userEvent.click(screen.getByTestId('home-origin'));
+    expect(screen.queryByTestId('airport-option-THR')).not.toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-IKA')).toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-DXB')).toBeInTheDocument();
+  });
+
   it('shows every cabin currently activated by Commercial flight inventory', async () => {
     mockDesktop();
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);

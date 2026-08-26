@@ -32,6 +32,7 @@ export function createAirport(payload: {
   code: string;
   airportNameFa?: string;
   tz?: string;
+  isInternational: boolean;
 }) {
   return apiPost<AirportEntry>("/flights/airports", payload);
 }
