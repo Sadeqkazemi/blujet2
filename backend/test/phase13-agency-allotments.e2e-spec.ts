@@ -160,21 +160,21 @@ describe('Phase 13 Part C — agency allotments', () => {
     );
   }
 
-  it('rejects creating an allotment when the instance has no agencySeatsAllocated quota set', async () => {
+  it('allows a manual allotment when the legacy agency quota is not set', async () => {
     const instance = await freshInstance(null);
-    const res = await request(app.getHttpServer())
+    await request(app.getHttpServer())
       .post(`/flights/${instance.id}/allotments`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ agencyId: agencyUserId, seatsAllocated: 5 });
-    expect(res.status).toBe(400);
+      .send({ agencyId: agencyUserId, seatsAllocated: 5 })
+      .expect(201);
   });
 
-  it('rejects an allotment that would push the total past agencySeatsAllocated', async () => {
+  it('rejects an allotment that would push the total past physical capacity', async () => {
     const instance = await freshInstance(5);
     await request(app.getHttpServer())
       .post(`/flights/${instance.id}/allotments`)
       .set('Authorization', `Bearer ${staffToken}`)
-      .send({ agencyId: agencyUserId, seatsAllocated: 4 })
+      .send({ agencyId: agencyUserId, seatsAllocated: 9 })
       .expect(201);
 
     const res = await request(app.getHttpServer())
@@ -191,13 +191,13 @@ describe('Phase 13 Part C — agency allotments', () => {
       .set('Authorization', `Bearer ${staffToken}`)
       .send({
         agencyId: agencyUserId,
-        seatsAllocated: 5,
+        seatsAllocated: 10,
         type: 'SOFT',
         releaseAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
       })
       .expect(201);
 
-    // Without the lazy SOFT-release exclusion this would 400 (5 + 3 > 5).
+    // Without the lazy SOFT-release exclusion this would exceed capacity (10 + 3 > 10).
     const res = await request(app.getHttpServer())
       .post(`/flights/${instance.id}/allotments`)
       .set('Authorization', `Bearer ${staffToken}`)
@@ -208,7 +208,7 @@ describe('Phase 13 Part C — agency allotments', () => {
       .get(`/flights/${instance.id}/allotments`)
       .set('Authorization', `Bearer ${staffToken}`);
     const expired = list.body.data.find(
-      (r: { seatsAllocated: number }) => r.seatsAllocated === 5,
+      (r: { seatsAllocated: number }) => r.seatsAllocated === 10,
     );
     expect(expired.active).toBe(false);
   });
