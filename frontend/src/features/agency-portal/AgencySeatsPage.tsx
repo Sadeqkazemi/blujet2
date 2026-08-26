@@ -224,6 +224,9 @@ export default function AgencySeatsPage() {
       );
     })
     .map(({ options }) => options[0]!);
+  const selectedVisibleIndex = visibleFlightOptions.findIndex(
+    (option) => optionKey(option) === requestFlightId,
+  );
   const requestGroup =
     routeGroups.find(({ options }) =>
       options.some((row) => optionKey(row) === requestFlightId),
@@ -648,10 +651,10 @@ export default function AgencySeatsPage() {
           </div>
 
           <div
-            className="mt-4 space-y-3"
+            className="mt-4 flex flex-col gap-3"
             data-testid="agency-request-route-list"
           >
-            {visibleFlightOptions.map((row) => {
+            {visibleFlightOptions.map((row, index) => {
               const key = optionKey(row);
               const flightGroup = routeGroups.find(({ options }) =>
                 options.some((option) => optionKey(option) === key),
@@ -693,6 +696,13 @@ export default function AgencySeatsPage() {
               return (
                 <article
                   key={key}
+                  data-testid={`agency-request-card-${row.flightInstanceId}`}
+                  style={{
+                    order:
+                      selectedVisibleIndex >= 0 && index > selectedVisibleIndex
+                        ? index * 2 + 1
+                        : index * 2,
+                  }}
                   className={`w-full cursor-pointer overflow-hidden rounded-2xl border text-start transition ${isSelected ? "border-[#9fc2ec] bg-[#f8fbff]" : "border-[#e8eef6] bg-white hover:border-[#bfd4ef]"}`}
                 >
                   <button
@@ -827,10 +837,10 @@ export default function AgencySeatsPage() {
                 </article>
               );
             })}
-          </div>
 
           {requestFlight && (
             <div
+              style={{ order: selectedVisibleIndex * 2 + 1 }}
               className="-mt-3 rounded-b-2xl border border-t-0 border-[#9fc2ec] bg-white p-4 pt-5"
               data-testid="agency-request-flight-detail"
             >
@@ -1243,6 +1253,7 @@ export default function AgencySeatsPage() {
               )}
             </div>
           )}
+          </div>
 
           {requestOptions?.length === 0 && (
             <p className="rounded-xl bg-[#f7f9fc] p-4 text-center text-xs text-[#7d8ba0]">

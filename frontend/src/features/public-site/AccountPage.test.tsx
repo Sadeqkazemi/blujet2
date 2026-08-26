@@ -8,6 +8,7 @@ import { mockAuthUser } from '../../test/mockAuthUser';
 import * as useLocaleModule from '../../hooks/useLocale';
 import * as publicSiteApi from '../../api/publicSite';
 import * as supportTicketsApi from '../../api/support-tickets';
+import * as filesApi from '../../api/files';
 import * as authApi from '../../api/auth';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
 import type { BookingDetail, PriceLock, RefundRequestView, SavedFlight, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
@@ -151,6 +152,7 @@ const SAVED_PASSENGER: SavedPassenger = {
   isChild: false,
   createdAt: '2026-07-01T00:00:00.000Z',
   updatedAt: '2026-07-01T00:00:00.000Z',
+  attachments: [],
 };
 
 const BANK_ACCOUNT: SavedBankAccount = {
@@ -395,6 +397,32 @@ describe('AccountPage', () => {
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
   });
 
+  it('uploads and submits a file attachment with a new support ticket', async () => {
+    mockAuth('authenticated');
+    const upload = vi.spyOn(filesApi, 'uploadFile').mockResolvedValue({
+      id: 'file-1',
+      fileName: 'payment.png',
+      sizeBytes: 128,
+    });
+    const submit = vi.spyOn(supportTicketsApi, 'submitMySupportTicket').mockResolvedValue({
+      id: 'ticket-new',
+      trackingCode: 'TK11223344',
+    });
+    renderPage('/account?tab=tickets');
+
+    await userEvent.click(await screen.findByRole('button', { name: /درخواست جدید/ }));
+    await userEvent.type(screen.getByPlaceholderText('موضوع درخواست را وارد کنید'), 'خطای پرداخت');
+    await userEvent.type(screen.getByPlaceholderText('پیام خود را بنویسید…'), 'تصویر خطا پیوست شده است.');
+    await userEvent.type(screen.getByPlaceholderText(/۰۹۱۲/), '09121234567');
+    const file = new File(['image'], 'payment.png', { type: 'image/png' });
+    await userEvent.upload(screen.getByTestId('ticket-attachment-input'), file);
+    expect(await screen.findByText('payment.png')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'ارسال درخواست' }));
+
+    expect(upload).toHaveBeenCalledWith(file);
+    expect(submit).toHaveBeenCalledWith(expect.objectContaining({ attachmentIds: ['file-1'] }));
+  });
+
   it('switches to the security tab and lists active sessions with revoke', async () => {
     mockAuth('authenticated');
     const revoke = vi.spyOn(publicSiteApi, 'revokeMySession').mockResolvedValue({ revoked: true });
@@ -417,6 +445,8 @@ describe('AccountPage', () => {
     await userEvent.click(screen.getByTestId('account-save-password'));
     await screen.findByText('رمز عبور با موفقیت تغییر کرد ✓');
     expect(setPw).toHaveBeenCalledWith('secret12');
+    expect(screen.getByTestId('account-security-tab')).toHaveStyle({ maxWidth: 'none' });
+    expect(screen.getByTestId('account-password-card')).toHaveTextContent('حداقل ۶ کاراکتر');
   });
 
   it('switches to the banks tab and lists saved accounts with default badge', async () => {

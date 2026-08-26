@@ -95,6 +95,9 @@ export class SupportTicket {
   @Column({ type: 'jsonb', default: [] })
   history!: JsonValue;
 
+  @Column({ type: 'jsonb', default: [] })
+  attachments!: string[];
+
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
 

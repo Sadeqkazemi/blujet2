@@ -131,6 +131,42 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
       expect(subjects).toContain('سوال بعد از ورود');
     });
 
+    it('uploads an owned attachment and returns it with the customer ticket', async () => {
+      const phone = '09120000103';
+      const { accessToken } = await loginAsCustomer(app, phone);
+      const upload = await request(app.getHttpServer())
+        .post('/files')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .attach('file', Buffer.from('test-image'), {
+          filename: 'payment.png',
+          contentType: 'image/png',
+        });
+      expect(upload.status).toBe(201);
+
+      const submit = await request(app.getHttpServer())
+        .post('/my/support-tickets')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          requesterName: 'کاربر پیوست',
+          requesterPhone: phone,
+          subject: 'خطای پرداخت',
+          body: 'تصویر خطا پیوست شده است.',
+          attachmentIds: [upload.body.data.id],
+        });
+      expect(submit.status).toBe(201);
+
+      const detail = await request(app.getHttpServer())
+        .get(`/my/support-tickets/${submit.body.data.id}`)
+        .set('Authorization', `Bearer ${accessToken}`);
+      expect(detail.status).toBe(200);
+      expect(detail.body.data.attachments).toEqual([
+        expect.objectContaining({
+          id: upload.body.data.id,
+          fileName: 'payment.png',
+        }),
+      ]);
+    });
+
     it('404s when requesting another user ticket by id', async () => {
       const other = await request(app.getHttpServer())
         .post('/support-tickets')

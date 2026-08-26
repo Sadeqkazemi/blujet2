@@ -10,6 +10,14 @@ export interface MySupportTicketRow {
   history: { step: string; labelFa: string; at: string }[];
   createdAt: string;
   updatedAt: string;
+  attachments?: SupportTicketAttachment[];
+}
+
+export interface SupportTicketAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
 }
 
 export interface SupportTicketRow {
@@ -26,6 +34,7 @@ export interface SupportTicketRow {
   history: { step: string; labelFa: string; at: string }[];
   createdAt: string;
   updatedAt: string;
+  attachments?: SupportTicketAttachment[];
 }
 
 export interface ForwardTarget {

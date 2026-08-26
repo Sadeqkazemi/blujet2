@@ -18,13 +18,13 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
-/** Customer-only — an OTP-authenticated USER account, never a staff/agency
- * one. Requires login (see search.controller.ts for the unauthenticated
- * browse step before this point). */
+/** Public checkout for authenticated customer and agency identities. Staff
+ * panel roles remain excluded; booking ownership is enforced by user id in
+ * BookingService for every read/payment operation. */
 @ApiTags('bookings')
 @Controller('bookings')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('USER')
+@Roles('USER', 'AGENCY')
 export class BookingController {
   constructor(private readonly bookings: BookingService) {}
 

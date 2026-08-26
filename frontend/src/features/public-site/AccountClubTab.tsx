@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { joinClub, submitClubCardRequest } from '../../api/publicSite';
+import { startLoanEligibility } from '../../api/loans';
 import { ApiRequestError } from '../../api/envelope';
 import { localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
@@ -299,6 +300,41 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
   const [requestError, setRequestError] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [bankCustomer, setBankCustomer] = useState(true);
+  const [bankCustomerNumber, setBankCustomerNumber] = useState('');
+  const [bankRequestBusy, setBankRequestBusy] = useState(false);
+  const [bankRequestError, setBankRequestError] = useState<string | null>(null);
+  const [bankRequestSent, setBankRequestSent] = useState(false);
+
+  async function onStartBankEligibility() {
+    const customerNumber = bankCustomerNumber.replace(/\D/g, '');
+    if (!/^\d{6,20}$/.test(customerNumber)) {
+      setBankRequestError(
+        locale === 'en'
+          ? 'Enter a valid Saman customer number.'
+          : locale === 'ar'
+            ? 'أدخل رقم عميل سامان صحيحًا.'
+            : 'شماره مشتری معتبر بانک سامان را وارد کنید.',
+      );
+      return;
+    }
+    setBankRequestBusy(true);
+    setBankRequestError(null);
+    setBankRequestSent(false);
+    try {
+      await startLoanEligibility(customerNumber, crypto.randomUUID());
+      setBankRequestSent(true);
+    } catch (err) {
+      setBankRequestError(
+        err instanceof ApiRequestError
+          ? err.message
+          : locale === 'en'
+            ? 'The credit assessment request could not be sent.'
+            : 'ارسال درخواست اعتبارسنجی انجام نشد.',
+      );
+    } finally {
+      setBankRequestBusy(false);
+    }
+  }
 
   async function onJoinClub() {
     setJoinBusy(true);
@@ -431,7 +467,11 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
               key={String(value)}
               type="button"
               data-testid={value ? 'club-bank-customer' : 'club-bank-non-customer'}
-              onClick={() => setBankCustomer(value)}
+              onClick={() => {
+                setBankCustomer(value);
+                setBankRequestError(null);
+                setBankRequestSent(false);
+              }}
               style={{ minHeight: 44, border: bankCustomer === value ? '1px solid #e0e6ee' : '1px solid transparent', borderRadius: 10, background: bankCustomer === value ? '#fff' : 'transparent', color: bankCustomer === value ? '#0d2640' : '#8a96a6', boxShadow: bankCustomer === value ? '0 2px 8px rgba(13,38,64,.07)' : 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}
             >
               {value ? t.bankCustomer : t.bankNotCustomer}
@@ -441,6 +481,40 @@ export default function AccountClubTab({ membership, onMembershipChange }: Props
         <p style={{ margin: '12px 0', color: '#718096', fontSize: 11.5, lineHeight: 1.9 }}>
           {bankCustomer ? t.bankCustomerHint : t.bankNotCustomerHint}
         </p>
+        {bankCustomer && (
+          <div style={{ border: '1px solid #d9e5f2', background: '#f8fbff', borderRadius: 14, padding: 14, marginBottom: 12 }}>
+            <label htmlFor="club-bank-customer-number" style={{ display: 'block', color: '#31465f', fontSize: 11.5, fontWeight: 800, marginBottom: 7 }}>
+              {locale === 'en' ? 'Saman customer number' : locale === 'ar' ? 'رقم عميل بنك سامان' : 'شماره مشتری بانک سامان'}
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <input
+                id="club-bank-customer-number"
+                data-testid="club-bank-customer-number"
+                value={bankCustomerNumber}
+                inputMode="numeric"
+                disabled={bankRequestBusy || bankRequestSent}
+                onChange={(event) => setBankCustomerNumber(event.target.value.replace(/\D/g, ''))}
+                placeholder={locale === 'fa' ? 'شماره مشتری را وارد کنید' : 'Customer number'}
+                style={{ minWidth: 0, flex: '1 1 230px', height: 50, border: '1px solid #cbd9e8', borderRadius: 11, background: '#fff', padding: '0 14px', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, outline: 'none', boxSizing: 'border-box' }}
+              />
+              <button
+                type="button"
+                data-testid="club-bank-submit"
+                disabled={bankRequestBusy || bankRequestSent || bankCustomerNumber.length < 6}
+                onClick={() => void onStartBankEligibility()}
+                style={{ minHeight: 50, flex: '1 1 190px', border: 'none', borderRadius: 11, background: '#1668c4', color: '#fff', padding: '0 18px', fontFamily: 'inherit', fontSize: 12, fontWeight: 900, cursor: bankRequestBusy ? 'wait' : 'pointer', opacity: bankRequestBusy || bankRequestSent || bankCustomerNumber.length < 6 ? 0.48 : 1 }}
+              >
+                {bankRequestBusy ? '…' : locale === 'fa' ? 'ارسال درخواست اعتبارسنجی' : locale === 'ar' ? 'إرسال طلب التقييم' : 'Request assessment'}
+              </button>
+            </div>
+            {bankRequestError && <p role="alert" style={{ margin: '10px 0 0', color: '#c0392b', fontSize: 11.5, fontWeight: 700 }}>{bankRequestError}</p>}
+            {bankRequestSent && (
+              <p role="status" data-testid="club-bank-success" style={{ margin: '10px 0 0', color: '#1f8a5b', background: '#eaf8f1', borderRadius: 10, padding: '9px 11px', fontSize: 11.5, fontWeight: 800 }}>
+                ✓ {locale === 'en' ? 'Your credit assessment request was sent.' : locale === 'ar' ? 'تم إرسال طلب التقييم الائتماني الخاص بك.' : 'درخواست اعتبارسنجی شما ارسال شد.'}
+              </p>
+            )}
+          </div>
+        )}
         <Link
           to={bankCustomer ? '/account?tab=loans' : '/account?tab=tickets'}
           data-testid="club-bank-action"
