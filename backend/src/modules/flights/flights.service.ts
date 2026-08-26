@@ -2064,26 +2064,6 @@ export class FlightsService {
     };
   }
 
-  /** Active = counts toward the agencySeatsAllocated cap right now: HARD
-   * always counts; SOFT counts only until its releaseAt passes (lazy,
-   * same pattern as Booking's HELD→EXPIRED — no cron job). */
-  private async activeAllotmentsTotal(
-    instanceId: string,
-    excludeId?: string,
-  ): Promise<number> {
-    const now = new Date();
-    const qb = this.allotmentRepo
-      .createQueryBuilder('a')
-      .where('a.flightInstanceId = :instanceId', { instanceId })
-      .andWhere(
-        '(a.type = :hard OR a.releaseAt IS NULL OR a.releaseAt > :now)',
-        { hard: 'HARD', now },
-      );
-    if (excludeId) qb.andWhere('a.id != :excludeId', { excludeId });
-    const rows = await qb.getMany();
-    return rows.reduce((a, r) => a + r.seatsAllocated, 0);
-  }
-
   async createAllotment(
     actor: AuthenticatedUser,
     instanceId: string,
@@ -2124,19 +2104,44 @@ export class FlightsService {
           message: 'پرواز لغو شده و قابل تخصیص سهمیه نیست.',
         });
       }
-      if (!instance.agencySeatsAllocated) {
+      const now = new Date();
+      const activeAllotments = await manager
+        .getRepository(AgencyAllotment)
+        .createQueryBuilder('a')
+        .where('a.flightInstanceId = :instanceId', { instanceId })
+        .andWhere(
+          '(a.type = :hard OR a.releaseAt IS NULL OR a.releaseAt > :now)',
+          { hard: 'HARD', now },
+        )
+        .getMany();
+      const existingTotal = activeAllotments.reduce(
+        (sum, allotment) => sum + allotment.seatsAllocated,
+        0,
+      );
+      const directReserved = await manager
+        .getRepository(Passenger)
+        .createQueryBuilder('passenger')
+        .innerJoin('passenger.booking', 'booking')
+        .where('booking.flightInstanceId = :instanceId', { instanceId })
+        .andWhere('booking.agencyId IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('passenger.occupiesSeat = true')
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+        })
+        .getCount();
+      const physicalAvailable = Math.max(
+        instance.capacity -
+          Math.max(instance.charterSeats ?? 0, 0) -
+          directReserved -
+          existingTotal,
+        0,
+      );
+      if (dto.seatsAllocated > physicalAvailable) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message:
-            'ابتدا سهمیه کلی آژانس‌ها برای این پرواز را از بخش نرخ‌گذاری تعیین کنید.',
-        });
-      }
-
-      const existingTotal = await this.activeAllotmentsTotal(instanceId);
-      if (existingTotal + dto.seatsAllocated > instance.agencySeatsAllocated) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: `مجموع سهمیه‌های تخصیص‌یافته به آژانس‌ها (${existingTotal + dto.seatsAllocated}) از سقف کلی این پرواز (${instance.agencySeatsAllocated}) بیشتر است.`,
+          message: `فقط ${physicalAvailable} صندلی از ظرفیت واقعی پرواز آزاد است؛ فروش آنلاین و تخصیص آژانس در مجموع نمی‌توانند از ${instance.capacity} صندلی بیشتر شوند.`,
         });
       }
 

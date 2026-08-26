@@ -415,9 +415,6 @@ describe("AddFlightPage", () => {
     await user.click(
       screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
     );
-    await user.click(
-      screen.getByRole("button", { name: "ادامه به مرحله بعد" }),
-    );
     await user.type(screen.getByTestId("af-proposed-money"), "7200000");
     await user.click(
       screen.getByRole("button", {

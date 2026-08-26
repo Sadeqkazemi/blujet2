@@ -31,6 +31,8 @@ describe('TimePicker', () => {
 
     await user.selectOptions(screen.getByTestId('tp-hour'), '8');
     await user.selectOptions(screen.getByTestId('tp-minute'), '30');
+    expect(onChange).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId('tp-done'));
     expect(onChange).toHaveBeenCalledWith('08:30');
   });
 });

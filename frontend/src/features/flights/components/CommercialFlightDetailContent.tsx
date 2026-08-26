@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  createAllotment,
+  deleteAllotment,
+  fetchAllotmentsSummary,
   fetchCommercialFlightControl,
   updateFareClassSitePrice,
   updateFlightSalesVisibility,
   upsertAgencyFareRelease,
 } from "../../../api/flights";
+import { fetchAgencies } from "../../../api/agencies";
 import {
   faDigits,
   faMoney,
@@ -14,11 +18,14 @@ import {
 } from "../../../lib/fa-format";
 import { formatJalaliDateTime } from "../../../lib/jalali";
 import type {
+  AllotmentSummary,
   CommercialFareClassControl,
   CommercialFlightControl,
   FlightDetail,
 } from "../../../types/flights";
+import type { AgencyListRow } from "../../../types/agencies";
 import { cancelFlight } from "../../../api/flight-cancellations";
+import AgencyAllotmentsSummaryCard from "./AgencyAllotmentsSummaryCard";
 
 interface Props {
   detail: FlightDetail;
@@ -69,12 +76,26 @@ export default function CommercialFlightDetailContent({
   const [priceReasons, setPriceReasons] = useState<Record<string, string>>({});
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [activeTab, setActiveTab] = useState<"OVERVIEW" | "AGENCY">("OVERVIEW");
+  const [allotmentSummary, setAllotmentSummary] = useState<AllotmentSummary | null>(null);
+  const [agencies, setAgencies] = useState<AgencyListRow[]>([]);
+  const [selectedAgencyId, setSelectedAgencyId] = useState("");
+  const [lockedSeats, setLockedSeats] = useState("");
+  const [contractPriceToman, setContractPriceToman] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const next = await fetchCommercialFlightControl(detail.id);
       setControl(next);
+      const [summary, agencyResult] = await Promise.all([
+        fetchAllotmentsSummary(detail.id).catch(() => null),
+        fetchAgencies({}).catch(() => null),
+      ]);
+      setAllotmentSummary(summary);
+      setAgencies(
+        agencyResult?.agencies.filter((agency) => agency.isActive) ?? [],
+      );
       setReleaseSeats(
         Object.fromEntries(
           next.fareClasses.map((row) => [row.ruleId, String(row.agencySeatsReleased)]),
@@ -210,6 +231,58 @@ export default function CommercialFlightDetailContent({
     }
   }
 
+  async function lockAgencySeats() {
+    const seats = Number(latinDigits(lockedSeats));
+    const priceIrr = parseTomanToRialString(contractPriceToman);
+    if (!selectedAgencyId) {
+      onError("آژانس را انتخاب کنید.");
+      return;
+    }
+    if (!Number.isInteger(seats) || seats <= 0) {
+      onError("تعداد صندلی معتبر را وارد کنید.");
+      return;
+    }
+    if (!priceIrr) {
+      onError("قیمت هر صندلی را وارد کنید.");
+      return;
+    }
+    if (allotmentSummary && seats > allotmentSummary.freeSeats) {
+      onError(`حداکثر ${faDigits(allotmentSummary.freeSeats)} صندلی آزاد است.`);
+      return;
+    }
+    setBusyKey("allotment-create");
+    try {
+      await createAllotment(detail.id, {
+        agencyId: selectedAgencyId,
+        seatsAllocated: seats,
+        type: "HARD",
+        contractPriceIrr: priceIrr,
+      });
+      setSelectedAgencyId("");
+      setLockedSeats("");
+      setContractPriceToman("");
+      await Promise.all([load(), Promise.resolve(onChanged())]);
+      onNotice("صندلی‌های آژانس با موفقیت قفل شد.");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "تخصیص صندلی به آژانس ناموفق بود.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function removeAgencyLock(allotmentId: string) {
+    setBusyKey(`allotment-delete-${allotmentId}`);
+    try {
+      await deleteAllotment(detail.id, allotmentId);
+      await Promise.all([load(), Promise.resolve(onChanged())]);
+      onNotice("قفل صندلی آژانس حذف شد.");
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "حذف تخصیص آژانس ناموفق بود.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-lg border border-[#2a3550] bg-[#101a2c] p-8 text-center text-xs text-[#9fb0c7]">
@@ -222,8 +295,26 @@ export default function CommercialFlightDetailContent({
 
   return (
     <div className="-m-5 min-h-full space-y-2.5 bg-[#0d1729] p-3 text-[#e7ecf3] sm:p-4" data-testid="commercial-flight-detail" dir="rtl">
+      <nav className="grid grid-cols-2 gap-1 rounded-lg border border-[#2a3550] bg-[#101a2c] p-1" aria-label="تب‌های جزئیات پرواز">
+        <button
+          type="button"
+          aria-current={activeTab === "OVERVIEW" ? "page" : undefined}
+          onClick={() => setActiveTab("OVERVIEW")}
+          className={`rounded-md px-3 py-2 text-[11px] font-black ${activeTab === "OVERVIEW" ? "bg-[#3b82f6] text-white" : "text-[#91a1b8]"}`}
+        >
+          اطلاعات و فروش
+        </button>
+        <button
+          type="button"
+          aria-current={activeTab === "AGENCY" ? "page" : undefined}
+          onClick={() => setActiveTab("AGENCY")}
+          className={`rounded-md px-3 py-2 text-[11px] font-black ${activeTab === "AGENCY" ? "bg-[#3b82f6] text-white" : "text-[#91a1b8]"}`}
+        >
+          آژانس
+        </button>
+      </nav>
       <section
-        className={`rounded-lg border p-2.5 ${
+        className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border p-2.5 ${
           control.publicSaleEnabled
             ? "border-[#20c99766] bg-[#0d332f66]"
             : "border-[#f59e0b55] bg-[#3b2c1566]"
@@ -262,7 +353,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className="grid grid-cols-3 gap-1.5">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} grid grid-cols-3 gap-1.5`}>
         <div className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5">
           <div className="text-[10px] text-[#8c9bb2]">صندلی فروخته‌شده</div>
           <div className="mt-1 font-num text-sm font-black text-white">
@@ -283,7 +374,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#24324b] bg-[#101a2c] p-2.5">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#24324b] bg-[#101a2c] p-2.5`}>
         <h3 className="mb-2 text-[11px] font-black text-white">تفکیک کانال فروش صندلی</h3>
         <div className="space-y-2">
           {detail.channels.map((channel) => {
@@ -309,14 +400,88 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className="flex items-center justify-between rounded-lg border border-[#2a3550] bg-[#18243b] px-3 py-2">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} flex items-center justify-between rounded-lg border border-[#2a3550] bg-[#18243b] px-3 py-2`}>
         <span className="text-[10px] font-black text-white">درآمد پرواز <span className="font-normal text-[#71829d]">(با فروش هر صندلی افزایش می‌یابد)</span></span>
         <span className="font-num text-sm font-black text-[#6ea8ff]">
           {faMoney(detail.totalRevenueIrr)} تومان
         </span>
       </section>
 
-      <section className="rounded-lg border border-[#2a3550] bg-[#121d31] p-2.5" data-commercial-section="agency-fare-release">
+      {activeTab === "AGENCY" && (
+        <section className="space-y-2.5" data-commercial-section="agency-allotments">
+          <AgencyAllotmentsSummaryCard summary={allotmentSummary} />
+          {canManage && (
+            <div className="rounded-lg border border-[#2a3550] bg-[#121d31] p-3">
+              <h3 className="text-[11px] font-black text-white">افزودن دستی آژانس و قفل صندلی</h3>
+              <p className="mt-1 text-[9px] leading-4 text-[#78879d]">
+                ظرفیت مجاز از موجودی واقعی پرواز محاسبه می‌شود؛ مجموع فروش آنلاین و قفل‌های آژانسی هرگز نمی‌تواند از ظرفیت پرواز بیشتر شود.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <label className="text-[9px] text-[#9fb0c7]">
+                  آژانس
+                  <select
+                    value={selectedAgencyId}
+                    onChange={(event) => setSelectedAgencyId(event.target.value)}
+                    className="mt-1 h-9 w-full rounded-md border border-[#34415a] bg-[#101827] px-2 text-[10px] text-white"
+                  >
+                    <option value="">انتخاب آژانس</option>
+                    {agencies.map((agency) => (
+                      <option key={agency.id} value={agency.id}>{agency.fullName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="text-[9px] text-[#9fb0c7]">
+                  تعداد صندلی
+                  <input
+                    value={lockedSeats}
+                    onChange={(event) => setLockedSeats(latinDigits(event.target.value).replace(/\D/g, ""))}
+                    inputMode="numeric"
+                    placeholder={allotmentSummary ? `حداکثر ${faDigits(allotmentSummary.freeSeats)}` : "تعداد"}
+                    className="mt-1 h-9 w-full rounded-md border border-[#34415a] bg-[#101827] px-2 text-[10px] text-white"
+                  />
+                </label>
+                <label className="text-[9px] text-[#9fb0c7]">
+                  قیمت هر صندلی (تومان)
+                  <input
+                    value={contractPriceToman}
+                    onChange={(event) => setContractPriceToman(latinDigits(event.target.value))}
+                    inputMode="numeric"
+                    placeholder="مثلاً ۲٬۸۰۰٬۰۰۰"
+                    className="mt-1 h-9 w-full rounded-md border border-[#34415a] bg-[#101827] px-2 text-[10px] text-white"
+                  />
+                </label>
+              </div>
+              <button
+                type="button"
+                disabled={busyKey === "allotment-create" || (allotmentSummary?.freeSeats ?? 0) <= 0}
+                onClick={() => void lockAgencySeats()}
+                className="mt-3 w-full rounded-md bg-[#3b82f6] px-4 py-2 text-[10px] font-black text-white disabled:opacity-50"
+              >
+                {busyKey === "allotment-create" ? "در حال ثبت…" : "قفل صندلی برای آژانس"}
+              </button>
+              {(allotmentSummary?.agencies.length ?? 0) > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {allotmentSummary?.agencies.map((agency) => (
+                    <div key={agency.id} className="flex items-center justify-between gap-3 rounded-md border border-[#2b3852] bg-[#0f192a] px-3 py-2 text-[10px]">
+                      <span><strong className="text-white">{agency.agencyName}</strong> · {faDigits(agency.seatsAllocated)} صندلی</span>
+                      <button
+                        type="button"
+                        disabled={busyKey === `allotment-delete-${agency.id}`}
+                        onClick={() => void removeAgencyLock(agency.id)}
+                        className="rounded border border-red-500/50 px-2 py-1 text-red-300 disabled:opacity-50"
+                      >
+                        حذف قفل
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className={`${activeTab !== "AGENCY" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#121d31] p-2.5`} data-commercial-section="agency-fare-release">
         <h3 className="text-[11px] font-black text-white">آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی</h3>
         <p className="mt-1 text-[9px] leading-4 text-[#78879d]">
           برای هر کلاس تعداد و قیمت صندلی را مشخص کنید؛ پیشنهاد ویژه پس از ثبت در پنل آژانس نمایش داده می‌شود.
@@ -411,7 +576,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5" data-commercial-section="public-fare-classes">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5`} data-commercial-section="public-fare-classes">
         <h3 className="text-[11px] font-black text-[#80b7ff]">قیمت فروش در سایت به تفکیک کلاس پروازی</h3>
         <div className="mt-2 space-y-1.5">
           {control.fareClasses.map((row) => {
@@ -481,7 +646,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section data-commercial-section="price-history">
+      <section className={activeTab !== "OVERVIEW" ? "hidden" : ""} data-commercial-section="price-history">
         <h3 className="mb-1.5 text-[10px] font-black text-white">تاریخچه تغییر قیمت</h3>
         {combinedHistory.length === 0 ? (
           <div className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5 text-[9px] text-[#8c9bb2]">
@@ -504,7 +669,7 @@ export default function CommercialFlightDetailContent({
         )}
       </section>
 
-      {canManage && detail.derivedStatus !== "CANCELLED" && (
+      {activeTab === "OVERVIEW" && canManage && detail.derivedStatus !== "CANCELLED" && (
         <section className="rounded-lg border border-red-500/35 bg-red-500/5 p-2.5">
           {!cancelOpen ? (
             <button

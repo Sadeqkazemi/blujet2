@@ -76,6 +76,7 @@ interface JalaliDatePickerProps {
   disabled?: boolean;
   /** Keep the original month-only header navigation when false. */
   granularNavigation?: boolean;
+  rtlForwardArrow?: boolean;
 }
 
 function CalendarPortal({ children }: { children: React.ReactNode }) {
@@ -100,6 +101,7 @@ export default function JalaliDatePicker({
   priceCalendar,
   disabled = false,
   granularNavigation = true,
+  rtlForwardArrow = true,
 }: JalaliDatePickerProps) {
   const isPriceCalendar = Boolean(priceCalendar);
   const locale = localeProp ?? priceCalendar?.locale ?? "fa";
@@ -649,11 +651,11 @@ export default function JalaliDatePicker({
             >
               <button
                 type="button"
-                aria-label={locale === "en" ? "Previous" : "قبلی"}
-                data-testid={testId ? `${testId}-previous-month` : undefined}
+                aria-label={isRTL && rtlForwardArrow ? (locale === "ar" ? "التالي" : "بعدی") : locale === "en" ? "Previous" : "قبلی"}
+                data-testid={testId ? `${testId}-${isRTL && rtlForwardArrow ? "next" : "previous"}-month` : undefined}
                 onClick={() =>
                   setViewMonth(
-                    viewMonth.subtract(
+                    viewMonth[isRTL && rtlForwardArrow ? "add" : "subtract"](
                       viewMode === "day" ? 1 : viewMode === "month" ? 1 : 12,
                       viewMode === "day" ? "month" : "year",
                     ),
@@ -705,11 +707,11 @@ export default function JalaliDatePicker({
               </button>
               <button
                 type="button"
-                aria-label={locale === "en" ? "Next" : "بعدی"}
-                data-testid={testId ? `${testId}-next-month` : undefined}
+                aria-label={isRTL && rtlForwardArrow ? (locale === "ar" ? "السابق" : "قبلی") : locale === "en" ? "Next" : "بعدی"}
+                data-testid={testId ? `${testId}-${isRTL && rtlForwardArrow ? "previous" : "next"}-month` : undefined}
                 onClick={() =>
                   setViewMonth(
-                    viewMonth.add(
+                    viewMonth[isRTL && rtlForwardArrow ? "subtract" : "add"](
                       viewMode === "day" ? 1 : viewMode === "month" ? 1 : 12,
                       viewMode === "day" ? "month" : "year",
                     ),

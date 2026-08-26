@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { faDigits, latinDigits } from '../lib/fa-format';
+import { faDigits } from '../lib/fa-format';
 import { isValidHhMm } from '../lib/flight-definition';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -84,21 +84,6 @@ export default function TimePicker({
     onChange(next);
   }
 
-  function onTyped(raw: string) {
-    const digits = latinDigits(raw).replace(/[^\d]/g, '').slice(0, 4);
-    if (!digits) {
-      onChange('');
-      return;
-    }
-    if (digits.length <= 2) {
-      onChange(digits);
-      return;
-    }
-    const h = digits.slice(0, 2);
-    const m = digits.slice(2);
-    onChange(`${h}:${m}`);
-  }
-
   return (
     <div className={className} ref={rootRef} data-testid={testId}>
       {label ? (
@@ -134,7 +119,7 @@ export default function TimePicker({
             data-testid={`${testId}-popup`}
             className="absolute start-0 z-40 mt-1.5 w-[240px] rounded-[12px] border border-[#2a3a55] bg-[#141d2e] p-3 shadow-[0_18px_40px_-18px_rgba(0,0,0,.7)]"
           >
-            <div className="mb-2 grid grid-cols-2 gap-2">
+            <div className="mb-3 grid grid-cols-2 gap-2" dir="rtl">
               <div>
                 <div className="mb-1 text-[10.5px] text-[#6b7b94]">ساعت</div>
                 <select
@@ -143,7 +128,6 @@ export default function TimePicker({
                   onChange={(e) => {
                     const h = Number(e.target.value);
                     setHour(h);
-                    commit(h, minute);
                   }}
                   className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#0f1726] px-2 font-num text-[13px] text-[#e7ecf3]"
                   dir="ltr"
@@ -163,7 +147,6 @@ export default function TimePicker({
                   onChange={(e) => {
                     const m = Number(e.target.value);
                     setMinute(m);
-                    commit(hour, m);
                   }}
                   className="h-10 w-full rounded-[9px] border border-[#28344c] bg-[#0f1726] px-2 font-num text-[13px] text-[#e7ecf3]"
                   dir="ltr"
@@ -176,25 +159,15 @@ export default function TimePicker({
                 </select>
               </div>
             </div>
-            <input
-              data-testid={`${testId}-typed`}
-              dir="ltr"
-              inputMode="numeric"
-              aria-label="ورود مستقیم ساعت"
-              placeholder="HH:mm"
-              value={value}
-              onChange={(e) => onTyped(e.target.value)}
-              className="mb-2 h-10 w-full rounded-[9px] border border-[#28344c] bg-[#0f1726] px-2 font-num text-left text-[13px] text-[#e7ecf3]"
-            />
+            <div className="mb-2 rounded-[9px] border border-[#28344c] bg-[#0f1726] px-3 py-2 text-center font-num text-[14px] font-bold text-[#e7ecf3]" dir="ltr">
+              {faDigits(`${pad2(hour)}:${pad2(minute)}`)}
+            </div>
             <button
               type="button"
               data-testid={`${testId}-done`}
               onClick={() => {
-                if (isValidHhMm(value)) setOpen(false);
-                else {
-                  commit(hour, minute);
-                  setOpen(false);
-                }
+                commit(hour, minute);
+                setOpen(false);
               }}
               className="h-9 w-full rounded-[9px] bg-[#1668c4] text-[12px] font-bold text-white"
             >

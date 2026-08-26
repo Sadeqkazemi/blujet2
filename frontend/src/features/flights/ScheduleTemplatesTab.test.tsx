@@ -109,8 +109,17 @@ describe("ScheduleTemplatesTab", () => {
     await screen.findByRole("heading", { name: "تعریف مسیر پروازی جدید" });
 
     const agencyPrice = screen.getByLabelText("قیمت آژانس (تومان)");
+    expect(document.querySelector('input[type="time"]')).toBeNull();
+    await user.click(screen.getByTestId("schedule-departure-time-trigger"));
+    await user.selectOptions(screen.getByTestId("schedule-departure-time-hour"), "9");
+    await user.selectOptions(screen.getByTestId("schedule-departure-time-minute"), "30");
+    await user.click(screen.getByTestId("schedule-departure-time-done"));
+    expect(screen.getByTestId("schedule-departure-time-trigger")).toHaveTextContent("۰۹:۳۰");
+    await user.click(screen.getByRole("button", { name: "پیش‌نمایش" }));
+    expect(agencyPrice).toHaveAttribute("aria-invalid", "true");
     await user.type(agencyPrice, "50");
     expect(agencyPrice).toHaveValue("۵۰");
+    expect(agencyPrice).toHaveAttribute("aria-invalid", "false");
     expect(screen.getByText("پنجاه تومان")).toBeInTheDocument();
 
     await user.type(agencyPrice, "0");

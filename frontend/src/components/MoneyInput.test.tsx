@@ -146,6 +146,26 @@ describe("JalaliDatePicker dark panel", () => {
     expect(screen.getByTestId("three-level-calendar-day-1")).toBeInTheDocument();
   });
 
+  it("moves a Persian panel calendar forward with the physical left arrow", async () => {
+    const user = userEvent.setup();
+    render(
+      <JalaliDatePicker
+        locale="fa"
+        label="تاریخ"
+        value="2026-08-24T12:00:00.000Z"
+        onChange={() => undefined}
+        testId="rtl-forward-calendar"
+      />,
+    );
+
+    await user.click(screen.getByTestId("rtl-forward-calendar"));
+    const before = screen.getByTestId("rtl-forward-calendar-month-label").textContent;
+    const leftArrow = screen.getByTestId("rtl-forward-calendar-next-month");
+    expect(leftArrow).toHaveTextContent("‹");
+    await user.click(leftArrow);
+    expect(screen.getByTestId("rtl-forward-calendar-month-label").textContent).not.toBe(before);
+  });
+
   it("keeps month navigation unchanged when granular navigation is disabled", async () => {
     const user = userEvent.setup();
     render(
