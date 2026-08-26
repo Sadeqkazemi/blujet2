@@ -7,6 +7,7 @@ import {
   fetchClubMembers,
   fetchSubmittedCardRequests,
   issueClubCard,
+  deactivateClubMember,
   referCardRequest,
   rejectCardRequest,
   updateClubMemberLevel,
@@ -15,6 +16,7 @@ import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDate, parseJalaliDateToIso } from '../../lib/jalali';
 import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
+import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 import { usePagination } from '../../hooks/usePagination';
 import type { ClubCardRequest, ClubMembersResult, ClubSubmittedCardRequest, ClubTier } from '../../types/club';
 
@@ -157,6 +159,9 @@ export default function ClubPage() {
     level: 'SILVER' as ClubTier,
   });
   const [addError, setAddError] = useState<string | null>(null);
+  const [deactivateTarget, setDeactivateTarget] = useState<{ id: string; fullName: string } | null>(null);
+  const [deactivateBusy, setDeactivateBusy] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -257,6 +262,22 @@ export default function ClubPage() {
       await load();
     } catch (e) {
       setAddError(e instanceof Error ? e.message : 'خطا در افزودن عضو.');
+    }
+  }
+
+  async function onDeactivateMember() {
+    if (!deactivateTarget) return;
+    setDeactivateBusy(true);
+    setDeactivateError(null);
+    try {
+      await deactivateClubMember(deactivateTarget.id);
+      setNotice(`عضویت VIP «${deactivateTarget.fullName}» غیرفعال شد ✓`);
+      setDeactivateTarget(null);
+      await load();
+    } catch (e) {
+      setDeactivateError(e instanceof Error ? e.message : 'خطا در غیرفعال‌سازی عضویت VIP.');
+    } finally {
+      setDeactivateBusy(false);
     }
   }
 
@@ -777,6 +798,14 @@ export default function ClubPage() {
                       صدور کارت
                     </button>
                   )}
+                  <button
+                    type="button"
+                    aria-label={`غیرفعال‌سازی عضویت VIP ${m.fullName}`}
+                    onClick={() => setDeactivateTarget({ id: m.id, fullName: m.fullName })}
+                    className="flex-none rounded-[9px] border border-[#ef444466] px-3 py-2 text-[10px] font-bold text-[#f87171]"
+                  >
+                    غیرفعال‌سازی
+                  </button>
                 </div>
               );
             })}
@@ -869,6 +898,17 @@ export default function ClubPage() {
                       </button>
                     </>
                   )}
+                  <button
+                    type="button"
+                    aria-label={`غیرفعال‌سازی عضویت VIP ${m.fullName}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDeactivateTarget({ id: m.id, fullName: m.fullName });
+                    }}
+                    className="rounded-lg border border-red-400/40 px-3 py-1.5 text-[11px] font-bold text-red-400"
+                  >
+                    غیرفعال‌سازی
+                  </button>
                 </div>
 
                 {isSenior && expandedMember === m.id && (
@@ -951,7 +991,7 @@ export default function ClubPage() {
       </section>
 
       {/* ── Add VIP accordion (executive dark) ── */}
-      {isExecutiveRich && (
+      {dark && (
         <section className="rounded-2xl border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
           <button
             type="button"
@@ -1020,6 +1060,26 @@ export default function ClubPage() {
           )}
         </section>
       )}
+
+      <ConfirmActionDialog
+        open={deactivateTarget !== null}
+        title="غیرفعال‌سازی عضویت VIP"
+        message={deactivateTarget ? `عضویت VIP «${deactivateTarget.fullName}» غیرفعال شود؟ مزایای باشگاه متوقف می‌شود اما حساب کاربری و تمام سوابق سفر، مالی و امتیاز مشتری محفوظ می‌ماند.` : ''}
+        confirmLabel="غیرفعال‌سازی"
+        cancelLabel="انصراف"
+        busy={deactivateBusy}
+        busyLabel="در حال غیرفعال‌سازی…"
+        error={deactivateError}
+        variant={dark ? 'dark' : 'light'}
+        testId="club-member-deactivate-confirm"
+        onCancel={() => {
+          if (!deactivateBusy) {
+            setDeactivateTarget(null);
+            setDeactivateError(null);
+          }
+        }}
+        onConfirm={onDeactivateMember}
+      />
 
       {/* Detail modal */}
       {detailRequest && (

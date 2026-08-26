@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { CustomerReferral } from '../../database/entities/customer-referral.entity';
 import { ClubMember } from '../../database/entities/club-member.entity';
@@ -123,6 +123,7 @@ export class CustomerReferralsService {
 
     const referrerMember = await manager.findOneBy(ClubMember, {
       userId: referral.referrerUserId,
+      deactivatedAt: IsNull(),
     });
 
     let pointsAwarded = 0;

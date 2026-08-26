@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { fetchInbox, postInboxMessage } from '../../api/agency-portal';
+import { fetchMySupportTickets, submitMySupportTicket } from '../../api/support-tickets';
 import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
+import type { MySupportTicketRow } from '../../types/support-tickets';
 import Modal from '../../components/Modal';
 
 function messageParts(message: AgencyMessage) {
@@ -36,6 +38,14 @@ const STR: Record<StoredLocale, {
   subjectPlaceholder: string;
   validation: string;
   cancel: string;
+  requesterName: string;
+  requesterPhone: string;
+  phonePlaceholder: string;
+  ticketValidation: string;
+  ticketSuccess: string;
+  ticketsHeading: string;
+  ticketsEmpty: string;
+  ticketsLoadError: string;
 }> = {
   fa: {
     heading: 'کارتابل و پیام‌ها',
@@ -49,6 +59,9 @@ const STR: Record<StoredLocale, {
     sendBtn: 'ارسال',
     newMessage: 'پیام جدید', recipient: 'گیرنده', subject: 'موضوع',
     subjectPlaceholder: 'موضوع پیام', validation: 'لطفاً گیرنده، موضوع و متن پیام را کامل کنید.', cancel: 'انصراف',
+    requesterName: 'نام درخواست‌کننده', requesterPhone: 'شماره تماس', phonePlaceholder: 'مثلاً ۰۹۱۲۱۲۳۴۵۶۷',
+    ticketValidation: 'نام، شماره تماس معتبر، موضوع و متن پیام را کامل کنید.', ticketSuccess: 'پیام شما ثبت شد. کد پیگیری:',
+    ticketsHeading: 'پیام‌های ارسالی', ticketsEmpty: 'پیامی برای پشتیبانی ثبت نشده است.', ticketsLoadError: 'خطا در دریافت پیام‌های پشتیبانی.',
   },
   en: {
     heading: 'Inbox & Messages',
@@ -62,6 +75,9 @@ const STR: Record<StoredLocale, {
     sendBtn: 'Send',
     newMessage: 'New message', recipient: 'Recipient', subject: 'Subject',
     subjectPlaceholder: 'Message subject', validation: 'Complete the recipient, subject and message.', cancel: 'Cancel',
+    requesterName: 'Requester name', requesterPhone: 'Phone number', phonePlaceholder: 'e.g. +989121234567',
+    ticketValidation: 'Enter a name, valid phone number, subject, and message.', ticketSuccess: 'Your message was submitted. Tracking code:',
+    ticketsHeading: 'Sent messages', ticketsEmpty: 'No support messages yet.', ticketsLoadError: 'Error loading support messages.',
   },
   ar: {
     heading: 'الوارد والرسائل',
@@ -75,6 +91,9 @@ const STR: Record<StoredLocale, {
     sendBtn: 'إرسال',
     newMessage: 'رسالة جديدة', recipient: 'المستلم', subject: 'الموضوع',
     subjectPlaceholder: 'موضوع الرسالة', validation: 'أكمل المستلم والموضوع ونص الرسالة.', cancel: 'إلغاء',
+    requesterName: 'اسم مقدم الطلب', requesterPhone: 'رقم الهاتف', phonePlaceholder: 'مثال: ٠٩١٢١٢٣٤٥٦٧',
+    ticketValidation: 'أدخل الاسم ورقم هاتف صحيحاً والموضوع ونص الرسالة.', ticketSuccess: 'تم تسجيل رسالتك. رمز المتابعة:',
+    ticketsHeading: 'الرسائل المرسلة', ticketsEmpty: 'لا توجد رسائل دعم بعد.', ticketsLoadError: 'خطأ في تحميل رسائل الدعم.',
   },
 };
 
@@ -84,11 +103,17 @@ export default function AgencyInboxPage() {
   const [messages, setMessages] = useState<AgencyMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [body, setBody] = useState('');
+  const [replyBody, setReplyBody] = useState('');
   const [subject, setSubject] = useState('');
   const [composeOpen, setComposeOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tickets, setTickets] = useState<MySupportTicketRow[] | null>(null);
+  const [ticketsError, setTicketsError] = useState<string | null>(null);
+  const [requesterName, setRequesterName] = useState('');
+  const [requesterPhone, setRequesterPhone] = useState('');
+  const [ticketNotice, setTicketNotice] = useState<string | null>(null);
 
   function reload() {
     fetchInbox()
@@ -99,37 +124,78 @@ export default function AgencyInboxPage() {
       .catch(() => setError(t.errorFallback));
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(reload, []);
+  function reloadTickets() {
+    fetchMySupportTickets()
+      .then((rows) => {
+        setTickets(rows);
+        setTicketsError(null);
+      })
+      .catch(() => {
+        setTickets([]);
+        setTicketsError(t.ticketsLoadError);
+      });
+  }
+
+  useEffect(() => {
+    fetchInbox()
+      .then((rows) => {
+        setMessages(rows);
+        setSelectedId((current) => current ?? rows[0]?.id ?? null);
+      })
+      .catch(() => setError(t.errorFallback));
+    fetchMySupportTickets()
+      .then((rows) => {
+        setTickets(rows);
+        setTicketsError(null);
+      })
+      .catch(() => {
+        setTickets([]);
+        setTicketsError(t.ticketsLoadError);
+      });
+  }, [t.errorFallback, t.ticketsLoadError]);
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
-    if (!body.trim() || !subject.trim()) {
-      setValidationError(t.validation);
+    if (
+      requesterName.trim().length < 2 ||
+      requesterPhone.trim().length < 8 ||
+      body.trim().length < 2 ||
+      subject.trim().length < 2
+    ) {
+      setValidationError(t.ticketValidation);
       return;
     }
     setSending(true);
     setValidationError(null);
+    setTicketNotice(null);
     try {
-      await postInboxMessage(`${t.subject}: ${subject.trim()}\n\n${body.trim()}`);
+      const created = await submitMySupportTicket({
+        requesterName: requesterName.trim(),
+        requesterPhone: requesterPhone.trim(),
+        subject: subject.trim(),
+        body: body.trim(),
+      });
       setBody('');
       setSubject('');
+      setRequesterName('');
+      setRequesterPhone('');
       setComposeOpen(false);
-      reload();
+      setTicketNotice(`${t.ticketSuccess} ${created.trackingCode}`);
+      reloadTickets();
     } catch {
-      setError(t.sendErrorFallback);
+      setValidationError(t.sendErrorFallback);
     } finally {
       setSending(false);
     }
   }
 
   async function onReply(replySubject: string) {
-    if (!body.trim()) return;
+    if (!replyBody.trim()) return;
     setSending(true);
     setValidationError(null);
     try {
-      await postInboxMessage(`${t.subject}: ${replySubject}\n\n${body.trim()}`);
-      setBody('');
+      await postInboxMessage(`${t.subject}: ${replySubject}\n\n${replyBody.trim()}`);
+      setReplyBody('');
       reload();
     } catch {
       setError(t.sendErrorFallback);
@@ -151,6 +217,8 @@ export default function AgencyInboxPage() {
         <div><h1 className="text-lg font-black text-[#0d2640]">{locale === 'fa' ? 'صندوق پیام‌ها' : t.heading}</h1></div>
         <button type="button" onClick={() => setComposeOpen(true)} className="rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-white">＋ {t.newMessage}</button>
       </div>
+
+      {ticketNotice && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">{ticketNotice}</p>}
 
       {messages.length === 0 ? (
         <div className="rounded-2xl border border-[#edf0f5] bg-white py-16 text-center text-xs text-muted">{t.empty}</div>
@@ -187,8 +255,8 @@ export default function AgencyInboxPage() {
                 <h3 className="mt-5 text-base font-black text-[#0d2640]">{parts.subject || fallbackSubject}</h3>
                 <p className="mt-4 whitespace-pre-line text-sm leading-8 text-[#526174]">{parts.body}</p>
                 <div className="mt-6 flex gap-2 border-t border-[#edf0f5] pt-4">
-                  <input value={body} onChange={(event) => setBody(event.target.value)} placeholder={replyPlaceholder} className="h-12 min-w-0 flex-1 rounded-xl border border-[#e1e6ee] bg-[#fafbfd] px-4 text-sm outline-none focus:border-[#1668c4]" />
-                  <button type="button" disabled={!body.trim() || sending} onClick={() => void onReply(parts.subject || fallbackSubject)} className="h-12 rounded-xl bg-[#1668c4] px-5 text-sm font-black text-white disabled:opacity-50">{t.sendBtn}</button>
+                  <input value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder={replyPlaceholder} className="h-12 min-w-0 flex-1 rounded-xl border border-[#e1e6ee] bg-[#fafbfd] px-4 text-sm outline-none focus:border-[#1668c4]" />
+                  <button type="button" disabled={!replyBody.trim() || sending} onClick={() => void onReply(parts.subject || fallbackSubject)} className="h-12 rounded-xl bg-[#1668c4] px-5 text-sm font-black text-white disabled:opacity-50">{t.sendBtn}</button>
                 </div>
               </section>
             );
@@ -196,8 +264,36 @@ export default function AgencyInboxPage() {
         </div>
       )}
 
+      <section className="mt-4 rounded-2xl border border-[#e8edf3] bg-white p-5" data-testid="agency-support-tickets">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-black text-[#0d2640]">{t.ticketsHeading}</h2>
+          <span className="rounded-lg bg-[#eef5fc] px-3 py-1 text-[10px] font-bold text-[#1668c4]">{tickets?.length ?? 0}</span>
+        </div>
+        {ticketsError ? (
+          <p role="alert" className="text-xs text-danger">{ticketsError}</p>
+        ) : tickets === null ? (
+          <p className="text-xs text-muted">{t.loading}</p>
+        ) : tickets.length === 0 ? (
+          <p className="text-xs text-muted">{t.ticketsEmpty}</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {tickets.map((ticket) => (
+              <article key={ticket.id} className="rounded-xl border border-[#e8edf3] bg-[#fafbfd] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <strong className="text-xs font-black text-[#1a2d42]">{ticket.subject}</strong>
+                  <span dir="ltr" className="text-[10px] font-bold text-[#1668c4]">{ticket.trackingCode}</span>
+                </div>
+                <p className="mt-2 line-clamp-2 text-[11px] leading-6 text-[#6f7b8b]">{ticket.body}</p>
+                <time className="mt-3 block text-[10px] text-[#a0a9b5]">{formatLocaleDateTime(ticket.updatedAt, locale)}</time>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       {composeOpen && <Modal title={t.newMessage} onClose={() => setComposeOpen(false)} variant="light" maxWidthClass="max-w-xl"><form onSubmit={onSend} className="space-y-4" data-testid="agency-compose-message">
-        <label className="block text-xs font-bold text-muted">{t.recipient}<select className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm" defaultValue="commercial"><option value="commercial">blujet · {t.subtitle}</option></select></label>
+        <label className="block text-xs font-bold text-muted">{t.requesterName}<input value={requesterName} onChange={(e) => setRequesterName(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
+        <label className="block text-xs font-bold text-muted">{t.requesterPhone}<input dir="ltr" inputMode="tel" value={requesterPhone} onChange={(e) => setRequesterPhone(e.target.value)} placeholder={t.phonePlaceholder} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
         <label className="block text-xs font-bold text-muted">{t.subject}<input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t.subjectPlaceholder} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
         <label className="block text-xs font-bold text-muted">{t.placeholder}<textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.placeholder} rows={5} className="mt-2 w-full rounded-xl border border-border bg-[#fafbfd] p-3 text-sm outline-none focus:border-accent" /></label>
         {validationError && <p role="alert" className="text-xs text-danger">{validationError}</p>}

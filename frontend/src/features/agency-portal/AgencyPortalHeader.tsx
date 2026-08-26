@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   ServiceMenuIcon,
@@ -8,6 +8,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import { useT } from '../../lib/i18n';
 import { localeMoney } from '../../lib/fa-format';
+import {
+  fetchNotifications,
+  fetchNotificationsUnreadCount,
+  markNotificationRead,
+} from '../../api/notifications';
+import { formatNotificationTime, notificationCategoryIcon } from '../../components/public/customer-notification-ui';
+import type { NotificationRow } from '../../types/notifications';
 import { AGENCY_NAV_ITEMS, agencyInitials } from './agency-nav-config';
 import type { AgencyNavKey } from './agency-nav-config';
 
@@ -60,10 +67,44 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
   const isRTL = locale !== 'en';
   const [langOpen, setLangOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [servicesMenuOpen, setServicesMenuOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetchNotifications({ limit: 12 }),
+      fetchNotificationsUnreadCount(),
+    ])
+      .then(([rows, counts]) => {
+        if (!active) return;
+        setNotifications(rows);
+        setUnreadNotifications(counts.total);
+      })
+      .catch(() => {
+        if (!active) return;
+        setNotifications([]);
+        setUnreadNotifications(0);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function openAgencyNotification(row: NotificationRow) {
+    if (row.readAt) return;
+    try {
+      const updated = await markNotificationRead(row.id);
+      setNotifications((current) => current.map((item) => (item.id === row.id ? updated : item)));
+      setUnreadNotifications((current) => Math.max(0, current - 1));
+    } catch {
+      // Keep the notification visible when the acknowledgement request fails.
+    }
+  }
 
   const displayName = agencyName || user?.fullName || '—';
   const initials = agencyInitials(displayName);
@@ -414,6 +455,14 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                     }}
                   >
                     🔔
+                    {unreadNotifications > 0 && (
+                      <span
+                        data-testid="agency-notif-badge"
+                        style={{ position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, background: '#e5484d', color: '#fff', display: 'grid', placeItems: 'center', padding: '0 4px', fontSize: 9, fontWeight: 900 }}
+                      >
+                        {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                      </span>
+                    )}
                   </div>
                   {notifOpen && (
                     <>
@@ -430,13 +479,31 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                           boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
                           zIndex: 130,
                           overflow: 'hidden',
-                          padding: 26,
-                          textAlign: 'center',
+                          padding: 8,
+                          textAlign: isRTL ? 'right' : 'left',
                           color: '#8a96a6',
                           fontSize: 11.5,
                         }}
                       >
-                        {locale === 'fa' ? 'هنوز اعلانی وجود ندارد.' : locale === 'ar' ? 'لا توجد إشعارات بعد.' : 'No notifications yet.'}
+                        {notifications.length === 0 ? (
+                          <div style={{ padding: 20, textAlign: 'center' }}>
+                            {locale === 'fa' ? 'هنوز اعلانی وجود ندارد.' : locale === 'ar' ? 'لا توجد إشعارات بعد.' : 'No notifications yet.'}
+                          </div>
+                        ) : notifications.map((row) => (
+                          <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => void openAgencyNotification(row)}
+                            style={{ width: '100%', border: 0, borderBottom: '1px solid #eef1f5', background: row.readAt ? '#fff' : '#f4f8ff', padding: '11px 10px', textAlign: 'inherit', cursor: 'pointer', display: 'flex', gap: 9 }}
+                          >
+                            <span aria-hidden>{notificationCategoryIcon(row.category)}</span>
+                            <span style={{ minWidth: 0 }}>
+                              <strong style={{ display: 'block', color: '#16202e', fontSize: 11.5 }}>{row.title}</strong>
+                              <span style={{ display: 'block', marginTop: 3, color: '#66758a', fontSize: 10, lineHeight: 1.6 }}>{row.body}</span>
+                              <span style={{ display: 'block', marginTop: 4, color: '#9aa4b2', fontSize: 9 }}>{formatNotificationTime(row.createdAt, locale)}</span>
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     </>
                   )}

@@ -41,7 +41,10 @@ export class PriceLockService {
     user: AuthenticatedUser,
     dto: { flightInstanceId: string; cabin: CabinClass },
   ) {
-    const member = await this.clubMemberRepo.findOneBy({ userId: user.id });
+    const member = await this.clubMemberRepo.findOneBy({
+      userId: user.id,
+      deactivatedAt: IsNull(),
+    });
     if (
       !member ||
       !GOLD_TIER_LEVELS.includes(

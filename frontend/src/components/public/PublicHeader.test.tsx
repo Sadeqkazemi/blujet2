@@ -76,6 +76,32 @@ function renderHeader(initialPath = '/') {
 }
 
 describe('PublicHeader — logged-in user', () => {
+  it('does not show the silver label in the customer profile header', async () => {
+    mockLocale();
+    mockCustomerNotifications();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: true, level: 'SILVER', balance: 10 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '0' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی', nationalId: null, birthDate: null, passportNo: null,
+      email: null, emailVerifiedAt: null, completionPct: 100, profileIncomplete: false,
+      missingProfileFields: [],
+    });
+
+    renderHeader();
+    await waitFor(() => {
+      expect(screen.getByTestId('public-user-menu-toggle')).toHaveTextContent('عضو باشگاه');
+    });
+    expect(screen.queryByText('نقره‌ای')).not.toBeInTheDocument();
+  });
+
   it('keeps an authenticated agency identity and profile menu on the public results header', async () => {
     mockLocale();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({

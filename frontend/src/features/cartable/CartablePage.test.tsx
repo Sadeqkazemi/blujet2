@@ -97,11 +97,28 @@ describe('CartablePage', () => {
     mockRole('CEO');
     vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
     vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+    vi.spyOn(cartableApi, 'fetchCartableTask').mockResolvedValue({
+      ...LIST.tasks[0],
+      history: [
+        {
+          id: 'h1',
+          action: 'ارسال پیام مدیر',
+          detail: 'گزارش تفکیکی ارسال شود.',
+          actorLabel: 'محمد رحیمی · مدیر ارشد',
+          actorRole: 'SENIOR_MANAGER',
+          createdAt: '2026-07-16T10:00:00.000Z',
+        },
+      ],
+    });
     const approve = vi.spyOn(cartableApi, 'approveCartableTask').mockResolvedValue(LIST.tasks[0]);
 
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
     await userEvent.click(await screen.findByRole('button', { name: 'بررسی' }));
+
+    expect(await screen.findByRole('region', { name: 'تاریخچه پیام‌ها و اقدامات' })).toHaveTextContent(
+      'ارسال پیام مدیر',
+    );
 
     await userEvent.click(screen.getByRole('button', { name: 'تأیید' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('برای ثبت تصمیم، درج نظر مدیر الزامی است.');

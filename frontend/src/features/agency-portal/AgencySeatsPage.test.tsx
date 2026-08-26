@@ -205,8 +205,11 @@ describe("AgencySeatsPage", () => {
     expect(
       await screen.findByTestId("agency-seat-inquiry-result"),
     ).toHaveTextContent("۱۲ صندلی موجود است");
-    expect(screen.getByTestId("agency-seat-inquiry-result")).toHaveTextContent(
+    expect(screen.getByTestId("agency-seat-inquiry-result")).not.toHaveTextContent(
       "ظرفیت آزاد واقعی",
+    );
+    expect(screen.getByTestId("agency-seat-inquiry-result")).not.toHaveTextContent(
+      "قابل درخواست",
     );
     expect(
       screen.getByText("وب‌سرویس مسیر (یک کلید برای تمام پروازهای این مسیر)"),
@@ -536,7 +539,8 @@ describe("AgencySeatsPage", () => {
       "active-flight-card-fi-active-without-allotment-ECONOMY-Y",
     );
     expect(activeCard).toHaveTextContent("BJ-330");
-    expect(activeCard).toHaveTextContent("۳۰");
+    expect(activeCard).not.toHaveTextContent("ظرفیت آزاد");
+    expect(activeCard).not.toHaveTextContent("قابل درخواست");
     expect(
       screen.queryByText("هنوز سهمیه‌ای برای آژانس شما ثبت نشده است."),
     ).not.toBeInTheDocument();

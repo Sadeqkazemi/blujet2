@@ -13,6 +13,7 @@ import {
 import { formatToman } from '../../../lib/fa-format';
 import { useMobileVisualViewport } from '../../../hooks/useMobileVisualViewport';
 import { useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll';
+import { airportsForSearchScope } from '../../../lib/airport-search-scope';
 import {
   DomesticFlightIcon,
   IntlFlightIcon,
@@ -793,7 +794,18 @@ export default function HomeSearchCard({
   ];
   const paxSummary = `${paxParts.join('، ')}، ${cabinLabel}`;
 
-  const airportOptions = airports;
+  const airportOptions = useMemo(
+    () => airportsForSearchScope(airports, service),
+    [airports, service],
+  );
+
+  function changeService(next: ServiceType) {
+    setService(next);
+    const allowed = airportsForSearchScope(airports, next);
+    if (origin && !allowed.some((airport) => airport.code === origin)) setOrigin('');
+    if (dest && !allowed.some((airport) => airport.code === dest)) setDest('');
+    setError(null);
+  }
 
   function originDisplay() {
     if (!origin) return t.originPlaceholder;
@@ -1002,7 +1014,7 @@ export default function HomeSearchCard({
                         key={svc}
                         type="button"
                         className={`home-svc-btn${active ? ' is-active' : ''}`}
-                        onClick={() => setService(svc)}
+                        onClick={() => changeService(svc)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',

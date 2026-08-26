@@ -7,6 +7,15 @@ export type CartableSourceType =
   | 'CHAIR_PERMISSION'
   | 'EMPLOYEE_MESSAGE';
 
+export interface CartableHistoryEntry {
+  id: string;
+  action: string;
+  detail: string;
+  actorLabel: string | null;
+  actorRole: string | null;
+  createdAt: string;
+}
+
 export interface CartableTask {
   id: string;
   category: CartableCategory;
@@ -19,6 +28,8 @@ export interface CartableTask {
   status: CartableStatus;
   resolutionNote: string | null;
   createdAt: string;
+  history?: CartableHistoryEntry[];
+  readAt?: string | null;
 }
 
 export interface CartableListResult {

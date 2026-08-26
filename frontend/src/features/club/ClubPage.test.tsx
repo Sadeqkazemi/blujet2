@@ -133,7 +133,7 @@ describe('ClubPage', () => {
     expect(screen.getByRole('button', { name: 'بررسی درخواست' })).toBeInTheDocument();
   });
 
-  it('Senior Manager sees the simple layout: no KPIs/search/add-form, inline approve for senior-assigned, read-only note for chair-assigned', async () => {
+  it('Senior Manager sees the simple layout with manual VIP add/deactivate controls', async () => {
     mockRole('SENIOR_MANAGER');
     vi.spyOn(clubApi, 'fetchClubMembers').mockResolvedValue(MEMBERS);
     vi.spyOn(clubApi, 'fetchCardRequests').mockResolvedValue([SENIOR_REQ, CHAIR_REQ]);
@@ -142,11 +142,30 @@ describe('ClubPage', () => {
 
     expect(await screen.findByText('درخواست‌های صدور کارت (ارجاع‌شده)')).toBeInTheDocument();
     expect(screen.queryByText('کل اعضای باشگاه')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'تعریف مشتری VIP جدید' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'تعریف مشتری VIP جدید' })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText('جستجو در نام، ایمیل، شماره ملی یا کارت…')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'غیرفعال‌سازی عضویت VIP نگار رضایی' })).toBeInTheDocument();
 
     expect(await screen.findByRole('button', { name: 'تأیید و صدور کارت' })).toBeInTheDocument();
     expect(screen.getByText('ارجاع‌شده به رئیس هیئت مدیره — در انتظار تأیید')).toBeInTheDocument();
+  });
+
+  it('deactivates a VIP membership only after executive confirmation', async () => {
+    mockRole('CEO');
+    vi.spyOn(clubApi, 'fetchClubMembers').mockResolvedValue(MEMBERS);
+    vi.spyOn(clubApi, 'fetchCardRequests').mockResolvedValue([]);
+    const deactivate = vi.spyOn(clubApi, 'deactivateClubMember').mockResolvedValue({
+      id: 'm1',
+      isActive: false,
+      deactivatedAt: '2026-08-26T10:00:00.000Z',
+    });
+
+    const { default: userEvent } = await import('@testing-library/user-event');
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'غیرفعال‌سازی عضویت VIP نگار رضایی' }));
+    expect(deactivate).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByTestId('club-member-deactivate-confirm-confirm'));
+    await waitFor(() => expect(deactivate).toHaveBeenCalledWith('m1'));
   });
 
   it('CEO request modal shows the روند درخواست timeline and approving calls the API', async () => {

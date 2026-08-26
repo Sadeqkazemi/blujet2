@@ -553,6 +553,48 @@ export default function CartablePage() {
             </div>
           </div>
 
+          <section
+            aria-label="تاریخچه پیام‌ها و اقدامات"
+            className={`mb-4 rounded-xl border p-3 ${
+              dark ? 'border-[#2a3550] bg-[#101a2c]' : 'border-border bg-white'
+            }`}
+          >
+            <h3 className={`text-xs font-black ${dark ? 'text-white' : 'text-ink'}`}>
+              تاریخچه پیام‌ها و اقدامات
+            </h3>
+            <div className="mt-3 space-y-3">
+              {(reviewTask.history?.length
+                ? reviewTask.history
+                : [
+                    {
+                      id: `created-${reviewTask.id}`,
+                      action: 'ثبت و ارسال پیام',
+                      detail: reviewTask.description,
+                      actorLabel: reviewTask.senderLabelFa ?? reviewTask.sender?.fullName ?? null,
+                      actorRole: reviewTask.sender?.role ?? null,
+                      createdAt: reviewTask.createdAt,
+                    },
+                  ]
+              ).map((entry) => (
+                <div key={entry.id} className="flex gap-3">
+                  <span className={`mt-1 h-2 w-2 flex-none rounded-full ${dark ? 'bg-[#60a5fa]' : 'bg-primary'}`} />
+                  <div className="min-w-0">
+                    <div className={`text-[11px] font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}>
+                      {entry.action}
+                    </div>
+                    <p className={`mt-0.5 text-[10px] leading-relaxed ${dark ? 'text-[#9fb0c7]' : 'text-text-2'}`}>
+                      {entry.detail}
+                    </p>
+                    <div className={`mt-1 text-[9px] ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
+                      {entry.actorLabel ? `${entry.actorLabel} · ` : ''}
+                      {formatJalaliDateTime(entry.createdAt)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <label
             className={`mb-1 block text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}
             htmlFor="review-note"

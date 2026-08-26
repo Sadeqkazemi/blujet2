@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyInboxPage from './AgencyInboxPage';
 import * as portalApi from '../../api/agency-portal';
+import * as supportTicketsApi from '../../api/support-tickets';
 import * as useLocaleModule from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
 
@@ -25,7 +26,11 @@ const MESSAGES: AgencyMessage[] = [
 ];
 
 describe('AgencyInboxPage', () => {
-  it('renders the thread and sends a new message', async () => {
+  beforeEach(() => {
+    vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([]);
+  });
+
+  it('renders the thread and sends a reply', async () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue(MESSAGES);
     const postSpy = vi.spyOn(portalApi, 'postInboxMessage').mockResolvedValue({
       id: 'm2',
@@ -39,13 +44,10 @@ describe('AgencyInboxPage', () => {
     expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /پیام جدید/ }));
-    const dialog = screen.getByRole('dialog', { name: 'پیام جدید' });
-    await user.type(screen.getByPlaceholderText('موضوع پیام'), 'تسویه فاکتور');
-    await user.type(screen.getByPlaceholderText('پیام خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
-    await user.click(within(dialog).getByRole('button', { name: 'ارسال' }));
+    await user.type(screen.getByPlaceholderText('پاسخ خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
+    await user.click(screen.getByRole('button', { name: 'ارسال' }));
 
-    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('موضوع: تسویه فاکتور\n\nحتماً تا پنجشنبه پرداخت می‌شود.'));
+    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('موضوع: پیام مدیریت\n\nحتماً تا پنجشنبه پرداخت می‌شود.'));
   });
 
   it('renders translated heading, placeholder, and send button in English', async () => {
@@ -66,5 +68,36 @@ describe('AgencyInboxPage', () => {
     render(<AgencyInboxPage />);
 
     expect(await screen.findByText('لا توجد رسائل بعد.')).toBeInTheDocument();
+  });
+
+  it('submits a support ticket through New message and shows its tracking code', async () => {
+    vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue([]);
+    const submit = vi.spyOn(supportTicketsApi, 'submitMySupportTicket').mockResolvedValue({
+      id: 'ticket-1',
+      trackingCode: 'TKABC12345',
+    });
+
+    render(<AgencyInboxPage />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /پیام جدید/ }));
+
+    const dialog = screen.getByRole('dialog', { name: 'پیام جدید' });
+    await user.click(within(dialog).getByRole('button', { name: 'ارسال' }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('نام، شماره تماس معتبر، موضوع و متن پیام را کامل کنید.');
+    expect(submit).not.toHaveBeenCalled();
+
+    await user.type(within(dialog).getByLabelText('نام درخواست‌کننده'), 'آژانس آزمون');
+    await user.type(within(dialog).getByLabelText('شماره تماس'), '09121234567');
+    await user.type(within(dialog).getByLabelText('موضوع'), 'خطا در صدور بلیط');
+    await user.type(within(dialog).getByLabelText('پیام خود را بنویسید…'), 'پس از پرداخت بلیط صادر نشد.');
+    await user.click(within(dialog).getByRole('button', { name: 'ارسال' }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledWith({
+      requesterName: 'آژانس آزمون',
+      requesterPhone: '09121234567',
+      subject: 'خطا در صدور بلیط',
+      body: 'پس از پرداخت بلیط صادر نشد.',
+    }));
+    expect(await screen.findByText(/TKABC12345/)).toBeInTheDocument();
   });
 });

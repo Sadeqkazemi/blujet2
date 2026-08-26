@@ -861,7 +861,8 @@ orphan like prior phases' dead blocks).
 - **Phase 2** — none directly (reporting reads Phase-2 tables; no new endpoints of its own beyond what's above).
 - **Phase 5 — VIP club** (`backend/src/modules/club/`; roles below are the 3 panels with the tab — CEO, BOARD_CHAIR, SENIOR_MANAGER):
   - GET `/club/members` — `level?`, `q?` (name/email/cardNo, plus exact nationalId via hash); returns members + the KPI counts (کل اعضا، کارت‌های صادرشده، درخواست در انتظار، توزیع سطوح). All 3 roles.
-  - POST `/club/members` — «تعریف مشتری VIP جدید» — CEO+BOARD_CHAIR only (the form exists only in their panels); national-ID checksum validated, PII encrypted.
+  - POST `/club/members` — «تعریف مشتری VIP جدید» — CEO+BOARD_CHAIR+SENIOR_MANAGER; national-ID checksum validated, PII encrypted. Re-adding a deactivated national ID reactivates the preserved membership.
+  - PATCH `/club/members/:id/deactivate` — all 3 executive roles; returns `{ id, isActive:false, deactivatedAt }`, suspends club benefits and hides the member from active lists without deleting account, points, booking, wallet, card-request or audit history. The former DELETE route is intentionally unavailable.
   - PATCH `/club/members/:id/level` — tier segmented control — SENIOR_MANAGER only, audited.
   - POST `/club/members/:id/issue-card` — «صدور کارت» direct issuance — all 3 roles; 409 if already issued; audited (⚑).
   - GET `/club/card-requests` — the panels' queue (server filters to REFERRED/APPROVED/REJECTED — SUBMITTED lives in the site-admin track); includes history timeline. All 3 roles.
@@ -1231,20 +1232,23 @@ Closes the gap flagged in `design-reference-v2/پنل کاربر.dc.html`'s
 `POST /support-tickets` flow existed from Phase 20 but logged-in customers
 had no way to see their submissions inside `/account`.
 
-- `GET /my/support-tickets` (new, `USER` role) — list the caller's own
+- `GET /my/support-tickets` (`USER` or `AGENCY` role) — list the caller's own
   tickets: rows where `userId = caller.id`, **plus** any anonymous
   submissions whose `requesterPhone` exactly matches the caller's stored
   `User.phone` (covers tickets filed before login with the same number).
   Returns `{ id, trackingCode, subject, body, status, history, attachments,
   createdAt, updatedAt }` only — no admin-only fields (`dept`, `priority`,
   `forwardedTo`).
-- `GET /my/support-tickets/:id` (new, `USER` role) — detail for one owned
+- `GET /my/support-tickets/:id` (`USER` or `AGENCY` role) — detail for one owned
   ticket; `404` if the row isn't linked to the caller by `userId` or
   phone match above.
-- `POST /my/support-tickets` (new, `USER` role, `@Throttle` 10/min per
+- `POST /my/support-tickets` (`USER` or `AGENCY` role, `@Throttle` 10/min per
   account) — same body as the public submit DTO plus optional
   `attachmentIds` (maximum one owner-validated file); always sets `userId`
   to the caller. Returns `{ id, trackingCode }`.
+- Authenticated agency submissions are routed to `dept=AGENCY`; customer
+  submissions remain in `dept=SITE`. In the agency portal these endpoints
+  power the existing «پیام‌ها» surface rather than a separate ticket menu.
 - Frontend: the `tickets` tab lists status, tracking code, history, and
   downloadable attachment metadata. New requests accept one PDF/PNG/JPG up
   to 5 MB. A reply thread remains deferred.

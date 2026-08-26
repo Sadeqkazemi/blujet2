@@ -151,7 +151,8 @@ describe("CommercialFlightDetailContent", () => {
       .mockResolvedValue(control.fareClasses[0]);
     renderContent();
 
-    await screen.findByText("آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی");
+    const releaseHeading = await screen.findByText("آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی");
+    expect(releaseHeading).toBeVisible();
     fireEvent.change(screen.getByLabelText("تعداد صندلی برای فروش"), {
       target: { value: "15" },
     });
@@ -184,6 +185,9 @@ describe("CommercialFlightDetailContent", () => {
         reason: "تقاضای آخر هفته",
       }),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "آژانس" }));
+    expect(releaseHeading.closest("section")).toHaveClass("hidden");
   });
 
   it("requires a reason and cancels the flight through the governed endpoint", async () => {
