@@ -47,6 +47,7 @@ import {
   filterSellableSearchFlights,
   onSearchResultsInvalidate,
 } from '../../lib/search-cache';
+import type { FlightSearchScope } from '../../lib/airport-search-scope';
 
 const GOLD_TIER_LEVELS = ['GOLD', 'PLATINUM'];
 const ROUNDTRIP_OUTBOUND_KEY = 'blujet_roundtrip_outbound';
@@ -90,6 +91,7 @@ export default function ResultsPage() {
   const date = params.get('date') ?? '';
   const returnDate = params.get('returnDate') ?? '';
   const cabinClass = parseCabinParam(params.get('cabin'));
+  const requestedScope = params.get('scope');
   const passengerMix = normalizePassengerMix({
     adults: Number(params.get('adults') || 1),
     children: Number(params.get('children') || 0),
@@ -98,6 +100,18 @@ export default function ResultsPage() {
   const paxCabinSummary = formatPaxCabinMeta(passengerMix, cabinClass, locale);
 
   const [airports, setAirports] = useState<Airport[]>([]);
+  const searchScope: FlightSearchScope =
+    requestedScope === 'intl'
+      ? 'intl'
+      : requestedScope === 'domestic'
+        ? 'domestic'
+        : airports.some(
+              (airport) =>
+                (airport.code === origin || airport.code === dest) &&
+                airport.isInternational,
+            )
+          ? 'intl'
+          : 'domestic';
   const [results, setResults] = useState<SearchFlightResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchNonce, setSearchNonce] = useState(0);
@@ -299,6 +313,7 @@ export default function ResultsPage() {
     next.set('children', String(mix.children));
     next.set('infants', String(mix.infants));
     next.set('cabin', nextCabin);
+    next.set('scope', searchScope);
     if (nextReturnDate) next.set('returnDate', nextReturnDate);
     else next.delete('returnDate');
     setSelectedOutbound(null);
@@ -1068,6 +1083,7 @@ export default function ResultsPage() {
         returnDate={returnDate}
         passengerMix={passengerMix}
         cabin={cabinClass}
+        scope={searchScope}
         onClose={() => setEditOpen(false)}
         onApply={applyEditSearch}
       />

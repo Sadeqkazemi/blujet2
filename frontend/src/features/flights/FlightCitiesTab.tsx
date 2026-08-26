@@ -39,6 +39,7 @@ export default function FlightCitiesTab({
   const [manualCity, setManualCity] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [manualAirportName, setManualAirportName] = useState("");
+  const [manualScope, setManualScope] = useState<"iran" | "foreign">("iran");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +67,9 @@ export default function FlightCitiesTab({
       ? manualAirportName.trim() || undefined
       : selectedAirport?.airportNameFa;
     const tz = manual ? "Asia/Tehran" : selectedAirport?.tz;
+    const isInternational = manual
+      ? manualScope === "foreign"
+      : selectedAirport?.countryFa !== "ایران";
     if (!cityFa) {
       setError(
         manual
@@ -85,11 +89,13 @@ export default function FlightCitiesTab({
         code,
         airportNameFa,
         tz,
+        isInternational,
       });
       setSelectedCode("");
       setManualCity("");
       setManualCode("");
       setManualAirportName("");
+      setManualScope("iran");
       onCreated(created);
       setNotice(
         `«${airportNameFa || `فرودگاه ${cityFa}`}» اضافه شد و از اکنون در انتخابگرهای پرواز و جستجوی سایت نمایش داده می‌شود.`,
@@ -149,7 +155,7 @@ export default function FlightCitiesTab({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.25fr_.65fr_1.25fr_auto] xl:items-end">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.2fr_.55fr_1.1fr_.7fr_auto] xl:items-end">
           {entryMode === "catalog" ? (
             <label className="block">
               <span className="mb-2 block text-[11px] font-bold text-panel-muted">
@@ -220,6 +226,33 @@ export default function FlightCitiesTab({
               placeholder="IATA"
               className="font-num h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs font-bold text-panel-link outline-none"
             />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-[11px] font-bold text-panel-muted">
+              موقعیت فرودگاه
+            </span>
+            <select
+              aria-label="موقعیت فرودگاه"
+              disabled={entryMode === "catalog"}
+              value={
+                entryMode === "catalog"
+                  ? selectedAirport
+                    ? selectedAirport.countryFa === "ایران"
+                      ? "iran"
+                      : "foreign"
+                    : ""
+                  : manualScope
+              }
+              onChange={(event) =>
+                setManualScope(event.target.value as "iran" | "foreign")
+              }
+              className="h-11 w-full rounded-lg border border-panel-border-2 bg-panel-elevated px-3 text-xs text-panel-text outline-none focus:border-panel-accent disabled:opacity-70"
+            >
+              <option value="" disabled>پس از انتخاب فرودگاه</option>
+              <option value="iran">داخل ایران</option>
+              <option value="foreign">خارج از ایران</option>
+            </select>
           </label>
 
           <label className="block">

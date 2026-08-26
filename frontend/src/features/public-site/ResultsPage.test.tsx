@@ -27,8 +27,9 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 }
 
 const AIRPORTS = [
-  { id: 'a1', code: 'THR', cityFa: 'تهران', tz: 'Asia/Tehran' },
-  { id: 'a2', code: 'MHD', cityFa: 'مشهد', tz: 'Asia/Tehran' },
+  { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه مهرآباد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی مشهد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a3', code: 'DXB', cityFa: 'دبی', airportNameFa: 'فرودگاه بین‌المللی دبی', tz: 'Asia/Dubai', isInternational: true },
 ];
 
 const RESULT: SearchFlightResult = {
@@ -57,6 +58,7 @@ const RESULT_WITH_COMFORT: SearchFlightResult = {
 
 function mockSearchApis() {
   vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+  vi.spyOn(publicSiteApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY', 'BUSINESS']);
   vi.spyOn(publicSiteApi, 'fetchPriceCalendar').mockResolvedValue([
     {
       date: '2026-07-29',
@@ -343,6 +345,7 @@ describe('ResultsPage', () => {
   it('opens edit-search modal with trip type, airport pickers, and inline calendar', async () => {
     mockLocale('fa');
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
+    vi.spyOn(publicSiteApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY', 'BUSINESS']);
     vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
     renderPage();
     await screen.findByTestId('result-card');
@@ -359,6 +362,39 @@ describe('ResultsPage', () => {
 
     await userEvent.click(screen.getByTestId('edit-search-date'));
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
+  });
+
+  it('limits edit-search airports to the current flight scope', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage('unauthenticated', 'origin=THR&dest=MHD&date=2026-08-01&scope=domestic');
+    await screen.findByTestId('result-card');
+
+    await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
+    await userEvent.click(screen.getByTestId('edit-search-origin'));
+
+    expect(screen.getByTestId('edit-airport-option-THR')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-airport-option-MHD')).toBeInTheDocument();
+    expect(screen.queryByTestId('edit-airport-option-DXB')).not.toBeInTheDocument();
+  });
+
+  it('loads edit-search cabin choices from active public inventory', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.mocked(publicSiteApi.fetchSearchCabins).mockResolvedValue(['COMFORT', 'FIRST']);
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+    await screen.findByTestId('result-card');
+
+    await userEvent.click(screen.getByRole('button', { name: /ویرایش جستجو/ }));
+    const cabin = await screen.findByTestId('edit-search-cabin');
+
+    expect(cabin).toHaveValue('COMFORT');
+    expect(cabin).toHaveTextContent('کامفورت');
+    expect(cabin).toHaveTextContent('فرست کلاس');
+    expect(cabin).not.toHaveTextContent('اکونومی');
+    expect(cabin).not.toHaveTextContent('بیزنس');
   });
 
   it('applies passenger mix from edit search into the results summary', async () => {

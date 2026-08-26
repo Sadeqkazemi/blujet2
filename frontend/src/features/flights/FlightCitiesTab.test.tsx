@@ -12,6 +12,7 @@ const AIRPORTS: AirportEntry[] = [
     cityFa: "تهران",
     airportNameFa: "فرودگاه بین‌المللی مهرآباد",
     tz: "Asia/Tehran",
+    isInternational: false,
   },
 ];
 
@@ -23,6 +24,7 @@ describe("FlightCitiesTab", () => {
       cityFa: "وان",
       airportNameFa: "فرودگاه فرید ملن",
       tz: "Europe/Istanbul",
+      isInternational: true,
     };
     const createSpy = vi
       .spyOn(flightsApi, "createAirport")
@@ -53,6 +55,7 @@ describe("FlightCitiesTab", () => {
         code: "VAN",
         airportNameFa: "فرودگاه فرید ملن",
         tz: "Europe/Istanbul",
+        isInternational: true,
       }),
     );
     expect(onCreated).toHaveBeenCalledWith(created);
@@ -102,6 +105,7 @@ describe("FlightCitiesTab", () => {
       cityFa: "گرگان",
       airportNameFa: "فرودگاه گرگان",
       tz: "Asia/Tehran",
+      isInternational: false,
     };
     const createSpy = vi
       .spyOn(flightsApi, "createAirport")
@@ -120,6 +124,7 @@ describe("FlightCitiesTab", () => {
     await userEvent.type(screen.getByLabelText("نام شهر"), "گرگان");
     await userEvent.type(screen.getByLabelText("کد فرودگاه"), "gbt");
     await userEvent.type(screen.getByLabelText("نام فرودگاه"), "فرودگاه گرگان");
+    await userEvent.selectOptions(screen.getByLabelText("موقعیت فرودگاه"), "iran");
     await userEvent.click(screen.getByRole("button", { name: "افزودن شهر" }));
 
     await waitFor(() =>
@@ -128,6 +133,7 @@ describe("FlightCitiesTab", () => {
         code: "GBT",
         airportNameFa: "فرودگاه گرگان",
         tz: "Asia/Tehran",
+        isInternational: false,
       }),
     );
     expect(onCreated).toHaveBeenCalledWith(created);

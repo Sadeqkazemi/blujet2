@@ -54,6 +54,7 @@ describe('FlightsService airport catalog', () => {
           cityFa: '  گرگان  ',
           code: ' gbt ',
           airportNameFa: ' فرودگاه گرگان ',
+          isInternational: false,
         },
       ),
     ).resolves.toEqual(
@@ -61,9 +62,33 @@ describe('FlightsService airport catalog', () => {
         cityFa: 'گرگان',
         code: 'GBT',
         airportNameFa: 'فرودگاه گرگان',
+        isInternational: false,
       }),
     );
     expect(airportRepo.findOneBy).toHaveBeenCalledWith({ code: 'GBT' });
+  });
+
+  it('persists the foreign-airport classification used by public search', async () => {
+    const { service, airportRepo } = makeService();
+
+    await service.createAirport(
+      {
+        id: 'commercial-1',
+        role: 'COMMERCIAL_MANAGER',
+        fullName: 'مدیر بازرگانی',
+      } as never,
+      {
+        cityFa: 'وان',
+        code: 'VAN',
+        airportNameFa: 'فرودگاه فرید ملن',
+        tz: 'Europe/Istanbul',
+        isInternational: true,
+      },
+    );
+
+    expect(airportRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'VAN', isInternational: true }),
+    );
   });
 
   it('rejects a malformed manually entered airport code inside the service', async () => {
@@ -76,7 +101,7 @@ describe('FlightsService airport catalog', () => {
           role: 'COMMERCIAL_MANAGER',
           fullName: 'مدیر بازرگانی',
         } as never,
-        { cityFa: 'گرگان', code: '12' },
+        { cityFa: 'گرگان', code: '12', isInternational: false },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
