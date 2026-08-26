@@ -28,13 +28,17 @@ describe('FlightsService createAllotment physical capacity', () => {
       getRepository: jest.fn((entity: { name?: string }) => ({
         createQueryBuilder: jest
           .fn()
-          .mockReturnValue(entity.name === 'Passenger' ? passengerQuery : allotmentQuery),
+          .mockReturnValue(
+            entity.name === 'Passenger' ? passengerQuery : allotmentQuery,
+          ),
       })),
       create: jest.fn(),
       save: jest.fn(),
     };
     const dataSource = {
-      transaction: jest.fn(async (run: (tx: typeof manager) => unknown) => run(manager)),
+      transaction: jest.fn((run: (tx: typeof manager) => unknown) =>
+        run(manager),
+      ),
     };
     const agencyProfileRepo = {
       findOneBy: jest.fn().mockResolvedValue({ userId: 'agency-1' }),
@@ -69,7 +73,11 @@ describe('FlightsService createAllotment physical capacity', () => {
 
     await expect(
       service.createAllotment(
-        { id: 'manager-1', role: 'COMMERCIAL_MANAGER', fullName: 'Manager' } as never,
+        {
+          id: 'manager-1',
+          role: 'COMMERCIAL_MANAGER',
+          fullName: 'Manager',
+        } as never,
         'fi-1',
         { agencyId: 'agency-1', seatsAllocated: 12, type: 'HARD' },
       ),
