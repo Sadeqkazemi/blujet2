@@ -631,7 +631,7 @@ export class FlightsService {
       cityFa: string;
       airportNameFa?: string;
       tz?: string;
-      isInternational: boolean;
+      isInternational?: boolean;
     },
   ) {
     const code = dto.code.trim().toUpperCase();
@@ -655,7 +655,7 @@ export class FlightsService {
         existing.cityFa = cityFa;
         existing.airportNameFa = airportNameFa;
         existing.tz = dto.tz?.trim() || existing.tz || 'Asia/Tehran';
-        existing.isInternational = dto.isInternational;
+        existing.isInternational = dto.isInternational ?? false;
         existing.active = true;
         const restored = await this.airportRepo.save(existing);
         await this.redis.del('search:airports');
@@ -686,7 +686,7 @@ export class FlightsService {
         cityFa,
         airportNameFa,
         tz: dto.tz?.trim() || 'Asia/Tehran',
-        isInternational: dto.isInternational,
+        isInternational: dto.isInternational ?? false,
         active: true,
       }),
     );
