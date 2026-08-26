@@ -539,7 +539,8 @@ describe("AgencySeatsPage", () => {
       "active-flight-card-fi-active-without-allotment-ECONOMY-Y",
     );
     expect(activeCard).toHaveTextContent("BJ-330");
-    expect(activeCard).toHaveTextContent("۳۰");
+    expect(activeCard).not.toHaveTextContent("ظرفیت آزاد");
+    expect(activeCard).not.toHaveTextContent("قابل درخواست");
     expect(
       screen.queryByText("هنوز سهمیه‌ای برای آژانس شما ثبت نشده است."),
     ).not.toBeInTheDocument();
