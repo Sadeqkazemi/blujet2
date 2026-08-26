@@ -660,6 +660,8 @@ export class FlightsService {
         const restored = await this.airportRepo.save(existing);
         await this.redis.del('search:airports');
         await this.redis.del('search:airports:v2');
+        await this.redis.del('search:airports:v3');
+        await this.redis.del('search:airports:v4');
         await this.audit.record({
           actorId: actor.id,
           actorRole: actor.role,
@@ -690,6 +692,8 @@ export class FlightsService {
     );
     await this.redis.del('search:airports');
     await this.redis.del('search:airports:v2');
+    await this.redis.del('search:airports:v3');
+    await this.redis.del('search:airports:v4');
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
@@ -716,6 +720,8 @@ export class FlightsService {
     await this.airportRepo.save(airport);
     await this.redis.del('search:airports');
     await this.redis.del('search:airports:v2');
+    await this.redis.del('search:airports:v3');
+    await this.redis.del('search:airports:v4');
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,

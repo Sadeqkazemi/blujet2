@@ -55,15 +55,19 @@ export class SearchService {
   ) {}
 
   async airports() {
-    // v2 includes the corrected Iran/foreign classification.
-    const cacheKey = 'search:airports:v2';
+    // v4 excludes UAT test fixtures in both the database query and cache.
+    const cacheKey = 'search:airports:v4';
     const cached = await this.redis.get<unknown>(cacheKey);
     if (cached) return cached;
 
-    const airports = await this.airportRepo.find({
-      where: { active: true },
-      order: { cityFa: 'ASC' },
-    });
+    const airports = await this.airportRepo
+      .createQueryBuilder('airport')
+      .where('airport.active = true')
+      .andWhere(`trim(airport.cityFa) !~ :testCityPattern`, {
+        testCityPattern: '^شهر[[:space:]]*(تست|آزمایش)',
+      })
+      .orderBy('airport.cityFa', 'ASC')
+      .getMany();
     await this.redis.set(cacheKey, airports, AIRPORTS_TTL_SECONDS);
     return airports;
   }

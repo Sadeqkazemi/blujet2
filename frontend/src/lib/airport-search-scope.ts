@@ -3,10 +3,15 @@ import type { Airport } from '../types/public-site';
 export type FlightSearchScope = 'domestic' | 'intl';
 
 const IRAN_INTERNATIONAL_IATA = new Set([
-  'IKA', 'MHD', 'SYZ', 'IFN', 'TBZ', 'KIH', 'GSM', 'BND', 'AWZ', 'RAS',
-  'SRY', 'GBT', 'KER', 'KSH', 'OMH', 'ADU', 'ZAH', 'BUZ', 'AZD', 'PGU',
-  'ABD', 'XBJ', 'LRR', 'LFM', 'AJK', 'JAR', 'IMQ',
+  'IKA', 'MHD', 'SYZ', 'IFN', 'TBZ', 'BND', 'AJK', 'XBJ', 'LRR', 'KIH',
+  'GSM',
 ]);
+
+const TEST_CITY_PATTERN = /^شهر\s*(?:تست|آزمایش)/u;
+
+export function isPublicAirport(airport: Airport): boolean {
+  return !TEST_CITY_PATTERN.test(airport.cityFa.trim());
+}
 
 export function isIranianInternationalAirport(airport: Airport): boolean {
   if (airport.isInternational) return false;
@@ -18,8 +23,11 @@ export function airportsForSearchScope(
   airports: Airport[],
   scope: FlightSearchScope,
 ): Airport[] {
-  if (scope === 'domestic') return airports.filter((airport) => !airport.isInternational);
-  return airports.filter(
+  const publicAirports = airports.filter(isPublicAirport);
+  if (scope === 'domestic') {
+    return publicAirports.filter((airport) => !airport.isInternational);
+  }
+  return publicAirports.filter(
     (airport) => airport.isInternational || isIranianInternationalAirport(airport),
   );
 }

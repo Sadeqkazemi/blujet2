@@ -4,6 +4,7 @@
 
 - [x] Domestic search lists only airports located in Iran.
 - [x] International search lists foreign airports plus approved Iranian international airports, and excludes Iranian domestic-only airports.
+- [x] Public airport pickers hide test and experimental city records.
 - [x] Airports added from the reference catalog persist their Iran/foreign classification.
 - [x] Manually added airports require an explicit Iran/foreign classification.
 - [x] Existing foreign airport records are corrected by a data migration.

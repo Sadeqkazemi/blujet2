@@ -16,6 +16,8 @@ const AIRPORTS = [
   { id: 'a3', code: 'KIH', cityFa: 'کیش', airportNameFa: 'فرودگاه بین‌المللی کیش', tz: 'Asia/Tehran', isInternational: false },
   { id: 'a4', code: 'IKA', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی امام خمینی', tz: 'Asia/Tehran', isInternational: false },
   { id: 'a5', code: 'DXB', cityFa: 'دبی', airportNameFa: 'فرودگاه بین‌المللی دبی', tz: 'Asia/Dubai', isInternational: true },
+  { id: 'a6', code: 'ADU', cityFa: 'اردبیل', airportNameFa: 'فرودگاه اردبیل', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a7', code: 'QDQ', cityFa: 'شهر آزمایش الف', airportNameFa: 'فرودگاه آزمایشی', tz: 'Asia/Tehran', isInternational: true },
 ];
 
 function mockLocale(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -128,7 +130,9 @@ describe('HomeSearchPage', () => {
     await userEvent.click(screen.getByTestId('home-origin'));
     expect(screen.getByTestId('airport-option-THR')).toBeInTheDocument();
     expect(screen.getByTestId('airport-option-IKA')).toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-ADU')).toBeInTheDocument();
     expect(screen.queryByTestId('airport-option-DXB')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-QDQ')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('home-origin'));
     await userEvent.click(screen.getByRole('button', { name: 'پرواز خارجی' }));
@@ -136,6 +140,8 @@ describe('HomeSearchPage', () => {
     expect(screen.queryByTestId('airport-option-THR')).not.toBeInTheDocument();
     expect(screen.getByTestId('airport-option-IKA')).toBeInTheDocument();
     expect(screen.getByTestId('airport-option-DXB')).toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-ADU')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-QDQ')).not.toBeInTheDocument();
   });
 
   it('shows every cabin currently activated by Commercial flight inventory', async () => {
