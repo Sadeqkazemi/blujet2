@@ -5,9 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { User } from '../../database/entities/user.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import type { JsonValue } from '../../database/json-types';
 import { AuditService } from '../audit/audit.service';
 import { StaffDirectoryService } from '../staff-directory/staff-directory.module';
@@ -36,6 +37,7 @@ const CUSTOMER_TICKET_SELECT = {
   history: true,
   createdAt: true,
   updatedAt: true,
+  attachments: true,
 } as const;
 
 @Injectable()
@@ -45,6 +47,8 @@ export class SupportTicketsService {
     private readonly ticketRepo: Repository<SupportTicket>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     private readonly audit: AuditService,
     private readonly staffDirectory: StaffDirectoryService,
   ) {}
@@ -113,6 +117,7 @@ export class SupportTicketsService {
   }
 
   async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {
+    await this.assertOwnedAttachments(actor, dto.attachmentIds);
     const ticket = await this.ticketRepo.save(
       this.ticketRepo.create({
         userId: actor.id,
@@ -121,6 +126,7 @@ export class SupportTicketsService {
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        attachments: dto.attachmentIds ?? [],
         updatedAt: new Date(),
         history: [
           {
@@ -132,6 +138,44 @@ export class SupportTicketsService {
       }),
     );
     return { id: ticket.id, trackingCode: ticket.trackingCode };
+  }
+
+  private async assertOwnedAttachments(
+    actor: AuthenticatedUser,
+    attachmentIds?: string[],
+  ) {
+    if (!attachmentIds || attachmentIds.length === 0) return;
+    const owned = await this.storedFileRepo.count({
+      where: { id: In(attachmentIds), ownerId: actor.id },
+    });
+    if (owned !== attachmentIds.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'فایل پیوست معتبر نیست.',
+      });
+    }
+  }
+
+  private async resolveAttachments(raw: unknown) {
+    const ids = Array.isArray(raw) ? (raw as string[]) : [];
+    if (ids.length === 0) return [];
+    const files = await this.storedFileRepo.find({
+      where: { id: In(ids) },
+      select: { id: true, fileName: true, mimeType: true, sizeBytes: true },
+    });
+    const byId = new Map(files.map((file) => [file.id, file]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((file): file is NonNullable<typeof file> => Boolean(file));
+  }
+
+  private async withResolvedAttachments<T extends { attachments: unknown }>(
+    ticket: T,
+  ) {
+    return {
+      ...ticket,
+      attachments: await this.resolveAttachments(ticket.attachments),
+    };
   }
 
   private async callerPhone(userId: string): Promise<string | null> {
@@ -159,9 +203,12 @@ export class SupportTicketsService {
 
   async listMine(actor: AuthenticatedUser) {
     const phone = await this.callerPhone(actor.id);
-    return this.customerTicketQuery(actor.id, phone)
+    const tickets = await this.customerTicketQuery(actor.id, phone)
       .orderBy('t.createdAt', 'DESC')
       .getMany();
+    return Promise.all(
+      tickets.map((ticket) => this.withResolvedAttachments(ticket)),
+    );
   }
 
   async getMine(actor: AuthenticatedUser, id: string) {
@@ -175,14 +222,14 @@ export class SupportTicketsService {
         message: 'تیکت یافت نشد.',
       });
     }
-    return ticket;
+    return this.withResolvedAttachments(ticket);
   }
 
   async list(filters: {
     status?: SupportTicketStatus;
     dept?: 'SITE' | 'AGENCY';
   }) {
-    return this.ticketRepo.find({
+    const tickets = await this.ticketRepo.find({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dept ? { dept: filters.dept } : {}),
@@ -190,6 +237,9 @@ export class SupportTicketsService {
       relations: { forwardedTo: true },
       order: { createdAt: 'DESC' },
     });
+    return Promise.all(
+      tickets.map((ticket) => this.withResolvedAttachments(ticket)),
+    );
   }
 
   private async getOrThrow(id: string) {
@@ -208,7 +258,7 @@ export class SupportTicketsService {
   }
 
   async detail(id: string) {
-    return this.getOrThrow(id);
+    return this.withResolvedAttachments(await this.getOrThrow(id));
   }
 
   /** Forwarding-target picker, scoped to this ticket system rather than

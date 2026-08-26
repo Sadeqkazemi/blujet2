@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsOptional,
   IsString,
@@ -31,6 +33,16 @@ export class SubmitSupportTicketDto {
   @IsString()
   @MinLength(2)
   body: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'شناسه فایل‌های بارگذاری‌شده متعلق به کاربر (حداکثر یک فایل)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
 }
 
 /** SITE_ADMIN «ایجاد تیکت» modal — dept/priority set at create time. */

@@ -33,6 +33,7 @@ import {
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
 import { fetchMySupportTickets, submitMySupportTicket } from '../../api/support-tickets';
+import { deleteFile, downloadFile, uploadFile } from '../../api/files';
 import { changeOwnPassword, setPassword } from '../../api/auth';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
 import { tomanAmountInWords } from '../../lib/amount-in-words';
@@ -619,6 +620,7 @@ export default function AccountPage() {
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketBody, setTicketBody] = useState('');
   const [ticketPhone, setTicketPhone] = useState('');
+  const [ticketAttachment, setTicketAttachment] = useState<File | null>(null);
   const [ticketSubmitBusy, setTicketSubmitBusy] = useState(false);
   const [ticketSubmitError, setTicketSubmitError] = useState<string | null>(null);
   const [ticketNotice, setTicketNotice] = useState<string | null>(null);
@@ -686,7 +688,7 @@ export default function AccountPage() {
         setTickets([]);
         setTicketsError(STR.fa.ticketsLoadError);
       });
-  }, [status]);
+  }, [status, locale]);
 
   useEffect(() => {
     const hasOpenHold = bookings?.some((b) => isHoldPayable(b));
@@ -821,21 +823,31 @@ export default function AccountPage() {
       return;
     }
     setTicketSubmitBusy(true);
+    let uploadedAttachmentId: string | null = null;
     try {
+      if (ticketAttachment) {
+        const uploaded = await uploadFile(ticketAttachment);
+        uploadedAttachmentId = uploaded.id;
+      }
       await submitMySupportTicket({
         requesterName: profile?.fullName || user?.fullName || t.defaultUserName,
         requesterPhone: ticketPhone.trim(),
         subject: ticketSubject.trim(),
         body: ticketBody.trim(),
+        attachmentIds: uploadedAttachmentId ? [uploadedAttachmentId] : undefined,
       });
       const refreshed = await fetchMySupportTickets();
       setTickets(refreshed);
       setTicketSubject('');
       setTicketBody('');
       setTicketPhone('');
+      setTicketAttachment(null);
       setTicketComposerOpen(false);
       setTicketNotice(t.ticketsCreateSuccess);
     } catch (err) {
+      if (uploadedAttachmentId) {
+        void deleteFile(uploadedAttachmentId).catch(() => undefined);
+      }
       setTicketSubmitError(err instanceof ApiRequestError ? err.message : t.ticketsLoadError);
     } finally {
       setTicketSubmitBusy(false);
@@ -1483,6 +1495,20 @@ export default function AccountPage() {
                   {expanded && (
                     <div style={{ borderTop: '1px solid #eef1f5', padding: '14px 16px', background: '#fafbfd' }}>
                       <p style={{ fontSize: 12.5, color: '#3b4554', lineHeight: 1.8, margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>{tk.body}</p>
+                      {(tk.attachments ?? []).length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                          {(tk.attachments ?? []).map((attachment) => (
+                            <button
+                              key={attachment.id}
+                              type="button"
+                              onClick={() => void downloadFile(attachment.id, attachment.fileName)}
+                              style={{ border: '1px solid #d8e5f3', borderRadius: 10, background: '#fff', color: '#1668c4', padding: '8px 11px', fontFamily: 'inherit', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
+                            >
+                              📎 {attachment.fileName}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {tk.history.length > 0 && (
                         <>
                           <div style={{ fontSize: 11.5, fontWeight: 800, color: '#6b7787', marginBottom: 8 }}>{t.ticketsHistoryHeading}</div>
@@ -1522,6 +1548,33 @@ export default function AccountPage() {
                       {t.ticketsPhoneLabel}
                       <input dir="ltr" value={ticketPhone} onChange={(e) => setTicketPhone(e.target.value)} placeholder={t.ticketsPhonePlaceholder} required inputMode="tel" style={{ height: 44, border: '1px solid #dfe7f0', borderRadius: 11, padding: '0 12px', fontFamily: 'inherit', fontSize: 13, boxSizing: 'border-box' }} />
                     </label>
+                    <label style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#5a6678', fontSize: 11.5, fontWeight: 700 }}>
+                      {locale === 'en' ? 'Attachment (optional)' : locale === 'ar' ? 'المرفق (اختياري)' : 'فایل پیوست (اختیاری)'}
+                      <span style={{ minHeight: 70, border: '1.5px dashed #bfd0e2', borderRadius: 12, background: '#f8fbff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 14px', cursor: 'pointer' }}>
+                        <span style={{ minWidth: 0 }}>
+                          <strong style={{ display: 'block', color: '#1668c4', fontSize: 12 }}>{ticketAttachment ? ticketAttachment.name : locale === 'fa' ? 'انتخاب فایل' : 'Choose file'}</strong>
+                          <small style={{ display: 'block', marginTop: 4, color: '#8a96a6', fontSize: 10.5 }}>{locale === 'fa' ? 'PDF، PNG یا JPG — حداکثر ۵ مگابایت' : 'PDF, PNG or JPG — max 5 MB'}</small>
+                        </span>
+                        <span aria-hidden="true" style={{ width: 34, height: 34, borderRadius: 10, background: '#eaf2fc', display: 'grid', placeItems: 'center', color: '#1668c4', fontSize: 18 }}>＋</span>
+                        <input
+                          type="file"
+                          accept="application/pdf,image/png,image/jpeg"
+                          data-testid="ticket-attachment-input"
+                          style={{ display: 'none' }}
+                          onChange={(event) => {
+                            const file = event.target.files?.[0] ?? null;
+                            if (!file) return;
+                            if (!['application/pdf', 'image/png', 'image/jpeg'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+                              setTicketSubmitError(locale === 'fa' ? 'فقط PDF، PNG یا JPG تا حجم ۵ مگابایت مجاز است.' : 'Only PDF, PNG or JPG files up to 5 MB are allowed.');
+                              event.target.value = '';
+                              return;
+                            }
+                            setTicketSubmitError(null);
+                            setTicketAttachment(file);
+                          }}
+                        />
+                      </span>
+                    </label>
                     {ticketSubmitError && <p role="alert" style={{ color: '#e5484d', fontSize: 12, margin: 0 }}>{ticketSubmitError}</p>}
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
                       <button type="button" onClick={() => setTicketComposerOpen(false)} style={{ border: 'none', borderRadius: 10, background: '#f1f4f8', color: '#5a6678', padding: '10px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>{t.ticketsCancelButton}</button>
@@ -1535,11 +1588,16 @@ export default function AccountPage() {
         )}
 
         {tab === 'security' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: isMobile ? '100%' : 520 }}>
-            <div style={{ background: '#fff', border: '1px solid #eef1f5', borderRadius: 16, padding: 18 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 800, margin: '0 0 4px' }}>{t.securityHeading}</h3>
-            <p style={{ fontSize: 11.5, color: '#8a96a6', margin: '0 0 16px', lineHeight: 1.8 }}>{t.securitySub}</p>
-            <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+          <div data-testid="account-security-tab" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', maxWidth: 'none' }}>
+            <div data-testid="account-password-card" style={{ background: '#fff', border: '1px solid #e4ebf3', borderRadius: 18, padding: isMobile ? 16 : 22, boxShadow: '0 8px 24px rgba(13,38,64,.045)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 18 }}>
+              <span aria-hidden="true" style={{ width: 42, height: 42, flex: 'none', borderRadius: 13, display: 'grid', placeItems: 'center', background: '#eaf2fc', color: '#1668c4', fontSize: 20 }}>🔐</span>
+              <div>
+                <h3 style={{ fontSize: 16, color: '#0d2640', fontWeight: 900, margin: '0 0 5px' }}>{t.securityHeading}</h3>
+                <p style={{ fontSize: 11.5, color: '#7d8998', margin: 0, lineHeight: 1.8 }}>{t.securitySub}</p>
+              </div>
+            </div>
+            <form onSubmit={(e) => void onSavePassword(e)} style={{ display: 'flex', flexDirection: 'column', gap: 13, maxWidth: 680 }}>
               <div>
                 <label htmlFor="acct-pw-cur" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>
                   {t.currentPasswordLabel} <span style={{ fontSize: 10 }}>{t.currentPasswordHint}</span>
@@ -1551,6 +1609,11 @@ export default function AccountPage() {
                   onChange={(e) => setPwCur(e.target.value)}
                   style={{ width: '100%', boxSizing: 'border-box', height: 46, border: '1.5px solid #e3e8ef', borderRadius: 12, padding: '0 14px', fontSize: 13, fontFamily: 'inherit' }}
                 />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, border: '1px solid #e4eaf1', borderRadius: 11, background: '#f8fafc', padding: '10px 12px', color: '#718096', fontSize: 10.5, lineHeight: 1.7 }}>
+                <span>✓ {locale === 'fa' ? 'حداقل ۶ کاراکتر' : locale === 'ar' ? '٦ أحرف على الأقل' : 'At least 6 characters'}</span>
+                <span>·</span>
+                <span>{locale === 'fa' ? 'ترکیب حروف و عدد پیشنهاد می‌شود' : locale === 'ar' ? 'يُنصح بمزج الأحرف والأرقام' : 'Letters and numbers are recommended'}</span>
               </div>
               <div>
                 <label htmlFor="acct-pw-new" style={{ display: 'block', fontSize: 11.5, color: '#6b7787', marginBottom: 6 }}>{t.newPasswordLabel}</label>
@@ -1578,7 +1641,7 @@ export default function AccountPage() {
                 type="submit"
                 data-testid="account-save-password"
                 disabled={pwSaving}
-                style={{ marginTop: 4, height: 44, borderRadius: 11, background: '#1668c4', color: '#fff', fontSize: 12.5, fontWeight: 800, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ marginTop: 4, minWidth: isMobile ? '100%' : 220, alignSelf: locale === 'en' ? 'flex-start' : 'flex-end', height: 46, borderRadius: 11, background: '#1668c4', color: '#fff', fontSize: 12.5, fontWeight: 900, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 6px 16px rgba(22,104,196,.18)' }}
               >
                 {pwSaving ? t.savingPasswordBtn : t.savePasswordBtn}
               </button>

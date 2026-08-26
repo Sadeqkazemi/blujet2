@@ -31,6 +31,7 @@ export function submitMySupportTicket(dto: {
   requesterPhone: string;
   subject: string;
   body: string;
+  attachmentIds?: string[];
 }) {
   return apiPost<{ id: string; trackingCode: string }>('/my/support-tickets', dto);
 }

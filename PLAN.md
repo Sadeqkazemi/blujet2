@@ -3818,3 +3818,14 @@ contracts and retires the production mock adapters.
 - [x] Keep `GALLEY` English and localize the rest of the Persian/Arabic seat map.
 - [x] Verify focused regressions, builds, semantic lint, and the local browser flow.
 - [ ] Commit/push; merge/deploy only after explicit user approval.
+
+# Customer account, agency seats, and checkout recovery (2026-08-26)
+
+- [x] Keep each agency seat-allotment inquiry attached to its selected flight card.
+- [x] Redesign the Saman customer-number and account-security controls.
+- [x] Restore the club loan eligibility form and localized submission feedback.
+- [x] Add owned PDF/PNG/JPG support-ticket attachments with staff/customer download access.
+- [x] Permit both customer and agency identities through the booking checkout controller while preserving ownership checks.
+- [x] Pass 868 frontend tests, 276 backend unit tests, 15 support-ticket integration tests, lint, and both production builds.
+- [ ] Complete visual browser verification when localhost browser access is available.
+- [ ] Commit/push, merge, and deploy only after explicit user approval.

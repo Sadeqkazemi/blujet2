@@ -14,6 +14,7 @@ import { ManagerReferral } from '../../database/entities/manager-referral.entity
 import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
 import { ManagerMessage } from '../../database/entities/manager-message.entity';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
+import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { CartableSourceType } from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
@@ -42,6 +43,8 @@ export class FilesService {
     private readonly messageRepo: Repository<ManagerMessage>,
     @InjectRepository(CartableTask)
     private readonly cartableTaskRepo: Repository<CartableTask>,
+    @InjectRepository(SupportTicket)
+    private readonly supportTicketRepo: Repository<SupportTicket>,
     private readonly audit: AuditService,
   ) {}
 
@@ -156,6 +159,19 @@ export class FilesService {
       });
       if (delivered > 0) return true;
     }
+
+    const supportTicket = await this.supportTicketRepo
+      .createQueryBuilder('ticket')
+      .select(['ticket.id', 'ticket.userId', 'ticket.forwardedToId'])
+      .where('ticket.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .getOne();
+    if (
+      supportTicket &&
+      (supportTicket.userId === actor.id ||
+        supportTicket.forwardedToId === actor.id ||
+        actor.role === 'SITE_ADMIN')
+    )
+      return true;
 
     return false;
   }

@@ -238,6 +238,63 @@ describe("AgencySeatsPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("places the inquiry controls immediately after the selected flight card", async () => {
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: "fi-economy",
+      flightNo: "CX1155",
+      originCode: "THR",
+      destCode: "MHD",
+      departureAt: "2026-09-05T05:00:00.000Z",
+      aircraftType: "MD-80",
+      cabin: "ECONOMY",
+      fareClassCode: "Y",
+      capacity: 120,
+      agencySeatsReleased: 40,
+      agencyAllocated: 0,
+      ownAllocated: 0,
+      availableToRequest: 40,
+      pricePerSeatIrr: "58000000",
+      specialOffer: false,
+      definitionStatus: "PUBLISHED",
+    };
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([
+      option,
+      {
+        ...option,
+        flightInstanceId: "fi-business",
+        cabin: "BUSINESS",
+        fareClassCode: "C",
+        capacity: 20,
+        agencySeatsReleased: 10,
+        availableToRequest: 10,
+        pricePerSeatIrr: "80000000",
+      },
+    ]);
+    vi.spyOn(portalApi, "fetchAllotments").mockResolvedValue([]);
+
+    render(<AgencySeatsPage />);
+    const user = userEvent.setup();
+    await user.selectOptions(
+      await screen.findByTestId("agency-request-origin"),
+      "THR",
+    );
+    await user.selectOptions(
+      screen.getByTestId("agency-request-destination"),
+      "MHD",
+    );
+    await user.click(screen.getByTestId("agency-request-route-fi-economy"));
+
+    expect(screen.getByTestId("agency-request-card-fi-economy")).toHaveStyle({
+      order: "0",
+    });
+    expect(screen.getByTestId("agency-request-flight-detail")).toHaveStyle({
+      order: "1",
+    });
+    expect(screen.getByTestId("agency-request-card-fi-business")).toHaveStyle({
+      order: "3",
+    });
+  });
+
   it("ignores a slower response for an older seat count", async () => {
     const user = userEvent.setup();
     const option: AgencySeatRequestOption = {

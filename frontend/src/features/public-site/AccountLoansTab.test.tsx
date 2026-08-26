@@ -45,6 +45,9 @@ describe("AccountLoansTab", () => {
     render(<AccountLoansTab />);
     const user = userEvent.setup();
     await user.click(await screen.findByTestId("loan-bank-customer"));
+    expect(screen.getByTestId("loan-customer-number-field")).toHaveClass(
+      "min-h-24",
+    );
     await user.type(screen.getByTestId("loan-customer-number"), "1234567890");
     await user.click(screen.getByTestId("loan-start-eligibility"));
 
@@ -57,6 +60,9 @@ describe("AccountLoansTab", () => {
     expect(screen.getByTestId("loan-amount-input")).toBeDisabled();
     expect(screen.getByTestId("loan-flow-status")).toHaveTextContent(
       "اعتبارسنجی در حال انجام",
+    );
+    expect(screen.getByTestId("loan-request-notice")).toHaveTextContent(
+      "درخواست اعتبارسنجی شما ارسال شد",
     );
   });
 

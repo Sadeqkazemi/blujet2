@@ -1507,6 +1507,7 @@ model SupportTicket {
   forwardedToId  String?
   forwardedTo    User?                 @relation("SupportTicketForwardedTo", fields: [forwardedToId], references: [id])
   history        Json                  @default("[]")
+  attachments    Json                  @default("[]") // validated StoredFile ids
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
@@ -1519,11 +1520,9 @@ model SupportTicket {
 - `ContactMessage` — no `userId`/relation at all; it is a pure anonymous
   inbox, never tied to an account even if the sender happens to be logged
   in (the design's own form has no such concept).
-- `SupportTicket.userId` is optional and currently always `null` in
-  practice — the public submission endpoint is fully unauthenticated (no
-  `JwtAuthGuard`), so there is no request-context user to attach. The
-  column exists for a future logged-in-submission path, not wired this
-  phase.
+- `SupportTicket.userId` remains optional for anonymous public submissions;
+  `/my/support-tickets` writes the authenticated customer id so account
+  listing and attachment authorization are owner-scoped.
 - `SupportTicket.trackingCode` — generated as `TK` + 8 uppercase hex
   characters (`crypto.randomBytes(4)`), same "no collision-retry loop"
   convention already used by `generatePnr()` (Phase 2/13) — a random
@@ -1533,6 +1532,8 @@ model SupportTicket {
   already established by `RefundRequest.history` (Phase 7) and
   `AgencyMembershipRequest.history` (Phase 16); no separate
   message-thread table this phase (see docs/API.md's deferral list).
+- `SupportTicket.attachments: Json` stores at most one owner-validated
+  `StoredFile.id`; read responses resolve the ids into safe file metadata.
 - `SupportTicket.dept`/`priority` exist to match the design's admin
   ticket-table columns (`پنل ادمین سایت.dc.html`'s `tkDepts`/
   `tkPriorityOptions`) but are not user-settable on the public form this
@@ -1547,8 +1548,8 @@ model SupportTicket {
   value for a scoped-down v1 feature.
 
 ⚑ **Explicitly deferred this phase** (see docs/API.md's Phase 20 section
-for the full reasoning): file attachments and multi-message reply
-threads on tickets; a public "track my ticket" status lookup; a
+for the full reasoning): multi-message reply threads on tickets; a public
+"track my ticket" status lookup; a
 dedicated تماس با ما admin review/reply UI (the new
 `SiteAdminDashboardPage.tsx` section is this phase's only admin surface
 for it).

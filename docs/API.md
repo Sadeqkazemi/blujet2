@@ -191,8 +191,8 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 | Method | Path         | Roles                                               | Notes                                                                              |
 | ------ | ------------ | --------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| POST   | `/files`     | any staff role                                      | multipart upload, PDF/image only, ≤ 5MB; returns `{ id, fileName }` for attaching. |
-| GET    | `/files/:id` | owner + participants of the entity it's attached to | Streams the file; 403 otherwise.                                                   |
+| POST   | `/files`     | any staff role or `USER`                            | multipart upload, PDF/image only, ≤ 5MB; returns `{ id, fileName }` for attaching. |
+| GET    | `/files/:id` | owner + participants/reviewer of the attached entity | Streams the file; support-ticket owners/assignees and `SITE_ADMIN` reviewers are included; 403 otherwise. |
 
 ---
 
@@ -511,6 +511,10 @@ a separate task, not bundled into this one so this phase's diff stays
 reviewable. Only what Phase 13 actually changes is documented below.
 
 - `GET /search/flights` and `POST /bookings` (`booking-engine` module):
+  - The authenticated booking controller accepts both `USER` and `AGENCY`
+    identities so an agency session can complete the same public checkout;
+    staff roles remain forbidden and every booking/read/payment stays scoped
+    to the caller's `userId`.
   - `GET /search/cabins` returns the ordered distinct `CabinClass` values
     backed by currently sellable public flight instances. Homepage and agency
     searches use this catalogue instead of assuming only Economy/Business.
@@ -1231,18 +1235,19 @@ had no way to see their submissions inside `/account`.
   tickets: rows where `userId = caller.id`, **plus** any anonymous
   submissions whose `requesterPhone` exactly matches the caller's stored
   `User.phone` (covers tickets filed before login with the same number).
-  Returns `{ id, trackingCode, subject, body, status, history, createdAt,
-updatedAt }` only — no admin-only fields (`dept`, `priority`,
+  Returns `{ id, trackingCode, subject, body, status, history, attachments,
+  createdAt, updatedAt }` only — no admin-only fields (`dept`, `priority`,
   `forwardedTo`).
 - `GET /my/support-tickets/:id` (new, `USER` role) — detail for one owned
   ticket; `404` if the row isn't linked to the caller by `userId` or
   phone match above.
 - `POST /my/support-tickets` (new, `USER` role, `@Throttle` 10/min per
-  account) — same body as the public submit DTO; always sets `userId` to
-  the caller. Returns `{ id, trackingCode }`.
-- Frontend: new `tickets` tab on `AccountPage.tsx` listing status +
-  tracking code + history timeline; link to `/support` to open a new
-  ticket. No reply thread or attachments (same Phase 20 deferrals).
+  account) — same body as the public submit DTO plus optional
+  `attachmentIds` (maximum one owner-validated file); always sets `userId`
+  to the caller. Returns `{ id, trackingCode }`.
+- Frontend: the `tickets` tab lists status, tracking code, history, and
+  downloadable attachment metadata. New requests accept one PDF/PNG/JPG up
+  to 5 MB. A reply thread remains deferred.
 
 ### پنل کاربر — باشگاه مشتریان (`/account` → تب `club`)
 

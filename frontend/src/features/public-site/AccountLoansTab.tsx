@@ -163,6 +163,7 @@ export default function AccountLoansTab() {
   const [customerNumber, setCustomerNumber] = useState("");
   const [amount, setAmount] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
 
@@ -239,10 +240,14 @@ export default function AccountLoansTab() {
   async function run(action: () => Promise<LoanCustomerProfile>) {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      setProfile(await action());
+      const next = await action();
+      setProfile(next);
+      return next;
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t.loadError);
+      return null;
     } finally {
       setBusy(false);
     }
@@ -254,7 +259,18 @@ export default function AccountLoansTab() {
       setError(t.validationCustomer);
       return;
     }
-    await run(() => startLoanEligibility(normalized, crypto.randomUUID()));
+    const next = await run(() =>
+      startLoanEligibility(normalized, crypto.randomUUID()),
+    );
+    if (next) {
+      setNotice(
+        locale === "en"
+          ? "Your credit assessment request was sent."
+          : locale === "ar"
+            ? "تم إرسال طلب التقييم الائتماني الخاص بك."
+            : "درخواست اعتبارسنجی شما ارسال شد.",
+      );
+    }
   }
 
   async function submit(event: FormEvent) {
@@ -368,29 +384,51 @@ export default function AccountLoansTab() {
             profile?.accountOpeningStatus === "COMPLETED") &&
             profile?.eligibilityStatus !== "ELIGIBLE" &&
             !eligibilityPending && (
-              <div className="mt-4 flex flex-col gap-2">
+              <div
+                className="mt-4 flex min-h-24 flex-col gap-3 rounded-2xl border border-[#dce5ef] bg-[#f8fbff] p-4"
+                data-testid="loan-customer-number-field"
+              >
+                <label
+                  htmlFor="loan-customer-number"
+                  className="flex items-center gap-2 text-xs font-black text-[#31465f]"
+                >
+                  <span className="grid h-8 w-8 place-items-center rounded-lg bg-white text-[#1668c4] shadow-sm" aria-hidden="true">
+                    #
+                  </span>
+                  {t.customerNo}
+                </label>
                 <input
+                  id="loan-customer-number"
                   data-testid="loan-customer-number"
                   inputMode="numeric"
                   value={customerNumber}
                   onChange={(event) =>
                     setCustomerNumber(event.target.value.replace(/\D/g, ""))
                   }
-                  placeholder={t.customerNo}
+                  placeholder={locale === "fa" ? "شماره مشتری را وارد کنید" : t.customerNo}
                   disabled={busy}
-                  className="h-12 flex-1 rounded-xl border border-[#dce5ef] px-4 text-sm outline-none focus:border-[#1668c4] disabled:bg-slate-50"
+                  className="h-14 flex-1 rounded-xl border border-[#c9d8e8] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#1668c4] focus:ring-2 focus:ring-[#d9eaff] disabled:bg-slate-50"
                 />
                 <button
                   type="button"
                   data-testid="loan-start-eligibility"
                   disabled={busy || customerNumber.length < 6}
                   onClick={() => void beginEligibility()}
-                  className="h-12 w-full rounded-xl bg-[#1668c4] px-5 text-xs font-black text-white disabled:opacity-40"
+                  className="h-12 w-full rounded-xl bg-[#1668c4] px-5 text-xs font-black text-white shadow-sm disabled:opacity-40"
                 >
                   {t.assess}
                 </button>
               </div>
             )}
+          {notice && (
+            <p
+              role="status"
+              data-testid="loan-request-notice"
+              className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-700"
+            >
+              ✓ {notice}
+            </p>
+          )}
           {eligibilityPending && (
             <div className="mt-4">
               <PendingBox

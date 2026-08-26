@@ -23,7 +23,7 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 @ApiTags('files')
 @Controller('files')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...STAFF_ROLES)
+@Roles(...STAFF_ROLES, 'USER')
 export class FilesController {
   constructor(private readonly files: FilesService) {}
 
