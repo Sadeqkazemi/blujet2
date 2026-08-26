@@ -442,6 +442,48 @@ describe('Agency Portal (e2e)', () => {
     ).toBe(true);
   });
 
+  it('support tickets: agency can create and list an agency-department ticket', async () => {
+    const agency = await createFreshAgency();
+    const { accessToken } = await loginAsAgency(agency.phone);
+
+    const createRes = await request(app.getHttpServer())
+      .post('/my/support-tickets')
+      .set('Authorization', auth(accessToken))
+      .send({
+        requesterName: 'آژانس تست',
+        requesterPhone: agency.phone,
+        subject: 'خطا در صدور بلیط',
+        body: 'پس از پرداخت بلیط صادر نشد.',
+      });
+    expect(createRes.status).toBe(201);
+
+    const listRes = await request(app.getHttpServer())
+      .get('/my/support-tickets')
+      .set('Authorization', auth(accessToken));
+    expect(listRes.status).toBe(200);
+    expect(listRes.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: createRes.body.data.id,
+          subject: 'خطا در صدور بلیط',
+        }),
+      ]),
+    );
+
+    const siteAdmin = await loginAs(app, 'site.admin');
+    const adminList = await request(app.getHttpServer())
+      .get('/support-tickets?dept=AGENCY')
+      .set('Authorization', auth(siteAdmin.accessToken));
+    expect(adminList.body.data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: createRes.body.data.id,
+          dept: 'AGENCY',
+        }),
+      ]),
+    );
+  });
+
   // ── Profile ───────────────────────────────────────────────────────────
 
   it('GET /agency-portal/profile: own fields only, no audit-log leakage', async () => {

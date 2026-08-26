@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import type { JsonValue } from '../../database/json-types';
 import { ClubTierRule } from '../../database/entities/club-tier-rule.entity';
 import { ClubMember } from '../../database/entities/club-member.entity';
@@ -87,9 +87,19 @@ function generateCardNo(tier: ClubTier): string {
 
 /** Public shape — the encrypted/hash columns never leave the service. */
 function toMemberView(m: ClubMember) {
-  const { nationalIdEnc, nationalIdHash, ...rest } = m;
+  const {
+    nationalIdEnc,
+    nationalIdHash,
+    deactivatedAt,
+    deactivatedById,
+    deactivatedBy,
+    ...rest
+  } = m;
   void nationalIdEnc;
   void nationalIdHash;
+  void deactivatedAt;
+  void deactivatedById;
+  void deactivatedBy;
   return rest;
 }
 
@@ -176,7 +186,10 @@ export class ClubService {
   }
 
   private async getMemberOrThrow(id: string): Promise<ClubMember> {
-    const member = await this.clubMemberRepo.findOneBy({ id });
+    const member = await this.clubMemberRepo.findOneBy({
+      id,
+      deactivatedAt: IsNull(),
+    });
     if (!member) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -190,7 +203,9 @@ export class ClubService {
     query: { level?: ClubTier; q?: string },
     actor?: AuthenticatedUser,
   ) {
-    const qb = this.clubMemberRepo.createQueryBuilder('m');
+    const qb = this.clubMemberRepo
+      .createQueryBuilder('m')
+      .where('m."deactivatedAt" IS NULL');
     if (query.level) qb.andWhere('m.level = :level', { level: query.level });
     if (query.q) {
       const q = query.q.trim();
@@ -207,7 +222,10 @@ export class ClubService {
     const [members, all, pendingRequests, submittedRequests] =
       await Promise.all([
         qb.clone().orderBy('m.joinDate', 'DESC').getMany(),
-        this.clubMemberRepo.find({ select: { level: true, cardStatus: true } }),
+        this.clubMemberRepo.find({
+          where: { deactivatedAt: IsNull() },
+          select: { level: true, cardStatus: true },
+        }),
         this.cardRequestRepo.count({
           where: { status: ClubCardRequestStatus.REFERRED },
         }),
@@ -265,6 +283,26 @@ export class ClubService {
       where: { nationalIdHash: hashPii(nationalId) },
     });
     if (duplicate) {
+      if (duplicate.deactivatedAt) {
+        duplicate.fullName = dto.fullName;
+        duplicate.email = dto.email;
+        duplicate.birthDate = dto.birthDate ? new Date(dto.birthDate) : null;
+        duplicate.level = dto.level;
+        duplicate.points = dto.points ?? duplicate.points;
+        duplicate.deactivatedAt = null;
+        duplicate.deactivatedById = null;
+        const restored = await this.clubMemberRepo.save(duplicate);
+        await this.audit.record({
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'CLUB',
+          action: 'بازگردانی مشتری VIP',
+          detail: `عضویت VIP «${dto.fullName}» توسط ${actor.fullName} دوباره فعال شد.`,
+          entityType: 'ClubMember',
+          entityId: restored.id,
+        });
+        return toMemberView(restored);
+      }
       throw new ConflictException({
         code: ErrorCode.CONFLICT,
         message: 'عضوی با این کد ملی قبلاً ثبت شده است.',
@@ -294,6 +332,29 @@ export class ClubService {
     });
 
     return toMemberView(member);
+  }
+
+  async deactivateMember(actor: AuthenticatedUser, id: string) {
+    const member = await this.getMemberOrThrow(id);
+    member.deactivatedAt = new Date();
+    member.deactivatedById = actor.id;
+    await this.clubMemberRepo.save(member);
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'CLUB',
+      action: 'غیرفعال‌سازی مشتری VIP',
+      detail: `عضویت VIP «${member.fullName}» توسط ${actor.fullName} غیرفعال شد؛ مزایا متوقف و تمام سوابق مشتری حفظ شد.`,
+      entityType: 'ClubMember',
+      entityId: member.id,
+    });
+
+    return {
+      id: member.id,
+      isActive: false,
+      deactivatedAt: member.deactivatedAt,
+    };
   }
 
   async updateLevel(actor: AuthenticatedUser, id: string, level: ClubTier) {
@@ -557,6 +618,13 @@ export class ClubService {
   async joinMine(userId: string) {
     const existing = await this.clubMemberRepo.findOne({ where: { userId } });
     if (existing) {
+      if (existing.deactivatedAt) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'عضویت باشگاه شما غیرفعال است؛ برای فعال‌سازی مجدد با پشتیبانی تماس بگیرید.',
+        });
+      }
       return this.getMyMembership(userId);
     }
 
@@ -585,6 +653,13 @@ export class ClubService {
       where: { nationalIdHash: hashPii(nationalId) },
     });
     if (byNid) {
+      if (byNid.deactivatedAt) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message:
+            'عضویت باشگاه با این کد ملی غیرفعال است؛ برای فعال‌سازی مجدد با پشتیبانی تماس بگیرید.',
+        });
+      }
       if (byNid.userId && byNid.userId !== userId) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
@@ -632,7 +707,9 @@ export class ClubService {
       cardRequestMinPoints: rule.cardRequestMinPoints,
     };
 
-    const member = await this.clubMemberRepo.findOne({ where: { userId } });
+    const member = await this.clubMemberRepo.findOne({
+      where: { userId, deactivatedAt: IsNull() },
+    });
     if (!member) {
       return {
         isMember: false,
@@ -682,7 +759,9 @@ export class ClubService {
 
   /** Customer self-service: submit a membership-card issuance request. */
   async submitCardRequest(userId: string) {
-    const member = await this.clubMemberRepo.findOne({ where: { userId } });
+    const member = await this.clubMemberRepo.findOne({
+      where: { userId, deactivatedAt: IsNull() },
+    });
     if (!member) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
@@ -769,6 +848,12 @@ export class ClubService {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'درخواست یافت نشد.',
+      });
+    }
+    if (request.member.deactivatedAt) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message: 'عضویت این مشتری غیرفعال است و صدور کارت مجاز نیست.',
       });
     }
     if (request.status !== ClubCardRequestStatus.REFERRED) {

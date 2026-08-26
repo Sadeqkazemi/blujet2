@@ -26,6 +26,13 @@ export function createClubMember(dto: {
   return apiPost<ClubMember>('/club/members', dto);
 }
 
+export function deactivateClubMember(id: string) {
+  return apiPatch<{ id: string; isActive: false; deactivatedAt: string }>(
+    `/club/members/${id}/deactivate`,
+    {},
+  );
+}
+
 export function updateClubMemberLevel(id: string, level: ClubTier) {
   return apiPatch<ClubMember>(`/club/members/${id}/level`, { level });
 }

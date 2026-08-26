@@ -59,6 +59,7 @@ describe('Club (e2e)', () => {
       '09180000001',
       '09180000002',
       '09180000003',
+      '09180000004',
     ]);
   });
 
@@ -196,7 +197,7 @@ describe('Club (e2e)', () => {
     expect(row!.nationalIdEnc).not.toContain(nid);
   });
 
-  it('POST /club/members: SENIOR 403; bad checksum 400; duplicate 409; stored encrypted', async () => {
+  it('POST /club/members: Senior Manager can add manually; bad checksum 400; duplicate 409', async () => {
     const senior = await loginAs(app, 'senior');
     const dto = {
       fullName: 'عضو جدید',
@@ -204,11 +205,11 @@ describe('Club (e2e)', () => {
       nationalId: validNationalId(),
       level: 'GOLD',
     };
-    const forbidden = await request(app.getHttpServer())
+    const createdBySenior = await request(app.getHttpServer())
       .post('/club/members')
       .set('Authorization', `Bearer ${senior.accessToken}`)
       .send(dto);
-    expect(forbidden.status).toBe(403);
+    expect(createdBySenior.status).toBe(201);
 
     const ceo = await loginAs(app, 'ceo');
     const badChecksum = await request(app.getHttpServer())
@@ -217,17 +218,55 @@ describe('Club (e2e)', () => {
       .send({ ...dto, nationalId: '0012345678' });
     expect(badChecksum.status).toBe(400);
 
-    const created = await request(app.getHttpServer())
-      .post('/club/members')
-      .set('Authorization', `Bearer ${ceo.accessToken}`)
-      .send(dto);
-    expect(created.status).toBe(201);
-
     const dup = await request(app.getHttpServer())
       .post('/club/members')
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ ...dto, email: 'other@new.example' });
     expect(dup.status).toBe(409);
+  });
+
+  it('PATCH /club/members/:id/deactivate preserves history, blocks benefits and replaces deletion', async () => {
+    const member = await createFreshMember();
+    const { accessToken: customerToken, userId } = await loginAsCustomer(
+      app,
+      '09180000004',
+    );
+    await linkMemberToUser(member.id, userId!, 6200);
+
+    const { accessToken } = await loginAs(app, 'chair');
+    const deactivated = await request(app.getHttpServer())
+      .patch(`/club/members/${member.id}/deactivate`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.data).toMatchObject({
+      id: member.id,
+      isActive: false,
+    });
+    expect(deactivated.body.data.deactivatedAt).toBeTruthy();
+
+    const persisted = await dataSource
+      .getRepository(ClubMember)
+      .findOneByOrFail({ id: member.id });
+    expect(persisted.deactivatedAt).toBeInstanceOf(Date);
+
+    const membership = await request(app.getHttpServer())
+      .get('/my/club/membership')
+      .set('Authorization', `Bearer ${customerToken}`);
+    expect(membership.status).toBe(200);
+    expect(membership.body.data.isMember).toBe(false);
+
+    const oldDelete = await request(app.getHttpServer())
+      .delete(`/club/members/${member.id}`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(oldDelete.status).toBe(404);
+
+    const audit = await findLatestAudit({
+      category: 'CLUB',
+      entityType: 'ClubMember',
+      entityId: member.id,
+    });
+    expect(audit?.action).toContain('غیرفعال');
   });
 
   it('PATCH level is Senior-only and audited', async () => {

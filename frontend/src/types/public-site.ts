@@ -4,6 +4,8 @@ export interface Airport {
   cityFa: string;
   airportNameFa?: string | null;
   tz: string;
+  /** True when the airport is outside Iran (server catalog convention). */
+  isInternational?: boolean;
 }
 
 export type CabinClass = 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';

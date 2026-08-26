@@ -503,7 +503,13 @@ export default function PublicHeader() {
     walletBalanceIrr !== null ? localeMoney(walletBalanceIrr, locale) : '—';
   const tierLabel =
     club?.isMember && club.level && TIER_KEY[club.level]
-      ? t(TIER_KEY[club.level])
+      ? club.level === 'SILVER'
+        ? locale === 'fa'
+          ? 'عضو باشگاه'
+          : locale === 'ar'
+            ? 'عضو النادي'
+            : 'Club member'
+        : t(TIER_KEY[club.level])
       : null;
   const agencyCopy = AGENCY_MENU_COPY[locale];
   const agencyName = agencyProfileName ?? user?.fullName ?? '';

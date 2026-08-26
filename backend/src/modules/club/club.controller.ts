@@ -51,15 +51,26 @@ export class ClubController {
   }
 
   @Post('members')
-  @Roles('CEO', 'BOARD_CHAIR')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER')
   @ApiOperation({
-    summary: 'تعریف مشتری VIP جدید — فقط مدیر عامل/رئیس هیئت مدیره',
+    summary: 'تعریف مشتری VIP جدید — مدیر ارشد/مدیر عامل/رئیس هیئت مدیره',
   })
   async createMember(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: CreateMemberDto,
   ) {
     const data = await this.club.createMember(actor, dto);
+    return { success: true, data };
+  }
+
+  @Patch('members/:id/deactivate')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER')
+  @ApiOperation({ summary: 'غیرفعال‌سازی عضویت VIP با حفظ سوابق و ممیزی' })
+  async deactivateMember(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.club.deactivateMember(actor, id);
     return { success: true, data };
   }
 

@@ -205,8 +205,11 @@ describe("AgencySeatsPage", () => {
     expect(
       await screen.findByTestId("agency-seat-inquiry-result"),
     ).toHaveTextContent("۱۲ صندلی موجود است");
-    expect(screen.getByTestId("agency-seat-inquiry-result")).toHaveTextContent(
+    expect(screen.getByTestId("agency-seat-inquiry-result")).not.toHaveTextContent(
       "ظرفیت آزاد واقعی",
+    );
+    expect(screen.getByTestId("agency-seat-inquiry-result")).not.toHaveTextContent(
+      "قابل درخواست",
     );
     expect(
       screen.getByText("وب‌سرویس مسیر (یک کلید برای تمام پروازهای این مسیر)"),

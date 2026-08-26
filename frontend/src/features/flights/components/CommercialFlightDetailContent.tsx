@@ -481,7 +481,7 @@ export default function CommercialFlightDetailContent({
         </section>
       )}
 
-      <section className={`${activeTab !== "AGENCY" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#121d31] p-2.5`} data-commercial-section="agency-fare-release">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#121d31] p-2.5`} data-commercial-section="agency-fare-release">
         <h3 className="text-[11px] font-black text-white">آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی</h3>
         <p className="mt-1 text-[9px] leading-4 text-[#78879d]">
           برای هر کلاس تعداد و قیمت صندلی را مشخص کنید؛ پیشنهاد ویژه پس از ثبت در پنل آژانس نمایش داده می‌شود.

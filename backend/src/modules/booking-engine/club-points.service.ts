@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { ClubMember } from '../../database/entities/club-member.entity';
 import { ClubPointsEntry } from '../../database/entities/club-points-entry.entity';
 import { ClubTierRule } from '../../database/entities/club-tier-rule.entity';
@@ -24,7 +24,10 @@ export class ClubPointsService {
   ) {}
 
   async findMemberByUserId(userId: string) {
-    return this.clubMemberRepo.findOneBy({ userId });
+    return this.clubMemberRepo.findOneBy({
+      userId,
+      deactivatedAt: IsNull(),
+    });
   }
 
   private async sumPoints(

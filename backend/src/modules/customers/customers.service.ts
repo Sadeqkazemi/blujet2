@@ -104,6 +104,7 @@ export class CustomersService {
     const clubs = await this.clubRepo
       .createQueryBuilder('c')
       .where('c.userId IN (:...ids)', { ids })
+      .andWhere('c.deactivatedAt IS NULL')
       .getMany();
     const clubByUser = new Map(clubs.map((c) => [c.userId!, c]));
 
@@ -164,7 +165,9 @@ export class CustomersService {
       ? maskIdentityValue(rawNationalId)
       : rawNationalId;
 
-    const club = await this.clubRepo.findOne({ where: { userId: user.id } });
+    const club = await this.clubRepo.findOne({
+      where: { userId: user.id, deactivatedAt: IsNull() },
+    });
 
     const identity = await this.identityRepo.findOne({
       where: { userId: user.id },

@@ -15,6 +15,7 @@ import { User } from './user.entity';
 @Index('club_members_level_idx', ['level'])
 @Index('club_members_nationalIdHash_idx', ['nationalIdHash'])
 @Index('club_members_userId_key', ['userId'], { unique: true })
+@Index('club_members_deactivatedAt_idx', ['deactivatedAt'])
 @Entity('club_members')
 export class ClubMember {
   @PrimaryColumn({
@@ -83,4 +84,18 @@ export class ClubMember {
 
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
+
+  /** Deactivation suspends benefits while keeping every historical relation intact. */
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  deactivatedAt!: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  deactivatedById!: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'deactivatedById',
+    foreignKeyConstraintName: 'club_members_deactivatedById_fkey',
+  })
+  deactivatedBy!: User | null;
 }

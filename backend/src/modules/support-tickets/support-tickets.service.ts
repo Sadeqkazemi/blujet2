@@ -15,7 +15,7 @@ import { StaffDirectoryService } from '../staff-directory/staff-directory.module
 import { ErrorCode } from '../../common/errors';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { SupportTicketStatus } from '../../database/enums';
+import { SupportTicketDept, SupportTicketStatus } from '../../database/enums';
 import type {
   SubmitSupportTicketDto,
   AdminCreateSupportTicketDto,
@@ -118,6 +118,7 @@ export class SupportTicketsService {
 
   async submitForUser(actor: AuthenticatedUser, dto: SubmitSupportTicketDto) {
     await this.assertOwnedAttachments(actor, dto.attachmentIds);
+    const isAgency = actor.role === 'AGENCY';
     const ticket = await this.ticketRepo.save(
       this.ticketRepo.create({
         userId: actor.id,
@@ -126,12 +127,13 @@ export class SupportTicketsService {
         requesterPhone: normalizeIranPhone(dto.requesterPhone),
         subject: dto.subject,
         body: dto.body,
+        dept: isAgency ? SupportTicketDept.AGENCY : SupportTicketDept.SITE,
         attachments: dto.attachmentIds ?? [],
         updatedAt: new Date(),
         history: [
           {
             step: 'submitted',
-            labelFa: 'ثبت تیکت توسط کاربر',
+            labelFa: isAgency ? 'ثبت تیکت توسط آژانس' : 'ثبت تیکت توسط کاربر',
             at: new Date().toISOString(),
           },
         ],

@@ -161,10 +161,33 @@ export class CartableService {
     // resolve()/transfer() logged with entityType 'CartableTask') — not the
     // linked source entity's separate history (e.g. AgencyMembershipRequest
     // exposes its own full trail via GET /agencies/requests/:id).
-    const history = await this.auditLogRepo.find({
+    const auditHistory = await this.auditLogRepo.find({
       where: { entityType: 'CartableTask', entityId: id },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: 'ASC' },
     });
+
+    const history = [
+      {
+        id: `created-${task.id}`,
+        action: 'ثبت و ارسال پیام',
+        detail: task.description,
+        actorLabel: task.senderLabelFa ?? task.sender?.fullName ?? null,
+        actorRole: task.sender?.role ?? null,
+        createdAt: task.createdAt,
+      },
+      ...auditHistory.map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        detail: entry.detail,
+        actorLabel: null,
+        actorRole: entry.actorRole,
+        createdAt: entry.createdAt,
+      })),
+    ].sort(
+      (left, right) =>
+        new Date(left.createdAt).getTime() -
+        new Date(right.createdAt).getTime(),
+    );
 
     return { ...task, history };
   }

@@ -29,9 +29,7 @@ export function fetchCartableUnreadCount() {
 }
 
 export function fetchCartableTask(id: string) {
-  return apiGet<CartableTask & { history: unknown[]; readAt: string | null }>(
-    `/cartable/${id}`,
-  );
+  return apiGet<CartableTask>(`/cartable/${id}`);
 }
 
 export function approveCartableTask(id: string, note: string) {

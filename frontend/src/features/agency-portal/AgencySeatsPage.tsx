@@ -951,8 +951,6 @@ export default function AgencySeatsPage() {
                           {locale === "fa" ? "جزئیات پاسخ API رزرواسیون" : "Reservation API response details"}
                         </summary>
                         <div className="mt-2 grid gap-1 sm:grid-cols-2">
-                          <span>{locale === "fa" ? `ظرفیت آزاد واقعی: ${localeDigits(seatInquiry.availableSeats, locale)}` : `Real capacity: ${seatInquiry.availableSeats}`}</span>
-                          <span>{locale === "fa" ? `قابل درخواست: ${localeDigits(seatInquiry.availableToRequest, locale)}` : `Requestable: ${seatInquiry.availableToRequest}`}</span>
                           <span>{locale === "fa" ? `فروش تاریخی: ${localeDigits(seatInquiry.historicalAgencySeatsSold, locale)}` : `Historical sales: ${seatInquiry.historicalAgencySeatsSold}`}</span>
                           <span>{locale === "fa" ? `فصل: ${seatInquiry.season}` : `Season: ${seatInquiry.season}`}</span>
                         </div>
@@ -1165,12 +1163,7 @@ export default function AgencySeatsPage() {
                               )}
                             </span>
                             <span className="mt-1 block text-[10px] opacity-80">
-                              {occurrence.flightNo} ·{" "}
-                              {localeDigits(
-                                occurrence.availableToRequest,
-                                locale,
-                              )}{" "}
-                              {locale === "fa" ? "صندلی" : "seats"}
+                              {occurrence.flightNo}
                             </span>
                           </button>
                         );
@@ -1375,20 +1368,11 @@ export default function AgencySeatsPage() {
                   {t.activeBadge}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {(
                   [
                     [t.allocatedLabel, option.ownAllocated, "#1668c4"],
                     [t.soldLabel, 0, "#1f8a5b"],
-                    [
-                      locale === "en"
-                        ? "Available to request"
-                        : locale === "ar"
-                          ? "متاح للطلب"
-                          : "قابل درخواست",
-                      option.availableToRequest,
-                      option.availableToRequest > 0 ? "#0d2640" : "#d64545",
-                    ],
                   ] as const
                 ).map(([label, value, color]) => (
                   <div

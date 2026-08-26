@@ -9,26 +9,26 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
-/** Customer account: list/detail/submit own support tickets (see
+/** Customer and agency accounts: list/detail/submit own support tickets (see
  * docs/API.md's «پنل کاربر — پیام به پشتیبانی» section). Kept separate
  * from SupportTicketsController so USER accounts never touch the
  * SITE_ADMIN review endpoints. */
 @ApiTags('support-tickets')
 @Controller('my/support-tickets')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('USER')
+@Roles('USER', 'AGENCY')
 export class MySupportTicketsController {
   constructor(private readonly tickets: SupportTicketsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'فهرست تیکت‌های پشتیبانی مشتری جاری' })
+  @ApiOperation({ summary: 'فهرست تیکت‌های پشتیبانی کاربر یا آژانس جاری' })
   async listMine(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.tickets.listMine(actor);
     return { success: true, data };
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'جزئیات یک تیکت پشتیبانی مشتری' })
+  @ApiOperation({ summary: 'جزئیات یک تیکت پشتیبانی متعلق به کاربر یا آژانس' })
   async getMine(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id') id: string,
@@ -39,7 +39,9 @@ export class MySupportTicketsController {
 
   @Post()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  @ApiOperation({ summary: 'ثبت تیکت پشتیبانی از پنل کاربر (با ورود)' })
+  @ApiOperation({
+    summary: 'ثبت تیکت پشتیبانی از پنل کاربر یا آژانس (با ورود)',
+  })
   async submit(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: SubmitSupportTicketDto,
