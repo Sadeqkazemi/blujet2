@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import AgencyProfilePage from './AgencyProfilePage';
 import * as portalApi from '../../api/agency-portal';
@@ -88,21 +89,28 @@ describe('AgencyProfilePage', () => {
     expect(await screen.findByText('قيد المراجعة')).toBeInTheDocument();
   });
 
-  it('renders a nullable UAT sandbox agency profile without crashing, shows the read-only notice, hides upload, and shows — for missing fields', async () => {
+  it('renders a nullable UAT agency profile and still exposes the operational document uploader', async () => {
     vi.spyOn(portalApi, 'fetchProfile').mockResolvedValue(UAT_PROFILE);
     vi.spyOn(portalApi, 'fetchDocuments').mockResolvedValue([]);
+    const upload = vi.spyOn(portalApi, 'uploadDocument').mockResolvedValue(DOCUMENTS[0]);
+    const user = userEvent.setup();
 
-    render(<AgencyProfilePage />);
+    const { container } = render(<AgencyProfilePage />);
 
-    expect(await screen.findByTestId('agency-profile-readonly-notice')).toHaveTextContent(
-      'این حساب آزمایشی فقط برای مشاهده است؛ امکان آپلود مدرک وجود ندارد.',
-    );
+    expect(await screen.findByText('اطلاعات آژانس')).toBeInTheDocument();
     // managerName, licenseNo, city, email, and partnership type are all
     // null — every one of them must render as the em-dash placeholder,
     // never a fabricated value like "NORMAL" or a fake license number.
     expect(screen.getAllByText('—')).toHaveLength(5);
-    expect(screen.queryByRole('button', { name: 'آپلود' })).not.toBeInTheDocument();
-    expect(screen.queryByText('آپلود مدرک جدید')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /افزودن مدرک/ })).toBeInTheDocument();
+    expect(screen.getByText('مدارک ارسالی')).toBeInTheDocument();
     expect(screen.getByText('مدرکی آپلود نشده است.')).toBeInTheDocument();
+
+    const file = new File(['license'], 'agency-license.pdf', { type: 'application/pdf' });
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+    expect(screen.getByText('agency-license.pdf')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'ارسال مدرک' }));
+    expect(upload).toHaveBeenCalledWith(file, 'LICENSE');
   });
 });

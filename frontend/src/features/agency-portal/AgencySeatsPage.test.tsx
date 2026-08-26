@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AgencySeatsPage from "./AgencySeatsPage";
@@ -241,7 +241,7 @@ describe("AgencySeatsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("places the inquiry controls immediately after the selected flight card", async () => {
+  it("keeps each route in its own card and opens inquiry controls inside only the selected card", async () => {
     const option: AgencySeatRequestOption = {
       flightInstanceId: "fi-economy",
       flightNo: "CX1155",
@@ -287,15 +287,11 @@ describe("AgencySeatsPage", () => {
     );
     await user.click(screen.getByTestId("agency-request-route-fi-economy"));
 
-    expect(screen.getByTestId("agency-request-card-fi-economy")).toHaveStyle({
-      order: "0",
-    });
-    expect(screen.getByTestId("agency-request-flight-detail")).toHaveStyle({
-      order: "1",
-    });
-    expect(screen.getByTestId("agency-request-card-fi-business")).toHaveStyle({
-      order: "3",
-    });
+    const economyCard = screen.getByTestId("agency-request-card-fi-economy");
+    const businessCard = screen.getByTestId("agency-request-card-fi-business");
+    expect(economyCard).toContainElement(screen.getByTestId("agency-request-flight-fi-economy-expanded"));
+    expect(screen.queryByTestId("agency-request-flight-fi-business-expanded")).not.toBeInTheDocument();
+    expect(economyCard).not.toContainElement(businessCard);
   });
 
   it("ignores a slower response for an older seat count", async () => {
@@ -496,7 +492,7 @@ describe("AgencySeatsPage", () => {
     expect(screen.getByText("۸")).toBeInTheDocument();
   });
 
-  it("lists every published flight in active flights without requiring an allotment and opens its request flow", async () => {
+  it("does not list a merely published/requestable flight as active before payment and allotment", async () => {
     const user = userEvent.setup();
     const option: AgencySeatRequestOption = {
       flightInstanceId: "fi-active-without-allotment",
@@ -533,30 +529,18 @@ describe("AgencySeatsPage", () => {
     const activeTab = await screen.findByRole("button", {
       name: /پروازهای فعال/,
     });
-    expect(activeTab).toHaveTextContent("۱");
+    expect(activeTab).toHaveTextContent("۰");
     await user.click(activeTab);
-    const activeCard = await screen.findByTestId(
-      "active-flight-card-fi-active-without-allotment-ECONOMY-Y",
-    );
-    expect(activeCard).toHaveTextContent("BJ-330");
-    expect(activeCard).not.toHaveTextContent("ظرفیت آزاد");
-    expect(activeCard).not.toHaveTextContent("قابل درخواست");
     expect(
-      screen.queryByText("هنوز سهمیه‌ای برای آژانس شما ثبت نشده است."),
+      screen.queryByTestId(
+        "active-flight-card-fi-active-without-allotment-ECONOMY-Y",
+      ),
     ).not.toBeInTheDocument();
-
-    await user.click(
-      within(activeCard).getByRole("button", { name: "درخواست خرید صندلی" }),
-    );
-
     expect(
-      await screen.findByTestId("agency-seat-request-panel"),
+      await screen.findByText(
+        "در حال حاضر سهمیه پرداخت‌شده و فعال برای فروش وجود ندارد.",
+      ),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("agency-request-origin")).toHaveValue("THR");
-    expect(screen.getByTestId("agency-request-destination")).toHaveValue("MHD");
-    expect(
-      screen.getByTestId("agency-request-flight-detail"),
-    ).toHaveTextContent("BJ-330");
   });
 
   it("keeps an existing allotment card without duplicating the matching catalogue class", async () => {
@@ -606,7 +590,7 @@ describe("AgencySeatsPage", () => {
     );
     expect(
       await screen.findByText(
-        "در حال حاضر پرواز فعال و منتشرشده‌ای وجود ندارد.",
+        "در حال حاضر سهمیه پرداخت‌شده و فعال برای فروش وجود ندارد.",
       ),
     ).toBeInTheDocument();
   });
@@ -622,7 +606,7 @@ describe("AgencySeatsPage", () => {
     );
     expect(await screen.findByText("Allocated")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText(/available for you to sell/)).toBeInTheDocument();
+    expect(screen.getByText(/only paid, approved seat requests/)).toBeInTheDocument();
   });
 
   it("renders translated labels in Arabic", async () => {

@@ -52,9 +52,9 @@ const STR: Record<
 > = {
   fa: {
     infoBanner:
-      "همه پروازهای فعال و منتشرشده در این بخش نمایش داده می‌شوند. ظرفیت تخصیص‌یافته برای فروش در اختیار شماست و برای سایر پروازها می‌توانید درخواست خرید صندلی ثبت کنید.",
+      "در تب پروازهای فعال فقط پروازهایی نمایش داده می‌شوند که درخواست صندلی آن‌ها تأیید و پرداخت شده و سهمیه فروش به آژانس تخصیص یافته است. سایر پروازها از مسیرهای موجود قابل درخواست‌اند.",
     errorFallback: "خطا در دریافت سهمیه‌های صندلی.",
-    empty: "در حال حاضر پرواز فعال و منتشرشده‌ای وجود ندارد.",
+    empty: "در حال حاضر سهمیه پرداخت‌شده و فعال برای فروش وجود ندارد.",
     activeBadge: "فعال",
     releasedBadge: "آزادشده",
     allocatedLabel: "تخصیص‌یافته",
@@ -71,9 +71,9 @@ const STR: Record<
   },
   en: {
     infoBanner:
-      "Every active published flight is listed here. Allocated capacity is available for you to sell, and you can request seat purchases for other flights.",
+      "Active Flights contains only paid, approved seat requests with an allotment assigned to this agency. Request other flights from Available Routes.",
     errorFallback: "Error loading seat allotments.",
-    empty: "There are currently no active published flights.",
+    empty: "There are currently no paid active allotments available for sale.",
     activeBadge: "Active",
     releasedBadge: "Released",
     allocatedLabel: "Allocated",
@@ -90,9 +90,9 @@ const STR: Record<
   },
   ar: {
     infoBanner:
-      "تظهر هنا جميع الرحلات النشطة والمنشورة. السعة المخصصة متاحة لك للبيع، ويمكنك طلب شراء مقاعد للرحلات الأخرى.",
+      "تعرض الرحلات النشطة فقط الطلبات المعتمدة والمدفوعة التي خُصصت مقاعدها لهذه الوكالة. اطلب الرحلات الأخرى من المسارات المتاحة.",
     errorFallback: "خطأ في تحميل حصص المقاعد.",
-    empty: "لا توجد حاليًا رحلات نشطة ومنشورة.",
+    empty: "لا توجد حاليًا حصص مدفوعة ونشطة متاحة للبيع.",
     activeBadge: "نشط",
     releasedBadge: "مُحرَّر",
     allocatedLabel: "مخصَّص",
@@ -386,20 +386,12 @@ export default function AgencySeatsPage() {
     (row) => row.invoice && row.invoice.status !== "PAID",
   );
   const activeAllotments = (rows ?? []).filter((row) => row.active);
-  const activeCatalogOptions = (requestOptions ?? []).filter(
-    (option) =>
-      !activeAllotments.some(
-        (allotment) =>
-          allotment.flightInstanceId === option.flightInstanceId &&
-          (!allotment.cabin || allotment.cabin === option.cabin) &&
-          (!allotment.fareClassCode ||
-            allotment.fareClassCode === option.fareClassCode),
-      ),
-  );
-  const activeFlightCount = new Set([
-    ...activeAllotments.map((row) => row.flightInstanceId),
-    ...(requestOptions ?? []).map((row) => row.flightInstanceId),
-  ]).size;
+  // A published occurrence is only requestable. It becomes an agency
+  // "active flight" after commercial/finance approval creates the agency's
+  // own allotment. Never present the public catalogue as purchased capacity.
+  const activeFlightCount = new Set(
+    activeAllotments.map((row) => row.flightInstanceId),
+  ).size;
 
   function openSeatRequest(option: AgencySeatRequestOption) {
     setOriginCode(option.originCode);
@@ -574,7 +566,7 @@ export default function AgencySeatsPage() {
 
       {activeView === "routes" && (
         <section
-          className="mb-5 rounded-2xl border border-[#e1e8f2] bg-white p-5 shadow-sm"
+          className="mb-5"
           data-testid="agency-seat-request-panel"
         >
           <div className="mb-4">
@@ -587,7 +579,7 @@ export default function AgencySeatsPage() {
             </h2>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <div className="grid gap-3 rounded-2xl border border-[#e1e8f2] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]">
             <label className="text-[11px] font-bold text-[#3f546b]">
               {locale === "en"
                 ? "Origin"
@@ -841,7 +833,7 @@ export default function AgencySeatsPage() {
           {requestFlight && (
             <div
               style={{ order: selectedVisibleIndex * 2 + 1 }}
-              className="-mt-3 rounded-b-2xl border border-t-0 border-[#9fc2ec] bg-white p-4 pt-5"
+              className="rounded-2xl border border-[#9fc2ec] bg-white p-4 shadow-sm"
               data-testid="agency-request-flight-detail"
             >
               <span className="sr-only">
@@ -1335,81 +1327,6 @@ export default function AgencySeatsPage() {
 
       {activeView === "active" && (
         <div className="flex flex-col gap-4">
-          {activeCatalogOptions.map((option) => (
-            <article
-              key={optionKey(option)}
-              data-testid={`active-flight-card-${option.flightInstanceId}-${option.cabin}-${option.fareClassCode}`}
-              className="rounded-2xl border border-[#e8eef6] bg-white p-5 shadow-sm"
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f7fd] text-base">
-                    ✈
-                  </span>
-                  <div>
-                    <div className="text-sm font-black text-[#0d2640]">
-                      {airportCityLabel(option.originCode, locale)} ←{" "}
-                      {airportCityLabel(option.destCode, locale)}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-[#8a96a6]">
-                      <span dir="ltr">{option.flightNo}</span> ·{" "}
-                      {formatLocaleDateTime(option.departureAt, locale)}
-                    </div>
-                    <div
-                      className="mt-0.5 text-[10px] text-[#8a96a6]"
-                      dir="ltr"
-                    >
-                      {option.aircraftType} · {option.cabin}/
-                      {option.fareClassCode}
-                    </div>
-                  </div>
-                </div>
-                <span className="rounded-full bg-[#e8f5ee] px-3 py-1 text-[10.5px] font-extrabold text-[#1f8a5b]">
-                  {t.activeBadge}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {(
-                  [
-                    [t.allocatedLabel, option.ownAllocated, "#1668c4"],
-                    [t.soldLabel, 0, "#1f8a5b"],
-                  ] as const
-                ).map(([label, value, color]) => (
-                  <div
-                    key={label}
-                    className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center"
-                  >
-                    <div className="mb-1 text-[10.5px] text-[#8a96a6]">
-                      {label}
-                    </div>
-                    <div className="text-lg font-black" style={{ color }}>
-                      {localeDigits(value, locale)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {option.availableToRequest < 1 && (
-                <p className="mt-4 rounded-xl bg-[#fff7ed] p-3 text-[11px] font-bold text-[#b25e18]">
-                  {locale === "en"
-                    ? "The flight is active; commercial agency capacity has not been released yet."
-                    : locale === "ar"
-                      ? "الرحلة نشطة، لكن السعة التجارية للوكالات لم تُحرر بعد."
-                      : "پرواز فعال است؛ ظرفیت فروش آژانسی هنوز توسط بازرگانی آزاد نشده است."}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => openSeatRequest(option)}
-                className="mt-4 w-full rounded-xl bg-[#1668c4] px-4 py-3 text-xs font-black text-white"
-              >
-                {locale === "en"
-                  ? "Request seat purchase"
-                  : locale === "ar"
-                    ? "طلب شراء مقاعد"
-                    : "درخواست خرید صندلی"}
-              </button>
-            </article>
-          ))}
           {activeAllotments.map((f) => {
             const left = Math.max(f.seatsAllocated - f.seatsUsed, 0);
             const matchingRequestOption = (requestOptions ?? []).find(

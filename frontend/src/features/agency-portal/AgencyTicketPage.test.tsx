@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -60,5 +60,25 @@ describe('AgencyTicketPage', () => {
 
     await user.click(screen.getByTestId('agency-ticket-search'));
     expect(screen.getByRole('alert')).toHaveTextContent('مبدا، مقصد و تاریخ رفت را کامل کنید.');
+  });
+
+  it('scopes domestic and international airport choices to the approved catalogs', async () => {
+    vi.spyOn(publicApi, 'fetchAirports').mockResolvedValue([
+      { code: 'THR', cityFa: 'تهران', airportNameFa: 'مهرآباد', tz: 'Asia/Tehran', isInternational: false },
+      { code: 'IKA', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی امام خمینی', tz: 'Asia/Tehran', isInternational: false },
+      { code: 'DXB', cityFa: 'دبی', airportNameFa: 'Dubai International', tz: 'Asia/Dubai', isInternational: true },
+    ]);
+    vi.spyOn(publicApi, 'fetchSearchCabins').mockResolvedValue(['ECONOMY']);
+    const user = userEvent.setup();
+    render(<MemoryRouter><AgencyTicketPage /></MemoryRouter>);
+
+    const origin = await screen.findByTestId('agency-ticket-origin');
+    expect(within(origin).getByRole('option', { name: /\(THR\)/ })).toBeInTheDocument();
+    expect(within(origin).queryByRole('option', { name: /\(DXB\)/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('agency-ticket-service-intl'));
+    expect(within(origin).getByRole('option', { name: /\(DXB\)/ })).toBeInTheDocument();
+    expect(within(origin).getByRole('option', { name: /\(IKA\)/ })).toBeInTheDocument();
+    expect(within(origin).queryByRole('option', { name: /\(THR\)/ })).not.toBeInTheDocument();
   });
 });

@@ -523,8 +523,8 @@ export class AgencyPortalService {
   }
 
   async documents(actor: AuthenticatedUser) {
-    if (await this.isUatSandboxAgencyActor(actor)) return [];
-    await this.getOwnProfileOrThrow(actor);
+    const isUatAgency = await this.isUatSandboxAgencyActor(actor);
+    if (!isUatAgency) await this.getOwnProfileOrThrow(actor);
     const docs = await this.documentRepo.find({
       where: { agencyId: actor.id },
       relations: { file: true },
@@ -545,8 +545,11 @@ export class AgencyPortalService {
     file: Express.Multer.File,
     dto: UploadDocumentDto,
   ) {
-    await this.assertAgencyPortalWritable(actor);
-    await this.getOwnProfileOrThrow(actor);
+    const isUatAgency = await this.isUatSandboxAgencyActor(actor);
+    if (!isUatAgency) {
+      await this.assertAgencyPortalWritable(actor);
+      await this.getOwnProfileOrThrow(actor);
+    }
     const stored = await this.files.store(actor, file);
     const saved = await this.documentRepo.save(
       this.documentRepo.create({

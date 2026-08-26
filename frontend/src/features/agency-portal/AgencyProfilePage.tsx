@@ -56,6 +56,7 @@ const STR: Record<StoredLocale, {
   noFileSelected: string;
   uploadErrorFallback: string;
   uploadBtn: string;
+  addDocumentBtn: string;
   uploadingBtn: string;
   documentsHeading: string;
   documentsEmpty: string;
@@ -74,11 +75,12 @@ const STR: Record<StoredLocale, {
     fieldPartnershipType: 'نوع همکاری',
     partnershipValue: (tier) => `آژانس همکار ${tier}`,
     emptyValue: '—',
-    readOnlyNotice: 'این حساب آزمایشی فقط برای مشاهده است؛ امکان آپلود مدرک وجود ندارد.',
+    readOnlyNotice: 'اطلاعات ثبتی این حساب آزمایشی فقط خواندنی است؛ ارسال مدرک برای بررسی فعال است.',
     uploadHeading: 'آپلود مدرک جدید',
     noFileSelected: 'فایلی انتخاب نشده است.',
     uploadErrorFallback: 'خطا در آپلود مدرک.',
-    uploadBtn: 'آپلود',
+    uploadBtn: 'ارسال مدرک',
+    addDocumentBtn: 'افزودن مدرک',
     uploadingBtn: 'در حال آپلود…',
     documentsHeading: 'مدارک ارسالی',
     documentsEmpty: 'مدرکی آپلود نشده است.',
@@ -97,11 +99,12 @@ const STR: Record<StoredLocale, {
     fieldPartnershipType: 'Partnership Type',
     partnershipValue: (tier) => `${tier} Partner Agency`,
     emptyValue: '—',
-    readOnlyNotice: 'This is a read-only sandbox test account; document upload is not available.',
+    readOnlyNotice: 'Registration fields are read-only; document submission is available for review.',
     uploadHeading: 'Upload New Document',
     noFileSelected: 'No file selected.',
     uploadErrorFallback: 'Error uploading the document.',
-    uploadBtn: 'Upload',
+    uploadBtn: 'Submit document',
+    addDocumentBtn: 'Add document',
     uploadingBtn: 'Uploading…',
     documentsHeading: 'Submitted Documents',
     documentsEmpty: 'No documents uploaded yet.',
@@ -120,11 +123,12 @@ const STR: Record<StoredLocale, {
     fieldPartnershipType: 'نوع الشراكة',
     partnershipValue: (tier) => `وكالة شريكة ${tier}`,
     emptyValue: '—',
-    readOnlyNotice: 'هذا حساب اختباري للقراءة فقط؛ رفع المستندات غير متاح.',
+    readOnlyNotice: 'بيانات التسجيل للقراءة فقط؛ إرسال المستندات متاح للمراجعة.',
     uploadHeading: 'رفع مستند جديد',
     noFileSelected: 'لم يتم اختيار ملف.',
     uploadErrorFallback: 'خطأ في رفع المستند.',
-    uploadBtn: 'رفع',
+    uploadBtn: 'إرسال المستند',
+    addDocumentBtn: 'إضافة مستند',
     uploadingBtn: 'جارٍ الرفع…',
     documentsHeading: 'المستندات المُرسلة',
     documentsEmpty: 'لم يتم رفع أي مستند بعد.',
@@ -140,6 +144,7 @@ export default function AgencyProfilePage() {
   const [docType, setDocType] = useState<AgencyDocumentType>('LICENSE');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function reload() {
@@ -165,6 +170,7 @@ export default function AgencyProfilePage() {
     try {
       await uploadDocument(file, docType);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFileName('');
       reload();
     } catch (err) {
       setUploadError(err instanceof ApiRequestError ? err.message : t.uploadErrorFallback);
@@ -210,11 +216,23 @@ export default function AgencyProfilePage() {
         </dl>
       </div>
 
-      {!profile.isTemporaryReadOnly && (
-        <div className="mb-6 rounded-xl border border-border bg-white p-5">
-          <div className="mb-4 text-sm font-bold text-ink">{t.uploadHeading}</div>
-          <div className="flex flex-wrap items-center gap-3">
+      <div className="mb-6 rounded-2xl border border-[#dbe7f5] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-black text-ink">{t.uploadHeading}</div>
+              <div className="mt-1 text-[11px] text-muted">PDF، JPG یا PNG تا حداکثر ۵ مگابایت</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-xl border border-accent bg-[#eef6ff] px-4 py-2.5 text-xs font-black text-accent"
+            >
+              + {t.addDocumentBtn}
+            </button>
+          </div>
+          <div className="grid gap-3 rounded-xl border border-dashed border-[#c7d9ed] bg-[#f8fbff] p-4 sm:grid-cols-[minmax(150px,0.7fr)_minmax(220px,1fr)_auto] sm:items-end">
             <select
+              aria-label={locale === 'fa' ? 'نوع مدرک' : locale === 'ar' ? 'نوع المستند' : 'Document type'}
               value={docType}
               onChange={(e) => setDocType(e.target.value as AgencyDocumentType)}
               className="rounded-lg border border-border bg-white px-3 py-2 text-xs"
@@ -225,8 +243,22 @@ export default function AgencyProfilePage() {
                 </option>
               ))}
             </select>
-            <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg" className="text-xs" />
             <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="h-10 truncate rounded-lg border border-border bg-white px-3 text-start text-xs text-muted"
+            >
+              {selectedFileName || t.noFileSelected}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              className="sr-only"
+              onChange={(event) => setSelectedFileName(event.target.files?.[0]?.name ?? '')}
+            />
+            <button
+              type="button"
               disabled={uploading}
               onClick={() => void onUpload()}
               className="rounded-lg bg-accent px-4 py-2 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-60"
@@ -239,8 +271,7 @@ export default function AgencyProfilePage() {
               {uploadError}
             </p>
           )}
-        </div>
-      )}
+      </div>
 
       <div className="rounded-xl border border-border bg-white p-5">
         <div className="mb-4 text-sm font-bold text-ink">{t.documentsHeading}</div>
