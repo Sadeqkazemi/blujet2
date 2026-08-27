@@ -393,6 +393,7 @@ describe('AccountPage', () => {
     mockAuth('authenticated');
     vi.spyOn(supportTicketsApi, 'fetchMySupportTickets').mockResolvedValue([TICKET]);
     renderPage('/account?tab=tickets');
+    expect(await screen.findByTestId('support-conversation-center')).toHaveAttribute('data-theme', 'light');
     expect(await screen.findByTestId('account-ticket')).toHaveTextContent('مشکل در پرداخت');
     expect(screen.getByText('TKAABBCCDD', { exact: false })).toBeInTheDocument();
   });

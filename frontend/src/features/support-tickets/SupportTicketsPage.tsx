@@ -77,10 +77,17 @@ function matchesQuery(t: SupportTicketRow, raw: string): boolean {
 }
 
 /**
- * SITE_ADMIN «تیکت‌ها» — dark layout matching design screenshots:
+ * کارتابل تیکت مدیران و کارمندان — dark layout matching design screenshots:
  * 5 KPIs, status/dept filters, search, create modal, table, 10/page.
  */
-export default function SupportTicketsPage() {
+export default function SupportTicketsPage({
+  embedded = false,
+  employeeMode = false,
+}: {
+  embedded?: boolean;
+  employeeMode?: boolean;
+}) {
+  const isEmployee = employeeMode;
   const [tickets, setTickets] = useState<SupportTicketRow[] | null>(null);
   const [detail, setDetail] = useState<SupportTicketRow | null>(null);
   const [targets, setTargets] = useState<ForwardTarget[]>([]);
@@ -106,6 +113,7 @@ export default function SupportTicketsPage() {
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createAttachments, setCreateAttachments] = useState<ReferralAttachment[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -117,10 +125,12 @@ export default function SupportTicketsPage() {
 
   useEffect(() => {
     void load();
-    fetchForwardTargets()
-      .then(setTargets)
-      .catch(() => setTargets([]));
-  }, [load]);
+    if (!isEmployee) {
+      fetchForwardTargets()
+        .then(setTargets)
+        .catch(() => setTargets([]));
+    }
+  }, [isEmployee, load]);
 
   async function openDetail(id: string) {
     setError(null);
@@ -194,6 +204,7 @@ export default function SupportTicketsPage() {
         dept: createForm.dept,
         priority: createForm.priority,
         body: createForm.body.trim(),
+        attachmentIds: createAttachments.length ? createAttachments.map((file) => file.id) : undefined,
       });
       setNotice(`تیکت ${created.trackingCode} ثبت شد ✓`);
       setCreateOpen(false);
@@ -204,6 +215,7 @@ export default function SupportTicketsPage() {
         priority: 'MEDIUM',
         body: '',
       });
+      setCreateAttachments([]);
       await load();
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'خطا در ثبت تیکت.');
@@ -242,7 +254,7 @@ export default function SupportTicketsPage() {
   }, [statusFilter, deptFilter, query]);
 
   return (
-    <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
+    <div data-testid="management-ticket-center" className={`flex flex-col gap-[15px] px-[21px] pb-[34px] ${embedded ? 'pt-[15px]' : 'pt-[18px]'}`}>
       <div>
         <h1 className="m-0 text-[20.5px] font-black text-white">تیکت‌ها</h1>
         <p className="mt-1 text-[11.5px] text-[#6b7b94]">
@@ -319,7 +331,7 @@ export default function SupportTicketsPage() {
               className="h-10 w-full rounded-[10px] border border-[#28344c] bg-[#18223a] py-0 pl-[11px] pr-[33px] text-[11.5px] text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
             />
           </div>
-          <button
+          {!isEmployee && <button
             type="button"
             onClick={() => {
               setCreateError(null);
@@ -331,7 +343,7 @@ export default function SupportTicketsPage() {
               <path d="M12 5v14M5 12h14" />
             </svg>
             ایجاد تیکت
-          </button>
+          </button>}
         </div>
 
         <div className="flex flex-wrap items-center gap-[7px] border-b border-[#1a2436] px-[11px] py-2">
@@ -423,7 +435,7 @@ export default function SupportTicketsPage() {
         )}
       </section>
 
-      {createOpen && (
+      {!isEmployee && createOpen && (
         <Modal
           variant="dark"
           title="ایجاد تیکت جدید"
@@ -498,14 +510,12 @@ export default function SupportTicketsPage() {
 
           <div className="mb-3">
             <div className="mb-1 text-[11px] font-bold text-[#e7ecf3]">بارگذاری مستندات (PDF یا تصویر)</div>
-            <div className="flex flex-col items-center justify-center gap-1.5 rounded-[11px] border border-dashed border-[#28344c] bg-[#0f1623] px-3 py-6 text-[#6b7b94]">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M12 16V7M8.5 10.5 12 7l3.5 3.5" />
-                <path d="M4 17.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5" />
-              </svg>
-              <span className="text-[11.5px] font-bold">افزودن سند</span>
-              <span className="text-[10px]">پیوست فایل در نسخه بعدی فعال می‌شود</span>
-            </div>
+            <AttachmentPicker
+              theme="dark"
+              value={createAttachments}
+              onChange={(files) => setCreateAttachments(files.slice(-1))}
+              disabled={creating}
+            />
           </div>
 
           {createError && (
@@ -618,6 +628,7 @@ export default function SupportTicketsPage() {
               />
               <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
                 <AttachmentPicker
+                  theme="dark"
                   value={replyAttachments}
                   onChange={(files) => setReplyAttachments(files.slice(-1))}
                   disabled={replyBusy}
@@ -635,7 +646,7 @@ export default function SupportTicketsPage() {
             </div>
           )}
 
-          <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+          {!isEmployee && <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
             <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">ارجاع به کارمند</h3>
             <div className="flex gap-2">
               <select
@@ -663,9 +674,9 @@ export default function SupportTicketsPage() {
             {detail.forwardedTo && (
               <p className="mt-2 text-[11px] text-[#6b7b94]">ارجاع فعلی: {detail.forwardedTo.fullName}</p>
             )}
-          </div>
+          </div>}
 
-          <div className="rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+          {!isEmployee && <div className="rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
             <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">تغییر وضعیت</h3>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(STATUS_META) as SupportTicketStatus[]).map((s) => (
@@ -680,7 +691,7 @@ export default function SupportTicketsPage() {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
         </Modal>
       )}
     </div>

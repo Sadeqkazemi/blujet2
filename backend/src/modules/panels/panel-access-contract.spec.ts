@@ -7,6 +7,10 @@ import {
 import { PanelsService } from './panels.service';
 
 describe('operations panel access contract', () => {
+  it('keeps the unified cartable reachable for IT management', () => {
+    expect(PANEL_NAV.IT_MANAGER?.map((item) => item.key)).toContain('cartable');
+  });
+
   it('publishes aircraft definition only in commercial navigation', () => {
     expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
       'aircraft',

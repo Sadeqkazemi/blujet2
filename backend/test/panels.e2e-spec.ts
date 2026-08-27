@@ -150,6 +150,7 @@ describe('Panels (e2e)', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.map((t: { key: string }) => t.key)).toEqual([
       'dashboard',
+      'cartable',
       'users',
       'security',
       'services',

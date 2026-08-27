@@ -8,11 +8,23 @@ const USER = {
   fullName: 'کاربر آزمون',
 } as const;
 
-const ADMIN = {
-  id: '22222222-2222-4222-8222-222222222222',
-  role: 'SITE_ADMIN',
-  fullName: 'ادمین سایت',
+const EMPLOYEE = {
+  id: '33333333-3333-4333-8333-333333333333',
+  role: 'EMPLOYEE',
+  fullName: 'کارمند آزمون',
 } as const;
+
+const STAFF_ROLES = [
+  'SITE_ADMIN',
+  'SENIOR_MANAGER',
+  'CEO',
+  'BOARD_CHAIR',
+  'COMMERCIAL_MANAGER',
+  'FINANCE_MANAGER',
+  'IT_MANAGER',
+  'OPERATIONS_MANAGER',
+  'EMPLOYEE',
+];
 
 describe('Support ticket reply controllers', () => {
   it('keeps requester reply routes restricted to USER and AGENCY and delegates with the actor', async () => {
@@ -33,21 +45,39 @@ describe('Support ticket reply controllers', () => {
     ]);
   });
 
-  it('keeps staff reply routes restricted to SITE_ADMIN and delegates with the actor', async () => {
+  it('allows management and employees to reply through the cartable and delegates with the actor', async () => {
     const service = {
       replyAsStaff: jest.fn().mockResolvedValue({ id: 'ticket-1' }),
     };
     const controller = new SupportTicketsController(service as never);
     const dto = { body: 'پاسخ پشتیبانی', attachmentIds: [] };
 
-    await expect(controller.reply(ADMIN, 'ticket-1', dto)).resolves.toEqual({
+    await expect(controller.reply(EMPLOYEE, 'ticket-1', dto)).resolves.toEqual({
       success: true,
       data: { id: 'ticket-1' },
     });
-    expect(service.replyAsStaff).toHaveBeenCalledWith(ADMIN, 'ticket-1', dto);
+    expect(service.replyAsStaff).toHaveBeenCalledWith(
+      EMPLOYEE,
+      'ticket-1',
+      dto,
+    );
     expect(
       // eslint-disable-next-line @typescript-eslint/unbound-method -- decorator metadata is read from the prototype method without invoking it
       Reflect.getMetadata(ROLES_KEY, SupportTicketsController.prototype.reply),
-    ).toEqual(['SITE_ADMIN']);
+    ).toEqual(STAFF_ROLES);
+  });
+
+  it('passes the actor to list so employee visibility can be scoped server-side', async () => {
+    const service = { list: jest.fn().mockResolvedValue([]) };
+    const controller = new SupportTicketsController(service as never);
+
+    await expect(controller.list(EMPLOYEE, 'OPEN', 'AGENCY')).resolves.toEqual({
+      success: true,
+      data: [],
+    });
+    expect(service.list).toHaveBeenCalledWith(EMPLOYEE, {
+      status: 'OPEN',
+      dept: 'AGENCY',
+    });
   });
 });
