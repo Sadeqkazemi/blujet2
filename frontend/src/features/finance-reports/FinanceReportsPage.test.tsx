@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import FinanceReportsPage from './FinanceReportsPage';
 import * as api from '../../api/finance-manager';
 import type { FinanceReportFilters } from '../../api/finance-manager';
+import type { FinanceFlightDetail } from '../../types/finance-manager';
 
 describe('FinanceReportsPage', () => {
   it('renders real partner rows and refetches when switching to charters', async () => {
@@ -132,5 +133,73 @@ describe('FinanceReportsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'گزارش تفصیلی' }));
     expect(await screen.findByText('BJTEST')).toBeInTheDocument();
     expect(screen.getByText('ECONOMY/Y')).toBeInTheDocument();
+  });
+
+  it('shows exactly ten report rows per page and navigates to the remainder', async () => {
+    vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({
+      kind: 'partners',
+      scope: 'AGENCIES',
+      period: 'month',
+      rows: Array.from({ length: 12 }, (_, index) => ({
+        id: `agency-${index + 1}`,
+        name: `آژانس صفحه ${index + 1}`,
+        totalIrr: '1000',
+        paidIrr: '1000',
+        outstandingIrr: '0',
+        soldSeats: 1,
+      })),
+      summary: { totalIrr: '12000', paidIrr: '12000' },
+    });
+
+    render(<FinanceReportsPage />);
+    expect(await screen.findByText('آژانس صفحه 10')).toBeInTheDocument();
+    expect(screen.queryByText('آژانس صفحه 11')).not.toBeInTheDocument();
+    expect(screen.getByText('نمایش ۱ تا ۱۰ از ۱۲ رکورد')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'صفحه بعد' }));
+    expect(await screen.findByText('آژانس صفحه 11')).toBeInTheDocument();
+    expect(screen.queryByText('آژانس صفحه 1')).not.toBeInTheDocument();
+  });
+
+  it('opens real selected-flight customer bookings from the details button', async () => {
+    vi.spyOn(api, 'fetchFinanceReport').mockImplementation(async (filters) => ({
+      kind: 'customers',
+      scope: 'CUSTOMERS',
+      period: filters.period,
+      rows: [{
+        flightInstanceId: 'fi-detail', flightNo: 'XY951',
+        departureAt: '2026-08-27T08:00:00.000Z', originCode: 'TBZ', destCode: 'FRA',
+        originCityFa: 'تبریز', destCityFa: 'فرانکفورت', capacity: 196,
+        soldSeats: 2, unsoldSeats: 194, totalIrr: '25000000', agencyCount: 0, agencySeats: 0,
+      }],
+      summary: { totalIrr: '25000000', soldSeats: 2 },
+    }));
+    vi.spyOn(api, 'fetchFinanceFlightDetail').mockResolvedValue({
+      summary: {
+        flightInstanceId: 'fi-detail', flightNo: 'XY951',
+        departureAt: '2026-08-27T08:00:00.000Z', originCode: 'TBZ', destCode: 'FRA',
+        originCityFa: 'تبریز', destCityFa: 'فرانکفورت', capacity: 196,
+        soldSeats: 2, unsoldSeats: 194, totalIrr: '25000000', agencyCount: 0, agencySeats: 0,
+      },
+      agencies: [],
+      bookings: [{
+        bookingId: 'booking-1', pnr: 'PNR951', bookedAt: '2026-08-20T10:00:00.000Z',
+        bookingStatus: 'TICKETED', paymentStatus: 'PAID', channel: 'SYSTEM',
+        flightInstanceId: 'fi-detail', flightNo: 'XY951', originCode: 'TBZ', destCode: 'FRA',
+        departureAt: '2026-08-27T08:00:00.000Z', arrivalAt: '2026-08-27T13:00:00.000Z',
+        cabin: 'BUSINESS', fareClassCode: 'C', passengerCount: 2,
+        baseFareIrr: '22000000', taxIrr: '3000000', extrasIrr: '0', totalIrr: '25000000',
+        agencyId: null, agencyName: null,
+      }],
+    } as unknown as FinanceFlightDetail);
+
+    render(<FinanceReportsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'مشتریان' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'جزئیات' }));
+
+    expect(await screen.findByRole('dialog', { name: /جزئیات فروش پرواز XY951/ })).toBeInTheDocument();
+    expect(screen.getByText('PNR951')).toBeInTheDocument();
+    expect(screen.getByText('BUSINESS/C')).toBeInTheDocument();
+    expect(api.fetchFinanceFlightDetail).toHaveBeenCalledWith('fi-detail');
   });
 });

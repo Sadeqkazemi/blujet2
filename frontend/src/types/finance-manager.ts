@@ -52,6 +52,7 @@ export interface FinanceFlightDetail {
     paidIrr: string;
     outstandingIrr: string;
   }[];
+  bookings: FinanceSalesRow[];
 }
 
 export interface FinanceSalesRow {

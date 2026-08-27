@@ -748,11 +748,10 @@ panels that carry these tabs. Design findings that scope this phase:
 | GET    | `/staff-reports`      | FINANCE_MANAGER, COMMERCIAL_MANAGER | «گزارش عملکرد کارمندان»: EMPLOYEE-role users whose `dept` maps to the caller (finance→FINANCE_MANAGER, sales/commercial→COMMERCIAL_MANAGER) + their `AuditLog` action feed (action, category, detail, at), `staffId?` filter for the per-employee tabs. Also returns the «کارمند جدید توسط مدیر IT اضافه شد» banner rows — real `AuditLog(category=ACCOUNT)` employee-creation events for the caller's dept, not a fabricated notification. |
 
 The earlier Excel-export deferral is superseded by the finance-manager
-completion section below. PDF
-export remains out of scope because the approved finance-manager reference
-only exposes CSV and Excel actions. The finance mock's orphaned
-income/expense chart and notification "mark as read" persistence remain
-out of scope.
+completion section below. CSV, native Excel and PDF exports are operational
+server-side exports; they are generated only from the filtered database
+result. The finance mock's orphaned income/expense chart and notification
+"mark as read" persistence remain out of scope.
 
 ### Finance-manager completion (2026-08-13) — reports, exports, and accounting connectors
 
@@ -762,18 +761,21 @@ All routes in this section are `FINANCE_MANAGER` only and remain protected by
 | Method | Path                                                 | Request                                                                                                                  | Response / behavior                                                                                                                                                                                                                              |
 | ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | GET    | `/reporting/finance-reports`                         | `scope=AGENCIES\|CHARTERS\|CUSTOMERS`, `period=flight\|day\|month\|q3\|q6\|year`, `date?`, `month?`, `flightInstanceId?` | Real booking/ledger aggregates for the approved «گزارشات و خروجی» tabs. Returns `{ rows, summary, selectedPeriod }`; empty datasets return empty rows and zero totals.                                                                           |
-| GET    | `/reporting/finance-reports/export`                  | Same filters plus `format=csv\|excel\|pdf`                                                                                | Downloads UTF-8 CSV, SpreadsheetML Excel or a PDF summary generated from the exact filtered result. No client-side sample rows are introduced.                                                                                                    |
+| GET    | `/reporting/finance-reports/export`                  | Same filters plus `format=csv\|excel\|pdf`                                                                                | Downloads UTF-8 CSV, native multi-sheet `.xlsx` finance pack or the A4 RTRD PDF generated from every matching server-side booking (export path does not apply the UI pagination limit). No client-side sample rows are introduced.                                                                                                    |
 
 ### Finance sales report engine v2
 
 - `GET /reporting/finance-sales` — server-side detailed sales report. Optional
   filters: `bookedFrom`, `bookedTo`, `flightFrom`, `flightTo`, `bookingStatus`,
-  `paymentStatus`, `originCode`, `destCode`, `cabin`, `channel`, `agencyId`.
+  `paymentStatus`, `originCode`, `destCode`, `cabin`, `channel`, `agencyId`,
+  `flightInstanceId`.
   Returns `{ rows, summary }`; `rows` use immutable booking and
   payment snapshots and `summary` contains order/passenger counts, gross/net
   IRR and average-order IRR.
 - `GET /reporting/finance-sales/export` — the same filters plus
-  `format=csv|excel|pdf`. CSV and Excel contain detailed rows; PDF is the
+  `format=csv|excel|pdf`. CSV and Excel contain detailed rows; Excel is a
+  native multi-sheet `.xlsx` workbook with summary, detail, agency, refund,
+  tax, flight, reconciliation and data-dictionary tabs; PDF is the
   finance summary. All aggregation stays on the server and requires
   `rp_exports` (preview requires `rp_finance`).
 - Booking detail responses now include nullable `fareClassCode`; invoice,
@@ -783,7 +785,7 @@ All routes in this section are `FINANCE_MANAGER` only and remain protected by
   and returns both open category counts and all-status counts for the active
   assignee. This powers the selectable cartable status strip.
 | GET    | `/reporting/finance-flight-search`                   | `q?`, `date?`, `month?`                                                                                                  | Completed/departed flights matching flight number or route, with real capacity, sold-seat and sales totals.                                                                                                                                      |
-| GET    | `/reporting/finance-flight-search/:flightInstanceId` | —                                                                                                                        | Selected flight summary plus per-agency sold seats, paid amount, and outstanding amount derived from bookings and ledger/invoices.                                                                                                               |
+| GET    | `/reporting/finance-flight-search/:flightInstanceId` | —                                                                                                                        | Selected flight summary plus `bookings[]` (PNR, cabin/fare class, channel, status, passenger count and immutable amounts) and per-agency sold seats, paid amount, and outstanding amount. The customer-sales «جزئیات» dialog consumes this payload directly. |
 | GET    | `/financial-integrations`                            | —                                                                                                                        | Five supported providers (`HOLO`, `SEPIDAR`, `HESABFA`, `RAHKARAN`, `PARMIS`) with connection status, masked key suffix, last real sync timestamp/status, and connected count. Secrets are never returned.                                       |
 | POST   | `/financial-integrations/:provider/connect`          | `{ apiKey }`                                                                                                             | Encrypts the key at rest and performs a real provider health/auth request against the configured endpoint. Persists connected state only after success; audited. Returns 422 when the provider endpoint is not configured or verification fails. |
 | POST   | `/financial-integrations/:provider/sync`             | —                                                                                                                        | Sends a real finance snapshot to the provider adapter, stores the real result/time, and audits it. Returns 409 if disconnected and 502 for upstream failure.                                                                                     |

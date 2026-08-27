@@ -51,7 +51,11 @@ export class FinanceReportsController {
   @Roles('FINANCE_MANAGER', 'EMPLOYEE')
   @RequiresPermission('rp_exports')
   @ApiOperation({ summary: 'خروجی CSV، Excel یا PDF موتور گزارش فروش' })
-  @ApiProduces('text/csv', 'application/vnd.ms-excel', 'application/pdf')
+  @ApiProduces(
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/pdf',
+  )
   async salesExport(
     @Query() query: FinanceSalesExportQueryDto,
     @Res() res: Response,
@@ -82,7 +86,11 @@ export class FinanceReportsController {
   @ApiOperation({
     summary: 'دانلود CSV، Excel یا PDF از گزارش فیلترشده مدیر مالی',
   })
-  @ApiProduces('text/csv', 'application/vnd.ms-excel', 'application/pdf')
+  @ApiProduces(
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/pdf',
+  )
   @ApiBadRequestResponse({ description: 'فرمت یا فیلتر گزارش نامعتبر است.' })
   async export(
     @Query() query: FinanceReportExportQueryDto,

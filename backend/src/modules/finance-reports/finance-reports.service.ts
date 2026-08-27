@@ -13,6 +13,7 @@ import {
   FinanceFlightSearchQueryDto,
   FinanceSalesQueryDto,
 } from './dto/finance-report-query.dto';
+import { buildFinanceXlsx, financeXlsxContentType } from './xlsx-export';
 
 type RawPartner = {
   id: string;
@@ -61,6 +62,11 @@ type RawSale = {
   agencyName: string | null;
 };
 
+type SalesReportOptions = {
+  /** Exporters must include every row matching the server-side filters. */
+  unbounded?: boolean;
+};
+
 const PAID_BOOKING_STATUSES = ['PAID', 'TICKETED'];
 
 function bigintString(
@@ -74,43 +80,299 @@ function escapeCsv(value: string | number): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function escapeXml(value: string | number): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
 function escapePdfText(value: string | number): string {
   return String(value)
     .replace(/[^\x20-\x7e]/g, '?')
     .replace(/([\\()])/g, '\\$1');
 }
 
-/** Dependency-free, standards-compliant one-page PDF used for summary exports.
- * Detailed Unicode data remains available in CSV/Excel; the final branded PDF
- * layout will replace this renderer when product supplies its template. */
-function buildSummaryPdf(lines: (string | number)[]): Buffer {
-  const commands = [
+type RtrdLine = {
+  no: number;
+  code: string;
+  description: string;
+  debit: bigint;
+  credit: bigint;
+};
+
+type RtrdSaleRow = {
+  bookedAt: string;
+  paymentStatus: string;
+  passengerCount: number;
+  baseFareIrr: string;
+  taxIrr: string;
+  extrasIrr: string;
+};
+
+function formatRtrdAmount(value: bigint): string {
+  return `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.00`;
+}
+
+function pdfText(
+  commands: string[],
+  value: string | number,
+  x: number,
+  y: number,
+  size = 9,
+  bold = false,
+) {
+  commands.push(
     'BT',
-    '/F1 14 Tf',
-    '50 790 Td',
-    ...lines
-      .flatMap((line, index) => [
-        index === 0 ? '' : '0 -22 Td',
-        `(${escapePdfText(line)}) Tj`,
-      ])
-      .filter(Boolean),
+    `/${bold ? 'F2' : 'F1'} ${size} Tf`,
+    `1 0 0 1 ${x} ${y} Tm`,
+    `(${escapePdfText(value)}) Tj`,
     'ET',
-  ].join('\n');
+  );
+}
+
+function rightPdfText(
+  commands: string[],
+  value: string | number,
+  right: number,
+  y: number,
+  size = 9,
+  bold = false,
+) {
+  const text = String(value);
+  pdfText(
+    commands,
+    text,
+    Math.max(0, right - text.length * size * 0.51),
+    y,
+    size,
+    bold,
+  );
+}
+
+function drawBlujetLogo(commands: string[]) {
+  commands.push('q', '0.086 0.408 0.769 rg', '451 744 38 38 re', 'f', 'Q');
+  commands.push(
+    'q',
+    '1 1 1 rg',
+    '470 750 m',
+    '473 753 l',
+    '473 761 l',
+    '485 768 l',
+    '485 772 l',
+    '473 768 l',
+    '473 776 l',
+    '477 779 l',
+    '477 782 l',
+    '470 780 l',
+    '463 782 l',
+    '463 779 l',
+    '467 776 l',
+    '467 768 l',
+    '455 772 l',
+    '455 768 l',
+    '467 761 l',
+    '467 753 l',
+    'h',
+    'f',
+    'Q',
+  );
+  pdfText(commands, 'blujet', 495, 758, 17, true);
+}
+
+function tableHeader(commands: string[], y: number) {
+  commands.push('0.7 G', `48 ${y - 6} m`, `548 ${y - 6} l`, 'S', '0 G');
+  pdfText(commands, 'No', 55, y, 8, true);
+  pdfText(commands, 'Code', 106, y, 8, true);
+  pdfText(commands, 'Description', 202, y, 8, true);
+  pdfText(commands, 'Debit', 389, y, 8, true);
+  pdfText(commands, 'Credit', 472, y, 8, true);
+  pdfText(commands, 'CUR', 530, y, 8, true);
+}
+
+function drawRtrdRow(commands: string[], line: RtrdLine, y: number) {
+  pdfText(commands, line.no, 58, y, 7.7, true);
+  pdfText(commands, line.code, 101, y, 7.7, line.no === 22);
+  pdfText(
+    commands,
+    line.description,
+    190,
+    y,
+    line.no === 22 ? 10 : 7.5,
+    line.no === 22,
+  );
+  rightPdfText(
+    commands,
+    formatRtrdAmount(line.debit),
+    452,
+    y,
+    7.5,
+    line.no === 22,
+  );
+  rightPdfText(
+    commands,
+    formatRtrdAmount(line.credit),
+    527,
+    y,
+    7.5,
+    line.no === 22,
+  );
+  pdfText(commands, 'IRR', 534, y, 7.5, line.no === 22);
+  commands.push('0.9 G', `48 ${y - 6} m`, `548 ${y - 6} l`, 'S', '0 G');
+}
+
+function buildRtrdLines(rows: RtrdSaleRow[]): RtrdLine[] {
+  const paid = rows.filter((row) => row.paymentStatus === 'PAID');
+  const refunded = rows.filter((row) => row.paymentStatus === 'REFUNDED');
+  const sum = (
+    source: typeof rows,
+    key: 'baseFareIrr' | 'taxIrr' | 'extrasIrr',
+  ) => source.reduce((total, row) => total + BigInt(row[key]), 0n);
+  const paidBase = sum(paid, 'baseFareIrr') + sum(paid, 'extrasIrr');
+  const paidTax = sum(paid, 'taxIrr');
+  const refundBase = sum(refunded, 'baseFareIrr') + sum(refunded, 'extrasIrr');
+  const refundTax = sum(refunded, 'taxIrr');
+  const creditBeforeSettlement = paidBase + paidTax;
+  const debitBeforeSettlement = refundBase + refundTax;
+  const totalPaid =
+    creditBeforeSettlement >= debitBeforeSettlement
+      ? creditBeforeSettlement - debitBeforeSettlement
+      : 0n;
+  const totalPayable =
+    debitBeforeSettlement > creditBeforeSettlement
+      ? debitBeforeSettlement - creditBeforeSettlement
+      : 0n;
+  const paidCount = paid.reduce((total, row) => total + row.passengerCount, 0);
+  const refundCount = refunded.reduce(
+    (total, row) => total + row.passengerCount,
+    0,
+  );
+  const line = (
+    no: number,
+    code: string,
+    description: string,
+    debit = 0n,
+    credit = 0n,
+  ): RtrdLine => ({ no, code, description, debit, credit });
+  return [
+    line(1, 'Sales', `Total Sales for ${paidCount} Tickets`, 0n, paidBase),
+    line(2, 'SalesTax-HL', `Total HL Sales Tax for ${paidCount} Tickets`),
+    line(3, 'SalesTax-I6', `Total I6 Sales Tax for ${paidCount} Tickets`),
+    line(
+      4,
+      'SalesTax-IR',
+      `Total IR Sales Tax for ${paidCount} Tickets`,
+      0n,
+      paidTax,
+    ),
+    line(5, 'SalesTax-LP', `Total LP Sales Tax for ${paidCount} Tickets`),
+    line(6, 'SalesTax-RI', `Total RI Sales Tax for ${paidCount} Tickets`),
+    line(7, 'SalesTax-V0', `Total V0 Sales Tax for ${paidCount} Tickets`),
+    line(8, 'SalesTax-YQ', `Total YQ Sales Tax for ${paidCount} Tickets`),
+    line(
+      9,
+      'RefundFare',
+      `Total Ticket Refund for ${refundCount} Tickets`,
+      refundBase,
+    ),
+    line(10, 'RefundTax-HL', `Total HL Refund Tax for ${refundCount} Tickets`),
+    line(11, 'RefundTax-I6', `Total I6 Refund Tax for ${refundCount} Tickets`),
+    line(
+      12,
+      'RefundTax-IR',
+      `Total IR Refund Tax for ${refundCount} Tickets`,
+      refundTax,
+    ),
+    line(13, 'RefundTax-LP', `Total LP Refund Tax for ${refundCount} Tickets`),
+    line(14, 'RefundTax-RI', `Total RI Refund Tax for ${refundCount} Tickets`),
+    line(15, 'RefundTax-V0', `Total V0 Refund Tax for ${refundCount} Tickets`),
+    line(16, 'RefundTax-YQ', `Total YQ Refund Tax for ${refundCount} Tickets`),
+    line(17, 'CRCN', `Total Agent CRCN for ${refundCount} Tickets`),
+    line(
+      18,
+      'SalesCommission',
+      `Total Sales Commission for ${paidCount} Tickets`,
+    ),
+    line(
+      19,
+      'RefundCommission',
+      `Total Refund Commission for ${refundCount} Tickets`,
+    ),
+    line(20, 'TotalVAT', 'Total VAT'),
+    line(21, 'TotalPaid', 'Total Paid', totalPaid),
+    line(22, 'TotalPayable', 'Total Payable', 0n, totalPayable),
+  ];
+}
+
+function buildRtrdPdf(
+  rows: RtrdSaleRow[],
+  options: { from?: string; to?: string; salesType?: string } = {},
+): Buffer {
+  const lines = buildRtrdLines(rows);
+  const generated = new Date();
+  const firstDate =
+    options.from ?? rows.at(-1)?.bookedAt ?? generated.toISOString();
+  const lastDate = options.to ?? rows[0]?.bookedAt ?? generated.toISOString();
+  const reportNo = generated.toISOString().replace(/\D/g, '').slice(2, 14);
+  const page1: string[] = [];
+  pdfText(page1, 'Blujet', 48, 759, 16, true);
+  drawBlujetLogo(page1);
+  pdfText(page1, 'NIRA-PRA', 48, 705, 12, true);
+  pdfText(page1, 'RTRD', 137, 705, 12, true);
+  pdfText(page1, 'BLJ001', 355, 705, 12, true);
+  pdfText(page1, 'BLUJET AIRLINE', 430, 705, 11, true);
+  page1.push('0 G', '48 698 m', '548 698 l', 'S');
+  const meta = [
+    [
+      'User:',
+      'BLUJET.FINANCE',
+      'Time:',
+      generated.toISOString().replace('T', ' ').slice(0, 19),
+    ],
+    ['RTRD From:', firstDate.slice(0, 10), 'RTRD To:', lastDate.slice(0, 10)],
+    ['Report Number:', reportNo, 'Sales Type:', options.salesType ?? 'All'],
+    ['Journey Type:', 'All', 'Ticket Type:', 'All'],
+  ];
+  meta.forEach((entry, index) => {
+    const y = 675 - index * 21;
+    pdfText(page1, entry[0], 48, y, 8.5, true);
+    pdfText(page1, entry[1], 137, y, 8.5, index === 0);
+    pdfText(page1, entry[2], 355, y, 8.5, true);
+    pdfText(page1, entry[3], 430, y, 8.5, index === 0);
+  });
+  page1.push('0 G', '48 580 m', '548 580 l', 'S');
+  tableHeader(page1, 565);
+  lines
+    .slice(0, 20)
+    .forEach((line, index) => drawRtrdRow(page1, line, 538 - index * 23));
+  pdfText(page1, 'Blujet Financial Reporting Engine', 405, 35, 7, true);
+
+  const page2: string[] = [];
+  tableHeader(page2, 780);
+  drawRtrdRow(page2, lines[20], 750);
+  drawRtrdRow(page2, lines[21], 722);
+  const totalDebit = lines.reduce((total, line) => total + line.debit, 0n);
+  const totalCredit = lines.reduce((total, line) => total + line.credit, 0n);
+  pdfText(page2, 'Total Debit:', 48, 675, 14);
+  rightPdfText(page2, formatRtrdAmount(totalDebit), 300, 675, 14);
+  page2.push('0 G', '303 662 m', '303 700 l', 'S');
+  pdfText(page2, 'Total Credit:', 328, 675, 14);
+  rightPdfText(page2, formatRtrdAmount(totalCredit), 548, 675, 14);
+  page2.push('0.85 G', '48 640 500 26 re', 'S', '0 G');
+  pdfText(page2, 'Powered by Blujet', 454, 618, 8, true);
+
+  const pageStreams = [page1.join('\n'), page2.join('\n')];
+  const fontRegularId = 3 + pageStreams.length * 2;
+  const fontBoldId = fontRegularId + 1;
+  const pageIds = pageStreams.map((_, index) => 3 + index * 2);
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${Buffer.byteLength(commands, 'ascii')} >>\nstream\n${commands}\nendstream`,
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageStreams.length} >>`,
   ];
+  pageStreams.forEach((commands, index) => {
+    const contentId = pageIds[index] + 1;
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`,
+    );
+    objects.push(
+      `<< /Length ${Buffer.byteLength(commands, 'ascii')} >>\nstream\n${commands}\nendstream`,
+    );
+  });
+  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
   let body = '%PDF-1.4\n';
   const offsets = [0];
   for (let index = 0; index < objects.length; index += 1) {
@@ -395,25 +657,26 @@ export class FinanceReportsService {
         agencyOutstandingIrr: string;
         agencySalesIrr: string;
       }>();
+    const agencyRows = agencies.map((row) => {
+      const sales = BigInt(bigintString(row.salesIrr));
+      const agencySales = BigInt(bigintString(row.agencySalesIrr));
+      const agencyOutstanding = BigInt(bigintString(row.agencyOutstandingIrr));
+      const outstanding =
+        agencySales === 0n ? 0n : (sales * agencyOutstanding) / agencySales;
+      const paid = sales > outstanding ? sales - outstanding : 0n;
+      return {
+        ...row,
+        soldSeats: Number(row.soldSeats),
+        salesIrr: sales.toString(),
+        paidIrr: paid.toString(),
+        outstandingIrr: outstanding.toString(),
+      };
+    });
+    const sales = await this.salesReport({ flightInstanceId, limit: 1000 });
     return {
       summary: this.toFlight(summaryRaw),
-      agencies: agencies.map((row) => {
-        const sales = BigInt(bigintString(row.salesIrr));
-        const agencySales = BigInt(bigintString(row.agencySalesIrr));
-        const agencyOutstanding = BigInt(
-          bigintString(row.agencyOutstandingIrr),
-        );
-        const outstanding =
-          agencySales === 0n ? 0n : (sales * agencyOutstanding) / agencySales;
-        const paid = sales > outstanding ? sales - outstanding : 0n;
-        return {
-          ...row,
-          soldSeats: Number(row.soldSeats),
-          salesIrr: sales.toString(),
-          paidIrr: paid.toString(),
-          outstandingIrr: outstanding.toString(),
-        };
-      }),
+      agencies: agencyRows,
+      bookings: sales.rows,
     };
   }
 
@@ -440,7 +703,10 @@ export class FinanceReportsService {
     return 'PENDING';
   }
 
-  async salesReport(query: FinanceSalesQueryDto) {
+  async salesReport(
+    query: FinanceSalesQueryDto,
+    options: SalesReportOptions = {},
+  ) {
     this.assertPairedRange(query.bookedFrom, query.bookedTo, 'تاریخ رزرو');
     this.assertPairedRange(query.flightFrom, query.flightTo, 'تاریخ پرواز');
     const qb = this.dataSource
@@ -493,6 +759,10 @@ export class FinanceReportsService {
         },
       );
     }
+    if (query.flightInstanceId)
+      qb.andWhere('b."flightInstanceId" = :flightInstanceId', {
+        flightInstanceId: query.flightInstanceId,
+      });
     if (query.bookingStatus)
       qb.andWhere('b.status = :bookingStatus', {
         bookingStatus: query.bookingStatus,
@@ -522,10 +792,9 @@ export class FinanceReportsService {
       });
     }
 
-    const raw = await qb
-      .orderBy('b."createdAt"', 'DESC')
-      .limit(query.limit ?? 250)
-      .getRawMany<RawSale>();
+    const orderedQuery = qb.orderBy('b."createdAt"', 'DESC');
+    if (!options.unbounded) orderedQuery.limit(query.limit ?? 250);
+    const raw = await orderedQuery.getRawMany<RawSale>();
     const rows = raw.map((row) => ({
       bookingId: row.bookingId,
       pnr: row.pnr,
@@ -570,10 +839,7 @@ export class FinanceReportsService {
   }
 
   async salesExport(query: FinanceSalesQueryDto, format: FinanceExportFormat) {
-    const result = await this.salesReport({
-      ...query,
-      limit: query.limit ?? 1000,
-    });
+    const result = await this.salesReport(query, { unbounded: true });
     const headers = [
       'Booking ID',
       'PNR',
@@ -618,15 +884,11 @@ export class FinanceReportsService {
     ]);
     if (format === FinanceExportFormat.PDF) {
       return {
-        body: buildSummaryPdf([
-          'Blujet Detailed Sales Summary',
-          `Orders: ${result.summary.orderCount}`,
-          `Passengers: ${result.summary.passengerCount}`,
-          `Gross IRR: ${result.summary.grossIrr}`,
-          `Net revenue IRR: ${result.summary.netRevenueIrr}`,
-          `Average order IRR: ${result.summary.averageOrderIrr}`,
-          `Generated: ${new Date().toISOString()}`,
-        ]),
+        body: buildRtrdPdf(result.rows, {
+          from: query.bookedFrom ?? query.flightFrom,
+          to: query.bookedTo ?? query.flightTo,
+          salesType: query.channel ?? 'All',
+        }),
         contentType: 'application/pdf',
         extension: 'pdf',
       };
@@ -638,16 +900,13 @@ export class FinanceReportsService {
         extension: 'csv',
       };
     }
-    const xmlRows = [headers, ...rows]
-      .map(
-        (row) =>
-          `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`).join('')}</Row>`,
-      )
-      .join('');
     return {
-      body: `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Sales"><Table>${xmlRows}</Table></Worksheet></Workbook>`,
-      contentType: 'application/vnd.ms-excel; charset=utf-8',
-      extension: 'xls',
+      body: buildFinanceXlsx({
+        salesRows: result.rows,
+        filters: `Sales detail • ${query.bookedFrom ?? query.flightFrom ?? 'all dates'}`,
+      }),
+      contentType: financeXlsxContentType,
+      extension: 'xlsx',
     };
   }
 
@@ -686,21 +945,50 @@ export class FinanceReportsService {
           row.soldSeats,
           row.unsoldSeats,
         ]);
-    if (format === FinanceExportFormat.PDF) {
-      const total = result.summary.totalIrr;
-      const secondary = partner
-        ? `Paid IRR: ${result.summary.paidIrr}`
-        : `Sold seats: ${result.summary.soldSeats}`;
+    if (
+      format === FinanceExportFormat.PDF ||
+      format === FinanceExportFormat.EXCEL
+    ) {
+      const salesType =
+        query.scope === FinanceReportScope.AGENCIES
+          ? 'AGENCY'
+          : query.scope === FinanceReportScope.CHARTERS
+            ? 'CHARTER'
+            : undefined;
+      const sales = await this.salesReport(
+        {
+          flightFrom: query.from,
+          flightTo: query.to,
+          flightInstanceId: query.flightInstanceId,
+          channel: salesType,
+        },
+        { unbounded: true },
+      );
+      if (format === FinanceExportFormat.EXCEL) {
+        return {
+          body: buildFinanceXlsx({
+            salesRows: sales.rows,
+            summaries: partner
+              ? result.rows.map((row) => ({
+                  name: row.name,
+                  totalIrr: row.totalIrr,
+                  paidIrr: row.paidIrr,
+                  outstandingIrr: row.outstandingIrr,
+                  soldSeats: row.soldSeats,
+                }))
+              : undefined,
+            filters: `${query.scope} • ${query.from ?? 'all dates'} → ${query.to ?? 'all dates'}`,
+          }),
+          contentType: financeXlsxContentType,
+          extension: 'xlsx',
+        };
+      }
       return {
-        body: buildSummaryPdf([
-          'Blujet Finance Report',
-          `Scope: ${query.scope}`,
-          `Period: ${query.period}`,
-          `Rows: ${rows.length}`,
-          `Total IRR: ${total}`,
-          secondary,
-          `Generated: ${new Date().toISOString()}`,
-        ]),
+        body: buildRtrdPdf(sales.rows, {
+          from: query.from,
+          to: query.to,
+          salesType: salesType ?? 'All',
+        }),
         contentType: 'application/pdf',
         extension: 'pdf',
       };
@@ -712,16 +1000,22 @@ export class FinanceReportsService {
         extension: 'csv',
       };
     }
-    const xmlRows = [headers, ...rows]
-      .map(
-        (row) =>
-          `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`).join('')}</Row>`,
-      )
-      .join('');
     return {
-      body: `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Finance"><Table>${xmlRows}</Table></Worksheet></Workbook>`,
-      contentType: 'application/vnd.ms-excel; charset=utf-8',
-      extension: 'xls',
+      body: buildFinanceXlsx({
+        salesRows: [],
+        summaries: partner
+          ? result.rows.map((row) => ({
+              name: row.name,
+              totalIrr: row.totalIrr,
+              paidIrr: row.paidIrr,
+              outstandingIrr: row.outstandingIrr,
+              soldSeats: row.soldSeats,
+            }))
+          : undefined,
+        filters: `${query.scope} • ${query.from ?? 'all dates'} → ${query.to ?? 'all dates'}`,
+      }),
+      contentType: financeXlsxContentType,
+      extension: 'xlsx',
     };
   }
 }

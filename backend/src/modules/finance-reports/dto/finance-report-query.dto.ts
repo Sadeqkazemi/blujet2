@@ -103,6 +103,11 @@ const CHANNELS = ['SYSTEM', 'AGENCY', 'CHARTER'] as const;
 const PAYMENT_STATUSES = ['PENDING', 'PAID', 'REFUNDED', 'CANCELLED'] as const;
 
 export class FinanceSalesQueryDto {
+  @ApiPropertyOptional({ description: 'Exact flight instance for drill-down' })
+  @IsOptional()
+  @IsUUID()
+  flightInstanceId?: string;
+
   @ApiPropertyOptional({ description: 'Inclusive booking-date start' })
   @IsOptional()
   @IsDateString()
