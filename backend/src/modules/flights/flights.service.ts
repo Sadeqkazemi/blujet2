@@ -53,6 +53,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService } from '../sms/sms.service';
 import {
   BookingStatus,
+  BookingChannel,
   FlightDefinitionStatus,
   FlightInstanceStatus,
   LedgerEntryType,
@@ -1505,6 +1506,47 @@ export class FlightsService {
     };
   }
 
+  async updateAgencySalesVisibility(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    enabled: boolean,
+  ) {
+    const instance = await this.loadCommercialInstance(instanceId);
+    if (
+      enabled &&
+      (instance.status !== FlightInstanceStatus.SCHEDULED ||
+        !isSellableDefinitionStatus(
+          instance.definitionStatus,
+          instance.approvedSnapshot != null,
+        ))
+    ) {
+      throw new ConflictException({
+        code: ErrorCode.CONFLICT,
+        message:
+          'فقط پرواز تأییدشده و زمان‌بندی‌شده قابل نمایش برای آژانس‌ها است.',
+      });
+    }
+    const previous = instance.agencySaleEnabled;
+    instance.agencySaleEnabled = enabled;
+    instance.version += 1;
+    const saved = await this.instanceRepo.save(instance);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'تغییر وضعیت فروش آژانسی پرواز',
+      detail: `نمایش آژانسی پرواز ${instance.flight.flightNo} توسط ${actor.fullName} ${enabled ? 'فعال' : 'غیرفعال'} شد.`,
+      entityType: 'FlightInstance',
+      entityId: instance.id,
+      metadata: { previous, enabled },
+    });
+    return {
+      flightInstanceId: saved.id,
+      agencySaleEnabled: saved.agencySaleEnabled,
+      version: saved.version,
+    };
+  }
+
   async commercialControl(instanceId: string) {
     const instance = await this.loadCommercialInstance(instanceId);
     const rules = await this.listFareRules(instanceId);
@@ -1513,6 +1555,7 @@ export class FlightsService {
       .innerJoin('p.booking', 'b')
       .select('b.cabin', 'cabin')
       .addSelect('b.fareClassCode', 'classCode')
+      .addSelect('b.channel', 'channel')
       .addSelect('COUNT(p.id)', 'soldSeats')
       .where('b.flightInstanceId = :instanceId', { instanceId })
       .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
@@ -1520,9 +1563,11 @@ export class FlightsService {
       .andWhere('p.deletedAt IS NULL')
       .groupBy('b.cabin')
       .addGroupBy('b.fareClassCode')
+      .addGroupBy('b.channel')
       .getRawMany<{
         cabin: CabinClass;
         classCode: string | null;
+        channel: BookingChannel;
         soldSeats: string;
       }>();
     const revenueRows = await this.bookingRepo
@@ -1558,8 +1603,9 @@ export class FlightsService {
     return {
       flightInstanceId: instance.id,
       publicSaleEnabled: instance.publicSaleEnabled,
+      agencySaleEnabled: instance.agencySaleEnabled,
       fareClasses: rules.map((rule) => {
-        const sold = soldRows.find(
+        const classSoldRows = soldRows.filter(
           (row) => row.cabin === rule.cabin && row.classCode === rule.classCode,
         );
         const revenue = revenueRows.find(
@@ -1588,13 +1634,24 @@ export class FlightsService {
               changedAt: entry.createdAt.toISOString(),
             };
           });
-        const soldSeats = Number(sold?.soldSeats ?? 0);
+        const soldSeats = classSoldRows.reduce(
+          (total, row) => total + Number(row.soldSeats),
+          0,
+        );
+        const siteSoldSeats = classSoldRows
+          .filter((row) => row.channel === BookingChannel.SYSTEM)
+          .reduce((total, row) => total + Number(row.soldSeats), 0);
+        const agencySoldSeats = classSoldRows
+          .filter((row) => row.channel === BookingChannel.AGENCY)
+          .reduce((total, row) => total + Number(row.soldSeats), 0);
         return {
           ruleId: rule.id,
           cabin: rule.cabin,
           classCode: rule.classCode,
           seatsAllocated: rule.seatsAllocated,
           soldSeats,
+          siteSoldSeats,
+          agencySoldSeats,
           remainingSeats: Math.max(0, rule.seatsAllocated - soldSeats),
           revenueIrr: String(revenue?.revenueIrr ?? '0'),
           basePriceIrr: rule.priceIrr.toString(),

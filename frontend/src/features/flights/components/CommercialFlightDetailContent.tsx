@@ -5,6 +5,7 @@ import {
   fetchAllotmentsSummary,
   fetchCommercialFlightControl,
   updateFareClassSitePrice,
+  updateAgencySalesVisibility,
   updateFlightSalesVisibility,
   upsertAgencyFareRelease,
 } from "../../../api/flights";
@@ -164,6 +165,25 @@ export default function CommercialFlightDetailContent({
       onNotice(enabled ? "فروش این پرواز در سایت فعال شد." : "فروش این پرواز در سایت متوقف شد.");
     } catch (error) {
       onError(error instanceof Error ? error.message : "تغییر وضعیت فروش ناموفق بود.");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function toggleAgencyVisibility() {
+    if (!control || !canManage) return;
+    const enabled = !control.agencySaleEnabled;
+    setBusyKey("agency-visibility");
+    try {
+      await updateAgencySalesVisibility(detail.id, enabled);
+      await Promise.all([load(), Promise.resolve(onChanged())]);
+      onNotice(
+        enabled
+          ? "نمایش و درخواست این پرواز برای آژانس‌ها فعال شد."
+          : "نمایش و درخواست این پرواز برای آژانس‌ها متوقف شد.",
+      );
+    } catch (error) {
+      onError(error instanceof Error ? error.message : "تغییر وضعیت فروش آژانسی ناموفق بود.");
     } finally {
       setBusyKey(null);
     }
@@ -366,6 +386,46 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
+      <section
+        className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border p-2.5 ${
+          control.agencySaleEnabled
+            ? "border-[#20c99766] bg-[#0d332f66]"
+            : "border-[#f59e0b55] bg-[#3b2c1566]"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h3 className={`text-[11px] font-black ${control.agencySaleEnabled ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
+              {control.agencySaleEnabled
+                ? "مجوز نمایش و درخواست برای آژانس‌ها"
+                : "نمایش و درخواست برای آژانس‌ها غیرفعال است"}
+            </h3>
+            <p className="mt-0.5 text-[9px] leading-4 text-[#91a1b8]">
+              {control.agencySaleEnabled
+                ? "این پرواز در فهرست صندلی‌های تخصیصی آژانس‌ها قابل مشاهده و درخواست است."
+                : "تا زمان فعال‌سازی، آژانس‌ها این پرواز را مشاهده و درخواست نمی‌کنند."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={control.agencySaleEnabled}
+            aria-label="مجوز نمایش و درخواست برای آژانس‌ها"
+            disabled={!canManage || busyKey === "agency-visibility"}
+            onClick={() => void toggleAgencyVisibility()}
+            className={`relative h-6 w-10 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              control.agencySaleEnabled ? "bg-[#19b66b]" : "bg-[#465168]"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
+                control.agencySaleEnabled ? "left-1" : "right-1"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
       <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} grid grid-cols-3 gap-1.5`}>
         <div className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5">
           <div className="text-[10px] text-[#8c9bb2]">صندلی فروخته‌شده</div>
@@ -517,7 +577,8 @@ export default function CommercialFlightDetailContent({
                 >
                   <span className="text-[10px] font-bold text-white">{classTitle(row)}</span>
                   <span className="flex items-center gap-2 text-[9px] text-[#34d399]">
-                    باقی‌مانده: {faDigits(row.remainingSeats)} صندلی
+                    <span>{faDigits(row.agencySoldSeats)} صندلی فروخته‌شده به آژانس‌ها</span>
+                    <span className="text-[#9fb0c7]">باقی‌مانده: {faDigits(row.remainingSeats)} صندلی</span>
                     <span className={`text-[#9fb0c7] transition ${expanded ? "rotate-90" : ""}`}>‹</span>
                   </span>
                 </button>
@@ -604,6 +665,9 @@ export default function CommercialFlightDetailContent({
                     </div>
                     <div className="mt-1 text-[9px] text-[#80b7ff]">
                       {faDigits(row.siteSeatsReleased)} صندلی آزادشده برای سایت
+                    </div>
+                    <div className="mt-1 text-[9px] text-[#34d399]">
+                      {faDigits(row.siteSoldSeats)} صندلی فروخته‌شده در سایت
                     </div>
                   </div>
                   <div className="text-left">

@@ -3009,3 +3009,11 @@ ledger/credit-line projection and is rechecked transactionally by the server.
 - `cartable_tasks.attachments jsonb NULL` stores the same ordered id array for
   direct employee/manager messages and manager broadcasts delivered into a
   recipient's cartable. File read authorization follows task participation.
+## Independent agency sales visibility (2026-08-27)
+
+`FlightInstance.agencySaleEnabled boolean NOT NULL DEFAULT true` is the
+commercial manager's independent agency-catalogue gate. It does not alter
+`publicSaleEnabled`, fare-class release quantities, agency allotments, or
+existing bookings. Existing rows default to enabled so active sellable flights
+remain requestable unless a commercial manager explicitly disables the agency
+channel.

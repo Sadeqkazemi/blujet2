@@ -108,6 +108,10 @@ export class FlightInstance {
   @Column({ type: 'boolean', default: true })
   publicSaleEnabled!: boolean;
 
+  /** Independent commercial gate for exposing this flight to agencies. */
+  @Column({ type: 'boolean', default: true })
+  agencySaleEnabled!: boolean;
+
   @Column({ type: 'timestamp', precision: 3, nullable: true })
   niraSubmittedAt!: Date | null;
 

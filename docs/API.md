@@ -4025,3 +4025,16 @@ only when the active agency credit line covers the server-computed total.
   Message/history responses resolve those ids to file metadata, and
   `GET /files/:id` authorizes the sender, recipient/assignee, agency participant,
   or staff participant as applicable.
+## Commercial channel visibility and sold-seat controls (2026-08-27)
+
+- `GET /flights/:instanceId/commercial-control` returns `publicSaleEnabled`,
+  `agencySaleEnabled`, and per fare class `soldSeats`, `siteSoldSeats`, and
+  `agencySoldSeats`. Sold counts are derived from paid/ticketed passenger seats;
+  they are not editable counters.
+- `PATCH /flights/:instanceId/sales-visibility` controls public search/sale only.
+- `PATCH /flights/:instanceId/agency-sales-visibility` independently controls
+  whether an otherwise active and sellable flight is listed in the agency seat
+  request catalogue. Disabling it also rejects direct agency inquiries.
+- `GET /agency-portal/seat-request-options` and
+  `POST /agency-portal/seat-inquiry` apply the agency visibility gate in
+  addition to schedule, approval, departure, and sale-window checks.

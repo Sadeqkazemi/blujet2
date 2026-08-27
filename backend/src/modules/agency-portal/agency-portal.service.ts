@@ -111,10 +111,12 @@ export function isAgencySeatRequestOccurrence(
     | 'departureAt'
     | 'saleStartsAt'
     | 'saleEndsAt'
+    | 'agencySaleEnabled'
   >,
   now = new Date(),
 ): boolean {
   return (
+    instance.agencySaleEnabled &&
     instance.status === FlightInstanceStatus.SCHEDULED &&
     instance.departureAt >= now &&
     isSellableDefinitionStatus(
@@ -704,7 +706,6 @@ export class AgencyPortalService {
         },
         relations: { flight: { route: true } },
         order: { departureAt: 'ASC' },
-        take: 200,
       })
     ).filter((instance) => isAgencySeatRequestOccurrence(instance, now));
 

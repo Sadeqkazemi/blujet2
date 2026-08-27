@@ -29,6 +29,7 @@ const detail: FlightDetail = {
 const control: CommercialFlightControl = {
   flightInstanceId: "fi-1",
   publicSaleEnabled: true,
+  agencySaleEnabled: true,
   fareClasses: [
     {
       ruleId: "rule-y",
@@ -36,6 +37,8 @@ const control: CommercialFlightControl = {
       classCode: "Y",
       seatsAllocated: 160,
       soldSeats: 40,
+      siteSoldSeats: 25,
+      agencySoldSeats: 5,
       remainingSeats: 120,
       revenueIrr: "1520000000",
       basePriceIrr: "38000000",
@@ -141,6 +144,21 @@ describe("CommercialFlightDetailContent", () => {
 
     fireEvent.click(screen.getByRole("switch", { name: "مجوز نمایش و فروش در سایت" }));
     await waitFor(() => expect(visibilitySpy).toHaveBeenCalledWith("fi-1", false));
+  });
+
+  it("shows channel sold counts and independently toggles agency catalogue visibility", async () => {
+    const agencyVisibilitySpy = vi
+      .spyOn(flightsApi, "updateAgencySalesVisibility")
+      .mockResolvedValue({ ...control, agencySaleEnabled: false });
+    renderContent();
+
+    expect(await screen.findByText("۲۵ صندلی فروخته‌شده در سایت")).toBeInTheDocument();
+    expect(screen.getByText("۵ صندلی فروخته‌شده به آژانس‌ها")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: "مجوز نمایش و درخواست برای آژانس‌ها" }));
+
+    await waitFor(() =>
+      expect(agencyVisibilitySpy).toHaveBeenCalledWith("fi-1", false),
+    );
   });
 
   it("saves the per-class agency allocation and website price with their canonical APIs", async () => {
