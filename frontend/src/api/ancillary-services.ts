@@ -65,3 +65,7 @@ export async function deleteCustomService(key: string): Promise<AncillaryService
 export function fetchPublicAncillaryServices() {
   return apiGet<PublicAncillaryService[]>('/public/ancillary-services');
 }
+
+export function fetchPublicSeatServices() {
+  return apiGet<PublicAncillaryService[]>('/public/ancillary-services/seat-types');
+}

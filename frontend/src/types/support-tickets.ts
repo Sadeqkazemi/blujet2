@@ -11,6 +11,16 @@ export interface MySupportTicketRow {
   createdAt: string;
   updatedAt: string;
   attachments?: SupportTicketAttachment[];
+  conversation?: SupportTicketConversationMessage[];
+}
+
+export interface SupportTicketConversationMessage {
+  id: string;
+  body: string;
+  senderType: 'REQUESTER' | 'STAFF';
+  senderLabel: string;
+  createdAt: string;
+  attachments: SupportTicketAttachment[];
 }
 
 export interface SupportTicketAttachment {
@@ -35,6 +45,7 @@ export interface SupportTicketRow {
   createdAt: string;
   updatedAt: string;
   attachments?: SupportTicketAttachment[];
+  conversation?: SupportTicketConversationMessage[];
 }
 
 export interface ForwardTarget {

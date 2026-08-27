@@ -5,6 +5,7 @@ import type { StoredLocale } from '../../../hooks/useLocale';
 import { localeMoney } from '../../../lib/fa-format';
 import { localeDigits } from '../../../lib/locale-format';
 import type { CabinClass, SeatMapCell } from '../../../types/public-site';
+import type { PublicAncillaryService } from '../../../types/ancillary-services';
 import { CHECKOUT_COPY } from './checkout-copy';
 import {
   extraDescription,
@@ -19,6 +20,10 @@ import {
   mapLegacyTakenSeatsToMd80,
   shouldUseMd80SeatMap,
 } from './md80-seat-layout';
+import {
+  classifySeatType,
+  seatTypeTotalIrr,
+} from './seat-type-pricing';
 
 function SvgBag() {
   return (
@@ -213,6 +218,7 @@ export default function ExtrasStep({
   bookedCabin,
   aircraftType,
   clubBalance,
+  seatServices = [],
 }: {
   locale: StoredLocale;
   extras: ExtraServiceState[];
@@ -227,6 +233,7 @@ export default function ExtrasStep({
   bookedCabin: CabinClass;
   aircraftType: string;
   clubBalance: number;
+  seatServices?: PublicAncillaryService[];
 }) {
   const t = CHECKOUT_COPY[locale];
   const isMobile = useIsMobile();
@@ -243,6 +250,8 @@ export default function ExtrasStep({
   const remainingSeatCount = Math.max(0, normalizedSeatLimit - selectedSeats.length);
   const selectionLimitReached = selectedSeats.length >= normalizedSeatLimit;
   const aircraft = aircraftType.trim() || 'MD-80';
+  const seatServiceByKey = new Map(seatServices.map((service) => [service.key, service]));
+  const selectedSeatTypesIrr = seatTypeTotalIrr(selectedSeats, aircraft, seatServices);
   const rawSeats = seats ?? [];
   const useMd80 = shouldUseMd80SeatMap(aircraft, rawSeats);
 
@@ -529,6 +538,20 @@ export default function ExtrasStep({
                 {t.reserved}
               </span>
             </div>
+            {seatServices.length > 0 && (
+              <div className="mb-3 grid gap-2 sm:grid-cols-3" data-testid="checkout-seat-type-prices">
+                {(['seat-normal', 'seat-legroom', 'seat-window-aisle'] as const).map((key) => {
+                  const service = seatServiceByKey.get(key);
+                  if (!service) return null;
+                  return (
+                    <div key={key} className="rounded-xl border border-[#dce8f5] bg-[#f8fbff] px-3 py-2 text-[10.5px] text-[#53647a]">
+                      <span className="font-bold">{service.titleFa}</span>
+                      <b className="font-num ms-2 text-[#1668c4]">{localeMoney(service.priceIrr, locale)} {t.toman}</b>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {seats === null && !useMd80 ? (
               <p className="text-xs text-[#8a96a6]">{t.loading}</p>
             ) : useMd80 ? (
@@ -558,6 +581,11 @@ export default function ExtrasStep({
                 <b className="text-[#1668c4]" dir="ltr">
                   {selectedSeats.join(', ') || t.noneSelected}
                 </b>
+                {selectedSeats.length > 0 && seatServices.length > 0 && (
+                  <span className="ms-2 text-[10px] text-[#6b7787]" data-testid="checkout-seat-type-subtotal">
+                    ({selectedSeats.map((seatCode) => seatServiceByKey.get(classifySeatType(seatCode, aircraft))?.titleFa).filter(Boolean).join('، ')} · {localeMoney(selectedSeatTypesIrr.toString(), locale)} {t.toman})
+                  </span>
+                )}
               </div>
               <div>
                 {t.totalSold}: <b className="text-[#c0343a]">{localeDigits(sold, locale)}</b> {t.ofLabel}{' '}

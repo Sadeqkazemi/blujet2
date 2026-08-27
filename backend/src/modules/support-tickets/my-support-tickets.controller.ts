@@ -6,7 +6,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { SubmitSupportTicketDto } from './dto/support-ticket.dtos';
+import {
+  ReplySupportTicketDto,
+  SubmitSupportTicketDto,
+} from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 /** Customer and agency accounts: list/detail/submit own support tickets (see
@@ -47,6 +50,18 @@ export class MySupportTicketsController {
     @Body() dto: SubmitSupportTicketDto,
   ) {
     const data = await this.tickets.submitForUser(actor, dto);
+    return { success: true, data };
+  }
+
+  @Post(':id/replies')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'ارسال پاسخ در تیکت متعلق به حساب جاری' })
+  async reply(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReplySupportTicketDto,
+  ) {
+    const data = await this.tickets.replyMine(actor, id, dto);
     return { success: true, data };
   }
 }

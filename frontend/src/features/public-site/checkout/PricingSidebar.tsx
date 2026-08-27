@@ -17,6 +17,7 @@ export default function PricingSidebar({
   extras,
   extraSeatCount = 0,
   extraSeatIrr = '0',
+  seatSelectionIrr = '0',
   nextLabel,
   onNext,
   onBack,
@@ -35,6 +36,7 @@ export default function PricingSidebar({
   extras: ExtraServiceState[];
   extraSeatCount?: number;
   extraSeatIrr?: string;
+  seatSelectionIrr?: string;
   nextLabel: string;
   onNext: () => void;
   onBack?: () => void;
@@ -48,10 +50,11 @@ export default function PricingSidebar({
   const t = CHECKOUT_COPY[locale];
   const ticketIrr = BigInt(priceIrr || '0');
   const additionalSeatIrr = BigInt(extraSeatIrr || '0');
+  const selectedSeatIrr = BigInt(seatSelectionIrr || '0');
   const extrasIrr = extras
     .filter((e) => e.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, paxCount), 0n);
-  const grandIrr = ticketIrr + additionalSeatIrr + extrasIrr;
+  const grandIrr = ticketIrr + additionalSeatIrr + extrasIrr + selectedSeatIrr;
   return (
     <aside
       className="flex flex-col rounded-[18px] border border-[#eef1f5] bg-white p-[22px] lg:sticky lg:top-[90px]"
@@ -86,6 +89,15 @@ export default function PricingSidebar({
             </span>
           </div>
         )}
+        {selectedSeatIrr > 0n && (
+          <div
+            data-testid="seat-selection-price-row"
+            className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]"
+          >
+            <span>{locale === 'en' ? 'Selected seat type' : locale === 'ar' ? 'نوع المقعد المختار' : 'نوع صندلی انتخابی'}</span>
+            <span className="font-bold text-[#16202e]">{localeMoney(selectedSeatIrr.toString(), locale)}</span>
+          </div>
+        )}
         {extras
           .filter((e) => e.selected)
           .map((e) => (
@@ -105,7 +117,7 @@ export default function PricingSidebar({
         <span className="text-[14.5px] font-extrabold text-[#0d2640]">
           {t.total}
         </span>
-        <span className="text-[19px] font-black text-[#1668c4]">
+        <span data-testid="checkout-pricing-total" className="text-[19px] font-black text-[#1668c4]">
           {localeMoney(grandIrr.toString(), locale)}
         </span>
       </div>

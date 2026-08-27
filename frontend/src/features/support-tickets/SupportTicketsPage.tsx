@@ -5,13 +5,17 @@ import {
   fetchSupportTicketDetail,
   fetchSupportTickets,
   forwardSupportTicket,
+  replySupportTicket,
   updateSupportTicketStatus,
 } from '../../api/support-tickets';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import ConversationHistory from '../../components/ConversationHistory';
 import Modal from '../../components/Modal';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import { faDigits } from '../../lib/fa-format';
 import { formatJalaliDateTime } from '../../lib/jalali';
+import type { ReferralAttachment } from '../../types/cartable';
 import type {
   ForwardTarget,
   SupportTicketDept,
@@ -83,6 +87,10 @@ export default function SupportTicketsPage() {
   const [targetPick, setTargetPick] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [replyBody, setReplyBody] = useState('');
+  const [replyAttachments, setReplyAttachments] = useState<ReferralAttachment[]>([]);
+  const [replyBusy, setReplyBusy] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | 'ALL'>('ALL');
   const [deptFilter, setDeptFilter] = useState<SupportTicketDept | 'ALL'>('ALL');
@@ -118,6 +126,9 @@ export default function SupportTicketsPage() {
     setError(null);
     try {
       setTargetPick('');
+      setReplyBody('');
+      setReplyAttachments([]);
+      setReplyError(null);
       setDetail(await fetchSupportTicketDetail(id));
     } catch {
       setError('خطا در دریافت جزئیات تیکت.');
@@ -145,6 +156,27 @@ export default function SupportTicketsPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در تغییر وضعیت.');
+    }
+  }
+
+  async function onReply() {
+    if (!detail || detail.status === 'CLOSED' || replyBody.trim().length < 2 || replyBusy) return;
+    setReplyBusy(true);
+    setReplyError(null);
+    try {
+      const updated = await replySupportTicket(detail.id, {
+        body: replyBody.trim(),
+        attachmentIds: replyAttachments.map((file) => file.id),
+      });
+      setDetail(updated);
+      setReplyBody('');
+      setReplyAttachments([]);
+      setNotice(`پاسخ تیکت ${updated.trackingCode} ارسال شد ✓`);
+      await load();
+    } catch (e) {
+      setReplyError(e instanceof Error ? e.message : 'خطا در ارسال پاسخ.');
+    } finally {
+      setReplyBusy(false);
     }
   }
 
@@ -541,6 +573,67 @@ export default function SupportTicketsPage() {
               </div>
             </dl>
           </div>
+
+          <div className="mb-3">
+            <ConversationHistory
+              title="تاریخچه گفتگو"
+              items={(detail.conversation?.length
+                ? detail.conversation
+                : [{
+                    id: 'initial',
+                    body: detail.body,
+                    senderType: 'REQUESTER' as const,
+                    senderLabel: detail.requesterName,
+                    createdAt: detail.createdAt,
+                    attachments: detail.attachments ?? [],
+                  }]
+              ).map((message) => ({
+                id: message.id,
+                body: message.body,
+                actor: message.senderLabel,
+                createdAt: message.createdAt,
+                attachments: message.attachments,
+                side: message.senderType === 'STAFF' ? 'recipient' : 'sender',
+              }))}
+            />
+          </div>
+
+          {detail.status === 'CLOSED' ? (
+            <p className="mb-3 rounded-xl border border-[#5a2933] bg-[#26171b] px-4 py-3 text-center text-xs font-bold text-[#f08b98]">
+              این تیکت بسته شده و امکان ارسال پاسخ ندارد.
+            </p>
+          ) : (
+            <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+              <label htmlFor={`admin-ticket-reply-${detail.id}`} className="mb-2 block text-xs font-extrabold text-[#8fa1bb]">
+                پاسخ به تیکت
+              </label>
+              <textarea
+                id={`admin-ticket-reply-${detail.id}`}
+                aria-label="پاسخ به تیکت"
+                value={replyBody}
+                onChange={(event) => setReplyBody(event.target.value)}
+                rows={3}
+                placeholder="پاسخ پشتیبانی را بنویسید…"
+                className="w-full resize-none rounded-xl border border-[#28344c] bg-[#0b111d] p-3 text-xs leading-6 text-white outline-none placeholder:text-[#66758a] focus:border-[#3b82f6]"
+              />
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]">
+                <AttachmentPicker
+                  value={replyAttachments}
+                  onChange={(files) => setReplyAttachments(files.slice(-1))}
+                  disabled={replyBusy}
+                />
+                <button
+                  type="button"
+                  onClick={() => void onReply()}
+                  disabled={replyBusy || replyBody.trim().length < 2}
+                  className="h-11 rounded-lg bg-[#3b82f6] px-4 text-xs font-black text-white transition hover:bg-[#2563eb] disabled:opacity-50"
+                >
+                  {replyBusy ? 'در حال ارسال…' : 'ارسال پاسخ'}
+                </button>
+              </div>
+              {replyError && <p role="alert" className="mt-2 text-xs text-[#f87171]">{replyError}</p>}
+            </div>
+          )}
 
           <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
             <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">ارجاع به کارمند</h3>

@@ -1531,8 +1531,9 @@ model SupportTicket {
   precedent.
 - `SupportTicket.history: Json` — same append-only event-log pattern
   already established by `RefundRequest.history` (Phase 7) and
-  `AgencyMembershipRequest.history` (Phase 16); no separate
-  message-thread table this phase (see docs/API.md's deferral list).
+  `AgencyMembershipRequest.history` (Phase 16). Ticket replies are stored as
+  append-only `step: "message"` records in this existing JSON column, so the
+  conversation feature requires no schema migration or separate message table.
 - `SupportTicket.attachments: Json` stores at most one owner-validated
   `StoredFile.id`; read responses resolve the ids into safe file metadata.
 - `SupportTicket.dept`/`priority` exist to match the design's admin
@@ -1548,12 +1549,11 @@ model SupportTicket {
   under the existing `SYSTEM` category rather than adding a `SUPPORT`
   value for a scoped-down v1 feature.
 
-⚑ **Explicitly deferred this phase** (see docs/API.md's Phase 20 section
-for the full reasoning): multi-message reply threads on tickets; a public
-"track my ticket" status lookup; a
+⚑ **Still deferred:** a public anonymous "track my ticket" status lookup and a
 dedicated تماس با ما admin review/reply UI (the new
 `SiteAdminDashboardPage.tsx` section is this phase's only admin surface
-for it).
+for it). Multi-message authenticated ticket threads and attachments are now
+implemented in the existing `history` and `attachments` JSON fields.
 
 ## Phase 21 — فراموشی رمز (customer forgot/set password)
 

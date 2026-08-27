@@ -51,6 +51,21 @@ describe('SupportTicketsPage', () => {
     expect(screen.getByPlaceholderText(/جستجو بر اساس شماره/)).toBeInTheDocument();
   });
 
+  it('filters tickets by their tracking code', async () => {
+    mockList([
+      TICKET,
+      row({ id: 't2', trackingCode: 'TKMATCH999', subject: 'تیکت دوم', requesterName: 'کاربر دوم' }),
+    ]);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    await screen.findByText('مشکل در پرداخت');
+    await userEvent.type(screen.getByPlaceholderText(/جستجو بر اساس شماره/), 'TKMATCH999');
+
+    expect(screen.getByText('تیکت دوم')).toBeInTheDocument();
+    expect(screen.queryByText('مشکل در پرداخت')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when no tickets exist', async () => {
     mockList([]);
     render(<SupportTicketsPage />);
@@ -70,7 +85,67 @@ describe('SupportTicketsPage', () => {
 
     expect(within(dialog).getByText('حسین رضوی')).toBeInTheDocument();
     expect(within(dialog).getByText('09121230000')).toBeInTheDocument();
-    expect(within(dialog).getByText('وجه کسر شد ولی بلیط صادر نشد.')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('وجه کسر شد ولی بلیط صادر نشد.')).toHaveLength(2);
+  });
+
+  it('lets site admin reply and immediately renders the updated conversation', async () => {
+    const detailed = row({
+      conversation: [
+        {
+          id: 'initial',
+          body: 'وجه کسر شد ولی بلیط صادر نشد.',
+          senderType: 'REQUESTER',
+          senderLabel: 'حسین رضوی',
+          createdAt: '2026-07-20T00:00:00.000Z',
+          attachments: [],
+        },
+      ],
+    });
+    mockList([detailed]);
+    vi.spyOn(ticketsApi, 'fetchSupportTicketDetail').mockResolvedValue(detailed);
+    const reply = vi.spyOn(ticketsApi, 'replySupportTicket').mockResolvedValue({
+      ...detailed,
+      status: 'ANSWERED',
+      conversation: [
+        ...detailed.conversation!,
+        {
+          id: 'staff-answer',
+          body: 'پرداخت بررسی و بلیط صادر شد.',
+          senderType: 'STAFF',
+          senderLabel: 'ادمین سایت',
+          createdAt: '2026-07-20T01:00:00.000Z',
+          attachments: [],
+        },
+      ],
+    });
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    await userEvent.click(await screen.findByText('حسین رضوی'));
+    const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
+    await userEvent.type(within(dialog).getByLabelText('پاسخ به تیکت'), 'پرداخت بررسی و بلیط صادر شد.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'ارسال پاسخ' }));
+
+    await waitFor(() => expect(reply).toHaveBeenCalledWith('t1', {
+      body: 'پرداخت بررسی و بلیط صادر شد.',
+      attachmentIds: [],
+    }));
+    expect(within(dialog).getByText('پرداخت بررسی و بلیط صادر شد.')).toBeInTheDocument();
+  });
+
+  it('keeps closed ticket history visible but hides the admin reply composer', async () => {
+    const closed = row({ status: 'CLOSED' });
+    mockList([closed]);
+    vi.spyOn(ticketsApi, 'fetchSupportTicketDetail').mockResolvedValue(closed);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    await userEvent.click(await screen.findByText('حسین رضوی'));
+    const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
+
+    expect(within(dialog).getByText('این تیکت بسته شده و امکان ارسال پاسخ ندارد.')).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('پاسخ به تیکت')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('region', { name: 'تاریخچه گفتگو' })).toBeInTheDocument();
   });
 
   it('forwards a ticket to a picked staffer and shows the notice', async () => {

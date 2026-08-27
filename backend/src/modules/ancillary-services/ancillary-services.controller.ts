@@ -26,12 +26,7 @@ import {
 
 @ApiTags('ancillary-services')
 @Controller('ancillary-services')
-@UseGuards(
-  JwtAuthGuard,
-  RolesGuard,
-  PanelAccessGuard,
-  EmployeePermissionGuard,
-)
+@UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
 @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
 export class AncillaryServicesController {
   constructor(private readonly services: AncillaryServicesService) {}
@@ -114,5 +109,16 @@ export class PublicAncillaryServicesController {
   })
   async list() {
     return { success: true, data: await this.services.listPublic() };
+  }
+
+  @Get('seat-types')
+  @ApiOperation({
+    summary: 'انواع صندلی فعال و قیمت جاری برای مرحله انتخاب صندلی',
+  })
+  async seatTypes() {
+    return {
+      success: true,
+      data: await this.services.listPublicSeatServices(),
+    };
   }
 }

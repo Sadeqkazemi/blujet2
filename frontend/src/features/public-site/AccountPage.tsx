@@ -32,8 +32,12 @@ import {
   verifyEmail,
 } from '../../api/publicSite';
 import { ApiRequestError } from '../../api/envelope';
-import { fetchMySupportTickets, submitMySupportTicket } from '../../api/support-tickets';
-import { deleteFile, downloadFile, uploadFile } from '../../api/files';
+import {
+  fetchMySupportTickets,
+  replyMySupportTicket,
+  submitMySupportTicket,
+} from '../../api/support-tickets';
+import { deleteFile, uploadFile } from '../../api/files';
 import { changeOwnPassword, setPassword } from '../../api/auth';
 import { localeMoney, parseTomanToRial } from '../../lib/fa-format';
 import { tomanAmountInWords } from '../../lib/amount-in-words';
@@ -43,7 +47,7 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { BookingDetail, PriceLock, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
-import type { MySupportTicketRow, SupportTicketStatus } from '../../types/support-tickets';
+import type { MySupportTicketRow } from '../../types/support-tickets';
 import AccountClubTab from './AccountClubTab';
 import AccountPassengersTab, { type SavedPassengerForm } from './AccountPassengersTab';
 import AccountBankAccountsTab, { type BankAccountForm } from './AccountBankAccountsTab';
@@ -59,6 +63,7 @@ import type { TabKey } from './account/account-types';
 import { isAccountTabKey } from './account/account-nav-items';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import MoneyInput from '../../components/MoneyInput';
+import SupportConversationCenter from '../../components/SupportConversationCenter';
 import { joinPersonName, splitPersonName } from '../../lib/person-name';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
@@ -116,13 +121,6 @@ function formatHoldClock(secs: number, locale: StoredLocale): string {
   const raw = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return localeDigits(raw, locale);
 }
-
-const TICKET_STATUS_LABEL: Record<SupportTicketStatus, Tr> = {
-  OPEN: { fa: 'باز', en: 'Open', ar: 'مفتوح' },
-  IN_PROGRESS: { fa: 'در حال بررسی', en: 'In Progress', ar: 'قيد المعالجة' },
-  ANSWERED: { fa: 'پاسخ داده‌شده', en: 'Answered', ar: 'تم الرد' },
-  CLOSED: { fa: 'بسته‌شده', en: 'Closed', ar: 'مغلق' },
-};
 
 const CABIN_LABEL: Record<string, Tr> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
@@ -622,6 +620,7 @@ export default function AccountPage() {
   const [ticketPhone, setTicketPhone] = useState('');
   const [ticketAttachment, setTicketAttachment] = useState<File | null>(null);
   const [ticketSubmitBusy, setTicketSubmitBusy] = useState(false);
+  const [ticketReplyBusy, setTicketReplyBusy] = useState(false);
   const [ticketSubmitError, setTicketSubmitError] = useState<string | null>(null);
   const [ticketNotice, setTicketNotice] = useState<string | null>(null);
   const [pwCur, setPwCur] = useState('');
@@ -851,6 +850,23 @@ export default function AccountPage() {
       setTicketSubmitError(err instanceof ApiRequestError ? err.message : t.ticketsLoadError);
     } finally {
       setTicketSubmitBusy(false);
+    }
+  }
+
+  async function onReplyTicket(id: string, body: string, attachmentIds: string[]) {
+    setTicketReplyBusy(true);
+    setTicketNotice(null);
+    try {
+      const updated = await replyMySupportTicket(id, {
+        body,
+        attachmentIds: attachmentIds.length ? attachmentIds : undefined,
+      });
+      setTickets((current) =>
+        current?.map((ticket) => (ticket.id === id ? updated : ticket)) ?? [updated],
+      );
+      setTicketNotice(locale === 'fa' ? 'پیام شما ارسال شد ✓' : locale === 'ar' ? 'تم إرسال رسالتك ✓' : 'Your message was sent ✓');
+    } finally {
+      setTicketReplyBusy(false);
     }
   }
 
@@ -1442,92 +1458,18 @@ export default function AccountPage() {
 
         {tab === 'tickets' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-              <div>
-                <h2 style={{ margin: 0, color: '#0d2640', fontSize: 18, fontWeight: 900 }}>{t.ticketsHeading}</h2>
-                <p style={{ margin: '6px 0 0', color: '#8a96a6', fontSize: 12 }}>{t.ticketsSubtitle}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }}
-                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '10px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
-              >
-                + {t.ticketsCreateButton}
-              </button>
-            </div>
+            <SupportConversationCenter
+              locale={locale}
+              tickets={tickets}
+              selectedId={expandedTicketId}
+              onSelect={setExpandedTicketId}
+              onReply={onReplyTicket}
+              onNew={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }}
+              newLabel={t.ticketsCreateHeading}
+              busy={ticketReplyBusy}
+            />
             {ticketsError && <p role="alert" style={{ fontSize: 12, color: '#e5484d', margin: 0 }}>{ticketsError}</p>}
             {ticketNotice && <p role="status" style={{ fontSize: 12, color: '#059669', fontWeight: 700, margin: 0 }}>{ticketNotice}</p>}
-            {tickets === null && <p style={{ fontSize: 13, color: '#6b7787' }}>{t.loading}</p>}
-            {tickets?.length === 0 && (
-              <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '48px 24px', textAlign: 'center' }}>
-                <div aria-hidden="true" style={{ width: 68, height: 68, borderRadius: 20, margin: '0 auto 16px', display: 'grid', placeItems: 'center', background: '#f1f5fb', color: '#9aa9bb', fontSize: 32 }}>✉</div>
-                <div style={{ color: '#0d2640', fontSize: 14, fontWeight: 800 }}>{t.ticketsEmptyText}</div>
-                <p style={{ color: '#8a96a6', fontSize: 12, lineHeight: 1.8, margin: '8px auto 18px', maxWidth: 420 }}>{t.ticketsSubtitle}</p>
-                <button type="button" onClick={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }} style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '10px 18px', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {t.ticketsCreateHeading}
-                </button>
-              </div>
-            )}
-            {tickets?.map((tk) => {
-              const st = TICKET_STATUS_LABEL[tk.status];
-              const expanded = expandedTicketId === tk.id;
-              return (
-                <div key={tk.id} data-testid="account-ticket" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, overflow: 'hidden' }}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedTicketId(expanded ? null : tk.id)}
-                    style={{ width: '100%', border: 'none', background: 'transparent', padding: '14px 16px', textAlign: 'inherit', cursor: 'pointer', fontFamily: 'inherit' }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                      <div style={{ textAlign: locale === 'en' ? 'left' : 'right' }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0d2640' }}>{tk.subject}</div>
-                        <div style={{ fontSize: 11, color: '#8a96a6', marginTop: 4 }}>
-                          {t.ticketsTrackingLabel}: <span className="font-num" dir="ltr">{tk.trackingCode}</span>
-                          {' · '}
-                          {formatLocaleDateTime(tk.createdAt, locale)}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: 10.5, fontWeight: 800, background: '#eef4fb', color: '#1668c4', padding: '5px 12px', borderRadius: 14 }}>
-                        {st?.[locale] ?? tk.status}
-                      </span>
-                    </div>
-                  </button>
-                  {expanded && (
-                    <div style={{ borderTop: '1px solid #eef1f5', padding: '14px 16px', background: '#fafbfd' }}>
-                      <p style={{ fontSize: 12.5, color: '#3b4554', lineHeight: 1.8, margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>{tk.body}</p>
-                      {(tk.attachments ?? []).length > 0 && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                          {(tk.attachments ?? []).map((attachment) => (
-                            <button
-                              key={attachment.id}
-                              type="button"
-                              onClick={() => void downloadFile(attachment.id, attachment.fileName)}
-                              style={{ border: '1px solid #d8e5f3', borderRadius: 10, background: '#fff', color: '#1668c4', padding: '8px 11px', fontFamily: 'inherit', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}
-                            >
-                              📎 {attachment.fileName}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {tk.history.length > 0 && (
-                        <>
-                          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#6b7787', marginBottom: 8 }}>{t.ticketsHistoryHeading}</div>
-                          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {tk.history.map((h, i) => (
-                              <li key={`${h.step}-${i}`} style={{ fontSize: 11.5, color: '#5a6678' }}>
-                                <span style={{ color: '#8a96a6' }}>{formatLocaleDateTime(h.at, locale)}</span>
-                                {' — '}
-                                {h.labelFa}
-                              </li>
-                            ))}
-                          </ul>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
             {ticketComposerOpen && (
               <div role="dialog" aria-modal="true" aria-label={t.ticketsCreateHeading} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(8, 21, 39, 0.58)', display: 'grid', placeItems: 'center', padding: 16 }}>
                 <form onSubmit={(e) => void onSubmitTicket(e)} style={{ width: 'min(100%, 560px)', maxHeight: 'min(760px, calc(100vh - 32px))', overflowY: 'auto', background: '#fff', borderRadius: 18, padding: 22, boxSizing: 'border-box', boxShadow: '0 24px 70px rgba(0,0,0,.25)' }}>

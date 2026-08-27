@@ -245,7 +245,7 @@ describe('CheckoutPage', () => {
     expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
     expect(screen.getByTestId('checkout-from-saved-0')).toBeDisabled();
-    expect(screen.getByTestId('checkout-next')).toBeDisabled();
+    expect(screen.getByTestId('checkout-next')).toBeEnabled();
 
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
@@ -267,7 +267,7 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
   });
 
-  it('keeps a guest on the passenger step and shows field errors before OTP', async () => {
+  it('defers passenger field errors until confirm is pressed', async () => {
     mockAuth('unauthenticated');
     const user = userEvent.setup();
     render(
@@ -287,13 +287,59 @@ describe('CheckoutPage', () => {
     );
 
     await screen.findByTestId('checkout-pax-step');
-    expect(screen.getByTestId('checkout-next')).toBeDisabled();
+    expect(screen.getByTestId('checkout-next')).toBeEnabled();
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'A');
 
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
+    expect(screen.queryByText('نام خانوادگی را وارد کنید.')).not.toBeInTheDocument();
+    expect(screen.queryByText('کد ملی را وارد کنید.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-last-0')).toHaveAttribute('aria-invalid', 'false');
+
+    await user.click(screen.getByTestId('checkout-next'));
+
     expect(screen.getByText('نام خانوادگی را وارد کنید.')).toBeInTheDocument();
     expect(screen.getByText('کد ملی را وارد کنید.')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-pax-last-0')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('checks the national-id checksum only after confirm and marks only that filled invalid field', async () => {
+    mockAuth();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/checkout/new',
+            search: '?flightInstanceId=fi-1&cabin=ECONOMY',
+            state: FLIGHT_STATE,
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/checkout/:bookingId" element={<CheckoutPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('checkout-pax-step');
+    await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
+    await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
+    await user.selectOptions(screen.getByTestId('checkout-pax-gender-0'), 'male');
+    await user.type(screen.getByTestId('checkout-pax-nid-0'), '0012345678');
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[1]!, '1');
+    await user.selectOptions(selects[2]!, '1');
+    await user.selectOptions(selects[3]!, '1370');
+
+    expect(screen.queryByText('کد ملی اشتباه وارد شده است.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-nid-0')).toHaveAttribute('aria-invalid', 'false');
+    await user.click(screen.getByTestId('checkout-next'));
+
+    expect(screen.getByText('کد ملی اشتباه وارد شده است.')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-nid-0')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByTestId('checkout-pax-first-0')).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.getByTestId('checkout-pax-last-0')).toHaveAttribute('aria-invalid', 'false');
+    expect(screen.getByTestId('checkout-pax-gender-0')).toHaveAttribute('aria-invalid', 'false');
   });
 
   it('mobile layout shows flight route + passenger form above pricing', async () => {

@@ -1,6 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { fetchInbox, postInboxMessage } from '../../api/agency-portal';
-import { fetchMySupportTickets, submitMySupportTicket } from '../../api/support-tickets';
+import {
+  fetchMySupportTickets,
+  replyMySupportTicket,
+  submitMySupportTicket,
+} from '../../api/support-tickets';
 import { formatLocaleDateTime } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
@@ -9,6 +13,7 @@ import Modal from '../../components/Modal';
 import AttachmentPicker from '../../components/AttachmentPicker';
 import AttachmentList from '../../components/AttachmentList';
 import type { ReferralAttachment } from '../../types/cartable';
+import SupportConversationCenter from '../../components/SupportConversationCenter';
 
 function messageParts(message: AgencyMessage) {
   const lines = message.body.split(/\r?\n/);
@@ -113,6 +118,7 @@ export default function AgencyInboxPage() {
   const [sending, setSending] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tickets, setTickets] = useState<MySupportTicketRow[] | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
   const [requesterName, setRequesterName] = useState('');
   const [requesterPhone, setRequesterPhone] = useState('');
@@ -215,6 +221,22 @@ export default function AgencyInboxPage() {
     }
   }
 
+  async function onTicketReply(id: string, reply: string, attachmentIds: string[]) {
+    setSending(true);
+    try {
+      const updated = await replyMySupportTicket(id, {
+        body: reply,
+        attachmentIds: attachmentIds.length ? attachmentIds : undefined,
+      });
+      setTickets((current) =>
+        current?.map((ticket) => (ticket.id === id ? updated : ticket)) ?? [updated],
+      );
+      setTicketNotice(locale === 'fa' ? 'پیام شما ارسال شد ✓' : locale === 'ar' ? 'تم إرسال رسالتك ✓' : 'Your message was sent ✓');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!messages) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
@@ -224,12 +246,22 @@ export default function AgencyInboxPage() {
 
   return (
     <div data-testid="agency-inbox-page">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div><h1 className="text-lg font-black text-[#0d2640]">{locale === 'fa' ? 'صندوق پیام‌ها' : t.heading}</h1></div>
-        <button type="button" onClick={() => setComposeOpen(true)} className="rounded-xl bg-accent px-4 py-2.5 text-xs font-black text-white">＋ {t.newMessage}</button>
-      </div>
-
       {ticketNotice && <p role="status" className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-emerald-700">{ticketNotice}</p>}
+
+      <SupportConversationCenter
+        locale={locale}
+        tickets={tickets}
+        selectedId={selectedTicketId}
+        onSelect={setSelectedTicketId}
+        onReply={onTicketReply}
+        onNew={() => setComposeOpen(true)}
+        newLabel={t.newMessage}
+        busy={sending}
+      />
+
+      <h2 className="mb-3 mt-6 text-sm font-black text-[#0d2640]">
+        {locale === 'fa' ? 'مکاتبات سازمانی با واحد بازرگانی' : locale === 'ar' ? 'المراسلات التنظيمية مع الإدارة التجارية' : 'Commercial correspondence'}
+      </h2>
 
       {messages.length === 0 ? (
         <div className="rounded-2xl border border-[#edf0f5] bg-white py-16 text-center text-xs text-muted">{t.empty}</div>
@@ -285,32 +317,7 @@ export default function AgencyInboxPage() {
         </div>
       )}
 
-      <section className="mt-4 rounded-2xl border border-[#e8edf3] bg-white p-5" data-testid="agency-support-tickets">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-black text-[#0d2640]">{t.ticketsHeading}</h2>
-          <span className="rounded-lg bg-[#eef5fc] px-3 py-1 text-[10px] font-bold text-[#1668c4]">{tickets?.length ?? 0}</span>
-        </div>
-        {ticketsError ? (
-          <p role="alert" className="text-xs text-danger">{ticketsError}</p>
-        ) : tickets === null ? (
-          <p className="text-xs text-muted">{t.loading}</p>
-        ) : tickets.length === 0 ? (
-          <p className="text-xs text-muted">{t.ticketsEmpty}</p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {tickets.map((ticket) => (
-              <article key={ticket.id} className="rounded-xl border border-[#e8edf3] bg-[#fafbfd] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <strong className="text-xs font-black text-[#1a2d42]">{ticket.subject}</strong>
-                  <span dir="ltr" className="text-[10px] font-bold text-[#1668c4]">{ticket.trackingCode}</span>
-                </div>
-                <p className="mt-2 line-clamp-2 text-[11px] leading-6 text-[#6f7b8b]">{ticket.body}</p>
-                <time className="mt-3 block text-[10px] text-[#a0a9b5]">{formatLocaleDateTime(ticket.updatedAt, locale)}</time>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      {ticketsError && <p role="alert" className="mt-3 text-xs text-danger">{ticketsError}</p>}
 
       {composeOpen && <Modal title={t.newMessage} onClose={() => setComposeOpen(false)} variant="light" maxWidthClass="max-w-xl"><form onSubmit={onSend} className="space-y-4" data-testid="agency-compose-message">
         <label className="block text-xs font-bold text-muted">{t.requesterName}<input value={requesterName} onChange={(e) => setRequesterName(e.target.value)} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>

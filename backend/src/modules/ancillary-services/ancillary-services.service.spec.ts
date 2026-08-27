@@ -1,5 +1,6 @@
 import { ANCILLARY_BUILT_IN_SERVICES } from './ancillary-services.catalog';
 import { AncillaryServicesService } from './ancillary-services.service';
+import { BadRequestException } from '@nestjs/common';
 
 describe('AncillaryServicesService fixed checkout mirrors', () => {
   it('recreates a missing SEAT_SELECTION travel-extra row from the permanent built-in', async () => {
@@ -82,5 +83,71 @@ describe('AncillaryServicesService fixed checkout mirrors', () => {
         expect.objectContaining({ key: 'baggage', titleFa: 'بار اضافه' }),
       ],
     });
+  });
+
+  it('prices selected seats from the current commercial seat-type rows', async () => {
+    const rows = [
+      {
+        key: 'seat-normal',
+        category: 'SEAT',
+        titleFa: 'صندلی عادی',
+        priceIrr: 0n,
+        enabled: true,
+      },
+      {
+        key: 'seat-legroom',
+        category: 'SEAT',
+        titleFa: 'فضای پای بیشتر',
+        priceIrr: 4_000_000n,
+        enabled: true,
+      },
+      {
+        key: 'seat-window-aisle',
+        category: 'SEAT',
+        titleFa: 'پنجره یا راهرو',
+        priceIrr: 2_000_000n,
+        enabled: true,
+      },
+    ];
+    const service = new AncillaryServicesService(
+      { find: jest.fn().mockResolvedValue(rows) } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.priceSelectedSeats(['19A', '12A', '12E'], 'MD-80'),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'SEAT_LEGROOM', totalIrr: '4000000' }),
+        expect.objectContaining({
+          code: 'SEAT_WINDOW_AISLE',
+          totalIrr: '2000000',
+        }),
+        expect.objectContaining({ code: 'SEAT_NORMAL', totalIrr: '0' }),
+      ]),
+    );
+  });
+
+  it('rejects a selected seat when its commercial seat type is disabled', async () => {
+    const service = new AncillaryServicesService(
+      {
+        find: jest.fn().mockResolvedValue([
+          {
+            key: 'seat-legroom',
+            category: 'SEAT',
+            titleFa: 'فضای پای بیشتر',
+            priceIrr: 4_000_000n,
+            enabled: false,
+          },
+        ]),
+      } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.priceSelectedSeats(['19A'], 'MD-80'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

@@ -13,6 +13,7 @@ import {
   fetchSeatMap,
 } from '../../api/publicSite';
 import { fetchPublicTravelCosts } from '../../api/travel-costs';
+import { fetchPublicSeatServices } from '../../api/ancillary-services';
 import { ApiRequestError } from '../../api/envelope';
 import { useAuth } from '../../hooks/useAuth';
 import { useLocale } from '../../hooks/useLocale';
@@ -66,6 +67,8 @@ import {
   mapLegacyTakenSeatsToMd80,
   shouldUseMd80SeatMap,
 } from './checkout/md80-seat-layout';
+import { seatTypeTotalIrr } from './checkout/seat-type-pricing';
+import type { PublicAncillaryService } from '../../types/ancillary-services';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
 const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
@@ -89,6 +92,7 @@ export default function CheckoutPage() {
     emptyPassenger(''),
   ]);
   const [extras, setExtras] = useState<ExtraServiceState[]>([]);
+  const [seatServices, setSeatServices] = useState<PublicAncillaryService[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [seats, setSeats] = useState<SeatMapCell[] | null>(null);
   const [savedPassengers, setSavedPassengers] = useState<SavedPassenger[]>([]);
@@ -252,6 +256,9 @@ export default function CheckoutPage() {
         ),
       )
       .catch(() => setExtras([]));
+    fetchPublicSeatServices()
+      .then(setSeatServices)
+      .catch(() => setSeatServices([]));
   }, [isWizard]);
 
   useEffect(() => {
@@ -361,9 +368,6 @@ export default function CheckoutPage() {
 
   function changePassengers(next: PassengerFormDraft[]) {
     setPassengers(next);
-    // Once the manifest is started, keep incomplete/invalid fields visible
-    // while the primary action remains disabled.
-    setShowPassengerErrors(true);
     setError(null);
   }
 
@@ -700,15 +704,23 @@ export default function CheckoutPage() {
   const extrasIrr = extras
     .filter((extra) => extra.selected)
     .reduce((sum, extra) => sum + extraTotalIrr(extra, passengerCount), 0n);
-  const grandIrr = baseTicketIrr + extraSeatIrr + extrasIrr;
+  const selectedSeatTypesIrr = seatTypeTotalIrr(
+    selectedSeats,
+    draft.flight.aircraftType ?? 'MD-80',
+    seatServices,
+  );
+  const grandIrr = baseTicketIrr + extraSeatIrr + extrasIrr + selectedSeatTypesIrr;
   const grandDisplay = localeMoney(grandIrr.toString(), locale);
   const passengerFormIncomplete =
     step === 'pax' &&
     (passengers.some((passenger) => !isPassengerValid(passenger)) ||
       nationalIdsExceedingSeatLimit(passengers).length > 0 ||
       passengerAgeError() !== null);
-  const passengerCompletionNotice = passengerFormIncomplete ? t.completePaxError : null;
-  const nextDisabled = busy || passengerFormIncomplete;
+  const passengerCompletionNotice =
+    showPassengerErrors && passengerFormIncomplete ? t.completePaxError : null;
+  // Passenger validation is intentionally submit-driven: customers can type
+  // without the whole form turning red, then see precise errors after confirm.
+  const nextDisabled = busy;
 
   const loginModal = loginOpen ? (
     <div
@@ -812,6 +824,7 @@ export default function CheckoutPage() {
           bookedCabin={draft?.cabin ?? 'ECONOMY'}
           aircraftType={draft?.flight.aircraftType ?? 'MD-80'}
           clubBalance={clubBalance}
+          seatServices={seatServices}
         />
       )}
       {step === 'review' && (
@@ -879,6 +892,7 @@ export default function CheckoutPage() {
             priceIrr={baseTicketIrr.toString()}
             extraSeatCount={extraSeatCount}
             extraSeatIrr={extraSeatIrr.toString()}
+            seatSelectionIrr={selectedSeatTypesIrr.toString()}
             paxCount={Math.max(1, passengers.length)}
             passengerMix={currentPassengerMix}
             extras={extras}
@@ -956,6 +970,7 @@ export default function CheckoutPage() {
           priceIrr={baseTicketIrr.toString()}
           extraSeatCount={extraSeatCount}
           extraSeatIrr={extraSeatIrr.toString()}
+          seatSelectionIrr={selectedSeatTypesIrr.toString()}
           paxCount={Math.max(1, passengers.length)}
           passengerMix={currentPassengerMix}
           extras={extras}

@@ -1211,15 +1211,12 @@ dept: SITE|AGENCY, priority: HIGH|MEDIUM|LOW, body }`. Phone optional
   `flightops`/`blog`/`media` remain deferred (still no backend for any
   role).
 
-### Explicit deferrals (flagged, not oversights)
+### Historical deferrals superseded by the authenticated conversation follow-up
 
-- **File attachments and multi-message reply threads** — the design's
-  admin ticket system (`پنل ادمین سایت.dc.html`) shows both (`messages[]`
-  carrying attachments per message). This phase ships a single
-  subject+body per ticket with a `history` log of status/forward events
-  only, matching the scope of every other "referral/status" workflow
-  already built (refunds, agency requests) rather than building a new
-  file-upload + threaded-messaging subsystem.
+- File attachments and multi-message reply threads were deferred in the
+  original phase, but are now implemented for authenticated customer and
+  agency tickets and for the site-admin reply surface. The remaining public
+  anonymous submission endpoint intentionally stays submission-only.
 - **Public ticket status lookup ("track my ticket")** — the design has no
   such UI (only a post-submission tracking-code display); not built this
   phase.
@@ -1248,12 +1245,24 @@ had no way to see their submissions inside `/account`.
   account) — same body as the public submit DTO plus optional
   `attachmentIds` (maximum one owner-validated file); always sets `userId`
   to the caller. Returns `{ id, trackingCode }`.
+- `POST /my/support-tickets/:id/replies` (`USER` or `AGENCY` role) — appends a
+  reply to an owned, non-closed ticket. Body is `{ body, attachmentIds? }`;
+  at most one owner-validated attachment is accepted. The ticket returns to
+  `OPEN` so support can respond.
+- `POST /support-tickets/:id/replies` (`SITE_ADMIN` only) — appends a staff
+  reply, preserves the chronological message history, resolves an optional
+  owner-validated attachment, and changes the ticket to `ANSWERED`. Closed
+  tickets reject replies. The site-admin detail modal renders the full thread
+  and inserts the returned reply immediately after a successful request.
 - Authenticated agency submissions are routed to `dept=AGENCY`; customer
   submissions remain in `dept=SITE`. In the agency portal these endpoints
   power the existing «پیام‌ها» surface rather than a separate ticket menu.
-- Frontend: the `tickets` tab lists status, tracking code, history, and
-  downloadable attachment metadata. New requests accept one PDF/PNG/JPG up
-  to 5 MB. A reply thread remains deferred.
+- Frontend: customer and agency ticket surfaces use the same conversation
+  center with status counters, independent rows, chronological requester/staff
+  messages, timestamps, and downloadable attachments. New requests and replies
+  accept one PDF/PNG/JPG up to 5 MB. Their local search filters only the
+  already owner-scoped response by tracking code or subject. The site-admin
+  table search is likewise wired to tracking code, subject, requester, and body.
 
 ### پنل کاربر — باشگاه مشتریان (`/account` → تب `club`)
 
@@ -3889,6 +3898,12 @@ disable/delete either rule return `VALIDATION_FAILED`.
 | POST   | `/ancillary-services`              | `COMMERCIAL_MANAGER` | `{ titleFa, descriptionFa?, priceIrr }` → OTHER + `isCustom=true`.                                                                                                                                |
 | DELETE | `/ancillary-services/:key`         | `COMMERCIAL_MANAGER` | Custom only; built-ins return `VALIDATION_FAILED`.                                                                                                                                                |
 | GET    | `/public/ancillary-services`       | public               | Enabled OTHER services only: `key`, `titleFa`, `descriptionFa`, `priceIrr`. Checkout continues to use `GET /public/travel-costs`, whose prices/enabled flags overlay this table for mapped codes. |
+| GET    | `/public/ancillary-services/seat-types` | public          | Current enabled `seat-normal`, `seat-legroom`, and `seat-window-aisle` rows used by the public seat picker. Prices are reloaded and validated again by booking creation. |
+
+Selected seat codes are classified on the server from the aircraft layout.
+Booking creation reloads the current seat-type catalogue and snapshots the
+matching charges in `extraServices`; client-supplied seat prices are never
+accepted. Those charges are included in `extrasIrr` and the final `priceIrr`.
 
 ## Panel nav
 
