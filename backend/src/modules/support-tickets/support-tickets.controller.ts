@@ -18,15 +18,15 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   AdminCreateSupportTicketDto,
   ForwardTicketDto,
+  ReplySupportTicketDto,
   SubmitSupportTicketDto,
   UpdateTicketStatusDto,
 } from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { SupportTicketStatus } from '../../database/enums';
 
-/** پشتیبانی — public ticket submission (no login), SITE_ADMIN-gated
- * review/forward/status endpoints (see docs/API.md's Phase 20 for the
- * scoped-down fields vs. the design's fuller attachment/thread version). */
+/** پشتیبانی — public ticket submission (no login), plus SITE_ADMIN-gated
+ * review, forwarding, status, attachment, and conversation endpoints. */
 @ApiTags('support-tickets')
 @Controller('support-tickets')
 export class SupportTicketsController {
@@ -107,6 +107,21 @@ export class SupportTicketsController {
     @Body() dto: UpdateTicketStatusDto,
   ) {
     const data = await this.tickets.updateStatus(actor, id, dto.status);
+    return { success: true, data };
+  }
+
+  @Post(':id/replies')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SITE_ADMIN')
+  @ApiOperation({
+    summary: 'ارسال پاسخ پشتیبانی در گفتگو و پاسخ‌داده‌شدن تیکت',
+  })
+  async reply(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReplySupportTicketDto,
+  ) {
+    const data = await this.tickets.replyAsStaff(actor, id, dto);
     return { success: true, data };
   }
 }

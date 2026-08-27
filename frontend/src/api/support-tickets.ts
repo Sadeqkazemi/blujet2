@@ -36,6 +36,13 @@ export function submitMySupportTicket(dto: {
   return apiPost<{ id: string; trackingCode: string }>('/my/support-tickets', dto);
 }
 
+export function replyMySupportTicket(
+  id: string,
+  dto: { body: string; attachmentIds?: string[] },
+) {
+  return apiPost<MySupportTicketRow>(`/my/support-tickets/${id}/replies`, dto);
+}
+
 export function createAdminSupportTicket(dto: {
   subject: string;
   requesterName: string;
@@ -66,6 +73,13 @@ export function forwardSupportTicket(id: string, targetUserId: string) {
 
 export function updateSupportTicketStatus(id: string, status: SupportTicketStatus) {
   return apiPatch<SupportTicketRow>(`/support-tickets/${id}/status`, { status });
+}
+
+export function replySupportTicket(
+  id: string,
+  dto: { body: string; attachmentIds?: string[] },
+) {
+  return apiPost<SupportTicketRow>(`/support-tickets/${id}/replies`, dto);
 }
 
 export function fetchRecentContactMessages() {

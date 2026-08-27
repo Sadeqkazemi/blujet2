@@ -21,6 +21,7 @@ import {
   ANCILLARY_KEY_BY_TRAVEL_EXTRA,
   ANCILLARY_TRAVEL_EXTRA_BY_KEY,
 } from './ancillary-services.catalog';
+import { classifySeatType, type SeatTypeKey } from './seat-type-pricing';
 
 const COMMERCIAL_HIDDEN_SERVICE_KEYS = new Set(['refund-fee']);
 
@@ -99,6 +100,47 @@ export class AncillaryServicesService implements OnModuleInit {
         descriptionFa: row.descriptionFa,
         priceIrr: row.priceIrr.toString(),
       }));
+  }
+
+  async listPublicSeatServices() {
+    const rows = await this.repo.find({
+      where: { enabled: true, category: AncillaryServiceCategory.SEAT },
+      order: { key: 'ASC' },
+    });
+    return rows.map((row) => this.toSeatRow(row));
+  }
+
+  async priceSelectedSeats(seatCodes: string[], aircraftType: string) {
+    if (seatCodes.length === 0) return [];
+    const rows = await this.repo.find({
+      where: { category: AncillaryServiceCategory.SEAT },
+    });
+    const byKey = new Map(rows.map((row) => [row.key as SeatTypeKey, row]));
+    const grouped = new Map<SeatTypeKey, string[]>();
+    for (const seatCode of seatCodes) {
+      const key = classifySeatType(seatCode, aircraftType);
+      const service = byKey.get(key);
+      if (!service?.enabled) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `نوع قیمت صندلی ${seatCode} در حال حاضر فعال نیست.`,
+        });
+      }
+      grouped.set(key, [...(grouped.get(key) ?? []), seatCode]);
+    }
+    return [...grouped.entries()].map(([key, codes]) => {
+      const service = byKey.get(key)!;
+      return {
+        id: `seat-type:${key}`,
+        code: key.toUpperCase().replace(/-/g, '_'),
+        titleFa: service.titleFa,
+        billingUnit: 'PER_SEAT',
+        unitPriceIrr: service.priceIrr.toString(),
+        quantity: codes.length,
+        totalIrr: (service.priceIrr * BigInt(codes.length)).toString(),
+        seatCodes: codes,
+      };
+    });
   }
 
   async setPrice(actor: AuthenticatedUser, key: string, priceIrr: Irr) {

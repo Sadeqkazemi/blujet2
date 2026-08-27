@@ -443,6 +443,10 @@ export class BookingService {
           'تعداد صندلی‌های انتخابی از تعداد بلیط‌های دارای صندلی بیشتر است.',
       });
     }
+    const seatTypeCharges = await this.ancillary.priceSelectedSeats(
+      requestedCodes,
+      resolveAircraftType(instance),
+    );
     if (new Set(requestedCodes).size !== requestedCodes.length) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -517,7 +521,7 @@ export class BookingService {
     const configuredById = new Map(
       pricedExtras.map((extra) => [extra.id, extra]),
     );
-    const extrasSnapshot = requestedExtras.map((selection) => {
+    const configuredExtrasSnapshot = requestedExtras.map((selection) => {
       const extra = configuredById.get(selection.id)!;
       if (extra.billingUnit !== 'PER_KG' && selection.quantity !== 1) {
         throw new BadRequestException({
@@ -540,6 +544,7 @@ export class BookingService {
         totalIrr: totalIrr.toString(),
       };
     });
+    const extrasSnapshot = [...configuredExtrasSnapshot, ...seatTypeCharges];
     const extrasIrr = extrasSnapshot.reduce(
       (total, extra) => total + BigInt(extra.totalIrr),
       0n,

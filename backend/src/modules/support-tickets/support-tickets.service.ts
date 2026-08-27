@@ -19,6 +19,7 @@ import { SupportTicketDept, SupportTicketStatus } from '../../database/enums';
 import type {
   SubmitSupportTicketDto,
   AdminCreateSupportTicketDto,
+  ReplySupportTicketDto,
 } from './dto/support-ticket.dtos';
 
 /** Staff-created tickets without a phone use this sentinel (schema requires a string). */
@@ -33,6 +34,7 @@ const CUSTOMER_TICKET_SELECT = {
   trackingCode: true,
   subject: true,
   body: true,
+  requesterName: true,
   status: true,
   history: true,
   createdAt: true,
@@ -174,9 +176,90 @@ export class SupportTicketsService {
   private async withResolvedAttachments<T extends { attachments: unknown }>(
     ticket: T,
   ) {
+    const history = Array.isArray((ticket as { history?: unknown }).history)
+      ? ((ticket as unknown as { history: unknown[] }).history ?? [])
+      : [];
+    const messageAttachmentIds = history.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const ids = (entry as { attachmentIds?: unknown }).attachmentIds;
+      return Array.isArray(ids)
+        ? ids.filter((id): id is string => typeof id === 'string')
+        : [];
+    });
+    const allAttachments = await this.resolveAttachments([
+      ...(Array.isArray(ticket.attachments)
+        ? (ticket.attachments as string[])
+        : []),
+      ...messageAttachmentIds,
+    ]);
+    const attachmentsById = new Map(
+      allAttachments.map((file) => [file.id, file]),
+    );
+    const initialAttachments = Array.isArray(ticket.attachments)
+      ? (ticket.attachments as string[])
+          .map((id) => attachmentsById.get(id))
+          .filter((file): file is NonNullable<typeof file> => Boolean(file))
+      : [];
+    const initialAt = (ticket as { createdAt?: Date | string }).createdAt;
+    const requesterName =
+      (ticket as { requesterName?: string }).requesterName || 'کاربر';
+    const conversation = [
+      {
+        id: 'initial',
+        body: (ticket as { body?: string }).body ?? '',
+        senderType: 'REQUESTER' as const,
+        senderLabel: requesterName,
+        createdAt:
+          initialAt instanceof Date
+            ? initialAt.toISOString()
+            : String(initialAt ?? ''),
+        attachments: initialAttachments,
+      },
+      ...history.flatMap((entry, index) => {
+        if (!entry || typeof entry !== 'object') return [];
+        const message = entry as {
+          step?: unknown;
+          body?: unknown;
+          senderType?: unknown;
+          senderLabel?: unknown;
+          at?: unknown;
+          attachmentIds?: unknown;
+        };
+        if (message.step !== 'message' || typeof message.body !== 'string')
+          return [];
+        const ids = Array.isArray(message.attachmentIds)
+          ? message.attachmentIds.filter(
+              (id): id is string => typeof id === 'string',
+            )
+          : [];
+        return [
+          {
+            id: `message-${index}`,
+            body: message.body,
+            senderType:
+              message.senderType === 'STAFF'
+                ? ('STAFF' as const)
+                : ('REQUESTER' as const),
+            senderLabel:
+              typeof message.senderLabel === 'string'
+                ? message.senderLabel
+                : message.senderType === 'STAFF'
+                  ? 'پشتیبانی blujet'
+                  : requesterName,
+            createdAt: typeof message.at === 'string' ? message.at : '',
+            attachments: ids
+              .map((id) => attachmentsById.get(id))
+              .filter((file): file is NonNullable<typeof file> =>
+                Boolean(file),
+              ),
+          },
+        ];
+      }),
+    ];
     return {
       ...ticket,
-      attachments: await this.resolveAttachments(ticket.attachments),
+      attachments: initialAttachments,
+      conversation,
     };
   }
 
@@ -214,6 +297,10 @@ export class SupportTicketsService {
   }
 
   async getMine(actor: AuthenticatedUser, id: string) {
+    return this.withResolvedAttachments(await this.findOwnedTicket(actor, id));
+  }
+
+  private async findOwnedTicket(actor: AuthenticatedUser, id: string) {
     const phone = await this.callerPhone(actor.id);
     const ticket = await this.customerTicketQuery(actor.id, phone)
       .andWhere('t.id = :id', { id })
@@ -224,7 +311,97 @@ export class SupportTicketsService {
         message: 'تیکت یافت نشد.',
       });
     }
-    return this.withResolvedAttachments(ticket);
+    return ticket;
+  }
+
+  async replyMine(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: ReplySupportTicketDto,
+  ) {
+    const ticket = await this.findOwnedTicket(actor, id);
+    if (ticket.status === SupportTicketStatus.CLOSED) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'این تیکت بسته شده و امکان ارسال پاسخ جدید ندارد.',
+      });
+    }
+    await this.assertOwnedAttachments(actor, dto.attachmentIds);
+    this.appendMessage(ticket, {
+      body: dto.body.trim(),
+      senderType: 'REQUESTER',
+      senderLabel: actor.fullName,
+      attachmentIds: dto.attachmentIds ?? [],
+    });
+    ticket.status = SupportTicketStatus.OPEN;
+    ticket.updatedAt = new Date();
+    const saved = await this.ticketRepo.save(ticket);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'پاسخ به تیکت پشتیبانی',
+      detail: `پاسخ جدید در تیکت ${ticket.trackingCode} توسط ${actor.fullName} ثبت شد.`,
+      entityType: 'SupportTicket',
+      entityId: ticket.id,
+    });
+    return this.withResolvedAttachments(saved);
+  }
+
+  async replyAsStaff(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: ReplySupportTicketDto,
+  ) {
+    const ticket = await this.getOrThrow(id);
+    if (ticket.status === SupportTicketStatus.CLOSED) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'این تیکت بسته شده و امکان ارسال پاسخ جدید ندارد.',
+      });
+    }
+    await this.assertOwnedAttachments(actor, dto.attachmentIds);
+    this.appendMessage(ticket, {
+      body: dto.body.trim(),
+      senderType: 'STAFF',
+      senderLabel: actor.fullName,
+      attachmentIds: dto.attachmentIds ?? [],
+    });
+    ticket.status = SupportTicketStatus.ANSWERED;
+    ticket.updatedAt = new Date();
+    await this.ticketRepo.save(ticket);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'پاسخ پشتیبانی به تیکت',
+      detail: `پاسخ پشتیبانی در تیکت ${ticket.trackingCode} توسط ${actor.fullName} ثبت شد.`,
+      entityType: 'SupportTicket',
+      entityId: ticket.id,
+    });
+    return this.withResolvedAttachments(await this.getOrThrow(id));
+  }
+
+  private appendMessage(
+    ticket: SupportTicket,
+    message: {
+      body: string;
+      senderType: 'REQUESTER' | 'STAFF';
+      senderLabel: string;
+      attachmentIds: string[];
+    },
+  ) {
+    const history = Array.isArray(ticket.history)
+      ? [...(ticket.history as unknown[])]
+      : [];
+    history.push({
+      step: 'message',
+      labelFa:
+        message.senderType === 'STAFF' ? 'پاسخ پشتیبانی' : 'پاسخ درخواست‌کننده',
+      at: new Date().toISOString(),
+      ...message,
+    });
+    ticket.history = history as JsonValue;
   }
 
   async list(filters: {

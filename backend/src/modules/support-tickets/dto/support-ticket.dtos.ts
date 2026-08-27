@@ -93,3 +93,20 @@ export class UpdateTicketStatusDto {
   @IsIn(['OPEN', 'IN_PROGRESS', 'ANSWERED', 'CLOSED'])
   status: 'OPEN' | 'IN_PROGRESS' | 'ANSWERED' | 'CLOSED';
 }
+
+export class ReplySupportTicketDto {
+  @ApiProperty({ example: 'پاسخ و توضیحات تکمیلی…' })
+  @IsString()
+  @MinLength(2)
+  body: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'شناسه فایل بارگذاری‌شده متعلق به فرستنده (حداکثر یک فایل)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
+}

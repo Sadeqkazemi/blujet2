@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import type { App } from 'supertest/types';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
+import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
@@ -294,7 +295,14 @@ describe('Flight engine completion', () => {
         passengers: [{ fullName: 'مسافر کلاس نرخی', seatCode: '11A' }],
       })
       .expect(201);
-    expect(booking.body.data.priceIrr).toBe('30000000');
+    const seatPriceIrr = (
+      await dataSource
+        .getRepository(AncillaryService)
+        .findOneByOrFail({ key: 'seat-window-aisle' })
+    ).priceIrr;
+    expect(booking.body.data.priceIrr).toBe(
+      (30_000_000n + seatPriceIrr).toString(),
+    );
 
     const row = await dataSource
       .getRepository(Booking)

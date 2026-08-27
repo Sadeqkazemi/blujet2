@@ -19,7 +19,7 @@ import type {
   ReferralAttachment,
 } from '../../types/cartable';
 import AttachmentPicker from '../../components/AttachmentPicker';
-import AttachmentList from '../../components/AttachmentList';
+import ConversationHistory from '../../components/ConversationHistory';
 
 function initials(name: string): string {
   return name
@@ -200,25 +200,18 @@ export default function EmployeeCartablePage() {
 
         {sent.length > 0 && (
           <div className="mt-4 border-t border-[#1f2a3d] pt-3">
-            <div className="mb-2 text-[10px] font-bold text-[#6b7b94]">پیام‌های ارسالی</div>
-            <ul className="space-y-2">
-              {sent.map((s) => (
-                <li
-                  key={s.id}
-                  className="rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 py-2"
-                >
-                  <div className="text-[11px] text-[#e7ecf3]">{s.body}</div>
-                  {s.attachments?.length ? (
-                    <div className="mt-2">
-                      <AttachmentList attachments={s.attachments} />
-                    </div>
-                  ) : null}
-                  <div className="mt-1 text-[9px] text-[#6b7b94]">
-                    به {s.toName} · {formatJalaliDateTime(s.createdAt)}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <ConversationHistory
+              title="تاریخچه پیام‌های ارسالی"
+              items={sent.map((message) => ({
+                id: message.id,
+                title: `ارسال به ${message.toName}`,
+                body: message.body,
+                actor: message.toName,
+                createdAt: message.createdAt,
+                attachments: message.attachments,
+                side: 'sender',
+              }))}
+            />
           </div>
         )}
       </section>}

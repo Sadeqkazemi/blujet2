@@ -3,6 +3,7 @@ import type { App } from 'supertest/types';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
 import { FareRule } from '../src/database/entities/fare-rule.entity';
@@ -224,8 +225,16 @@ describe('Phase 13 Part B — fare-class management', () => {
       });
     expect(booking.status).toBe(201);
     // The EXPIRED (cheaper) class must be skipped — Y's price + tax used.
+    // Row 1 is extra-legroom, so its configured seat fee is also included.
     // Money fields are decimal STRINGs on the wire (BigInt.prototype.toJSON).
-    expect(booking.body.data.priceIrr).toBe(String(25_000_000 + 1_000_000));
+    const seatPriceIrr = (
+      await dataSource
+        .getRepository(AncillaryService)
+        .findOneByOrFail({ key: 'seat-legroom' })
+    ).priceIrr;
+    expect(booking.body.data.priceIrr).toBe(
+      (25_000_000n + 1_000_000n + seatPriceIrr).toString(),
+    );
     expect(booking.body.data.taxIrr).toBe('1000000');
   });
 
