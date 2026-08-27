@@ -32,12 +32,12 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 // part of this design's siteAdmin.access list). "کارتابل من" is
 // self-scoped (actor.id-filtered), so this is a safe read/act-on-own-items
 // grant. EMPLOYEE is method-scoped with @RequiresPermission(ct_*).
-@Roles(...EXEC_ROLES, 'SITE_ADMIN')
+@Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN')
 export class CartableController {
   constructor(private readonly cartable: CartableService) {}
 
   @Get()
-  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
   @RequiresPermission('ct_list')
   @ApiOperation({
     summary: 'کارتابل من — فقط موارد خود کاربر + شمارنده کارت‌ها',
@@ -51,7 +51,7 @@ export class CartableController {
   }
 
   @Get('unread-count')
-  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
   @RequiresPermission('ct_list')
   @ApiOperation({ summary: 'شمارندهٔ موارد دیده‌نشدهٔ کارتابل من' })
   async unreadCount(@CurrentUser() actor: AuthenticatedUser) {
@@ -113,7 +113,7 @@ export class CartableController {
   // matches routes in declaration order, and a wildcard segment here would
   // otherwise swallow 'unread-count', 'manager-recipients', etc.
   @Get(':id')
-  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
   @RequiresPermission('ct_list')
   @ApiOperation({
     summary:
@@ -128,7 +128,7 @@ export class CartableController {
   }
 
   @Patch(':id/approve')
-  @Roles(...EXEC_ROLES, 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
   @RequiresPermission('ct_process')
   @ApiOperation({ summary: 'تأیید — نظر مدیر الزامی' })
   async approve(

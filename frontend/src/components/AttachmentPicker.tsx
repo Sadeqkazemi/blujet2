@@ -6,9 +6,10 @@ interface AttachmentPickerProps {
   value: ReferralAttachment[];
   onChange: (files: ReferralAttachment[]) => void;
   disabled?: boolean;
+  theme?: 'light' | 'dark';
 }
 
-export default function AttachmentPicker({ value, onChange, disabled }: AttachmentPickerProps) {
+export default function AttachmentPicker({ value, onChange, disabled, theme = 'light' }: AttachmentPickerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -41,7 +42,7 @@ export default function AttachmentPicker({ value, onChange, disabled }: Attachme
 
   return (
     <div>
-      <label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border text-xs font-bold text-text-2 transition hover:border-accent hover:text-accent">
+      <label className={`flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed text-xs font-bold transition hover:border-accent hover:text-accent ${theme === 'dark' ? 'border-[#34435d] bg-[#101827] text-[#9fb0c7]' : 'border-border text-text-2'}`}>
         {uploading ? 'در حال بارگذاری…' : 'افزودن سند'}
         <input
           ref={inputRef}

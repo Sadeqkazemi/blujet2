@@ -41,6 +41,7 @@ describe('AgencyInboxPage', () => {
     });
 
     render(<AgencyInboxPage />);
+    expect(await screen.findByTestId('support-conversation-center')).toHaveAttribute('data-theme', 'light');
     expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
 
     const user = userEvent.setup();

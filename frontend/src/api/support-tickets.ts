@@ -50,6 +50,7 @@ export function createAdminSupportTicket(dto: {
   dept: SupportTicketDept;
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
   body: string;
+  attachmentIds?: string[];
 }) {
   return apiPost<SupportTicketRow>('/support-tickets/admin', dto);
 }

@@ -134,6 +134,7 @@ export const PANEL_NAV: Partial<Record<Role, PanelNavItem[]>> = {
     // REPORTING_ROLES). All eleven IT entries below have matching routes;
     // employee-level delegation is limited to the catalogued operations.
     { key: 'dashboard', labelFa: 'داشبورد فنی', implemented: true },
+    { key: 'cartable', labelFa: 'کارتابل', implemented: true },
     { key: 'users', labelFa: 'کاربران و دسترسی‌ها', implemented: true },
     { key: 'security', labelFa: 'رمزها و امنیت', implemented: true },
     { key: 'services', labelFa: 'سرویس‌های سایت', implemented: true },

@@ -21,6 +21,7 @@ function buildService(ticket: Record<string, unknown> | null) {
   const ticketRepo = {
     createQueryBuilder: jest.fn().mockReturnValue(qb),
     findOne: jest.fn().mockResolvedValue(ticket),
+    find: jest.fn().mockResolvedValue(ticket ? [ticket] : []),
     save: jest
       .fn()
       .mockImplementation((value: unknown) => Promise.resolve(value)),
@@ -127,6 +128,32 @@ describe('SupportTicketsService conversations', () => {
       expect.arrayContaining([
         expect.objectContaining({ body: 'پاسخ پشتیبانی', senderType: 'STAFF' }),
       ]),
+    );
+  });
+
+  it('does not expose an unassigned ticket to an employee', async () => {
+    const ticket = { ...baseTicket(), forwardedToId: null };
+    const { service } = buildService(ticket);
+    const employee = {
+      ...ACTOR,
+      role: 'EMPLOYEE' as const,
+      fullName: 'کارمند آزمون',
+    };
+
+    await expect(service.detail(employee, ticket.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('scopes the employee ticket list to tickets forwarded to that employee', async () => {
+    const ticket = { ...baseTicket(), forwardedToId: ACTOR.id };
+    const { service, ticketRepo } = buildService(ticket);
+    const employee = { ...ACTOR, role: 'EMPLOYEE' as const };
+
+    await service.list(employee, {});
+
+    expect(ticketRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { forwardedToId: ACTOR.id } }),
     );
   });
 

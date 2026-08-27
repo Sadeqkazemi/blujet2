@@ -25,8 +25,19 @@ import {
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { SupportTicketStatus } from '../../database/enums';
 
-/** پشتیبانی — public ticket submission (no login), plus SITE_ADMIN-gated
- * review, forwarding, status, attachment, and conversation endpoints. */
+const SUPPORT_MANAGER_ROLES = [
+  'SITE_ADMIN',
+  'SENIOR_MANAGER',
+  'CEO',
+  'BOARD_CHAIR',
+  'COMMERCIAL_MANAGER',
+  'FINANCE_MANAGER',
+  'IT_MANAGER',
+  'OPERATIONS_MANAGER',
+] as const;
+const SUPPORT_STAFF_ROLES = [...SUPPORT_MANAGER_ROLES, 'EMPLOYEE'] as const;
+
+/** پشتیبانی — ثبت عمومی تیکت و کارتابل مدیریت/کارمند با کنترل نقش و مالکیت. */
 @ApiTags('support-tickets')
 @Controller('support-tickets')
 export class SupportTicketsController {
@@ -42,7 +53,7 @@ export class SupportTicketsController {
 
   @Post('admin')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_MANAGER_ROLES)
   @ApiOperation({
     summary: 'ثبت تیکت از پنل ادمین سایت (مودال ایجاد تیکت — با بخش و اولویت)',
   })
@@ -56,19 +67,20 @@ export class SupportTicketsController {
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_STAFF_ROLES)
   @ApiOperation({ summary: 'فهرست تیکت‌های پشتیبانی' })
   async list(
+    @CurrentUser() actor: AuthenticatedUser,
     @Query('status') status?: SupportTicketStatus,
     @Query('dept') dept?: 'SITE' | 'AGENCY',
   ) {
-    const data = await this.tickets.list({ status, dept });
+    const data = await this.tickets.list(actor, { status, dept });
     return { success: true, data };
   }
 
   @Get('forward-targets')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_MANAGER_ROLES)
   @ApiOperation({ summary: 'فهرست کارکنان برای انتخاب مقصد ارجاع تیکت' })
   async forwardTargets(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.tickets.forwardTargets(actor);
@@ -77,16 +89,19 @@ export class SupportTicketsController {
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_STAFF_ROLES)
   @ApiOperation({ summary: 'جزئیات تیکت پشتیبانی' })
-  async detail(@Param('id') id: string) {
-    const data = await this.tickets.detail(id);
+  async detail(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.tickets.detail(actor, id);
     return { success: true, data };
   }
 
   @Patch(':id/forward')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_MANAGER_ROLES)
   @ApiOperation({ summary: 'ارجاع تیکت به کارمند/مدیر' })
   async forward(
     @CurrentUser() actor: AuthenticatedUser,
@@ -99,7 +114,7 @@ export class SupportTicketsController {
 
   @Patch(':id/status')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_MANAGER_ROLES)
   @ApiOperation({ summary: 'تغییر وضعیت تیکت' })
   async updateStatus(
     @CurrentUser() actor: AuthenticatedUser,
@@ -112,7 +127,7 @@ export class SupportTicketsController {
 
   @Post(':id/replies')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SITE_ADMIN')
+  @Roles(...SUPPORT_STAFF_ROLES)
   @ApiOperation({
     summary: 'ارسال پاسخ پشتیبانی در گفتگو و پاسخ‌داده‌شدن تیکت',
   })

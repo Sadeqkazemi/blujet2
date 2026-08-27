@@ -80,6 +80,16 @@ export class AdminCreateSupportTicketDto {
   @IsString()
   @MinLength(2)
   body: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'شناسه فایل بارگذاری‌شده توسط کارمند (حداکثر یک فایل)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1)
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
 }
 
 export class ForwardTicketDto {

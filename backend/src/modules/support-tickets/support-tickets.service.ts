@@ -81,6 +81,7 @@ export class SupportTicketsService {
     actor: AuthenticatedUser,
     dto: AdminCreateSupportTicketDto,
   ) {
+    await this.assertOwnedAttachments(actor, dto.attachmentIds);
     const phoneRaw = dto.requesterPhone?.trim();
     const phone = phoneRaw
       ? normalizeIranPhone(phoneRaw)
@@ -94,6 +95,7 @@ export class SupportTicketsService {
         body: dto.body,
         dept: dto.dept,
         priority: dto.priority,
+        attachments: dto.attachmentIds ?? [],
         updatedAt: new Date(),
         history: [
           {
@@ -353,7 +355,7 @@ export class SupportTicketsService {
     id: string,
     dto: ReplySupportTicketDto,
   ) {
-    const ticket = await this.getOrThrow(id);
+    const ticket = await this.getAccessibleTicket(actor, id);
     if (ticket.status === SupportTicketStatus.CLOSED) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
@@ -404,14 +406,18 @@ export class SupportTicketsService {
     ticket.history = history as JsonValue;
   }
 
-  async list(filters: {
-    status?: SupportTicketStatus;
-    dept?: 'SITE' | 'AGENCY';
-  }) {
+  async list(
+    actor: AuthenticatedUser,
+    filters: {
+      status?: SupportTicketStatus;
+      dept?: 'SITE' | 'AGENCY';
+    },
+  ) {
     const tickets = await this.ticketRepo.find({
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dept ? { dept: filters.dept } : {}),
+        ...(actor.role === 'EMPLOYEE' ? { forwardedToId: actor.id } : {}),
       },
       relations: { forwardedTo: true },
       order: { createdAt: 'DESC' },
@@ -436,8 +442,21 @@ export class SupportTicketsService {
     return ticket;
   }
 
-  async detail(id: string) {
-    return this.withResolvedAttachments(await this.getOrThrow(id));
+  private async getAccessibleTicket(actor: AuthenticatedUser, id: string) {
+    const ticket = await this.getOrThrow(id);
+    if (actor.role === 'EMPLOYEE' && ticket.forwardedToId !== actor.id) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'تیکت یافت نشد.',
+      });
+    }
+    return ticket;
+  }
+
+  async detail(actor: AuthenticatedUser, id: string) {
+    return this.withResolvedAttachments(
+      await this.getAccessibleTicket(actor, id),
+    );
   }
 
   /** Forwarding-target picker, scoped to this ticket system rather than
@@ -448,7 +467,7 @@ export class SupportTicketsService {
   }
 
   async forward(actor: AuthenticatedUser, id: string, targetUserId: string) {
-    const ticket = await this.getOrThrow(id);
+    const ticket = await this.getAccessibleTicket(actor, id);
     const targets = await this.staffDirectory.list(actor.id);
     const target = targets.find((t) => t.id === targetUserId);
     if (!target) {
@@ -495,7 +514,7 @@ export class SupportTicketsService {
     id: string,
     status: SupportTicketStatus,
   ) {
-    const ticket = await this.getOrThrow(id);
+    const ticket = await this.getAccessibleTicket(actor, id);
 
     const history = Array.isArray(ticket.history)
       ? [...(ticket.history as unknown[])]

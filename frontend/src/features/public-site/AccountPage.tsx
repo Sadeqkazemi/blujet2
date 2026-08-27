@@ -1459,6 +1459,7 @@ export default function AccountPage() {
         {tab === 'tickets' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <SupportConversationCenter
+              theme="light"
               locale={locale}
               tickets={tickets}
               selectedId={expandedTicketId}

@@ -37,6 +37,24 @@ const tickets: MySupportTicketRow[] = [
 ];
 
 describe('SupportConversationCenter', () => {
+  it('uses the light visual theme inside customer and agency shells', () => {
+    render(
+      <SupportConversationCenter
+        theme="light"
+        locale="fa"
+        tickets={tickets}
+        selectedId="ticket-1"
+        onSelect={vi.fn()}
+        onReply={vi.fn()}
+        onNew={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('support-conversation-center')).toHaveAttribute('data-theme', 'light');
+    expect(screen.getByTestId('support-conversation-center')).toHaveClass('bg-white');
+    expect(screen.getByRole('heading', { name: 'تیکت‌های من' })).toHaveClass('text-[#102a43]');
+  });
+
   it('renders status counters, ticket rows, the conversation, and sends a reply', async () => {
     const onReply = vi.fn().mockResolvedValue(undefined);
     render(
