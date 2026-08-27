@@ -3868,3 +3868,23 @@ contracts and retires the production mock adapters.
   frontend lint, targeted backend lint, PDF render verification, and
   `git diff --check`.
 - [x] User approved commit, merge, push, and UAT deployment on 2026-08-27.
+
+# Finance report audit, customer details, and 10-row tables (2026-08-27)
+
+- [x] Inspect the supplied two-page debit/credit PDF and all nine sheets of the
+  supplied sales-report workbook without importing any sample business rows.
+- [x] Document the selected-flight booking-detail contract and the no-schema
+  pagination decision before implementation.
+- [x] Make customer sales «جزئیات» open the selected flight's real booking data.
+- [x] Limit every report table to 10 visible rows with usable paging controls.
+- [x] Compare implemented coverage with IATA BSP/DISH, SIS/RAM and ICAO Form EF
+  and report gaps without claiming certification.
+- [x] Replace the placeholder PDF with a two-page A4 RTRD-style reconciliation
+  matching the supplied sample's structure and columns; retain the layout and
+  values while changing only the airline branding to Blujet.
+- [x] Upgrade finance Excel exports to a native multi-sheet `.xlsx` reporting
+  pack with summary, sales detail, agency settlement, refunds, tax breakdown,
+  flight summary, reconciliation and data-dictionary tabs.
+- [x] Pass focused frontend/backend tests, source lint, production builds and
+  automated rendered-DOM interaction coverage for the modal and paginator.
+- [ ] Commit/push, merge and deploy only after explicit user approval.

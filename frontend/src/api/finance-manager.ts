@@ -19,6 +19,7 @@ export interface FinanceReportFilters {
 }
 
 export interface FinanceSalesFilters {
+  flightInstanceId?: string;
   bookedFrom?: string;
   bookedTo?: string;
   flightFrom?: string;

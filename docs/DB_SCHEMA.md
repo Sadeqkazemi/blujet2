@@ -3033,3 +3033,12 @@ commercial manager's independent agency-catalogue gate. It does not alter
 existing bookings. Existing rows default to enabled so active sellable flights
 remain requestable unless a commercial manager explicitly disables the agency
 channel.
+
+## Finance report detail and paging correction (2026-08-27)
+
+No schema migration is required. The finance customer-flight detail is a
+read-only projection over existing `bookings`, `passengers`, `flight_instances`,
+`flights`, `routes`, `users`, and `ledger_entries`. Purchased cabin/fare class
+and monetary fields continue to come from the immutable booking snapshot.
+Report tables paginate in the client at exactly 10 visible rows per page; no
+duplicate summary or mutable reporting table is introduced.

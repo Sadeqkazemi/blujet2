@@ -31,6 +31,32 @@ const PERIODS: { key: FinanceReportPeriod; label: string }[] = [
 ];
 
 type TopTab = FinanceReportScope | 'FLIGHT_SEARCH' | 'SALES_ENGINE';
+const PAGE_SIZE = 10;
+
+function useTenRowPage<T>(rows: T[]) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  useEffect(() => setPage(1), [rows]);
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+  const start = (page - 1) * PAGE_SIZE;
+  return { page, setPage, totalPages, start, pageRows: rows.slice(start, start + PAGE_SIZE) };
+}
+
+function TablePagination({ page, totalPages, start, total, onPage }: { page: number; totalPages: number; start: number; total: number; onPage: (page: number) => void }) {
+  if (!total) return null;
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#222e43] px-4 py-3 text-[10px] text-[#9fb0c7]">
+      <span>نمایش {faDigits(start + 1)} تا {faDigits(Math.min(start + PAGE_SIZE, total))} از {faDigits(total)} رکورد</span>
+      <div className="flex items-center gap-2">
+        <button type="button" aria-label="صفحه قبل" disabled={page === 1} onClick={() => onPage(page - 1)} className="rounded-lg border border-[#2b3852] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">قبلی</button>
+        <span className="font-num">{faDigits(page)} / {faDigits(totalPages)}</span>
+        <button type="button" aria-label="صفحه بعد" disabled={page === totalPages} onClick={() => onPage(page + 1)} className="rounded-lg border border-[#2b3852] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">بعدی</button>
+      </div>
+    </div>
+  );
+}
 
 function jalaliMonth(month: number) {
   return dayjs().calendar('jalali').month(month).startOf('month');
@@ -116,12 +142,13 @@ function MonthPicker({ selected, onSelect }: { selected: number; onSelect: (mont
 }
 
 function PartnerTable({ result }: { result: Extract<FinanceReportResult, { kind: 'partners' }> }) {
+  const paging = useTenRowPage(result.rows);
   if (!result.rows.length) return <EmptyState text="در این بازه گزارشی ثبت نشده است." />;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-right text-xs">
+    <div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-right text-xs">
         <thead className="text-[10px] text-[#6b7b94]"><tr><th className="px-4 py-3">نام</th><th className="px-4 py-3">فروش کل</th><th className="px-4 py-3">پرداخت‌شده</th><th className="px-4 py-3">مانده</th></tr></thead>
-        <tbody>{result.rows.map((row) => (
+        <tbody>{paging.pageRows.map((row) => (
           <tr key={row.id} className="border-t border-[#222e43] text-white">
             <td className="px-4 py-4 font-extrabold">{row.name}</td>
             <td className="font-num px-4 py-4">{faMoney(row.totalIrr)} تومان</td>
@@ -129,7 +156,8 @@ function PartnerTable({ result }: { result: Extract<FinanceReportResult, { kind:
             <td className={`font-num px-4 py-4 font-bold ${BigInt(row.outstandingIrr) > 0n ? 'text-[#f59e0b]' : 'text-[#34d399]'}`}>{BigInt(row.outstandingIrr) > 0n ? `${faMoney(row.outstandingIrr)} تومان` : 'تسویه‌شده'}</td>
           </tr>
         ))}</tbody>
-      </table>
+      </table></div>
+      <TablePagination page={paging.page} totalPages={paging.totalPages} start={paging.start} total={result.rows.length} onPage={paging.setPage} />
     </div>
   );
 }
@@ -147,6 +175,7 @@ function FlightTable({
   summary?: { totalIrr: string; soldSeats: number };
   period?: FinanceReportPeriod;
 }) {
+  const paging = useTenRowPage(rows);
   if (!rows.length) return <EmptyState text="پروازی در بازه انتخاب‌شده وجود ندارد." />;
   const periodLabel =
     period === 'day'
@@ -197,7 +226,7 @@ function FlightTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
+            {paging.pageRows.map((row) => {
               const direct = Math.max(0, row.soldSeats - row.agencySeats);
               return (
                 <tr key={row.flightInstanceId} className="border-t border-[#222e43] text-white">
@@ -233,6 +262,49 @@ function FlightTable({
           </tbody>
         </table>
       </div>
+      <TablePagination page={paging.page} totalPages={paging.totalPages} start={paging.start} total={rows.length} onPage={paging.setPage} />
+    </div>
+  );
+}
+
+function AgencySalesTable({ agencies }: { agencies: FinanceFlightDetail['agencies'] }) {
+  const paging = useTenRowPage(agencies);
+  if (!agencies.length) return <EmptyState text="این پرواز فروش آژانسی ندارد." />;
+  return (
+    <div className="rounded-xl border border-[#26334b]">
+      <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-xs"><thead className="text-[10px] text-[#6b7b94]"><tr><th className="p-3">نام آژانس</th><th className="p-3">تعداد صندلی</th><th className="p-3">مبلغ فروش</th><th className="p-3">پرداخت‌شده</th><th className="p-3">بدهی</th></tr></thead><tbody>{paging.pageRows.map((agency) => <tr key={agency.agencyId} className="border-t border-[#222e43]"><td className="p-3 font-bold">{agency.agencyName}</td><td className="font-num p-3">{faDigits(agency.soldSeats)}</td><td className="font-num p-3">{faMoney(agency.salesIrr)} تومان</td><td className="font-num p-3 text-[#34d399]">{faMoney(agency.paidIrr)} تومان</td><td className="font-num p-3 text-[#f59e0b]">{faMoney(agency.outstandingIrr)} تومان</td></tr>)}</tbody></table></div>
+      <TablePagination page={paging.page} totalPages={paging.totalPages} start={paging.start} total={agencies.length} onPage={paging.setPage} />
+    </div>
+  );
+}
+
+function BookingSalesTable({ bookings }: { bookings: FinanceFlightDetail['bookings'] }) {
+  const paging = useTenRowPage(bookings);
+  if (!bookings.length) return <EmptyState text="برای این پرواز رزرو قطعی ثبت نشده است." />;
+  return (
+    <div className="rounded-xl border border-[#26334b]">
+      <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-right text-[10px]"><thead className="text-[#6b7b94]"><tr>{['PNR','تاریخ رزرو','وضعیت','پرداخت','کانال','کلاس','مسافر','پایه','مالیات','خدمات','جمع'].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}</tr></thead><tbody>{paging.pageRows.map((row) => <tr key={row.bookingId} className="border-t border-[#222e43] text-[#e7ecf3]"><td dir="ltr" className="px-3 py-3 font-bold text-[#7da7ff]">{row.pnr}</td><td className="px-3 py-3">{formatJalaliDate(row.bookedAt)}</td><td className="px-3 py-3">{row.bookingStatus}</td><td className="px-3 py-3">{row.paymentStatus}</td><td className="px-3 py-3">{row.channel}</td><td dir="ltr" className="px-3 py-3">{row.cabin}{row.fareClassCode ? `/${row.fareClassCode}` : ''}</td><td className="px-3 py-3">{faDigits(row.passengerCount)}</td><td className="font-num px-3 py-3">{faMoney(row.baseFareIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.taxIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.extrasIrr)}</td><td className="font-num px-3 py-3 font-bold">{faMoney(row.totalIrr)}</td></tr>)}</tbody></table></div>
+      <TablePagination page={paging.page} totalPages={paging.totalPages} start={paging.start} total={bookings.length} onPage={paging.setPage} />
+    </div>
+  );
+}
+
+function FlightDetailDialog({ target, detail, loading, error, busy, onClose, onRetry, onExport }: { target: FinanceFlightRow; detail: FinanceFlightDetail | null; loading: boolean; error: boolean; busy: string | null; onClose: () => void; onRetry: () => void; onExport: (format: 'csv' | 'excel' | 'pdf') => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="finance-flight-detail-title">
+      <section className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-[#2b3852] bg-[#111a2b] shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[#26334b] bg-[#111a2b] px-5 py-4">
+          <div><h2 id="finance-flight-detail-title" className="text-base font-black text-white">جزئیات فروش پرواز {target.flightNo}</h2><p className="mt-1 text-[10px] text-[#9fb0c7]">{target.originCityFa} ← {target.destCityFa} · {formatJalaliDate(target.departureAt)}</p></div>
+          <button type="button" aria-label="بستن جزئیات" onClick={onClose} className="h-9 w-9 rounded-lg border border-[#2b3852] text-lg text-[#9fb0c7]">×</button>
+        </header>
+        {loading ? <EmptyState text="در حال دریافت جزئیات فروش…" /> : error ? <ErrorState onRetry={onRetry} /> : detail ? (
+          <div className="space-y-5 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3"><div className="grid flex-1 grid-cols-2 gap-3 md:grid-cols-4">{[['فروش مستقیم', detail.summary.soldSeats - detail.summary.agencySeats], ['فروش آژانس', detail.summary.agencySeats], ['فروش‌نرفته', detail.summary.unsoldSeats], ['فروش کل', `${faMoney(detail.summary.totalIrr)} تومان`]].map(([label, value]) => <div key={label} className="rounded-xl border border-[#26334b] bg-[#141d2e] p-3"><span className="block text-[9px] text-[#6b7b94]">{label}</span><strong className="font-num mt-1 block text-sm text-white">{typeof value === 'number' ? faDigits(value) : value}</strong></div>)}</div><ExportButtons busy={busy} onExport={onExport} /></div>
+            <section><h3 className="mb-2 text-sm font-extrabold text-white">فروش مشتریان و رزروها</h3><BookingSalesTable bookings={detail.bookings} /></section>
+            <section><h3 className="mb-2 text-sm font-extrabold text-white">تفکیک فروش آژانس‌ها</h3><AgencySalesTable agencies={detail.agencies} /></section>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }
@@ -258,6 +330,8 @@ function SalesEngineView({
   onExport: (format: 'csv' | 'excel' | 'pdf') => void;
   busy: string | null;
 }) {
+  const salesRows = useMemo(() => result?.rows ?? [], [result]);
+  const paging = useTenRowPage(salesRows);
   const fieldClass = 'h-10 rounded-[9px] border border-[#2b3852] bg-[#18223a] px-3 text-[11px] text-white outline-none focus:border-[#4f7ff0]';
   const update = (key: keyof FinanceSalesFilters, value: string) =>
     onChange({ ...filters, [key]: value || undefined });
@@ -298,8 +372,9 @@ function SalesEngineView({
             ].map(([label, value]) => <div key={label} className="rounded-xl border border-[#26334b] bg-[#111a2b] p-3"><span className="block text-[9px] text-[#6b7b94]">{label}</span><strong className="font-num mt-1 block text-sm text-white">{value}</strong></div>)}
           </div>
           <div className="overflow-x-auto border-t border-[#222e43]">
-            <table className="w-full min-w-[1250px] text-right text-[10px]"><thead className="text-[#6b7b94]"><tr>{['PNR','تاریخ رزرو','وضعیت','پرداخت','کانال','پرواز','مسیر','تاریخ پرواز','کلاس','مسافر','پایه','مالیات','خدمات','جمع'].map((h) => <th key={h} className="px-3 py-3">{h}</th>)}</tr></thead><tbody>{result.rows.map((row) => <tr key={row.bookingId} className="border-t border-[#222e43] text-[#e7ecf3]"><td dir="ltr" className="px-3 py-3 font-bold text-[#7da7ff]">{row.pnr}</td><td className="px-3 py-3">{formatJalaliDate(row.bookedAt)}</td><td className="px-3 py-3">{row.bookingStatus}</td><td className="px-3 py-3">{row.paymentStatus}</td><td className="px-3 py-3">{row.channel}</td><td dir="ltr" className="px-3 py-3">{row.flightNo}</td><td dir="ltr" className="px-3 py-3">{row.originCode}-{row.destCode}</td><td className="px-3 py-3">{formatJalaliDate(row.departureAt)}</td><td dir="ltr" className="px-3 py-3">{row.cabin}{row.fareClassCode ? `/${row.fareClassCode}` : ''}</td><td className="px-3 py-3">{faDigits(row.passengerCount)}</td><td className="font-num px-3 py-3">{faMoney(row.baseFareIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.taxIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.extrasIrr)}</td><td className="font-num px-3 py-3 font-bold">{faMoney(row.totalIrr)}</td></tr>)}</tbody></table>
+            <table className="w-full min-w-[1250px] text-right text-[10px]"><thead className="text-[#6b7b94]"><tr>{['PNR','تاریخ رزرو','وضعیت','پرداخت','کانال','پرواز','مسیر','تاریخ پرواز','کلاس','مسافر','پایه','مالیات','خدمات','جمع'].map((h) => <th key={h} className="px-3 py-3">{h}</th>)}</tr></thead><tbody>{paging.pageRows.map((row) => <tr key={row.bookingId} className="border-t border-[#222e43] text-[#e7ecf3]"><td dir="ltr" className="px-3 py-3 font-bold text-[#7da7ff]">{row.pnr}</td><td className="px-3 py-3">{formatJalaliDate(row.bookedAt)}</td><td className="px-3 py-3">{row.bookingStatus}</td><td className="px-3 py-3">{row.paymentStatus}</td><td className="px-3 py-3">{row.channel}</td><td dir="ltr" className="px-3 py-3">{row.flightNo}</td><td dir="ltr" className="px-3 py-3">{row.originCode}-{row.destCode}</td><td className="px-3 py-3">{formatJalaliDate(row.departureAt)}</td><td dir="ltr" className="px-3 py-3">{row.cabin}{row.fareClassCode ? `/${row.fareClassCode}` : ''}</td><td className="px-3 py-3">{faDigits(row.passengerCount)}</td><td className="font-num px-3 py-3">{faMoney(row.baseFareIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.taxIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.extrasIrr)}</td><td className="font-num px-3 py-3 font-bold">{faMoney(row.totalIrr)}</td></tr>)}</tbody></table>
           </div>
+          <TablePagination page={paging.page} totalPages={paging.totalPages} start={paging.start} total={salesRows.length} onPage={paging.setPage} />
         </>
       )}
     </section>
@@ -319,6 +394,9 @@ export default function FinanceReportsPage() {
   const [query, setQuery] = useState('');
   const [searchRows, setSearchRows] = useState<FinanceFlightRow[] | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<FinanceFlightDetail | null>(null);
+  const [detailTarget, setDetailTarget] = useState<FinanceFlightRow | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
   const [salesFilters, setSalesFilters] = useState<FinanceSalesFilters>(EMPTY_SALES_FILTERS);
   const [appliedSalesFilters, setAppliedSalesFilters] = useState<FinanceSalesFilters>(EMPTY_SALES_FILTERS);
   const [salesResult, setSalesResult] = useState<FinanceSalesResult | null>(null);
@@ -369,7 +447,7 @@ export default function FinanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `finance-report.${format === 'excel' ? 'xls' : format}`;
+      link.download = `finance-report.${format === 'excel' ? 'xlsx' : format}`;
       link.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -380,6 +458,20 @@ export default function FinanceReportsPage() {
   async function selectFlight(row: FinanceFlightRow) {
     setSelectedFlight(null);
     setSelectedFlight(await fetchFinanceFlightDetail(row.flightInstanceId));
+  }
+
+  async function openFlightDetail(row: FinanceFlightRow) {
+    setDetailTarget(row);
+    setSelectedFlight(null);
+    setDetailLoading(true);
+    setDetailError(false);
+    try {
+      setSelectedFlight(await fetchFinanceFlightDetail(row.flightInstanceId));
+    } catch {
+      setDetailError(true);
+    } finally {
+      setDetailLoading(false);
+    }
   }
 
   async function exportSelectedFlight(format: 'csv' | 'excel' | 'pdf') {
@@ -397,7 +489,7 @@ export default function FinanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'excel' ? 'xls' : format}`;
+      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'excel' ? 'xlsx' : format}`;
       link.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -412,7 +504,7 @@ export default function FinanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `finance-sales.${format === 'excel' ? 'xls' : format}`;
+      link.download = `finance-sales.${format === 'excel' ? 'xlsx' : format}`;
       link.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -468,7 +560,7 @@ export default function FinanceReportsPage() {
               ) : (
                 <FlightTable
                   rows={result.rows}
-                  onSelect={selectFlight}
+                  onSelect={(row) => void openFlightDetail(row)}
                   rich={tab === 'CUSTOMERS'}
                   summary={result.summary}
                   period={result.period}
@@ -545,10 +637,22 @@ export default function FinanceReportsPage() {
                 </div>
               </div>
               <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">{[['مسافران عادی', selectedFlight.summary.soldSeats - selectedFlight.summary.agencySeats], ['صندلی آژانس‌ها', selectedFlight.summary.agencySeats], ['تعداد آژانس‌ها', selectedFlight.summary.agencyCount], ['صندلی فروش‌نرفته', selectedFlight.summary.unsoldSeats]].map(([label, value]) => <div key={label} className="rounded-xl border border-[#26334b] bg-[#111a2b] p-4"><span className="block text-[10px] text-[#6b7b94]">{label}</span><strong className="font-num mt-2 block text-lg text-white">{faDigits(value)}</strong></div>)}</div>
-              {selectedFlight.agencies.length === 0 ? <EmptyState text="این پرواز فروش آژانسی ندارد." /> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-right text-xs"><thead className="text-[10px] text-[#6b7b94]"><tr><th className="p-3">نام آژانس</th><th className="p-3">تعداد صندلی</th><th className="p-3">مبلغ فروش</th><th className="p-3">پرداخت‌شده</th><th className="p-3">بدهی</th></tr></thead><tbody>{selectedFlight.agencies.map((agency) => <tr key={agency.agencyId} className="border-t border-[#222e43]"><td className="p-3 font-bold">{agency.agencyName}</td><td className="font-num p-3">{faDigits(agency.soldSeats)}</td><td className="font-num p-3">{faMoney(agency.salesIrr)} تومان</td><td className="font-num p-3 text-[#34d399]">{faMoney(agency.paidIrr)} تومان</td><td className="font-num p-3 text-[#f59e0b]">{faMoney(agency.outstandingIrr)} تومان</td></tr>)}</tbody></table></div>}
+              <AgencySalesTable agencies={selectedFlight.agencies} />
             </section>
           )}
         </>
+      )}
+      {detailTarget && (
+        <FlightDetailDialog
+          target={detailTarget}
+          detail={selectedFlight}
+          loading={detailLoading}
+          error={detailError}
+          busy={exportBusy}
+          onClose={() => { setDetailTarget(null); setSelectedFlight(null); }}
+          onRetry={() => void openFlightDetail(detailTarget)}
+          onExport={(format) => void exportSelectedFlight(format)}
+        />
       )}
     </div>
   );
