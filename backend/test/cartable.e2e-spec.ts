@@ -101,12 +101,18 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.body.data.counts.ADMIN).toBeGreaterThan(0);
   });
 
-  it('a non-exec role (IT_MANAGER) gets 403 on cartable endpoints', async () => {
+  it('IT_MANAGER can access the unified cartable', async () => {
     const { accessToken } = await loginAs(app, 'itadmin');
     const res = await request(app.getHttpServer())
       .get('/cartable')
       .set('Authorization', `Bearer ${accessToken}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual(
+      expect.objectContaining({
+        tasks: expect.any(Array),
+        counts: expect.any(Object),
+      }),
+    );
   });
 
   // ── Detail + unread state ────────────────────────────────────────────

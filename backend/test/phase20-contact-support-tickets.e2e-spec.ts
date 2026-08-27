@@ -206,12 +206,13 @@ describe('Phase 20 — contact + support tickets (e2e)', () => {
       expect(res.status).toBe(401);
     });
 
-    it('403s the list endpoint for a non-SITE_ADMIN staff role', async () => {
+    it('allows FINANCE_MANAGER to list support tickets from its cartable', async () => {
       const { accessToken } = await loginAs(app, 'finance');
       const res = await request(app.getHttpServer())
         .get('/support-tickets')
         .set('Authorization', `Bearer ${accessToken}`);
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body.data)).toBe(true);
     });
 
     it('SITE_ADMIN lists, views detail, forwards, and changes status', async () => {
