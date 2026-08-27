@@ -4005,3 +4005,23 @@ reservation source of truth. `POST /agency-portal/seat-requests` additionally
 accepts `selectedFlightInstanceIds`; every id must belong to the confirmed
 route/class series and have enough live request capacity. `CREDIT` is accepted
 only when the active agency credit line covers the server-computed total.
+
+## Channel inventory and message attachments (2026-08-27)
+
+- `PATCH /flights/:instanceId/fare-rules/:ruleId/site-price`
+  accepts `priceIrr`, `reason`, and optional `seats`. `seats` is the public-site
+  release for that fare class. Together with the agency release it cannot
+  exceed `FareRule.seatsAllocated`.
+- Public search, price-calendar results, and `POST /bookings` use the remaining
+  site release (`siteSeatsReleased - active SYSTEM passengers`) and still obey
+  the smaller physical/commercial cabin ceiling. A cabin with no site release
+  is omitted from public search.
+- `POST /agency-portal/seat-inquiry` returns `suggestedSeats` and
+  `canFulfillRequested`. If the request exceeds the live agency release,
+  `suggestedSeats` is the largest currently orderable quantity. The subsequent
+  seat request remains transactionally revalidated.
+- Agency inbox messages, employee-to-manager messages, and manager cartable
+  messages accept `attachmentIds: string[]`. Every id must belong to the sender.
+  Message/history responses resolve those ids to file metadata, and
+  `GET /files/:id` authorizes the sender, recipient/assignee, agency participant,
+  or staff participant as applicable.

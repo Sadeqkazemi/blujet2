@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react';
 import Modal from '../../components/Modal';
 import { postInboxMessage } from '../../api/agency-portal';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import type { ReferralAttachment } from '../../types/cartable';
 
 const COPY: Record<StoredLocale, {
   title: string;
@@ -67,6 +69,7 @@ export default function AgencyComposeMessageModal({ onClose, onSent }: { onClose
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [attachments, setAttachments] = useState<ReferralAttachment[]>([]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -78,7 +81,10 @@ export default function AgencyComposeMessageModal({ onClose, onSent }: { onClose
     setBusy(true);
     setError(null);
     try {
-      await postInboxMessage(`گیرنده: ${recipientLabel}\nموضوع: ${subject.trim()}\n\n${body.trim()}`);
+      await postInboxMessage(
+        `گیرنده: ${recipientLabel}\nموضوع: ${subject.trim()}\n\n${body.trim()}`,
+        attachments.map((file) => file.id),
+      );
       onSent?.();
       onClose();
     } catch {
@@ -106,6 +112,7 @@ export default function AgencyComposeMessageModal({ onClose, onSent }: { onClose
           {t.body}
           <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder={t.bodyPlaceholder} rows={5} className="mt-2 w-full resize-y rounded-xl border border-[#e1e6ee] bg-[#f8f9fc] p-4 text-sm leading-7 outline-none focus:border-[#1668c4]" />
         </label>
+        <AttachmentPicker value={attachments} onChange={setAttachments} disabled={busy} />
         {error && <p role="alert" className="text-xs font-bold text-red-600">{error}</p>}
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className="h-12 flex-1 rounded-xl bg-[#1668c4] text-sm font-black text-white disabled:opacity-60">{busy ? t.sending : t.send}</button>

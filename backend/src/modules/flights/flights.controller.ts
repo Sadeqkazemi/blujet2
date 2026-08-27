@@ -359,6 +359,16 @@ class UpdateFareClassSitePriceDto {
   @TransformToIrr()
   priceIrr: Irr;
 
+  @ApiProperty({
+    required: false,
+    description: 'تعداد صندلی آزادشده برای فروش سایت',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  seats?: number;
+
   @ApiProperty({ example: 'افزایش تقاضا در این کلاس' })
   @IsString()
   reason: string;
@@ -642,7 +652,12 @@ export class FlightsController {
   }
 
   @Get('operations-queue')
-  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @Roles(
+    Role.OPERATIONS_MANAGER,
+    Role.SENIOR_MANAGER,
+    Role.COMMERCIAL_MANAGER,
+    Role.EMPLOYEE,
+  )
   @RequiresPermission('op_view')
   @ApiOperation({
     summary: 'صف بررسی مدیر عملیات (PENDING_OPERATIONS)',
@@ -653,7 +668,12 @@ export class FlightsController {
   }
 
   @Get('operations-overview')
-  @Roles(Role.OPERATIONS_MANAGER, Role.SENIOR_MANAGER, Role.COMMERCIAL_MANAGER, Role.EMPLOYEE)
+  @Roles(
+    Role.OPERATIONS_MANAGER,
+    Role.SENIOR_MANAGER,
+    Role.COMMERCIAL_MANAGER,
+    Role.EMPLOYEE,
+  )
   @RequiresPermission('op_view')
   @ApiOperation({
     summary: 'داشبورد و فهرست وضعیت‌های گردش کار مدیر عملیات',
@@ -1064,6 +1084,7 @@ export class FlightsController {
       ruleId,
       dto.priceIrr,
       dto.reason,
+      dto.seats,
     );
     return { success: true, data };
   }

@@ -15,10 +15,12 @@ import { ManagerReferralReport } from '../../database/entities/manager-referral-
 import { ManagerMessage } from '../../database/entities/manager-message.entity';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
 import { SupportTicket } from '../../database/entities/support-ticket.entity';
+import { AgencyMessage } from '../../database/entities/agency-message.entity';
 import { CartableSourceType } from '../../database/enums';
 import { AuditService } from '../audit/audit.service';
 import { ErrorCode } from '../../common/errors';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { STAFF_ROLES } from '../../common/exec-roles';
 
 export const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -45,6 +47,8 @@ export class FilesService {
     private readonly cartableTaskRepo: Repository<CartableTask>,
     @InjectRepository(SupportTicket)
     private readonly supportTicketRepo: Repository<SupportTicket>,
+    @InjectRepository(AgencyMessage)
+    private readonly agencyMessageRepo: Repository<AgencyMessage>,
     private readonly audit: AuditService,
   ) {}
 
@@ -160,6 +164,18 @@ export class FilesService {
       if (delivered > 0) return true;
     }
 
+    const directTask = await this.cartableTaskRepo
+      .createQueryBuilder('task')
+      .where('task.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .andWhere(
+        '(task."senderId" = :actorId OR task."assigneeId" = :actorId)',
+        {
+          actorId: actor.id,
+        },
+      )
+      .getOne();
+    if (directTask) return true;
+
     const supportTicket = await this.supportTicketRepo
       .createQueryBuilder('ticket')
       .select(['ticket.id', 'ticket.userId', 'ticket.forwardedToId'])
@@ -170,6 +186,18 @@ export class FilesService {
       (supportTicket.userId === actor.id ||
         supportTicket.forwardedToId === actor.id ||
         actor.role === 'SITE_ADMIN')
+    )
+      return true;
+
+    const agencyMessage = await this.agencyMessageRepo
+      .createQueryBuilder('message')
+      .where('message.attachments @> :fileIdJson::jsonb', { fileIdJson })
+      .getOne();
+    if (
+      agencyMessage &&
+      (agencyMessage.senderId === actor.id ||
+        agencyMessage.agencyId === actor.id ||
+        STAFF_ROLES.some((role) => role === actor.role))
     )
       return true;
 

@@ -49,6 +49,21 @@ const CREDIT_REVIEW_ROLES = [
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
+export function agencySeatSuggestion(
+  requestedSeats: number,
+  availableSeats: number,
+) {
+  const normalizedRequested = Math.max(0, Math.trunc(requestedSeats));
+  const suggestedSeats = Math.min(
+    normalizedRequested,
+    Math.max(0, Math.trunc(availableSeats)),
+  );
+  return {
+    suggestedSeats,
+    canFulfillRequested: suggestedSeats === normalizedRequested,
+  };
+}
+
 export function isAgencySeatRequestOccurrence(
   instance: Pick<
     FlightInstance,
@@ -477,10 +492,20 @@ export class AgencyPortalService {
     return this.agencies.listMessages(actor.id);
   }
 
-  async postInboxMessage(actor: AuthenticatedUser, body: string) {
+  async postInboxMessage(
+    actor: AuthenticatedUser,
+    body: string,
+    attachmentIds?: string[],
+  ) {
     await this.assertAgencyPortalWritable(actor);
     await this.getOwnProfileOrThrow(actor);
-    return this.agencies.postMessage(actor, actor.id, body, true);
+    return this.agencies.postMessage(
+      actor,
+      actor.id,
+      body,
+      true,
+      attachmentIds,
+    );
   }
 
   // ── Profile & documents ──────────────────────────────────────────────
@@ -635,13 +660,13 @@ export class AgencyPortalService {
     const now = new Date();
     const instances = (
       await this.flightInstanceRepo.find({
-      where: {
-        departureAt: MoreThanOrEqual(now),
-        status: FlightInstanceStatus.SCHEDULED,
-      },
-      relations: { flight: { route: true } },
-      order: { departureAt: 'ASC' },
-      take: 200,
+        where: {
+          departureAt: MoreThanOrEqual(now),
+          status: FlightInstanceStatus.SCHEDULED,
+        },
+        relations: { flight: { route: true } },
+        order: { departureAt: 'ASC' },
+        take: 200,
       })
     ).filter((instance) => isAgencySeatRequestOccurrence(instance, now));
 
@@ -946,12 +971,18 @@ export class AgencyPortalService {
           ? 'تقاضا متوسط است؛ ظرفیت آزادشده را بر اساس فروش واقعی تنظیم کنید.'
           : 'ظرفیت کافی است؛ برای این پرواز فعلاً آزادسازی بیشتری لازم نیست.';
     const unitPrice = rule.agencyReleasePriceIrr ?? 0n;
+    const { suggestedSeats, canFulfillRequested } = agencySeatSuggestion(
+      dto.seats,
+      availableToRequest,
+    );
 
     return {
       flightInstanceId: instance.id,
       cabin: dto.cabin,
       fareClassCode: dto.fareClassCode,
       requestedSeats: dto.seats,
+      suggestedSeats,
+      canFulfillRequested,
       capacity,
       soldSeats: sold,
       heldSeats: held,
@@ -967,9 +998,11 @@ export class AgencyPortalService {
       season,
       occasion,
       demandLevel,
-      recommendation,
+      recommendation: canFulfillRequested
+        ? recommendation
+        : `${availableToRequest} صندلی در حال حاضر قابل ارائه است.`,
       pricePerSeatIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
-      totalPriceIrr: (unitPrice * BigInt(dto.seats)).toString(),
+      totalPriceIrr: (unitPrice * BigInt(suggestedSeats)).toString(),
     };
   }
 

@@ -6,6 +6,7 @@ import { ManagerReferral } from '../../database/entities/manager-referral.entity
 import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { CartableController } from './cartable.controller';
 import { CartableService } from './cartable.service';
 import { PanelsModule } from '../panels/panels.module';
@@ -21,6 +22,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       ManagerReferralReport,
       User,
       AuditLog,
+      StoredFile,
     ]),
     PanelsModule,
     AuditModule,

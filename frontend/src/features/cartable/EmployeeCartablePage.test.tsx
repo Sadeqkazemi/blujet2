@@ -73,7 +73,11 @@ describe('EmployeeCartablePage', () => {
     await userEvent.type(screen.getByLabelText('متن پیام'), 'سلام');
     await userEvent.click(screen.getByRole('button', { name: 'ارسال' }));
     await waitFor(() => {
-      expect(send).toHaveBeenCalledWith({ toId: 'mgr1', body: 'سلام' });
+      expect(send).toHaveBeenCalledWith({
+        toId: 'mgr1',
+        body: 'سلام',
+        attachmentIds: [],
+      });
     });
   });
 

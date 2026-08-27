@@ -17,6 +17,7 @@ import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
 import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
+import AttachmentList from '../../components/AttachmentList';
 import type {
   CartableCategory,
   CartableListResult,
@@ -543,6 +544,9 @@ export default function CartablePage() {
             <p className={`mt-1 text-xs leading-relaxed ${dark ? 'text-[#9fb0c7]' : 'text-text-2'}`}>
               {reviewTask.description}
             </p>
+            {reviewTask.attachments?.length ? (
+              <AttachmentList attachments={reviewTask.attachments} />
+            ) : null}
           </div>
           <div
             className={`mb-4 rounded-lg p-3 ${dark ? 'bg-[#18223a]' : 'bg-surface'}`}

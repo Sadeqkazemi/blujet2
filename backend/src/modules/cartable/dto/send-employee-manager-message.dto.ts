@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, MinLength } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MinLength,
+} from 'class-validator';
 
 export class SendEmployeeManagerMessageDto {
   @ApiProperty({ description: 'شناسه مدیر مقصد' })
@@ -13,4 +20,11 @@ export class SendEmployeeManagerMessageDto {
   @IsString()
   @MinLength(1, { message: 'متن پیام الزامی است.' })
   body: string;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  attachmentIds?: string[];
 }

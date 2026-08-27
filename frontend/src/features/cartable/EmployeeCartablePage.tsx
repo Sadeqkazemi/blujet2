@@ -16,7 +16,10 @@ import type {
   CartableTask,
   EmployeeManagerRecipient,
   SentEmployeeManagerMessage,
+  ReferralAttachment,
 } from '../../types/cartable';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import AttachmentList from '../../components/AttachmentList';
 
 function initials(name: string): string {
   return name
@@ -39,6 +42,7 @@ export default function EmployeeCartablePage() {
   const [msgTo, setMsgTo] = useState('');
   const [msgText, setMsgText] = useState('');
   const [sending, setSending] = useState(false);
+  const [msgAttachments, setMsgAttachments] = useState<ReferralAttachment[]>([]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -99,11 +103,16 @@ export default function EmployeeCartablePage() {
     setSending(true);
     setError(null);
     try {
-      await sendEmployeeManagerMessage({ toId: msgTo, body: msgText.trim() });
+      await sendEmployeeManagerMessage({
+        toId: msgTo,
+        body: msgText.trim(),
+        attachmentIds: msgAttachments.map((file) => file.id),
+      });
       const target = recipients.find((r) => r.id === msgTo);
       setNotice(`پیام به ${target?.fullName ?? 'مدیر'} ارسال شد ✓`);
       setMsgTo('');
       setMsgText('');
+      setMsgAttachments([]);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'خطا در ارسال پیام.');
@@ -185,6 +194,10 @@ export default function EmployeeCartablePage() {
           </button>
         </div>
 
+        <div className="mt-3">
+          <AttachmentPicker value={msgAttachments} onChange={setMsgAttachments} disabled={sending} />
+        </div>
+
         {sent.length > 0 && (
           <div className="mt-4 border-t border-[#1f2a3d] pt-3">
             <div className="mb-2 text-[10px] font-bold text-[#6b7b94]">پیام‌های ارسالی</div>
@@ -195,6 +208,11 @@ export default function EmployeeCartablePage() {
                   className="rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 py-2"
                 >
                   <div className="text-[11px] text-[#e7ecf3]">{s.body}</div>
+                  {s.attachments?.length ? (
+                    <div className="mt-2">
+                      <AttachmentList attachments={s.attachments} />
+                    </div>
+                  ) : null}
                   <div className="mt-1 text-[9px] text-[#6b7b94]">
                     به {s.toName} · {formatJalaliDateTime(s.createdAt)}
                   </div>

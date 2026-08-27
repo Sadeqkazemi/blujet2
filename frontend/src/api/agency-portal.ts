@@ -67,8 +67,8 @@ export function fetchInbox() {
   return apiGet<AgencyMessage[]>("/agency-portal/inbox");
 }
 
-export function postInboxMessage(body: string) {
-  return apiPost<AgencyMessage>("/agency-portal/inbox", { body });
+export function postInboxMessage(body: string, attachmentIds?: string[]) {
+  return apiPost<AgencyMessage>("/agency-portal/inbox", { body, attachmentIds });
 }
 
 export function fetchProfile() {

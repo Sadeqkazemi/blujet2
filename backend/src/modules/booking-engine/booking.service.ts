@@ -53,7 +53,10 @@ import { calculateActiveCharges } from '../flights/charge-rules';
 import { serializeCabinCapacities } from '../flights/flight-definition.util';
 import { sumActiveCommittedSeats } from '../flights/commitment-capacity.util';
 import { getCabinPrice, resolveFareClass } from './pricing';
-import { resolveCommercialCabinCapacity } from './commercial-cabin-capacity';
+import {
+  resolveCommercialCabinCapacity,
+  resolveSiteCabinAvailability,
+} from './commercial-cabin-capacity';
 import type { Irr } from '../../common/money';
 import type { CabinClass } from '../../database/enums';
 import { PAYMENT_GATEWAY, type PaymentGateway } from './payment-gateway';
@@ -675,6 +678,19 @@ export class BookingService {
         throw new ConflictException({
           code: ErrorCode.POOL_EXHAUSTED,
           message: `ظرفیت غیرمتعهد کابین ${cabinLabelFa(dto.cabin)} برای این پرواز تکمیل شده است.`,
+        });
+      }
+
+      const siteAvailability = await resolveSiteCabinAvailability(
+        tx,
+        instance.id,
+        dto.cabin,
+        availableInCabin,
+      );
+      if (occupiedSeatCount > siteAvailability.seatsLeft) {
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message: 'ظرفیت آزادشده برای فروش سایت تکمیل شده است.',
         });
       }
 

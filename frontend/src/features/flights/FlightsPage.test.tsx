@@ -138,6 +138,7 @@ const COMMERCIAL_CONTROL: CommercialFlightControl = {
       revenueIrr: "5776000000",
       basePriceIrr: "38000000",
       sitePriceIrr: "38000000",
+      siteSeatsReleased: 10,
       agencySeatsReleased: 12,
       agencyReleasePriceIrr: "35000000",
       agencySpecialOffer: false,

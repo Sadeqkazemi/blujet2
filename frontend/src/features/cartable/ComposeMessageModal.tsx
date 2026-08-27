@@ -2,6 +2,8 @@ import { useState } from 'react';
 import Modal from '../../components/Modal';
 import { sendManagerMessage } from '../../api/cartable';
 import type { ManagerMessageDept } from '../../types/cartable';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import type { ReferralAttachment } from '../../types/cartable';
 
 const DEPT_OPTIONS: { value: ManagerMessageDept; label: string }[] = [
   { value: 'FINANCE', label: 'واحد مالی' },
@@ -24,6 +26,7 @@ export default function ComposeMessageModal({ onClose, onSent, theme = 'light' }
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<ReferralAttachment[]>([]);
 
   const fieldClass = dark
     ? 'w-full rounded-[11px] border border-[#28344c] bg-[#0f1623] p-3 text-xs text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]'
@@ -36,7 +39,12 @@ export default function ComposeMessageModal({ onClose, onSent, theme = 'light' }
       return;
     }
     try {
-      await sendManagerMessage({ toDept, subject: subject.trim(), body: body.trim() });
+      await sendManagerMessage({
+        toDept,
+        subject: subject.trim(),
+        body: body.trim(),
+        attachmentIds: attachments.map((file) => file.id),
+      });
       onSent(DEPT_OPTIONS.find((d) => d.value === toDept)?.label ?? toDept);
       onClose();
     } catch {
@@ -85,6 +93,10 @@ export default function ComposeMessageModal({ onClose, onSent, theme = 'light' }
         rows={4}
         className={fieldClass}
       />
+
+      <div className="mt-3">
+        <AttachmentPicker value={attachments} onChange={setAttachments} />
+      </div>
 
       {error && (
         <p role="alert" className={`mt-2 text-xs ${dark ? 'text-[#f87171]' : 'text-danger'}`}>

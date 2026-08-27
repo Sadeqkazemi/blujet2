@@ -100,6 +100,7 @@ export function sendManagerMessage(dto: {
   toDept: ManagerMessageDept;
   subject: string;
   body: string;
+  attachmentIds?: string[];
 }) {
   return apiPost<SendMessageResult>('/manager-messages', dto);
 }
@@ -108,7 +109,11 @@ export function fetchManagerRecipients() {
   return apiGet<EmployeeManagerRecipient[]>('/cartable/manager-recipients');
 }
 
-export function sendEmployeeManagerMessage(dto: { toId: string; body: string }) {
+export function sendEmployeeManagerMessage(dto: {
+  toId: string;
+  body: string;
+  attachmentIds?: string[];
+}) {
   return apiPost<{ id: string }>('/cartable/manager-message', dto);
 }
 

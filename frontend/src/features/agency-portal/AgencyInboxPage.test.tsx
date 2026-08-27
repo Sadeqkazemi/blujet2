@@ -47,7 +47,10 @@ describe('AgencyInboxPage', () => {
     await user.type(screen.getByPlaceholderText('پاسخ خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
     await user.click(screen.getByRole('button', { name: 'ارسال' }));
 
-    await waitFor(() => expect(postSpy).toHaveBeenCalledWith('موضوع: پیام مدیریت\n\nحتماً تا پنجشنبه پرداخت می‌شود.'));
+    await waitFor(() => expect(postSpy).toHaveBeenCalledWith(
+      'موضوع: پیام مدیریت\n\nحتماً تا پنجشنبه پرداخت می‌شود.',
+      [],
+    ));
   });
 
   it('renders translated heading, placeholder, and send button in English', async () => {
@@ -97,6 +100,7 @@ describe('AgencyInboxPage', () => {
       requesterPhone: '09121234567',
       subject: 'خطا در صدور بلیط',
       body: 'پس از پرداخت بلیط صادر نشد.',
+      attachmentIds: [],
     }));
     expect(await screen.findByText(/TKABC12345/)).toBeInTheDocument();
   });

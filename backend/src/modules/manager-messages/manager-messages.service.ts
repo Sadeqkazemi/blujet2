@@ -86,6 +86,7 @@ export class ManagerMessagesService {
               senderId: actor.id,
               sourceType: 'MANAGER_MESSAGE',
               sourceId: message.id,
+              attachments: dto.attachmentIds ?? [],
             },
             actor.id,
           )

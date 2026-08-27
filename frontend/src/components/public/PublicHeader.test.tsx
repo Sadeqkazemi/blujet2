@@ -97,8 +97,10 @@ describe('PublicHeader — logged-in user', () => {
 
     renderHeader();
     await waitFor(() => {
-      expect(screen.getByTestId('public-user-menu-toggle')).toHaveTextContent('عضو باشگاه');
+      expect(screen.getByTestId('public-user-menu-toggle')).not.toHaveTextContent('عضو باشگاه');
     });
+    await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
+    expect(screen.getByTestId('public-user-menu')).toHaveTextContent('عضو باشگاه');
     expect(screen.queryByText('نقره‌ای')).not.toBeInTheDocument();
   });
 

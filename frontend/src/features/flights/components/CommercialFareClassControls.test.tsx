@@ -21,6 +21,7 @@ const control: CommercialFlightControl = {
       revenueIrr: '304000000',
       basePriceIrr: '36000000',
       sitePriceIrr: '38000000',
+      siteSeatsReleased: 10,
       agencySeatsReleased: 5,
       agencyReleasePriceIrr: '32000000',
       agencySpecialOffer: false,
@@ -148,7 +149,7 @@ describe('CommercialFareClassControls', () => {
       expect(flightsApi.updateFareClassSitePrice).toHaveBeenCalledWith(
         'flight-1',
         'rule-y',
-        { priceIrr: '42000000', reason: 'افزایش تقاضا' },
+        { priceIrr: '42000000', reason: 'افزایش تقاضا', seats: 10 },
       ),
     );
   });

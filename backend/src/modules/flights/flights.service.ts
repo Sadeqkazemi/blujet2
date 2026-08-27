@@ -69,6 +69,7 @@ import {
   resolveSiteVisible,
   type CommercialPanelSettings,
 } from './commercial-panel-settings';
+import { maximumChannelRelease } from '../booking-engine/commercial-cabin-capacity';
 
 /** Long-range published inventory is repeated in the planning tab, but it
  * must never be removed from the complete active-flight list. */
@@ -338,7 +339,9 @@ export class FlightsService {
     lockedSeats: number,
     routeAgencyPriceIrr: string | null,
   ) {
-    const settings = parseCommercialPanelSettings(instance.commercialPanelSettings);
+    const settings = parseCommercialPanelSettings(
+      instance.commercialPanelSettings,
+    );
     const classBreakdown = buildClassBreakdown({
       capacity: instance.capacity,
       cabinCapacities: instance.cabinCapacities,
@@ -352,10 +355,10 @@ export class FlightsService {
     });
     return {
       ...commercialRowExtras({
-      settings,
-      classBreakdown,
-      lockedSeats,
-      routeAgencyPriceIrr,
+        settings,
+        classBreakdown,
+        lockedSeats,
+        routeAgencyPriceIrr,
       }),
       // publicSaleEnabled is the canonical sellability flag. Keeping the
       // legacy panel value aligned prevents the list and detail views from
@@ -1596,6 +1599,7 @@ export class FlightsService {
           revenueIrr: String(revenue?.revenueIrr ?? '0'),
           basePriceIrr: rule.priceIrr.toString(),
           sitePriceIrr: rule.sitePriceIrr?.toString() ?? null,
+          siteSeatsReleased: rule.siteSeatsReleased,
           agencySeatsReleased: rule.agencySeatsReleased,
           agencyReleasePriceIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
           agencySpecialOffer: rule.agencySpecialOffer,
@@ -1605,32 +1609,13 @@ export class FlightsService {
     };
   }
 
-  private async loadFareRuleForCommercialControl(
-    instanceId: string,
-    ruleId: string,
-  ) {
-    const rule = await this.fareRuleRepo
-      .createQueryBuilder('r')
-      .leftJoinAndSelect('r.flightInstance', 'flightInstance')
-      .leftJoinAndSelect('flightInstance.flight', 'flight')
-      .leftJoinAndSelect('flight.route', 'route')
-      .where('r.id = :ruleId', { ruleId })
-      .getOne();
-    if (!rule || rule.flightInstanceId !== instanceId) {
-      throw new NotFoundException({
-        code: ErrorCode.NOT_FOUND,
-        message: 'کلاس نرخی یافت نشد.',
-      });
-    }
-    return rule;
-  }
-
   async updateFareClassSitePrice(
     actor: AuthenticatedUser,
     instanceId: string,
     ruleId: string,
     priceIrr: Irr,
     reason: string,
+    seats?: number,
   ) {
     const trimmedReason = reason.trim();
     if (trimmedReason.length < 2) {
@@ -1639,28 +1624,58 @@ export class FlightsService {
         message: 'دلیل تغییر قیمت را وارد کنید.',
       });
     }
-    const rule = await this.loadFareRuleForCommercialControl(
-      instanceId,
-      ruleId,
+    const { saved, previousPriceIrr } = await this.dataSource.transaction(
+      async (tx) => {
+        const rule = await tx
+          .createQueryBuilder(FareRule, 'r')
+          .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+          .leftJoinAndSelect('flightInstance.flight', 'flight')
+          .leftJoinAndSelect('flight.route', 'route')
+          .setLock('pessimistic_write', undefined, ['r'])
+          .where('r.id = :ruleId', { ruleId })
+          .getOne();
+        if (!rule || rule.flightInstanceId !== instanceId) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'کلاس نرخی یافت نشد.',
+          });
+        }
+        const nextSeats = seats ?? rule.siteSeatsReleased;
+        if (
+          nextSeats < 0 ||
+          nextSeats + rule.agencySeatsReleased > rule.seatsAllocated
+        ) {
+          const maximum = maximumChannelRelease(
+            rule.seatsAllocated,
+            rule.agencySeatsReleased,
+          );
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `حداکثر ${maximum} صندلی از این کلاس برای سایت قابل آزادسازی است.`,
+          });
+        }
+        const previousPriceIrr = rule.sitePriceIrr ?? rule.priceIrr;
+        rule.sitePriceIrr = priceIrr;
+        rule.siteSeatsReleased = nextSeats;
+        return { saved: await tx.save(rule), previousPriceIrr };
+      },
     );
-    const previousPriceIrr = rule.sitePriceIrr ?? rule.priceIrr;
-    rule.sitePriceIrr = priceIrr;
-    const saved = await this.fareRuleRepo.save(rule);
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'PRICING',
       action: 'تغییر قیمت فروش سایت کلاس نرخی',
-      detail: `قیمت فروش سایت کلاس ${rule.classCode} پرواز ${rule.flightInstance.flight.flightNo} توسط ${actor.fullName} تغییر کرد.`,
+      detail: `قیمت و ظرفیت فروش سایت کلاس ${saved.classCode} پرواز ${saved.flightInstance.flight.flightNo} توسط ${actor.fullName} تغییر کرد.`,
       entityType: 'FareRule',
-      entityId: rule.id,
+      entityId: saved.id,
       metadata: {
         previousPriceIrr: previousPriceIrr.toString(),
         newPriceIrr: priceIrr.toString(),
         reason: trimmedReason,
+        seats: saved.siteSeatsReleased,
       },
     });
-    await this.invalidateFlightSearch(rule.flightInstance);
+    await this.invalidateFlightSearch(saved.flightInstance);
     return saved;
   }
 
@@ -1708,10 +1723,14 @@ export class FlightsService {
           message: `سهمیه آژانسی نمی‌تواند از ${activated} صندلی فعال‌شده کمتر باشد.`,
         });
       }
-      if (dto.seats > rule.seatsAllocated) {
+      if (dto.seats + rule.siteSeatsReleased > rule.seatsAllocated) {
+        const maximum = maximumChannelRelease(
+          rule.seatsAllocated,
+          rule.siteSeatsReleased,
+        );
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `حداکثر ${rule.seatsAllocated} صندلی از این کلاس قابل آزادسازی است.`,
+          message: `حداکثر ${maximum} صندلی از این کلاس برای آژانس‌ها قابل آزادسازی است.`,
         });
       }
       rule.agencySeatsReleased = dto.seats;
@@ -1837,6 +1856,7 @@ export class FlightsService {
         classCode: dto.classCode,
         priceIrr: dto.priceIrr,
         seatsAllocated: dto.seatsAllocated,
+        siteSeatsReleased: dto.seatsAllocated,
         taxIrr: dto.taxIrr ?? ZERO_IRR,
         refundable: dto.refundable ?? true,
         changeable: dto.changeable ?? true,
@@ -2229,7 +2249,11 @@ export class FlightsService {
     return { success: true };
   }
 
-  async cancelFlight(actor: AuthenticatedUser, instanceId: string, reasonInput: string) {
+  async cancelFlight(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    reasonInput: string,
+  ) {
     const reason = reasonInput.trim();
     if (reason.length < 3) {
       throw new BadRequestException({
@@ -2247,10 +2271,17 @@ export class FlightsService {
         .where('fi.id = :instanceId', { instanceId })
         .getOne();
       if (!instance) {
-        throw new NotFoundException({ code: ErrorCode.NOT_FOUND, message: 'پرواز یافت نشد.' });
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'پرواز یافت نشد.',
+        });
       }
       if (instance.status === FlightInstanceStatus.CANCELLED) {
-        return { instance, alreadyCancelled: true as const, bookings: [] as Booking[] };
+        return {
+          instance,
+          alreadyCancelled: true as const,
+          bookings: [] as Booking[],
+        };
       }
       if (instance.status !== FlightInstanceStatus.SCHEDULED) {
         throw new ConflictException({
@@ -2275,42 +2306,50 @@ export class FlightsService {
           status: In([BookingStatus.PAID, BookingStatus.TICKETED]),
         },
       });
-      await manager.save(manager.create(AuditLog, {
-        actorId: actor.id,
-        actorRole: actor.role,
-        category: 'RESERVATION',
-        action: 'کنسلی پرواز',
-        detail: `پرواز ${instance.flight.flightNo} توسط ${actor.fullName} کنسل شد: ${reason}`,
-        entityType: 'FlightInstance',
-        entityId: instance.id,
-        metadata: { reason, affectedBookings: bookings.length },
-      }));
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'RESERVATION',
+          action: 'کنسلی پرواز',
+          detail: `پرواز ${instance.flight.flightNo} توسط ${actor.fullName} کنسل شد: ${reason}`,
+          entityType: 'FlightInstance',
+          entityId: instance.id,
+          metadata: { reason, affectedBookings: bookings.length },
+        }),
+      );
       return { instance, alreadyCancelled: false as const, bookings };
     });
 
     if (!result.alreadyCancelled) {
       await this.invalidateFlightSearch(result.instance);
       const route = `${result.instance.flight.route.originCode} به ${result.instance.flight.route.destCode}`;
-      await Promise.allSettled(result.bookings.flatMap((booking) => {
-        const jobs: Promise<unknown>[] = [this.sms.send(
-          booking.contactPhone,
-          `مسافر گرامی، پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد. استرداد وجه توسط واحد مالی انجام می‌شود.`,
-          'FLIGHT_CANCELLED',
-        )];
-        if (booking.userId) {
-          jobs.push(this.notifications.notify({
-            recipientId: booking.userId,
-            category: NotificationCategory.SYSTEM,
-            action: 'FLIGHT_CANCELLED',
-            title: 'پرواز شما کنسل شد',
-            body: `پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد.`,
-            entityType: 'Booking',
-            entityId: booking.id,
-            dedupeKey: `Booking:${booking.id}:FLIGHT_CANCELLED`,
-          }));
-        }
-        return jobs;
-      }));
+      await Promise.allSettled(
+        result.bookings.flatMap((booking) => {
+          const jobs: Promise<unknown>[] = [
+            this.sms.send(
+              booking.contactPhone,
+              `مسافر گرامی، پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد. استرداد وجه توسط واحد مالی انجام می‌شود.`,
+              'FLIGHT_CANCELLED',
+            ),
+          ];
+          if (booking.userId) {
+            jobs.push(
+              this.notifications.notify({
+                recipientId: booking.userId,
+                category: NotificationCategory.SYSTEM,
+                action: 'FLIGHT_CANCELLED',
+                title: 'پرواز شما کنسل شد',
+                body: `پرواز ${result.instance.flight.flightNo} مسیر ${route} کنسل شد.`,
+                entityType: 'Booking',
+                entityId: booking.id,
+                dedupeKey: `Booking:${booking.id}:FLIGHT_CANCELLED`,
+              }),
+            );
+          }
+          return jobs;
+        }),
+      );
     }
     return {
       flightInstanceId: result.instance.id,
@@ -2336,13 +2375,20 @@ export class FlightsService {
     const bookings = await this.bookingRepo.find({
       where: {
         flightInstanceId: In(instances.map((instance) => instance.id)),
-        status: In([BookingStatus.PAID, BookingStatus.TICKETED, BookingStatus.REFUNDED]),
+        status: In([
+          BookingStatus.PAID,
+          BookingStatus.TICKETED,
+          BookingStatus.REFUNDED,
+        ]),
       },
       order: { createdAt: 'ASC' },
     });
     const passengers = bookings.length
       ? await this.passengerRepo.find({
-          where: { bookingId: In(bookings.map((booking) => booking.id)), deletedAt: IsNull() },
+          where: {
+            bookingId: In(bookings.map((booking) => booking.id)),
+            deletedAt: IsNull(),
+          },
         })
       : [];
     const namesByBooking = new Map<string, string[]>();
@@ -2352,7 +2398,9 @@ export class FlightsService {
       namesByBooking.set(passenger.bookingId, names);
     }
     return instances.map((instance) => {
-      const affected = bookings.filter((booking) => booking.flightInstanceId === instance.id);
+      const affected = bookings.filter(
+        (booking) => booking.flightInstanceId === instance.id,
+      );
       return {
         id: instance.id,
         flightNo: instance.flight.flightNo,
@@ -2362,12 +2410,19 @@ export class FlightsService {
         cancelledAt: instance.cancelledAt?.toISOString() ?? null,
         cancellationReason: instance.cancellationReason,
         cancelledBy: instance.cancelledBy
-          ? { id: instance.cancelledBy.id, fullName: instance.cancelledBy.fullName }
+          ? {
+              id: instance.cancelledBy.id,
+              fullName: instance.cancelledBy.fullName,
+            }
           : null,
         refundSummary: {
           total: affected.length,
-          pending: affected.filter((booking) => booking.status !== BookingStatus.REFUNDED).length,
-          refunded: affected.filter((booking) => booking.status === BookingStatus.REFUNDED).length,
+          pending: affected.filter(
+            (booking) => booking.status !== BookingStatus.REFUNDED,
+          ).length,
+          refunded: affected.filter(
+            (booking) => booking.status === BookingStatus.REFUNDED,
+          ).length,
         },
         bookings: affected.map((booking) => ({
           id: booking.id,
@@ -2381,57 +2436,85 @@ export class FlightsService {
     });
   }
 
-  async refundCancelledBooking(actor: AuthenticatedUser, instanceId: string, bookingId: string) {
+  async refundCancelledBooking(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    bookingId: string,
+  ) {
     const result = await this.dataSource.transaction(async (manager) => {
-      const instance = await manager.getRepository(FlightInstance)
-        .createQueryBuilder('fi').setLock('pessimistic_read')
-        .where('fi.id = :instanceId', { instanceId }).getOne();
+      const instance = await manager
+        .getRepository(FlightInstance)
+        .createQueryBuilder('fi')
+        .setLock('pessimistic_read')
+        .where('fi.id = :instanceId', { instanceId })
+        .getOne();
       if (!instance || instance.status !== FlightInstanceStatus.CANCELLED) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'این پرواز در فهرست پروازهای کنسل‌شده نیست.',
         });
       }
-      const booking = await manager.getRepository(Booking)
-        .createQueryBuilder('booking').setLock('pessimistic_write')
+      const booking = await manager
+        .getRepository(Booking)
+        .createQueryBuilder('booking')
+        .setLock('pessimistic_write')
         .where('booking.id = :bookingId', { bookingId })
-        .andWhere('booking.flightInstanceId = :instanceId', { instanceId }).getOne();
+        .andWhere('booking.flightInstanceId = :instanceId', { instanceId })
+        .getOne();
       if (!booking) {
-        throw new NotFoundException({ code: ErrorCode.NOT_FOUND, message: 'رزرو مرتبط با این پرواز یافت نشد.' });
+        throw new NotFoundException({
+          code: ErrorCode.NOT_FOUND,
+          message: 'رزرو مرتبط با این پرواز یافت نشد.',
+        });
       }
       if (booking.status === BookingStatus.REFUNDED) {
         return { booking, alreadyRefunded: true as const };
       }
-      if (booking.status !== BookingStatus.PAID && booking.status !== BookingStatus.TICKETED) {
-        throw new ConflictException({ code: ErrorCode.CONFLICT, message: 'این رزرو وجه قابل استرداد ندارد.' });
+      if (
+        booking.status !== BookingStatus.PAID &&
+        booking.status !== BookingStatus.TICKETED
+      ) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این رزرو وجه قابل استرداد ندارد.',
+        });
       }
       booking.status = BookingStatus.REFUNDED;
       await manager.save(booking);
-      await manager.save(manager.create(LedgerEntry, {
-        bookingId: booking.id,
-        type: LedgerEntryType.REFUND,
-        signedAmountIrr: -booking.priceIrr,
-        createdById: actor.id,
-        agencyId: booking.agencyId,
-      }));
-      if (booking.userId) {
-        await manager.save(manager.create(WalletEntry, {
-          userId: booking.userId,
-          type: WalletEntryType.REFUND,
-          signedAmountIrr: booking.priceIrr,
+      await manager.save(
+        manager.create(LedgerEntry, {
           bookingId: booking.id,
-        }));
+          type: LedgerEntryType.REFUND,
+          signedAmountIrr: -booking.priceIrr,
+          createdById: actor.id,
+          agencyId: booking.agencyId,
+        }),
+      );
+      if (booking.userId) {
+        await manager.save(
+          manager.create(WalletEntry, {
+            userId: booking.userId,
+            type: WalletEntryType.REFUND,
+            signedAmountIrr: booking.priceIrr,
+            bookingId: booking.id,
+          }),
+        );
       }
-      await manager.save(manager.create(AuditLog, {
-        actorId: actor.id,
-        actorRole: actor.role,
-        category: 'REFUND',
-        action: 'استرداد پرواز کنسل‌شده',
-        detail: `مبلغ رزرو ${booking.pnr} توسط ${actor.fullName} به حساب مسافر بازگشت داده شد.`,
-        entityType: 'Booking',
-        entityId: booking.id,
-        metadata: { flightInstanceId: instanceId, amountIrr: booking.priceIrr.toString() },
-      }));
+      await manager.save(
+        manager.create(AuditLog, {
+          actorId: actor.id,
+          actorRole: actor.role,
+          category: 'REFUND',
+          action: 'استرداد پرواز کنسل‌شده',
+          detail: `مبلغ رزرو ${booking.pnr} توسط ${actor.fullName} به حساب مسافر بازگشت داده شد.`,
+          entityType: 'Booking',
+          entityId: booking.id,
+          metadata: {
+            flightInstanceId: instanceId,
+            amountIrr: booking.priceIrr.toString(),
+          },
+        }),
+      );
       return { booking, alreadyRefunded: false as const };
     });
     if (!result.alreadyRefunded && result.booking.userId) {
@@ -2495,7 +2578,8 @@ export class FlightsService {
       }
       instance.publicSaleEnabled = dto.siteVisible;
     }
-    instance.commercialPanelSettings = merged as unknown as typeof instance.commercialPanelSettings;
+    instance.commercialPanelSettings =
+      merged as unknown as typeof instance.commercialPanelSettings;
     instance.version += 1;
     await this.instanceRepo.save(instance);
 

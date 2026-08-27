@@ -13,6 +13,7 @@ import { ManagerReferral } from '../../database/entities/manager-referral.entity
 import { ManagerReferralReport } from '../../database/entities/manager-referral-report.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -43,6 +44,8 @@ export class CartableService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepo: Repository<AuditLog>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
   ) {}
@@ -189,7 +192,30 @@ export class CartableService {
         new Date(right.createdAt).getTime(),
     );
 
-    return { ...task, history };
+    const attachmentIds = Array.isArray(task.attachments)
+      ? task.attachments.filter(
+          (value): value is string => typeof value === 'string',
+        )
+      : [];
+    const files = attachmentIds.length
+      ? await this.storedFileRepo.findBy({ id: In(attachmentIds) })
+      : [];
+    const byId = new Map(files.map((file) => [file.id, file]));
+    const attachments = attachmentIds.flatMap((fileId) => {
+      const file = byId.get(fileId);
+      return file
+        ? [
+            {
+              id: file.id,
+              fileName: file.fileName,
+              mimeType: file.mimeType,
+              sizeBytes: file.sizeBytes,
+            },
+          ]
+        : [];
+    });
+
+    return { ...task, attachments, history };
   }
 
   /** Badge count for "کارتابل من" — never-viewed tasks regardless of
@@ -500,6 +526,7 @@ export class CartableService {
       | 'CHAIR_PERMISSION'
       | 'EMPLOYEE_MESSAGE';
     sourceId?: string;
+    attachments?: string[];
   }) {
     return this.taskRepo.save(this.taskRepo.create(input));
   }
@@ -559,7 +586,7 @@ export class CartableService {
 
   async sendEmployeeManagerMessage(
     actor: AuthenticatedUser,
-    dto: { toId: string; body: string },
+    dto: { toId: string; body: string; attachmentIds?: string[] },
   ) {
     const target = await this.userRepo.findOneBy({ id: dto.toId });
     if (
@@ -572,6 +599,17 @@ export class CartableService {
         message: 'گیرندهٔ پیام معتبر نیست.',
       });
     }
+    if (dto.attachmentIds?.length) {
+      const owned = await this.storedFileRepo.count({
+        where: { id: In(dto.attachmentIds), ownerId: actor.id },
+      });
+      if (owned !== dto.attachmentIds.length) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'فایل پیوست معتبر نیست.',
+        });
+      }
+    }
 
     const task = await this.createTask({
       assigneeId: target.id,
@@ -581,6 +619,7 @@ export class CartableService {
       senderId: actor.id,
       senderLabelFa: `${actor.fullName} · کارمند`,
       sourceType: 'EMPLOYEE_MESSAGE',
+      attachments: dto.attachmentIds ?? [],
     });
 
     await this.audit.record({
@@ -609,10 +648,41 @@ export class CartableService {
       order: { createdAt: 'DESC' },
       take: 20,
     });
+    const ids = [
+      ...new Set(
+        rows.flatMap((row) =>
+          Array.isArray(row.attachments)
+            ? row.attachments.filter(
+                (value): value is string => typeof value === 'string',
+              )
+            : [],
+        ),
+      ),
+    ];
+    const files = ids.length
+      ? await this.storedFileRepo.findBy({ id: In(ids) })
+      : [];
+    const byId = new Map(files.map((file) => [file.id, file]));
     return rows.map((r) => ({
       id: r.id,
       toName: r.assignee.fullName,
       body: r.description,
+      attachments: (Array.isArray(r.attachments) ? r.attachments : []).flatMap(
+        (id) => {
+          if (typeof id !== 'string') return [];
+          const file = byId.get(id);
+          return file
+            ? [
+                {
+                  id: file.id,
+                  fileName: file.fileName,
+                  mimeType: file.mimeType,
+                  sizeBytes: file.sizeBytes,
+                },
+              ]
+            : [];
+        },
+      ),
       createdAt: r.createdAt,
     }));
   }

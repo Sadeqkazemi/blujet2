@@ -690,6 +690,11 @@ export default function PublicHeader() {
                 {phoneDisplay}
               </div>
             )}
+            {club?.isMember && tierLabel && (
+              <div style={{ marginTop: 2, fontSize: compact ? 10 : 11, color: '#caa53a', fontWeight: 700 }}>
+                ★ {tierLabel} · {localeMoney(club.balance, locale)} {locale === 'fa' ? 'امتیاز' : locale === 'ar' ? 'نقطة' : 'points'}
+              </div>
+            )}
           </div>
         </div>
         <div
@@ -1278,9 +1283,6 @@ export default function PublicHeader() {
                       </div>
                       <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#16202e' }}>{displayName}</div>
-                        {club?.isMember && tierLabel && (
-                          <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>★ {tierLabel}</div>
-                        )}
                       </div>
                       <ChevronDownIcon />
                     </div>

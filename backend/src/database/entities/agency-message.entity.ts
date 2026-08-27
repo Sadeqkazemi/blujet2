@@ -52,6 +52,9 @@ export class AgencyMessage {
   @Column({ type: 'text' })
   body!: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  attachments!: string[] | null;
+
   @CreateDateColumn({ precision: 3, default: () => 'CURRENT_TIMESTAMP' })
   createdAt!: Date;
 }

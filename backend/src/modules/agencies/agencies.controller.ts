@@ -386,7 +386,13 @@ export class AgenciesController {
     @Param('id') id: string,
     @Body() dto: CreateMessageDto,
   ) {
-    const data = await this.agencies.postMessage(actor, id, dto.body);
+    const data = await this.agencies.postMessage(
+      actor,
+      id,
+      dto.body,
+      false,
+      dto.attachmentIds,
+    );
     return { success: true, data };
   }
 
