@@ -533,8 +533,8 @@ describe("AgencySeatsPage", () => {
       agencySeatsReleased: 0,
       agencyAllocated: 0,
       ownAllocated: 0,
-      availableToRequest: 0,
-      pricePerSeatIrr: null,
+      availableToRequest: 180,
+      pricePerSeatIrr: "30000000",
       specialOffer: false,
       definitionStatus: "PUBLISHED",
     };
@@ -555,11 +555,16 @@ describe("AgencySeatsPage", () => {
       screen.getByTestId("agency-request-route-fi-awaiting-release"),
     );
 
-    expect(screen.getByText("در انتظار تخصیص بازرگانی")).toBeInTheDocument();
+    expect(screen.getByText("قابل درخواست از بازرگانی")).toBeInTheDocument();
     expect(
-      screen.getByText(/هنوز ظرفیت و نرخ فروش آژانسی این کلاس را آزاد نکرده/),
+      screen.getByText(/پرواز فعال و قابل درخواست است/),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("agency-submit-seat-request")).toBeDisabled();
+    const seats = screen.getByTestId("agency-request-seat-count");
+    await user.type(seats, "10");
+    expect(
+      await screen.findByTestId("agency-seat-inquiry-result"),
+    ).toHaveTextContent("۱۰ صندلی موجود است");
+    expect(screen.getByTestId("agency-seat-inquiry-confirm")).toBeEnabled();
   });
 
   it("renders real per-flight allotment cards with allocated/sold/remaining counts", async () => {

@@ -221,6 +221,60 @@ describe('Commercial manager overhaul (e2e)', () => {
   });
 
   describe('seat requests', () => {
+    it('lists an active sellable flight and accepts a request before a dedicated agency pool is released', async () => {
+      const agency = await createFreshAgency();
+      const instance = await futureInstance();
+      await dataSource.getRepository(FareRule).update(
+        {
+          flightInstanceId: instance.id,
+          cabin: CabinClass.ECONOMY,
+          classCode: 'Y',
+        },
+        { agencySeatsReleased: 0, agencyReleasePriceIrr: null },
+      );
+      const agencyToken = await loginAsAgency(agency.phone);
+
+      const catalogue = await request(app.getHttpServer())
+        .get('/agency-portal/seat-request-options')
+        .set('Authorization', auth(agencyToken))
+        .expect(200);
+      const option = (
+        catalogue.body.data as Array<{
+          flightInstanceId: string;
+          fareClassCode: string;
+          agencySeatsReleased: number;
+          availableToRequest: number;
+          pricePerSeatIrr: string;
+        }>
+      ).find(
+        (row) =>
+          row.flightInstanceId === instance.id && row.fareClassCode === 'Y',
+      );
+      expect(option).toMatchObject({
+        flightInstanceId: instance.id,
+        agencySeatsReleased: 0,
+        availableToRequest: 80,
+        pricePerSeatIrr: '5000000',
+      });
+
+      const submitted = await request(app.getHttpServer())
+        .post('/agency-portal/seat-requests')
+        .set('Authorization', auth(agencyToken))
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          fareClassCode: 'Y',
+          seats: 4,
+          payMethod: 'INVOICE',
+        })
+        .expect(201);
+      expect(submitted.body.data).toMatchObject({
+        flightInstanceId: instance.id,
+        seats: 4,
+        status: 'SUBMITTED',
+      });
+    });
+
     it('agency submission creates a structured row; manager list, approve, reject, and 409 work', async () => {
       const agency = await createFreshAgency();
       const instance = await futureInstance();
@@ -350,7 +404,7 @@ describe('Commercial manager overhaul (e2e)', () => {
           .countBy({ seatRequestId: requestId }),
       ).toBe(0);
       await request(app.getHttpServer())
-        .post(`/agency-portal/invoices/${invoices[0]!.id}/pay`)
+        .post(`/agency-portal/invoices/${invoices[0].id}/pay`)
         .set('Authorization', auth(agencyToken))
         .expect(201);
       const activated = await dataSource
