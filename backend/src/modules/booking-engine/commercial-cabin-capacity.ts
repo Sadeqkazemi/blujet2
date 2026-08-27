@@ -78,6 +78,11 @@ export async function resolveSiteCabinAvailability(
       sum + Math.max(0, Math.trunc(Number(rule.siteSeatsReleased ?? 0))),
     0,
   );
+  const hasExplicitSiteRelease = rules.some(
+    (rule) =>
+      Math.max(0, Math.trunc(Number(rule.siteSeatsReleased ?? 0))) > 0 ||
+      rule.sitePriceIrr !== null,
+  );
   const now = new Date();
   const row = await manager
     .createQueryBuilder(Passenger, 'passenger')
@@ -106,11 +111,11 @@ export async function resolveSiteCabinAvailability(
     .andWhere('booking."deletedAt" IS NULL')
     .getRawOne<{ usedSeats: string }>();
   const usedSeats = Number(row?.usedSeats ?? 0);
-  // A legacy/simple flight may not have fare classes at all. In that case
-  // there is no commercial channel quota to enforce, so retain the historical
-  // physical-cabin availability. Once a fare class exists, its released seats
-  // become the authoritative public quota.
-  if (rules.length === 0) {
+  // A legacy/simple flight may have no fare classes, or fare classes created
+  // before explicit channel release metadata existed. In either case retain
+  // the historical commercial/physical availability. A manager-set release of
+  // zero is still explicit because the sales control also stamps sitePriceIrr.
+  if (rules.length === 0 || !hasExplicitSiteRelease) {
     const seatsLeft = Math.max(0, Math.trunc(physicalSeatsLeft));
     return {
       releasedSeats: seatsLeft + Math.max(0, Math.trunc(usedSeats)),
