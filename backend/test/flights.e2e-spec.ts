@@ -16,6 +16,7 @@ import { Route } from '../src/database/entities/route.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { FarePricingProposal } from '../src/database/entities/fare-pricing-proposal.entity';
 import { FareRule } from '../src/database/entities/fare-rule.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
 import { CabinClass } from '../src/database/enums';
 import {
   PRICE_SUGGESTION_PROVIDER,
@@ -154,6 +155,18 @@ describe('Flights (e2e)', () => {
         seatsAllocated: 20,
       }),
     );
+    for (const channel of ['SYSTEM', 'AGENCY'] as const) {
+      const booking = await addBooking(instance.id, channel, 30_000_000);
+      booking.cabin = CabinClass.ECONOMY;
+      booking.fareClassCode = rule.classCode;
+      await dataSource.getRepository(Booking).save(booking);
+      await dataSource.getRepository(Passenger).save(
+        dataSource.getRepository(Passenger).create({
+          bookingId: booking.id,
+          fullName: `مسافر ${channel}`,
+        }),
+      );
+    }
 
     const unauthenticated = await request(app.getHttpServer()).get(
       `/flights/${instance.id}/commercial-control`,
@@ -186,10 +199,14 @@ describe('Flights (e2e)', () => {
         expect.objectContaining({
           ruleId: rule.id,
           classCode: rule.classCode,
-          remainingSeats: 20,
+          soldSeats: 2,
+          siteSoldSeats: 1,
+          agencySoldSeats: 1,
+          remainingSeats: 18,
         }),
       ]),
     );
+    expect(detail.body.data.agencySaleEnabled).toBe(true);
 
     const visibility = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/sales-visibility`)
@@ -197,6 +214,13 @@ describe('Flights (e2e)', () => {
       .send({ enabled: false });
     expect(visibility.status).toBe(200);
     expect(visibility.body.data.publicSaleEnabled).toBe(false);
+
+    const agencyVisibility = await request(app.getHttpServer())
+      .patch(`/flights/${instance.id}/agency-sales-visibility`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ enabled: false });
+    expect(agencyVisibility.status).toBe(200);
+    expect(agencyVisibility.body.data.agencySaleEnabled).toBe(false);
 
     const invalidPrice = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/fare-rules/${rule.id}/site-price`)

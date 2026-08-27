@@ -966,6 +966,7 @@ export default function AgencySeatsPage() {
                   disabled={
                     seatInquiryState !== "ready" ||
                     !seatInquiry ||
+                    !seatInquiry.canFulfillRequested ||
                     seatInquiry.suggestedSeats < 1
                   }
                   onClick={() => setSeatInquiryState("confirmed")}

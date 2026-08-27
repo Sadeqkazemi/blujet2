@@ -4,6 +4,7 @@ import {
 } from '../../database/enums';
 import {
   agencySeatRequestClassOffer,
+  AgencyPortalService,
   isAgencySeatRequestOccurrence,
 } from './agency-portal.service';
 
@@ -13,6 +14,7 @@ describe('agency seat request occurrence source', () => {
     status: FlightInstanceStatus.SCHEDULED,
     definitionStatus: FlightDefinitionStatus.PUBLISHED,
     approvedSnapshot: { flightNo: 'XY1235' },
+    agencySaleEnabled: true,
     departureAt: new Date('2026-09-03T05:00:00.000Z'),
     saleStartsAt: null,
     saleEndsAt: null,
@@ -73,6 +75,12 @@ describe('agency seat request occurrence source', () => {
       ),
     ).toBe(false);
   });
+
+  it('excludes a flight explicitly hidden from the agency catalogue', () => {
+    expect(
+      isAgencySeatRequestOccurrence({ ...base, agencySaleEnabled: false }, now),
+    ).toBe(false);
+  });
 });
 
 describe('agency seat request class offer', () => {
@@ -107,5 +115,27 @@ describe('agency seat request class offer', () => {
       availableToRequest: 18,
       pricePerSeatIrr: 28_000_000n,
     });
+  });
+});
+
+describe('agency seat request option source', () => {
+  it('does not truncate scheduled flights before sellability and fare-class filtering', async () => {
+    const find = jest
+      .fn<(options: Record<string, unknown>) => Promise<unknown[]>>()
+      .mockResolvedValue([]);
+    const service = Object.create(
+      AgencyPortalService.prototype,
+    ) as AgencyPortalService;
+    Object.assign(service, {
+      isUatSandboxAgencyActor: jest.fn().mockResolvedValue(true),
+      flightInstanceRepo: { find },
+    });
+
+    await service.seatRequestOptions(
+      {} as Parameters<AgencyPortalService['seatRequestOptions']>[0],
+    );
+
+    const calls = find.mock.calls as Array<[Record<string, unknown>]>;
+    expect(calls[0]?.[0]).not.toHaveProperty('take');
   });
 });

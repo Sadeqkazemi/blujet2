@@ -142,6 +142,13 @@ export function updateFlightSalesVisibility(instanceId: string, enabled: boolean
   );
 }
 
+export function updateAgencySalesVisibility(instanceId: string, enabled: boolean) {
+  return apiPatch<{ flightInstanceId: string; agencySaleEnabled: boolean; version: number }>(
+    `/flights/${instanceId}/agency-sales-visibility`,
+    { enabled },
+  );
+}
+
 export function updateFareClassSitePrice(
   instanceId: string,
   ruleId: string,

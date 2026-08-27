@@ -960,7 +960,7 @@ export class FlightsController {
 
   @Get(':instanceId/commercial-control')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view', 'fl_active')
+  @RequiresPermission('fl_sales_view', 'fl_view', 'fl_active')
   @ApiOperation({ summary: 'کنترل فروش عمومی و تفکیک فروش کلاس‌های نرخی' })
   async commercialControl(
     @Param('instanceId', ParseUUIDPipe) instanceId: string,
@@ -971,7 +971,7 @@ export class FlightsController {
 
   @Patch(':instanceId/sales-visibility')
   @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission('fl_site_sales', 'fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'فعال یا غیرفعال کردن فروش پرواز در سایت عمومی' })
   async updateSalesVisibility(
     @CurrentUser() actor: AuthenticatedUser,
@@ -986,9 +986,33 @@ export class FlightsController {
     return { success: true, data };
   }
 
+  @Patch(':instanceId/agency-sales-visibility')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_agency_sales', 'fl_manage', 'fl_assign')
+  @ApiOperation({
+    summary: 'فعال یا غیرفعال کردن نمایش و درخواست پرواز برای آژانس‌ها',
+  })
+  async updateAgencySalesVisibility(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Body() dto: UpdateSalesVisibilityDto,
+  ) {
+    const data = await this.flights.updateAgencySalesVisibility(
+      actor,
+      instanceId,
+      dto.enabled,
+    );
+    return { success: true, data };
+  }
+
   @Patch(':instanceId/commercial-settings')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission(
+    'fl_site_sales',
+    'fl_agency_sales',
+    'fl_manage',
+    'fl_assign',
+  )
   @ApiOperation({
     summary:
       'تنظیمات پنل بازرگانی: نمایش در سایت، قیمت کلاس‌ها، آزادسازی آژانس',
@@ -1070,7 +1094,7 @@ export class FlightsController {
 
   @Patch(':instanceId/fare-rules/:ruleId/site-price')
   @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission('fl_site_sales', 'fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'ثبت قیمت فروش سایت برای یک کلاس نرخی' })
   async updateFareClassSitePrice(
     @CurrentUser() actor: AuthenticatedUser,
@@ -1091,7 +1115,7 @@ export class FlightsController {
 
   @Put(':instanceId/fare-rules/:ruleId/agency-release')
   @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission('fl_agency_sales', 'fl_manage', 'fl_assign')
   @ApiOperation({ summary: 'آزادسازی صندلی یک کلاس برای فروش آژانسی' })
   async upsertAgencyFareRelease(
     @CurrentUser() actor: AuthenticatedUser,
@@ -1160,7 +1184,12 @@ export class FlightsController {
 
   @Get(':instanceId/allotments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view', 'fl_assign')
+  @RequiresPermission(
+    'fl_sales_view',
+    'fl_agency_allotments',
+    'fl_view',
+    'fl_assign',
+  )
   @ApiOperation({ summary: 'فهرست سهمیه‌های آژانس این پرواز' })
   async listAllotments(@Param('instanceId') instanceId: string) {
     const data = await this.flights.listAllotments(instanceId);
@@ -1169,7 +1198,12 @@ export class FlightsController {
 
   @Get(':instanceId/allotments/summary')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_view', 'fl_assign')
+  @RequiresPermission(
+    'fl_sales_view',
+    'fl_agency_allotments',
+    'fl_view',
+    'fl_assign',
+  )
   @ApiOperation({
     summary: 'خلاصه خودکار تعهدات آژانس، ظرفیت آزاد و درآمد قراردادی',
   })
@@ -1180,7 +1214,7 @@ export class FlightsController {
 
   @Post(':instanceId/allotments')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission('fl_agency_allotments', 'fl_manage', 'fl_assign')
   @ApiOperation({
     summary:
       'تخصیص سهمیه به آژانس — رد با ۴۰۰ اگر مجموع سهمیه‌ها از سقف کلی آژانس‌های پرواز بیشتر شود',
@@ -1196,7 +1230,7 @@ export class FlightsController {
 
   @Delete(':instanceId/allotments/:allotmentId')
   @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
-  @RequiresPermission('fl_manage', 'fl_assign')
+  @RequiresPermission('fl_agency_allotments', 'fl_manage', 'fl_assign')
   @ApiOperation({
     summary: 'حذف سهمیه آژانس — رد با ۴۰۹ اگر آژانس رزرو فعالی داشته باشد',
   })

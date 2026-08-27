@@ -110,6 +110,10 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     ['fl_cities', 'مدیریت شهرهای پروازی'],
     ['fl_costs', 'مشاهده هزینه‌های سفر'],
     ['fl_history', 'مشاهده تاریخچه پرواز'],
+    ['fl_sales_view', 'مشاهده اطلاعات و فروش پرواز'],
+    ['fl_site_sales', 'مدیریت نمایش، ظرفیت و قیمت فروش سایت'],
+    ['fl_agency_sales', 'مدیریت نمایش، ظرفیت و قیمت فروش آژانسی'],
+    ['fl_agency_allotments', 'تخصیص و آزادسازی صندلی آژانس‌ها'],
   ].map(([key, labelFa]) => ({
     dept: 'commercial',
     sectionKey: 'flights',
@@ -209,6 +213,27 @@ export const PERMISSION_CATALOG: PermissionCatalogEntry[] = [
     labelFa: 'انجام کارها و ارسال پیام به مدیر',
   },
   // finance
+  {
+    dept: 'finance',
+    sectionKey: 'finance',
+    sectionLabelFa: 'امور مالی',
+    key: 'fn_dashboard',
+    labelFa: 'مشاهده داشبورد مالی',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'finance',
+    sectionLabelFa: 'امور مالی',
+    key: 'fn_transactions',
+    labelFa: 'مشاهده تراکنش‌های اخیر',
+  },
+  {
+    dept: 'finance',
+    sectionKey: 'finance',
+    sectionLabelFa: 'امور مالی',
+    key: 'fn_settlements',
+    labelFa: 'مشاهده و پیگیری تسویه آژانس‌ها',
+  },
   {
     dept: 'finance',
     sectionKey: 'refund',

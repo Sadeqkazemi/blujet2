@@ -245,7 +245,7 @@ describe("AgencySeatsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows an over-capacity suggestion in red and orders the suggested count", async () => {
+  it("shows an over-capacity suggestion in red and blocks confirmation", async () => {
     const user = userEvent.setup();
     const option: AgencySeatRequestOption = {
       flightInstanceId: "fi-limited",
@@ -293,17 +293,7 @@ describe("AgencySeatsPage", () => {
       pricePerSeatIrr: "30000000",
       totalPriceIrr: "210000000",
     });
-    const request = vi.spyOn(portalApi, "requestAgencySeats").mockResolvedValue({
-      id: "request-limited",
-      status: "SUBMITTED",
-      recipientCount: 1,
-      flightInstanceId: option.flightInstanceId,
-      cabin: option.cabin,
-      fareClassCode: option.fareClassCode,
-      seats: 7,
-      preferredWeekdays: [],
-      termMonths: 3,
-    });
+    const request = vi.spyOn(portalApi, "requestAgencySeats");
 
     render(<AgencySeatsPage />);
     await user.selectOptions(await screen.findByTestId("agency-request-origin"), "THR");
@@ -314,13 +304,9 @@ describe("AgencySeatsPage", () => {
     const result = await screen.findByTestId("agency-seat-inquiry-result");
     expect(result).toHaveClass("border-red-300");
     expect(result).toHaveTextContent("۷ صندلی در حال حاضر قابل ارائه است");
-    await user.click(screen.getByTestId("agency-seat-inquiry-confirm"));
-    await user.click(screen.getByTestId("agency-flight-date-fi-limited"));
-    await user.click(screen.getByTestId("agency-submit-seat-request"));
-
-    await waitFor(() =>
-      expect(request).toHaveBeenCalledWith(expect.objectContaining({ seats: 7 })),
-    );
+    expect(screen.getByTestId("agency-seat-inquiry-confirm")).toBeDisabled();
+    expect(screen.getByTestId("agency-submit-seat-request")).toBeDisabled();
+    expect(request).not.toHaveBeenCalled();
   });
 
   it("keeps each route in its own card and opens inquiry controls inside only the selected card", async () => {

@@ -211,6 +211,10 @@ export const EMPLOYEE_SECTION_NAV: Record<
       'fl_cities',
       'fl_costs',
       'fl_history',
+      'fl_sales_view',
+      'fl_site_sales',
+      'fl_agency_sales',
+      'fl_agency_allotments',
     ],
   },
   routes: {

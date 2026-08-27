@@ -16,6 +16,10 @@ export const EMPLOYEE_PERMISSION_DEPENDENCIES: Readonly<
   fl_cities: ['fl_view'],
   fl_costs: ['fl_view'],
   fl_history: ['fl_view'],
+  fl_sales_view: ['fl_view'],
+  fl_site_sales: ['fl_sales_view'],
+  fl_agency_sales: ['fl_sales_view'],
+  fl_agency_allotments: ['fl_sales_view'],
   rt_create: ['rt_view'],
   rt_manage: ['rt_view'],
   ac_manage: ['ac_view'],
@@ -27,6 +31,8 @@ export const EMPLOYEE_PERMISSION_DEPENDENCIES: Readonly<
   ag_debtors: ['ag_list'],
   cr_manage: ['cr_view'],
   rp_exports: ['rp_finance'],
+  fn_transactions: ['fn_dashboard'],
+  fn_settlements: ['fn_dashboard'],
   // IT employee capabilities are deliberately independent.  The old
   // us_* -> us_manage chain made selecting one narrow action silently grant
   // the broad users capability.  Read prerequisites remain explicit, while
@@ -57,6 +63,12 @@ export const EMPLOYEE_PERMISSION_BUNDLES: Readonly<
   ],
   sv_control: ['sv_view'],
   sc_manage: ['sc_view'],
+  fl_manage: [
+    'fl_sales_view',
+    'fl_site_sales',
+    'fl_agency_sales',
+    'fl_agency_allotments',
+  ],
 };
 
 export function expandEmployeePermissionKeys(

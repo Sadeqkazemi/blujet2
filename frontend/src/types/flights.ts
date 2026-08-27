@@ -107,6 +107,8 @@ export interface CommercialFareClassControl {
   classCode: string;
   seatsAllocated: number;
   soldSeats: number;
+  siteSoldSeats: number;
+  agencySoldSeats: number;
   remainingSeats: number;
   revenueIrr: string;
   basePriceIrr: string;
@@ -121,6 +123,7 @@ export interface CommercialFareClassControl {
 export interface CommercialFlightControl {
   flightInstanceId: string;
   publicSaleEnabled: boolean;
+  agencySaleEnabled: boolean;
   fareClasses: CommercialFareClassControl[];
 }
 
