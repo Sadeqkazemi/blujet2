@@ -64,6 +64,44 @@ export function agencySeatSuggestion(
   };
 }
 
+/**
+ * A published flight must stay requestable even before the commercial manager
+ * reserves a dedicated agency pool.  A configured agency release remains the
+ * hard request ceiling; otherwise the class inventory is only a provisional
+ * ceiling and the live reservation inquiry below applies the real seat limit.
+ */
+export function agencySeatRequestClassOffer(
+  rule: Pick<
+    FareRule,
+    | 'seatsAllocated'
+    | 'agencySeatsReleased'
+    | 'agencyReleasePriceIrr'
+    | 'sitePriceIrr'
+    | 'priceIrr'
+  >,
+  allocatedSeats: number,
+) {
+  const classCapacity = Math.max(0, Math.trunc(rule.seatsAllocated));
+  const releasedSeats = Math.min(
+    classCapacity,
+    Math.max(0, Math.trunc(rule.agencySeatsReleased)),
+  );
+  const hasDedicatedAgencyRelease =
+    releasedSeats > 0 && rule.agencyReleasePriceIrr != null;
+  const requestCeiling = hasDedicatedAgencyRelease
+    ? releasedSeats
+    : classCapacity;
+  return {
+    hasDedicatedAgencyRelease,
+    availableToRequest: Math.max(
+      requestCeiling - Math.max(0, Math.trunc(allocatedSeats)),
+      0,
+    ),
+    pricePerSeatIrr:
+      rule.agencyReleasePriceIrr ?? rule.sitePriceIrr ?? rule.priceIrr,
+  };
+}
+
 export function isAgencySeatRequestOccurrence(
   instance: Pick<
     FlightInstance,
@@ -723,16 +761,12 @@ export class AgencyPortalService {
 
     return fareRules.flatMap((rule) => {
       const instance = instanceById.get(rule.flightInstanceId);
-      if (
-        !instance ||
-        rule.agencySeatsReleased < 1 ||
-        rule.agencyReleasePriceIrr == null
-      )
-        return [];
+      if (!instance || rule.seatsAllocated < 1) return [];
       const key = `${instance.id}:${rule.cabin}:${rule.classCode}`;
       const allotment = allotmentByClass.get(key);
       const allocated = Number(allotment?.total ?? 0);
       const ownAllocated = Number(allotment?.own ?? 0);
+      const offer = agencySeatRequestClassOffer(rule, allocated);
       return {
         flightInstanceId: instance.id,
         flightNo: instance.flight.flightNo,
@@ -747,8 +781,8 @@ export class AgencyPortalService {
         agencySeatsReleased: rule.agencySeatsReleased,
         agencyAllocated: allocated,
         ownAllocated,
-        availableToRequest: Math.max(rule.agencySeatsReleased - allocated, 0),
-        pricePerSeatIrr: rule.agencyReleasePriceIrr,
+        availableToRequest: offer.availableToRequest,
+        pricePerSeatIrr: offer.pricePerSeatIrr,
         specialOffer: rule.agencySpecialOffer,
         // Every returned row has already passed the same CEO-approved active
         // inventory gate used above; the portal does not expose revision
@@ -769,15 +803,18 @@ export class AgencyPortalService {
     }
 
     const now = new Date();
-    const instance = await this.flightInstanceRepo.findOne({
+    const candidateInstance = await this.flightInstanceRepo.findOne({
       where: {
         id: dto.flightInstanceId,
         departureAt: MoreThanOrEqual(now),
         status: FlightInstanceStatus.SCHEDULED,
-        definitionStatus: 'PUBLISHED',
       },
       relations: { flight: { route: true } },
     });
+    const instance =
+      candidateInstance && isAgencySeatRequestOccurrence(candidateInstance, now)
+        ? candidateInstance
+        : null;
     const rule = instance
       ? await this.fareRuleRepo.findOne({
           where: {
@@ -936,8 +973,9 @@ export class AgencyPortalService {
     // commitments. Re-applying allotments here would double-count agency
     // capacity and under-report the seats the reservation engine can sell.
     const availableSeats = availability.seatsLeft;
+    const offer = agencySeatRequestClassOffer(rule, agencyAllocated);
     const availableToRequest = Math.max(
-      Math.min(rule.agencySeatsReleased - agencyAllocated, availableSeats),
+      Math.min(offer.availableToRequest, availableSeats),
       0,
     );
     const activeRequestSeats = Number(demandRaw?.seats ?? 0);
@@ -970,7 +1008,7 @@ export class AgencyPortalService {
         : demandLevel === 'MEDIUM'
           ? 'تقاضا متوسط است؛ ظرفیت آزادشده را بر اساس فروش واقعی تنظیم کنید.'
           : 'ظرفیت کافی است؛ برای این پرواز فعلاً آزادسازی بیشتری لازم نیست.';
-    const unitPrice = rule.agencyReleasePriceIrr ?? 0n;
+    const unitPrice = offer.pricePerSeatIrr;
     const { suggestedSeats, canFulfillRequested } = agencySeatSuggestion(
       dto.seats,
       availableToRequest,
@@ -1001,7 +1039,7 @@ export class AgencyPortalService {
       recommendation: canFulfillRequested
         ? recommendation
         : `${availableToRequest} صندلی در حال حاضر قابل ارائه است.`,
-      pricePerSeatIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
+      pricePerSeatIrr: offer.pricePerSeatIrr.toString(),
       totalPriceIrr: (unitPrice * BigInt(suggestedSeats)).toString(),
     };
   }

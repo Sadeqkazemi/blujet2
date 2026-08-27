@@ -747,10 +747,10 @@ export default function AgencySeatsPage() {
                         {isReleased
                           ? localeMoney(row.pricePerSeatIrr!, locale)
                           : locale === "fa"
-                            ? "در انتظار تخصیص بازرگانی"
+                            ? "قابل درخواست از بازرگانی"
                             : locale === "ar"
-                              ? "بانتظار تخصيص الإدارة التجارية"
-                              : "Awaiting commercial release"}
+                              ? "متاح للطلب من الإدارة التجارية"
+                              : "Available to request"}
                       </b>
                     </div>
                     <span
@@ -782,7 +782,11 @@ export default function AgencySeatsPage() {
                             </span>
                           </>
                         ) : (
-                          "مسیر فعال است؛ مدیر بازرگانی هنوز ظرفیت و نرخ فروش آژانسی این کلاس را آزاد نکرده است."
+                          locale === "fa"
+                            ? "پرواز فعال و قابل درخواست است؛ تعداد و تخصیص نهایی پس از بررسی مدیر بازرگانی تأیید می‌شود."
+                            : locale === "ar"
+                              ? "الرحلة نشطة ومتاحة للطلب؛ يتم اعتماد العدد والتخصيص النهائي بعد مراجعة الإدارة التجارية."
+                              : "This flight is active and requestable; the final quantity and allotment are confirmed after commercial review."
                         )}
                       </div>
                       <div className="grid grid-cols-3 border-y border-[#edf1f6] bg-[#fafbfd]">

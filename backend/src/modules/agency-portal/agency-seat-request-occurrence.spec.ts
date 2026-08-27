@@ -1,5 +1,11 @@
-import { FlightDefinitionStatus, FlightInstanceStatus } from '../../database/enums';
-import { isAgencySeatRequestOccurrence } from './agency-portal.service';
+import {
+  FlightDefinitionStatus,
+  FlightInstanceStatus,
+} from '../../database/enums';
+import {
+  agencySeatRequestClassOffer,
+  isAgencySeatRequestOccurrence,
+} from './agency-portal.service';
 
 describe('agency seat request occurrence source', () => {
   const now = new Date('2026-08-25T10:00:00.000Z');
@@ -16,13 +22,16 @@ describe('agency seat request occurrence source', () => {
     expect(isAgencySeatRequestOccurrence(base as never, now)).toBe(true);
     expect(
       isAgencySeatRequestOccurrence(
-        { ...base, definitionStatus: FlightDefinitionStatus.PENDING_CEO } as never,
+        {
+          ...base,
+          definitionStatus: FlightDefinitionStatus.PENDING_CEO,
+        },
         now,
       ),
     ).toBe(false);
     expect(
       isAgencySeatRequestOccurrence(
-        { ...base, definitionStatus: FlightDefinitionStatus.REJECTED } as never,
+        { ...base, definitionStatus: FlightDefinitionStatus.REJECTED },
         now,
       ),
     ).toBe(false);
@@ -31,7 +40,10 @@ describe('agency seat request occurrence source', () => {
   it('keeps an already approved occurrence live during a pending revision', () => {
     expect(
       isAgencySeatRequestOccurrence(
-        { ...base, definitionStatus: FlightDefinitionStatus.PENDING_REVISION } as never,
+        {
+          ...base,
+          definitionStatus: FlightDefinitionStatus.PENDING_REVISION,
+        },
         now,
       ),
     ).toBe(true);
@@ -41,7 +53,7 @@ describe('agency seat request occurrence source', () => {
           ...base,
           definitionStatus: FlightDefinitionStatus.PENDING_REVISION,
           approvedSnapshot: null,
-        } as never,
+        },
         now,
       ),
     ).toBe(false);
@@ -50,15 +62,50 @@ describe('agency seat request occurrence source', () => {
   it('excludes expired sale windows and past occurrences', () => {
     expect(
       isAgencySeatRequestOccurrence(
-        { ...base, saleEndsAt: new Date('2026-08-24T00:00:00.000Z') } as never,
+        { ...base, saleEndsAt: new Date('2026-08-24T00:00:00.000Z') },
         now,
       ),
     ).toBe(false);
     expect(
       isAgencySeatRequestOccurrence(
-        { ...base, departureAt: new Date('2026-08-24T00:00:00.000Z') } as never,
+        { ...base, departureAt: new Date('2026-08-24T00:00:00.000Z') },
         now,
       ),
     ).toBe(false);
+  });
+});
+
+describe('agency seat request class offer', () => {
+  const baseRule = {
+    seatsAllocated: 120,
+    agencySeatsReleased: 0,
+    agencyReleasePriceIrr: null,
+    sitePriceIrr: 32_000_000n,
+    priceIrr: 30_000_000n,
+  };
+
+  it('keeps an active class requestable before a dedicated agency release', () => {
+    expect(agencySeatRequestClassOffer(baseRule, 20)).toEqual({
+      hasDedicatedAgencyRelease: false,
+      availableToRequest: 100,
+      pricePerSeatIrr: 32_000_000n,
+    });
+  });
+
+  it('uses the dedicated agency pool as the hard ceiling after release', () => {
+    expect(
+      agencySeatRequestClassOffer(
+        {
+          ...baseRule,
+          agencySeatsReleased: 25,
+          agencyReleasePriceIrr: 28_000_000n,
+        },
+        7,
+      ),
+    ).toEqual({
+      hasDedicatedAgencyRelease: true,
+      availableToRequest: 18,
+      pricePerSeatIrr: 28_000_000n,
+    });
   });
 });
