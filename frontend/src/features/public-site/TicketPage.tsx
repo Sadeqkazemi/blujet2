@@ -217,6 +217,11 @@ export default function TicketPage() {
               <div className="text-[10px] text-[#8a96a6]">{t.cabinLabel}</div>
               <div className="text-xs font-extrabold text-[#0d2640]">
                 {CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}
+                {booking.fareClassCode ? (
+                  <span className="font-num mr-1 inline-block rounded bg-[#eef4fb] px-1.5 py-0.5 text-[10px] text-[#1668c4]" dir="ltr">
+                    {booking.fareClassCode}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>

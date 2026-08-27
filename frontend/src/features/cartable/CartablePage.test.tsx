@@ -26,6 +26,7 @@ const LIST: CartableListResult = {
   ],
   counts: { ADMIN: 2, AGENCY: 1, MANAGER: 1 },
   totalOpen: 4,
+  statusCounts: { OPEN: 4, APPROVED: 2, REJECTED: 1, TRANSFERRED: 1 },
 };
 
 function mockRole(role: Role) {
@@ -79,6 +80,29 @@ describe('CartablePage', () => {
     expect(screen.getByRole('button', { name: 'بررسی' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ایجاد پیام' })).toBeInTheDocument();
     expect(listSpy).toHaveBeenCalled();
+  });
+
+  it('loads resolved cartable rows when a status filter is selected', async () => {
+    mockRole('CEO');
+    const listSpy = vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+    const { default: userEvent } = await import('@testing-library/user-event');
+
+    renderPage();
+    await screen.findByText('درخواست گزارش فروش سه‌ماهه');
+    await userEvent.click(screen.getByRole('button', { name: /تأییدشده.*۲/ }));
+
+    await waitFor(() => expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'APPROVED' })));
+  });
+
+  it('uses the same dark organized cartable for IT manager', async () => {
+    mockRole('IT_MANAGER');
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+
+    renderPage();
+    expect(await screen.findByRole('heading', { name: 'کارتابل' })).toBeInTheDocument();
+    expect(screen.getByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
   });
 
   it('Finance Manager sees the chairman-permission gate with the request button', async () => {

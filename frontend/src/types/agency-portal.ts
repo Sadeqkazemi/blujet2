@@ -50,6 +50,8 @@ export interface AgencyCreditRequest {
 export interface AgencySalesTicket {
   pnr: string;
   status: string;
+  cabin?: string;
+  fareClassCode?: string | null;
   flightNo: string;
   route: string;
   departureAt: string;

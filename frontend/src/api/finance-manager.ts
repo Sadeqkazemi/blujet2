@@ -5,6 +5,7 @@ import type {
   FinanceReportPeriod,
   FinanceReportResult,
   FinanceReportScope,
+  FinanceSalesResult,
   FinancialIntegrationsResult,
   FinancialProvider,
 } from '../types/finance-manager';
@@ -15,6 +16,39 @@ export interface FinanceReportFilters {
   from?: string;
   to?: string;
   flightInstanceId?: string;
+}
+
+export interface FinanceSalesFilters {
+  bookedFrom?: string;
+  bookedTo?: string;
+  flightFrom?: string;
+  flightTo?: string;
+  bookingStatus?: string;
+  paymentStatus?: string;
+  originCode?: string;
+  destCode?: string;
+  cabin?: string;
+  channel?: string;
+  agencyId?: string;
+  limit?: number;
+}
+
+function salesQuery(filters: FinanceSalesFilters) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  });
+  return params;
+}
+
+export function fetchFinanceSales(filters: FinanceSalesFilters) {
+  return apiGet<FinanceSalesResult>(`/reporting/finance-sales?${salesQuery(filters)}`);
+}
+
+export function downloadFinanceSales(filters: FinanceSalesFilters, format: 'csv' | 'excel' | 'pdf') {
+  const params = salesQuery(filters);
+  params.set('format', format);
+  return apiGetBlob(`/reporting/finance-sales/export?${params}`);
 }
 
 function reportQuery(filters: FinanceReportFilters) {
@@ -29,7 +63,7 @@ export function fetchFinanceReport(filters: FinanceReportFilters) {
   return apiGet<FinanceReportResult>(`/reporting/finance-reports?${reportQuery(filters)}`);
 }
 
-export function downloadFinanceReport(filters: FinanceReportFilters, format: 'csv' | 'excel') {
+export function downloadFinanceReport(filters: FinanceReportFilters, format: 'csv' | 'excel' | 'pdf') {
   const params = reportQuery(filters);
   params.set('format', format);
   return apiGetBlob(`/reporting/finance-reports/export?${params}`);

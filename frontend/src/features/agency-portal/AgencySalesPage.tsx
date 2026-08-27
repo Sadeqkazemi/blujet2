@@ -44,6 +44,7 @@ const STR: Record<StoredLocale, {
   ticketsEmpty: string;
   colPnr: string;
   colDepartureDate: string;
+  colCabin: string;
   colAmount: string;
   colStatus: string;
   toman: string;
@@ -70,6 +71,7 @@ const STR: Record<StoredLocale, {
     ticketsEmpty: 'بلیطی ثبت نشده است.',
     colPnr: 'PNR',
     colDepartureDate: 'تاریخ پرواز',
+    colCabin: 'کلاس پروازی',
     colAmount: 'مبلغ',
     colStatus: 'وضعیت',
     toman: 'تومان',
@@ -96,6 +98,7 @@ const STR: Record<StoredLocale, {
     ticketsEmpty: 'No tickets recorded yet.',
     colPnr: 'PNR',
     colDepartureDate: 'Departure Date',
+    colCabin: 'Cabin / Fare class',
     colAmount: 'Amount',
     colStatus: 'Status',
     toman: 'Toman',
@@ -122,6 +125,7 @@ const STR: Record<StoredLocale, {
     ticketsEmpty: 'لا توجد تذاكر مسجّلة بعد.',
     colPnr: 'رمز الحجز',
     colDepartureDate: 'تاريخ الرحلة',
+    colCabin: 'درجة السفر',
     colAmount: 'المبلغ',
     colStatus: 'الحالة',
     toman: 'تومان',
@@ -252,6 +256,7 @@ export default function AgencySalesPage() {
                   <th className="py-2 font-bold">{t.colPnr}</th>
                   <th className="py-2 font-bold">{t.colFlight}</th>
                   <th className="py-2 font-bold">{t.colDepartureDate}</th>
+                  <th className="py-2 font-bold">{t.colCabin}</th>
                   <th className="py-2 font-bold">{t.colAmount}</th>
                   <th className="py-2 font-bold">{t.colStatus}</th>
                 </tr>
@@ -264,6 +269,7 @@ export default function AgencySalesPage() {
                       {t2.flightNo} — {t2.route}
                     </td>
                     <td className="py-2.5">{formatLocaleDate(t2.departureAt, locale)}</td>
+                    <td className="ltr py-2.5">{t2.cabin ?? '—'}{t2.fareClassCode ? ` / ${t2.fareClassCode}` : ''}</td>
                     <td className="py-2.5 font-bold">{localeMoney(t2.priceIrr, locale)} {t.toman}</td>
                     <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
                   </tr>

@@ -224,7 +224,7 @@ export default function SupportTicketsPage({
     }
   }
 
-  const all = tickets ?? [];
+  const all = useMemo(() => tickets ?? [], [tickets]);
   const kpis = useMemo(
     () => ({
       total: all.length,
@@ -270,32 +270,30 @@ export default function SupportTicketsPage({
       )}
 
       <div className="grid grid-cols-2 gap-[11px] md:grid-cols-5">
-        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-[11px]">
-          <div className="text-[11px] text-[#6b7b94]">کل تیکت‌ها</div>
-          <div className="font-num mt-1 text-[20.5px] font-black text-white">{faDigits(kpis.total)}</div>
-        </div>
-        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-[11px]">
-          <div className="text-[11px] text-[#6b7b94]">باز</div>
-          <div className="font-num mt-1 text-[20.5px] font-black text-[#f59e0b]">{faDigits(kpis.open)}</div>
-        </div>
-        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-[11px]">
-          <div className="text-[11px] text-[#6b7b94]">در حال بررسی</div>
-          <div className="font-num mt-1 text-[20.5px] font-black text-[#60a5fa]">
-            {faDigits(kpis.progress)}
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-[11px]">
-          <div className="text-[11px] text-[#6b7b94]">پاسخ داده‌شده</div>
-          <div className="font-num mt-1 text-[20.5px] font-black text-[#34d399]">
-            {faDigits(kpis.answered)}
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-[11px]">
-          <div className="text-[11px] text-[#6b7b94]">بسته‌شده</div>
-          <div className="font-num mt-1 text-[20.5px] font-black text-[#8b97a8]">
-            {faDigits(kpis.closed)}
-          </div>
-        </div>
+        {([
+          ['ALL', 'کل تیکت‌ها', kpis.total, 'text-white'],
+          ['OPEN', 'باز', kpis.open, 'text-[#f59e0b]'],
+          ['IN_PROGRESS', 'در حال بررسی', kpis.progress, 'text-[#60a5fa]'],
+          ['ANSWERED', 'پاسخ داده‌شده', kpis.answered, 'text-[#34d399]'],
+          ['CLOSED', 'بسته‌شده', kpis.closed, 'text-[#8b97a8]'],
+        ] as const).map(([key, label, count, color]) => {
+          const selected = statusFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-label={`${label} ${faDigits(count)}`}
+              aria-pressed={selected}
+              onClick={() => setStatusFilter(key)}
+              className={`rounded-[14px] border bg-[#141d2e] px-3 py-[11px] text-start transition focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/50 ${
+                selected ? 'border-[#3b82f6] shadow-[0_0_0_1px_rgba(59,130,246,.18)]' : 'border-[#1f2a3d] hover:border-[#34435f]'
+              }`}
+            >
+              <div className="text-[11px] text-[#6b7b94]">{label}</div>
+              <div className={`font-num mt-1 text-[20.5px] font-black ${color}`}>{faDigits(count)}</div>
+            </button>
+          );
+        })}
       </div>
 
       <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">

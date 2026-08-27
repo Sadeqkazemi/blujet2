@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   downloadFinanceReport,
+  downloadFinanceSales,
+  fetchFinanceSales,
   fetchFinanceFlightDetail,
   fetchFinanceReport,
   searchFinanceFlights,
   type FinanceReportFilters,
+  type FinanceSalesFilters,
 } from '../../api/finance-manager';
 import type {
   FinanceFlightDetail,
@@ -12,6 +15,7 @@ import type {
   FinanceReportPeriod,
   FinanceReportResult,
   FinanceReportScope,
+  FinanceSalesResult,
 } from '../../types/finance-manager';
 import { dayjs, formatJalaliDate } from '../../lib/jalali';
 import { faDigits, faMoney, faMoneyCompact } from '../../lib/fa-format';
@@ -26,7 +30,7 @@ const PERIODS: { key: FinanceReportPeriod; label: string }[] = [
   { key: 'year', label: 'سالانه' },
 ];
 
-type TopTab = FinanceReportScope | 'FLIGHT_SEARCH';
+type TopTab = FinanceReportScope | 'FLIGHT_SEARCH' | 'SALES_ENGINE';
 
 function jalaliMonth(month: number) {
   return dayjs().calendar('jalali').month(month).startOf('month');
@@ -61,7 +65,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function ExportButtons({ onExport, busy }: { onExport: (format: 'csv' | 'excel') => void; busy: string | null }) {
+function ExportButtons({ onExport, busy }: { onExport: (format: 'csv' | 'excel' | 'pdf') => void; busy: string | null }) {
   return (
     <div className="flex gap-2" dir="ltr">
       <button type="button" disabled={Boolean(busy)} onClick={() => onExport('excel')} className="rounded-[10px] bg-[#4f7ff0] px-4 py-2.5 text-[11px] font-extrabold text-white disabled:opacity-50">
@@ -69,6 +73,9 @@ function ExportButtons({ onExport, busy }: { onExport: (format: 'csv' | 'excel')
       </button>
       <button type="button" disabled={Boolean(busy)} onClick={() => onExport('csv')} className="rounded-[10px] border border-[#2b3852] bg-[#18223a] px-4 py-2.5 text-[11px] font-extrabold text-white disabled:opacity-50">
         {busy === 'csv' ? 'در حال ساخت…' : 'خروجی CSV'}
+      </button>
+      <button type="button" disabled={Boolean(busy)} onClick={() => onExport('pdf')} className="rounded-[10px] border border-[#2b3852] bg-[#18223a] px-4 py-2.5 text-[11px] font-extrabold text-white disabled:opacity-50">
+        {busy === 'pdf' ? 'در حال ساخت…' : 'خروجی PDF'}
       </button>
     </div>
   );
@@ -230,6 +237,75 @@ function FlightTable({
   );
 }
 
+const EMPTY_SALES_FILTERS: FinanceSalesFilters = { limit: 250 };
+
+function SalesEngineView({
+  filters,
+  onChange,
+  result,
+  loading,
+  error,
+  onApply,
+  onExport,
+  busy,
+}: {
+  filters: FinanceSalesFilters;
+  onChange: (filters: FinanceSalesFilters) => void;
+  result: FinanceSalesResult | null;
+  loading: boolean;
+  error: boolean;
+  onApply: () => void;
+  onExport: (format: 'csv' | 'excel' | 'pdf') => void;
+  busy: string | null;
+}) {
+  const fieldClass = 'h-10 rounded-[9px] border border-[#2b3852] bg-[#18223a] px-3 text-[11px] text-white outline-none focus:border-[#4f7ff0]';
+  const update = (key: keyof FinanceSalesFilters, value: string) =>
+    onChange({ ...filters, [key]: value || undefined });
+  return (
+    <section className="rounded-[15px] border border-[#222e43] bg-[#141d2e]">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#222e43] p-5">
+        <div>
+          <h2 className="text-base font-extrabold text-white">موتور گزارش تفصیلی فروش</h2>
+          <p className="mt-1 text-[10px] text-[#6b7b94]">فیلتر و تجمیع مستقیماً در سرور انجام می‌شود.</p>
+        </div>
+        <ExportButtons onExport={onExport} busy={busy} />
+      </div>
+      <div className="grid gap-3 border-b border-[#222e43] p-5 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">رزرو از<input type="date" value={filters.bookedFrom ?? ''} onChange={(e) => update('bookedFrom', e.target.value)} className={fieldClass} /></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">رزرو تا<input type="date" value={filters.bookedTo ?? ''} onChange={(e) => update('bookedTo', e.target.value)} className={fieldClass} /></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">پرواز از<input type="date" value={filters.flightFrom ?? ''} onChange={(e) => update('flightFrom', e.target.value)} className={fieldClass} /></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">پرواز تا<input type="date" value={filters.flightTo ?? ''} onChange={(e) => update('flightTo', e.target.value)} className={fieldClass} /></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">وضعیت رزرو<select value={filters.bookingStatus ?? ''} onChange={(e) => update('bookingStatus', e.target.value)} className={fieldClass}><option value="">همه</option>{['DRAFT','HELD','PAID','TICKETED','CANCELLED','EXPIRED','REFUNDED','FLOWN','NO_SHOW'].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">وضعیت پرداخت<select value={filters.paymentStatus ?? ''} onChange={(e) => update('paymentStatus', e.target.value)} className={fieldClass}><option value="">همه</option><option value="PENDING">در انتظار</option><option value="PAID">پرداخت‌شده</option><option value="REFUNDED">مستردشده</option><option value="CANCELLED">لغوشده</option></select></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">کلاس کابین<select value={filters.cabin ?? ''} onChange={(e) => update('cabin', e.target.value)} className={fieldClass}><option value="">همه</option><option value="ECONOMY">اکونومی</option><option value="COMFORT">کامفورت</option><option value="BUSINESS">بیزینس</option><option value="FIRST">فرست</option></select></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">کانال فروش<select value={filters.channel ?? ''} onChange={(e) => update('channel', e.target.value)} className={fieldClass}><option value="">همه</option><option value="SYSTEM">سایت</option><option value="AGENCY">آژانس</option><option value="CHARTER">چارتر</option></select></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">مبدأ<input dir="ltr" maxLength={10} value={filters.originCode ?? ''} onChange={(e) => update('originCode', e.target.value.toUpperCase())} className={fieldClass} placeholder="THR" /></label>
+        <label className="grid gap-1 text-[10px] text-[#9fb0c7]">مقصد<input dir="ltr" maxLength={10} value={filters.destCode ?? ''} onChange={(e) => update('destCode', e.target.value.toUpperCase())} className={fieldClass} placeholder="MHD" /></label>
+        <div className="flex items-end gap-2 sm:col-span-2">
+          <button type="button" onClick={onApply} className="h-10 flex-1 rounded-[9px] bg-[#4f7ff0] px-4 text-[11px] font-bold text-white">اعمال فیلتر</button>
+          <button type="button" onClick={() => onChange(EMPTY_SALES_FILTERS)} className="h-10 rounded-[9px] border border-[#2b3852] px-4 text-[11px] font-bold text-[#9fb0c7]">پاک‌کردن</button>
+        </div>
+      </div>
+      {loading ? <EmptyState text="در حال ساخت گزارش…" /> : error ? <ErrorState onRetry={onApply} /> : !result ? <EmptyState text="فیلترها را تنظیم و گزارش را اجرا کنید." /> : (
+        <>
+          <div className="grid grid-cols-2 gap-3 p-5 lg:grid-cols-5">
+            {[
+              ['سفارش', faDigits(result.summary.orderCount)],
+              ['مسافر', faDigits(result.summary.passengerCount)],
+              ['فروش ناخالص', `${faMoney(result.summary.grossIrr)} تومان`],
+              ['درآمد خالص', `${faMoney(result.summary.netRevenueIrr)} تومان`],
+              ['میانگین سفارش', `${faMoney(result.summary.averageOrderIrr)} تومان`],
+            ].map(([label, value]) => <div key={label} className="rounded-xl border border-[#26334b] bg-[#111a2b] p-3"><span className="block text-[9px] text-[#6b7b94]">{label}</span><strong className="font-num mt-1 block text-sm text-white">{value}</strong></div>)}
+          </div>
+          <div className="overflow-x-auto border-t border-[#222e43]">
+            <table className="w-full min-w-[1250px] text-right text-[10px]"><thead className="text-[#6b7b94]"><tr>{['PNR','تاریخ رزرو','وضعیت','پرداخت','کانال','پرواز','مسیر','تاریخ پرواز','کلاس','مسافر','پایه','مالیات','خدمات','جمع'].map((h) => <th key={h} className="px-3 py-3">{h}</th>)}</tr></thead><tbody>{result.rows.map((row) => <tr key={row.bookingId} className="border-t border-[#222e43] text-[#e7ecf3]"><td dir="ltr" className="px-3 py-3 font-bold text-[#7da7ff]">{row.pnr}</td><td className="px-3 py-3">{formatJalaliDate(row.bookedAt)}</td><td className="px-3 py-3">{row.bookingStatus}</td><td className="px-3 py-3">{row.paymentStatus}</td><td className="px-3 py-3">{row.channel}</td><td dir="ltr" className="px-3 py-3">{row.flightNo}</td><td dir="ltr" className="px-3 py-3">{row.originCode}-{row.destCode}</td><td className="px-3 py-3">{formatJalaliDate(row.departureAt)}</td><td dir="ltr" className="px-3 py-3">{row.cabin}{row.fareClassCode ? `/${row.fareClassCode}` : ''}</td><td className="px-3 py-3">{faDigits(row.passengerCount)}</td><td className="font-num px-3 py-3">{faMoney(row.baseFareIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.taxIrr)}</td><td className="font-num px-3 py-3">{faMoney(row.extrasIrr)}</td><td className="font-num px-3 py-3 font-bold">{faMoney(row.totalIrr)}</td></tr>)}</tbody></table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function FinanceReportsPage() {
   const nowJalali = dayjs().calendar('jalali');
   const [tab, setTab] = useState<TopTab>('AGENCIES');
@@ -243,9 +319,14 @@ export default function FinanceReportsPage() {
   const [query, setQuery] = useState('');
   const [searchRows, setSearchRows] = useState<FinanceFlightRow[] | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<FinanceFlightDetail | null>(null);
+  const [salesFilters, setSalesFilters] = useState<FinanceSalesFilters>(EMPTY_SALES_FILTERS);
+  const [appliedSalesFilters, setAppliedSalesFilters] = useState<FinanceSalesFilters>(EMPTY_SALES_FILTERS);
+  const [salesResult, setSalesResult] = useState<FinanceSalesResult | null>(null);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesError, setSalesError] = useState(false);
 
   const filters = useMemo<FinanceReportFilters | null>(() => {
-    if (tab === 'FLIGHT_SEARCH') return null;
+    if (tab === 'FLIGHT_SEARCH' || tab === 'SALES_ENGINE') return null;
     return { scope: tab, period: tab === 'CUSTOMERS' ? period : 'month', ...rangeFor(tab === 'CUSTOMERS' ? period : 'month', month, day) };
   }, [tab, period, month, day]);
 
@@ -268,7 +349,19 @@ export default function FinanceReportsPage() {
     return () => { active = false; };
   }, [tab, query, month, day]);
 
-  async function onExport(format: 'csv' | 'excel') {
+  useEffect(() => {
+    if (tab !== 'SALES_ENGINE') return;
+    let active = true;
+    setSalesLoading(true);
+    setSalesError(false);
+    fetchFinanceSales(appliedSalesFilters)
+      .then((data) => active && setSalesResult(data))
+      .catch(() => active && setSalesError(true))
+      .finally(() => active && setSalesLoading(false));
+    return () => { active = false; };
+  }, [tab, appliedSalesFilters]);
+
+  async function onExport(format: 'csv' | 'excel' | 'pdf') {
     if (!filters) return;
     setExportBusy(format);
     try {
@@ -276,7 +369,7 @@ export default function FinanceReportsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `finance-report.${format === 'csv' ? 'csv' : 'xls'}`;
+      link.download = `finance-report.${format === 'excel' ? 'xls' : format}`;
       link.click();
       URL.revokeObjectURL(url);
     } finally {
@@ -289,7 +382,45 @@ export default function FinanceReportsPage() {
     setSelectedFlight(await fetchFinanceFlightDetail(row.flightInstanceId));
   }
 
-  const title = tab === 'AGENCIES' ? 'گزارش فروش و پرداخت آژانس‌ها' : tab === 'CHARTERS' ? 'گزارش فروش و پرداخت چارترکنندگان' : tab === 'CUSTOMERS' ? 'گزارش فروش مشتریان' : 'جستجوی گزارش پرواز';
+  async function exportSelectedFlight(format: 'csv' | 'excel' | 'pdf') {
+    if (!selectedFlight) return;
+    setExportBusy(format);
+    try {
+      const blob = await downloadFinanceReport(
+        {
+          scope: 'CUSTOMERS',
+          period: 'flight',
+          flightInstanceId: selectedFlight.summary.flightInstanceId,
+        },
+        format,
+      );
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'excel' ? 'xls' : format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportBusy(null);
+    }
+  }
+
+  async function exportSales(format: 'csv' | 'excel' | 'pdf') {
+    setExportBusy(format);
+    try {
+      const blob = await downloadFinanceSales(appliedSalesFilters, format);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `finance-sales.${format === 'excel' ? 'xls' : format}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportBusy(null);
+    }
+  }
+
+  const title = tab === 'AGENCIES' ? 'گزارش فروش و پرداخت آژانس‌ها' : tab === 'CHARTERS' ? 'گزارش فروش و پرداخت چارترکنندگان' : tab === 'CUSTOMERS' ? 'گزارش فروش مشتریان' : tab === 'SALES_ENGINE' ? 'موتور گزارش فروش' : 'جستجوی گزارش پرواز';
 
   return (
     <div dir="rtl" className="min-h-full bg-[#0f1623] px-6 py-5 text-[#e7ecf3] lg:px-8" data-testid="finance-reports-page">
@@ -300,13 +431,24 @@ export default function FinanceReportsPage() {
 
       <div className="mb-4 flex justify-end">
         <div className="flex rounded-[12px] border border-[#28344c] bg-[#18223a] p-1">
-          {([['AGENCIES', 'آژانس‌ها'], ['CHARTERS', 'چارترها'], ['CUSTOMERS', 'مشتریان'], ['FLIGHT_SEARCH', 'جستجوی پرواز']] as const).map(([key, label]) => (
+          {([['AGENCIES', 'آژانس‌ها'], ['CHARTERS', 'چارترها'], ['CUSTOMERS', 'مشتریان'], ['SALES_ENGINE', 'گزارش تفصیلی'], ['FLIGHT_SEARCH', 'جستجوی پرواز']] as const).map(([key, label]) => (
             <button key={key} type="button" onClick={() => setTab(key)} className={`rounded-[9px] px-5 py-2.5 text-xs font-bold ${tab === key ? 'bg-[#4f7ff0] text-white' : 'text-[#9fb0c7]'}`}>{label}</button>
           ))}
         </div>
       </div>
 
-      {tab !== 'FLIGHT_SEARCH' ? (
+      {tab === 'SALES_ENGINE' ? (
+        <SalesEngineView
+          filters={salesFilters}
+          onChange={setSalesFilters}
+          result={salesResult}
+          loading={salesLoading}
+          error={salesError}
+          onApply={() => setAppliedSalesFilters({ ...salesFilters })}
+          onExport={(format) => void exportSales(format)}
+          busy={exportBusy}
+        />
+      ) : tab !== 'FLIGHT_SEARCH' ? (
         <>
           <section className="rounded-[15px] border border-[#222e43] bg-[#141d2e]">
             <div className="flex flex-wrap items-start justify-between gap-4 p-5">
@@ -397,35 +539,7 @@ export default function FinanceReportsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <ExportButtons
                     busy={exportBusy}
-                    onExport={(format) => {
-                      const headers = ['نام آژانس', 'تعداد صندلی', 'مبلغ فروش', 'پرداخت‌شده', 'بدهی'];
-                      const bodyRows = selectedFlight.agencies.map((a) => [
-                        a.agencyName,
-                        String(a.soldSeats),
-                        String(a.salesIrr),
-                        String(a.paidIrr),
-                        String(a.outstandingIrr),
-                      ]);
-                      const html = `<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="utf-8"/></head><body><table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${bodyRows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
-                      const blob =
-                        format === 'csv'
-                          ? new Blob(
-                              [
-                                '\ufeff' +
-                                  [headers.join(','), ...bodyRows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(','))].join(
-                                    '\n',
-                                  ),
-                              ],
-                              { type: 'text/csv;charset=utf-8' },
-                            )
-                          : new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel' });
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.href = url;
-                      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'csv' ? 'csv' : 'xls'}`;
-                      link.click();
-                      URL.revokeObjectURL(url);
-                    }}
+                    onExport={(format) => void exportSelectedFlight(format)}
                   />
                   <span className="font-num text-lg font-black">{faMoney(selectedFlight.summary.totalIrr)} تومان</span>
                 </div>

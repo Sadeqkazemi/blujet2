@@ -103,7 +103,7 @@ export class CartableService {
       );
     }
 
-    const [tasks, countRows] = await Promise.all([
+    const [tasks, countRows, statusRows] = await Promise.all([
       this.taskRepo.find({
         where,
         relations: { sender: true },
@@ -123,14 +123,28 @@ export class CartableService {
           category: 'ADMIN' | 'AGENCY' | 'MANAGER';
           count: string;
         }>(),
+      this.taskRepo
+        .createQueryBuilder('t')
+        .select('t.status', 'status')
+        .addSelect('COUNT(*)', 'count')
+        .where('t.assigneeId = :assigneeId', { assigneeId: actor.id })
+        .groupBy('t.status')
+        .getRawMany<{
+          status: 'OPEN' | 'APPROVED' | 'REJECTED' | 'TRANSFERRED';
+          count: string;
+        }>(),
     ]);
 
     const counts = { ADMIN: 0, AGENCY: 0, MANAGER: 0 };
     for (const row of countRows) counts[row.category] = parseInt(row.count, 10);
+    const statusCounts = { OPEN: 0, APPROVED: 0, REJECTED: 0, TRANSFERRED: 0 };
+    for (const row of statusRows)
+      statusCounts[row.status] = parseInt(row.count, 10);
 
     return {
       tasks,
       counts,
+      statusCounts,
       totalOpen: counts.ADMIN + counts.AGENCY + counts.MANAGER,
     };
   }

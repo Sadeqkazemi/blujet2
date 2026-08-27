@@ -95,4 +95,42 @@ describe('FinanceReportsPage', () => {
     expect(screen.getByText('آژانس')).toBeInTheDocument();
     expect(screen.getByText('فروخته‌نشده')).toBeInTheDocument();
   });
+
+  it('offers server-generated PDF alongside Excel and CSV', async () => {
+    vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({
+      kind: 'partners',
+      scope: 'AGENCIES',
+      period: 'month',
+      rows: [],
+      summary: { totalIrr: '0', paidIrr: '0' },
+    });
+    vi.spyOn(api, 'downloadFinanceReport').mockResolvedValue(new Blob(['pdf']));
+
+    render(<FinanceReportsPage />);
+    expect(await screen.findByRole('button', { name: 'خروجی PDF' })).toBeInTheDocument();
+  });
+
+  it('renders server-side detailed sales rows with cabin and fare class', async () => {
+    vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({
+      kind: 'partners', scope: 'AGENCIES', period: 'month', rows: [],
+      summary: { totalIrr: '0', paidIrr: '0' },
+    });
+    vi.spyOn(api, 'fetchFinanceSales').mockResolvedValue({
+      rows: [{
+        bookingId: 'b1', pnr: 'BJTEST', bookedAt: '2026-08-01T00:00:00.000Z',
+        bookingStatus: 'TICKETED', paymentStatus: 'PAID', channel: 'SYSTEM',
+        flightInstanceId: 'fi1', flightNo: 'XY123', originCode: 'THR', destCode: 'MHD',
+        departureAt: '2026-08-02T08:00:00.000Z', arrivalAt: '2026-08-02T09:00:00.000Z',
+        cabin: 'ECONOMY', fareClassCode: 'Y', passengerCount: 1,
+        baseFareIrr: '1000000', taxIrr: '100000', extrasIrr: '0', totalIrr: '1100000',
+        agencyId: null, agencyName: null,
+      }],
+      summary: { orderCount: 1, passengerCount: 1, grossIrr: '1100000', netRevenueIrr: '1100000', averageOrderIrr: '1100000' },
+    });
+
+    render(<FinanceReportsPage />);
+    await userEvent.click(screen.getByRole('button', { name: 'گزارش تفصیلی' }));
+    expect(await screen.findByText('BJTEST')).toBeInTheDocument();
+    expect(screen.getByText('ECONOMY/Y')).toBeInTheDocument();
+  });
 });
