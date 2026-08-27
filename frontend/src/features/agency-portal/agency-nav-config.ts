@@ -8,6 +8,7 @@ export type AgencyNavKey =
   | 'apidocs'
   | 'credit'
   | 'report'
+  | 'notices'
   | 'inbox'
   | 'profile';
 
@@ -19,6 +20,7 @@ export type AgencyNavIconKey =
   | 'apidocs'
   | 'credit'
   | 'report'
+  | 'notices'
   | 'inbox'
   | 'profile';
 
@@ -72,6 +74,12 @@ export const AGENCY_NAV_ITEMS: AgencyNavItem[] = [
     path: '/agency/sales',
     icon: 'report',
     label: { fa: 'فروش و گزارش‌ها', en: 'Sales & Reports', ar: 'المبيعات والتقارير' },
+  },
+  {
+    key: 'notices',
+    path: '/agency/notices',
+    icon: 'notices',
+    label: { fa: 'اطلاعیه و اصلاحیه', en: 'Notices & Amendments', ar: 'الإشعارات والتعديلات' },
   },
   {
     key: 'inbox',
@@ -148,6 +156,14 @@ export const AGENCY_PAGE_META: Record<
       ar: 'أداء مبيعات الوكالة والتقارير',
     },
   },
+  notices: {
+    title: { fa: 'اطلاعیه و اصلاحیه', en: 'Notices & Amendments', ar: 'الإشعارات والتعديلات' },
+    subtitle: {
+      fa: 'اطلاعیه‌های سایت، پروازهای جدید و پیام‌های مرتبط با آژانس شما',
+      en: 'Site notices, new flights, and notifications relevant to your agency',
+      ar: 'إشعارات الموقع والرحلات الجديدة والتنبيهات الخاصة بوكالتك',
+    },
+  },
   inbox: {
     title: { fa: 'صندوق پیام‌ها', en: 'Inbox & Messages', ar: 'صندوق الرسائل' },
     subtitle: {
@@ -174,6 +190,7 @@ export function agencyNavKeyFromPath(pathname: string): AgencyNavKey {
   if (pathname.startsWith('/agency/apidocs')) return 'apidocs';
   if (pathname.startsWith('/agency/credit')) return 'credit';
   if (pathname.startsWith('/agency/sales')) return 'report';
+  if (pathname.startsWith('/agency/notices')) return 'notices';
   if (pathname.startsWith('/agency/inbox')) return 'inbox';
   if (pathname.startsWith('/agency/profile')) return 'profile';
   return 'dashboard';

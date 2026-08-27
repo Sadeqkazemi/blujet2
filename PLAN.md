@@ -19,6 +19,25 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Agency RTRD / PSR / PRR sales-report redesign (2026-08-28)** —
+  rebuilt `/agency/sales` from the supplied reconciliation screenshots using
+  only tenant-scoped sales, profile, credit and invoice APIs. The page now has
+  a real report header, period/balance/payment KPIs, honest sales/refund
+  counters, RTRD reconciliation rows, searchable PSR detail, refund-only PRR,
+  10-row pagination and CSV export. Financial components absent from the
+  current schema are explicitly blank instead of being fabricated. Acceptance
+  and proof: `docs/features/agency-sales-report-rtrd-redesign.md`.
+
+- [x] **Agency notices and amendments hub (2026-08-28)** — added the
+  `/agency/notices` page to the shared agency desktop/mobile navigation. It
+  aggregates the active Site Admin `ANNOUNCEMENT_BAR`, real published flight
+  seat-request options, and recipient-scoped agency notifications; each item
+  opens a full detail dialog and unread notifications are acknowledged through
+  the existing notifications API. Site Admin can now maintain the full agency
+  instruction in the announcement subtitle. No mock rows or new parallel data
+  store were introduced. Acceptance and proof:
+  `docs/features/agency-notices-and-amendments.md`.
+
 - [x] **Remove ticket refund from Commercial services (2026-08-25)** — the
   commercial ancillary-services API and page omit the legacy `refund-fee`
   entry while retaining the actual customer refund and finance workflows.

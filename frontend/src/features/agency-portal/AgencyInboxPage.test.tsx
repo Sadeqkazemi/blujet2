@@ -42,9 +42,11 @@ describe('AgencyInboxPage', () => {
 
     render(<AgencyInboxPage />);
     expect(await screen.findByTestId('support-conversation-center')).toHaveAttribute('data-theme', 'light');
-    expect(await screen.findByText('لطفاً فاکتور را تسویه بفرمایید.')).toBeInTheDocument();
-
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /مکاتبات بازرگانی/ }));
+    expect(screen.getByTestId('agency-commercial-inbox')).toBeInTheDocument();
+    expect((await screen.findAllByText('لطفاً فاکتور را تسویه بفرمایید.')).length).toBeGreaterThan(0);
+
     await user.type(screen.getByPlaceholderText('پاسخ خود را بنویسید…'), 'حتماً تا پنجشنبه پرداخت می‌شود.');
     await user.click(screen.getByRole('button', { name: 'ارسال' }));
 
@@ -71,6 +73,7 @@ describe('AgencyInboxPage', () => {
     vi.spyOn(portalApi, 'fetchInbox').mockResolvedValue([]);
     render(<AgencyInboxPage />);
 
+    await userEvent.click(await screen.findByRole('button', { name: /المراسلات التجارية/ }));
     expect(await screen.findByText('لا توجد رسائل بعد.')).toBeInTheDocument();
   });
 

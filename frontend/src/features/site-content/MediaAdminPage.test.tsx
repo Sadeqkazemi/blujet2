@@ -25,7 +25,7 @@ const mockBlocks = [
     key: 'ANNOUNCEMENT_BAR' as const,
     enabled: true,
     title: 'اطلاعیه تست',
-    subtitle: '',
+    subtitle: 'دستورالعمل کامل آژانس',
     buttonText: 'مشاهده',
     badgeText: '',
     imageFileId: null,
@@ -136,7 +136,8 @@ describe('MediaAdminPage', () => {
     render(<MediaAdminPage />);
     expect(await screen.findByText('مدیریت سایت')).toBeInTheDocument();
     expect(screen.getByText('بنر اصلی سایت')).toBeInTheDocument();
-    expect(screen.getByText('بنر اطلاع‌رسانی بالای هدر')).toBeInTheDocument();
+    expect(screen.getByText('اطلاعیه سایت و پنل آژانس')).toBeInTheDocument();
+    expect(screen.getByText('دستورالعمل کامل آژانس')).toBeInTheDocument();
     expect(screen.getByText('بنر تبلیغاتی میانی')).toBeInTheDocument();
     expect(screen.getByText('مقاصد محبوب')).toBeInTheDocument();
     expect(screen.getByText('مسیرهای پرتردد')).toBeInTheDocument();
@@ -225,13 +226,22 @@ describe('MediaAdminPage', () => {
   it('toggles announcement bar with design deactivate label', async () => {
     const user = userEvent.setup();
     render(<MediaAdminPage />);
-    await screen.findByText('بنر اطلاع‌رسانی بالای هدر');
+    await screen.findByText('اطلاعیه سایت و پنل آژانس');
     await user.click(screen.getByRole('button', { name: 'غیرفعال کردن' }));
     await waitFor(() => {
       expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith('ANNOUNCEMENT_BAR', {
         enabled: false,
       });
     });
+  });
+
+  it('allows the site admin to edit the full agency instruction', async () => {
+    const user = userEvent.setup();
+    render(<MediaAdminPage />);
+    await screen.findByText('اطلاعیه سایت و پنل آژانس');
+
+    await user.click(screen.getByTestId('edit-agency-announcement'));
+    expect(screen.getByDisplayValue('دستورالعمل کامل آژانس')).toBeInTheDocument();
   });
 
   it('requires an in-app confirmation before deleting a destination', async () => {

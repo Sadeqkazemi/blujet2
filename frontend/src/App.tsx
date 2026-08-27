@@ -26,6 +26,7 @@ import AgencyWebservicePage from './features/agency-portal/AgencyWebservicePage'
 import AgencyApiDocsPage from './features/agency-portal/AgencyApiDocsPage';
 import AgencyCreditPage from './features/agency-portal/AgencyCreditPage';
 import AgencySalesPage from './features/agency-portal/AgencySalesPage';
+import AgencyNoticesPage from './features/agency-portal/AgencyNoticesPage';
 import AgencyInboxPage from './features/agency-portal/AgencyInboxPage';
 import AgencyProfilePage from './features/agency-portal/AgencyProfilePage';
 import AgenciesRouter from './features/agencies/AgenciesRouter';
@@ -150,6 +151,7 @@ export default function App() {
               <Route path="webservice" element={<AgencyWebservicePage />} />
               <Route path="apidocs" element={<AgencyApiDocsPage />} />
               <Route path="sales" element={<AgencySalesPage />} />
+              <Route path="notices" element={<AgencyNoticesPage />} />
               <Route path="inbox" element={<AgencyInboxPage />} />
               <Route path="profile" element={<AgencyProfilePage />} />
             </Route>

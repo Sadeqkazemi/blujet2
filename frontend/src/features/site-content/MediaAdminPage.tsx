@@ -49,9 +49,9 @@ const BLOCK_META: Record<
     fields: ['title', 'subtitle', 'buttonText', 'badgeText'],
   },
   ANNOUNCEMENT_BAR: {
-    title: 'بنر اطلاع‌رسانی بالای هدر',
-    subtitle: 'نوار اطلاعیه در مواقع خاص، بالای هدر صفحه اصلی',
-    fields: ['title', 'buttonText'],
+    title: 'اطلاعیه سایت و پنل آژانس',
+    subtitle: 'متن فعال این بخش در صفحه اصلی و «اطلاعیه و اصلاحیه» پنل آژانس نمایش داده می‌شود',
+    fields: ['title', 'subtitle', 'buttonText'],
   },
   PROMO_BANNER: {
     title: 'بنر تبلیغاتی میانی',
@@ -511,8 +511,8 @@ export default function MediaAdminPage() {
       <div className={cardClass()}>
         <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="m-0 text-[14.5px] font-extrabold text-white">بنر اطلاع‌رسانی بالای هدر</h3>
-            <p className="mt-0.5 text-[11px] text-[#6b7b94]">نوار اطلاعیه بالای صفحه اصلی</p>
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">اطلاعیه سایت و پنل آژانس</h3>
+            <p className="mt-0.5 text-[11px] text-[#6b7b94]">عنوان و دستورالعمل کامل برای سایت و بخش اطلاعیه آژانس</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -526,6 +526,7 @@ export default function MediaAdminPage() {
             </button>
             <button
               type="button"
+              data-testid="edit-agency-announcement"
               onClick={() => openBlockEdit('ANNOUNCEMENT_BAR')}
               className="cursor-pointer rounded-[9px] bg-accent px-2.5 py-1.5 text-[11.5px] font-bold text-white"
             >
@@ -535,7 +536,10 @@ export default function MediaAdminPage() {
         </div>
         <div className="flex items-center gap-2.5 rounded-[11px] border border-[#28344c] bg-gradient-to-l from-[#123457] to-[#0a1f36] px-3.5 py-2.5">
           <span className={`h-2 w-2 flex-none rounded-full ${ann?.enabled ? 'bg-[#1f8a5b]' : 'bg-[#6b7280]'}`} />
-          <span className="min-w-0 flex-1 truncate text-xs font-bold text-[#cdd6e3]">{ann?.title}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-bold text-[#cdd6e3]">{ann?.title}</span>
+            {ann?.subtitle && <span className="mt-1 block truncate text-[10px] text-[#8797ad]">{ann.subtitle}</span>}
+          </span>
           <span className="flex-none rounded-[14px] bg-[#f2c94c] px-2.5 py-1 text-[10.5px] font-extrabold text-[#0d2640]">
             {ann?.buttonText || 'مشاهده'} ←
           </span>
