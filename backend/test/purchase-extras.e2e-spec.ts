@@ -4,6 +4,7 @@ import { App } from 'supertest/types';
 import * as crypto from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { CabinFare } from '../src/database/entities/cabin-fare.entity';
 import { ClubMember } from '../src/database/entities/club-member.entity';
@@ -381,6 +382,13 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       .send({ flightInstanceId: instance.id, cabin: 'ECONOMY' });
     expect(lockRes.status).toBe(201);
     const lockedPriceIrr = Number(lockRes.body.data.lockedPriceIrr);
+    const seatPriceIrr = Number(
+      (
+        await dataSource
+          .getRepository(AncillaryService)
+          .findOneByOrFail({ key: 'seat-window-aisle' })
+      ).priceIrr,
+    );
 
     // Market price moves (a registered fare change) — the lock must still win.
     const cabinFareRepo = dataSource.getRepository(CabinFare);
@@ -415,7 +423,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
         cabin: 'ECONOMY',
         passengers: [{ fullName: 'قفل قیمت', seatCode: '6A' }],
       });
-    expect(bookRes.body.data.priceIrr).toBe(String(lockedPriceIrr));
+    expect(bookRes.body.data.priceIrr).toBe(
+      String(lockedPriceIrr + seatPriceIrr),
+    );
 
     // Payment must not trigger the "price changed" flow.
     const payRes = await request(app.getHttpServer())
@@ -423,7 +433,9 @@ describe('Purchase extras: promo codes, wallet, club points, price lock (e2e)', 
       .set('Authorization', `Bearer ${accessToken}`)
       .send({});
     expect(payRes.body.data.priceChanged).toBe(false);
-    expect(payRes.body.data.booking.priceIrr).toBe(String(lockedPriceIrr));
+    expect(payRes.body.data.booking.priceIrr).toBe(
+      String(lockedPriceIrr + seatPriceIrr),
+    );
 
     const lockAfter = await dataSource
       .getRepository(PriceLock)

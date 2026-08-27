@@ -278,16 +278,30 @@ describe('Booking engine (e2e)', () => {
       })
       .expect(201);
 
-    expect(createRes.body.data.extrasIrr).toBe('9000000');
-    expect(createRes.body.data.extras).toEqual([
-      expect.objectContaining({
-        id: extra.id,
-        code: 'EXTRA_BAGGAGE',
-        unitPriceIrr: '4500000',
-        quantity: 2,
-        totalIrr: '9000000',
-      }),
-    ]);
+    const seatPriceIrr = (
+      await dataSource
+        .getRepository(AncillaryService)
+        .findOneByOrFail({ key: 'seat-window-aisle' })
+    ).priceIrr;
+    expect(createRes.body.data.extrasIrr).toBe(
+      (9_000_000n + seatPriceIrr).toString(),
+    );
+    expect(createRes.body.data.extras).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: extra.id,
+          code: 'EXTRA_BAGGAGE',
+          unitPriceIrr: '4500000',
+          quantity: 2,
+          totalIrr: '9000000',
+        }),
+        expect.objectContaining({
+          id: 'seat-type:seat-window-aisle',
+          quantity: 1,
+          totalIrr: seatPriceIrr.toString(),
+        }),
+      ]),
+    );
 
     await repo.update({ id: extra.id }, { priceIrr: 9_000_000n });
     const stored = await dataSource
