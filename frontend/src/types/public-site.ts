@@ -113,6 +113,7 @@ export interface BookingDetail {
   pnr: string;
   status: BookingStatus;
   cabin: CabinClass;
+  fareClassCode?: string | null;
   priceIrr: string;
   taxIrr?: string;
   extrasIrr?: string;

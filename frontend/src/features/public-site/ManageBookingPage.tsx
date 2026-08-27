@@ -349,7 +349,10 @@ export default function ManageBookingPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', borderTop: '1px solid #f2f4f7' }}>
                 {[
-                  [t.classLabel, CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin],
+                  [
+                    t.classLabel,
+                    `${CABIN_LABEL[booking.cabin]?.[locale] ?? booking.cabin}${booking.fareClassCode ? ` (${booking.fareClassCode})` : ''}`,
+                  ],
                   [t.statusLabel, booking.status],
                   [t.priceLabel, `${localeMoney(booking.priceIrr, locale)} ${t.toman}`],
                 ].map(([k, v]) => (

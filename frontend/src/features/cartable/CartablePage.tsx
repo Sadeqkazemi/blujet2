@@ -22,6 +22,7 @@ import ConversationHistory from '../../components/ConversationHistory';
 import type {
   CartableCategory,
   CartableListResult,
+  CartableStatus,
   CartableTask,
   ChairPermission,
   StaffDirectoryEntry,
@@ -123,6 +124,13 @@ const CATEGORY_META: Record<
   },
 };
 
+const STATUS_FILTERS: { key: CartableStatus; label: string }[] = [
+  { key: 'OPEN', label: 'باز' },
+  { key: 'APPROVED', label: 'تأییدشده' },
+  { key: 'REJECTED', label: 'ردشده' },
+  { key: 'TRANSFERRED', label: 'منتقل‌شده' },
+];
+
 export default function CartablePage() {
   const { user } = useAuth();
   const hasChairGate = user?.role === 'FINANCE_MANAGER' || user?.role === 'COMMERCIAL_MANAGER';
@@ -132,10 +140,12 @@ export default function CartablePage() {
     user?.role === 'SENIOR_MANAGER' ||
     user?.role === 'FINANCE_MANAGER' ||
     user?.role === 'COMMERCIAL_MANAGER' ||
+    user?.role === 'IT_MANAGER' ||
     user?.role === 'SITE_ADMIN';
 
   const [result, setResult] = useState<CartableListResult | null>(null);
   const [category, setCategory] = useState<CartableCategory | null>(null);
+  const [status, setStatus] = useState<CartableStatus>('OPEN');
   const [filterDate, setFilterDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -156,6 +166,7 @@ export default function CartablePage() {
       const data = await fetchCartable({
         category: category ?? undefined,
         date: filterDate ?? undefined,
+        status,
       });
       setResult(data);
       if (hasChairGate) setChairPerm(await fetchChairPermission());
@@ -164,7 +175,7 @@ export default function CartablePage() {
     } finally {
       setLoading(false);
     }
-  }, [category, filterDate, hasChairGate]);
+  }, [category, filterDate, hasChairGate, status]);
 
   useEffect(() => {
     void load();
@@ -335,6 +346,35 @@ export default function CartablePage() {
         })}
       </div>
 
+      <div className="mb-[15px] grid grid-cols-2 gap-[9px] sm:grid-cols-4">
+        {STATUS_FILTERS.map((item) => {
+          const selected = status === item.key;
+          const count =
+            result?.statusCounts?.[item.key] ??
+            (item.key === 'OPEN' ? result?.totalOpen ?? 0 : 0);
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setStatus(item.key)}
+              className={`rounded-[12px] border px-3 py-2.5 text-start transition ${
+                dark
+                  ? selected
+                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.14)] text-[#60a5fa]'
+                    : 'border-[#1f2a3d] bg-[#141d2e] text-[#9fb0c7] hover:border-[#34435f]'
+                  : selected
+                    ? 'border-accent bg-accent/5 text-accent'
+                    : 'border-border bg-white text-text-2 hover:border-accent/40'
+              }`}
+            >
+              <span className="text-[11px] font-bold">{item.label}</span>
+              <span className="font-num mt-1 block text-lg font-black">{faDigits(count)}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div
         className={
           dark
@@ -410,7 +450,11 @@ export default function CartablePage() {
                   : 'bg-danger/10 text-danger'
               }`}
             >
-              {faDigits(result?.totalOpen ?? 0)} مورد
+              {faDigits(
+                result?.statusCounts?.[status] ??
+                  (status === 'OPEN' ? result?.totalOpen ?? 0 : tasks.length),
+              )}{' '}
+              مورد
             </span>
             <button
               type="button"
@@ -508,7 +552,7 @@ export default function CartablePage() {
                           <circle cx="11" cy="11" r="7" />
                           <path d="M21 21l-4-4" />
                         </svg>
-                        بررسی
+                        {t.status === 'OPEN' ? 'بررسی' : 'مشاهده'}
                       </button>
                     </div>
                   </li>
@@ -583,6 +627,7 @@ export default function CartablePage() {
             />
           </div>
 
+          {reviewTask.status === 'OPEN' ? <>
           <label
             className={`mb-1 block text-xs font-bold ${dark ? 'text-[#e7ecf3]' : 'text-ink'}`}
             htmlFor="review-note"
@@ -657,6 +702,12 @@ export default function CartablePage() {
               تأیید
             </button>
           </div>
+          </> : (
+            <div className={`rounded-lg border p-3 text-xs ${dark ? 'border-[#28344c] bg-[#18223a] text-[#9fb0c7]' : 'border-border bg-surface text-text-2'}`}>
+              این مورد با وضعیت «{STATUS_FILTERS.find((item) => item.key === reviewTask.status)?.label ?? reviewTask.status}» ثبت شده و فقط برای مشاهده تاریخچه نمایش داده می‌شود.
+              {reviewTask.resolutionNote ? <p className="mt-2 font-bold">نتیجه: {reviewTask.resolutionNote}</p> : null}
+            </div>
+          )}
         </Modal>
       )}
     </div>

@@ -323,6 +323,7 @@ export class BookingService {
       pnr: b.pnr,
       status: b.status,
       cabin: b.cabin,
+      fareClassCode: b.fareClassCode,
       priceIrr: b.priceIrr,
       taxIrr: b.taxIrr,
       extrasIrr: b.extrasIrr,

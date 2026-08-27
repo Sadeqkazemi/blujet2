@@ -450,6 +450,8 @@ export class AgencyPortalService {
     const tickets = bookings.map((b) => ({
       pnr: b.pnr,
       status: b.status,
+      cabin: b.cabin,
+      fareClassCode: b.fareClassCode,
       flightNo: b.flightInstance.flight.flightNo,
       route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
       departureAt: b.flightInstance.departureAt,
@@ -509,13 +511,16 @@ export class AgencyPortalService {
   /** CSV export for agency sales — UTF-8 BOM for Excel Persian compatibility. */
   async salesCsv(actor: AuthenticatedUser): Promise<string> {
     const report = await this.sales(actor);
-    const header = 'PNR,Flight,Route,Departure,Status,Passengers,AmountIRR';
+    const header =
+      'PNR,Flight,Route,Departure,Cabin,FareClass,Status,Passengers,AmountIRR';
     const rows = report.tickets.map((t) =>
       [
         t.pnr,
         t.flightNo,
         `"${t.route}"`,
         t.departureAt.toISOString(),
+        t.cabin,
+        t.fareClassCode ?? '',
         t.status,
         t.passengerCount,
         String(t.priceIrr),

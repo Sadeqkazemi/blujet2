@@ -2,11 +2,16 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsDateString,
   IsEnum,
+  IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export enum FinanceReportScope {
   AGENCIES = 'AGENCIES',
@@ -26,6 +31,7 @@ export enum FinanceReportPeriod {
 export enum FinanceExportFormat {
   CSV = 'csv',
   EXCEL = 'excel',
+  PDF = 'pdf',
 }
 
 export class FinanceReportQueryDto {
@@ -79,4 +85,92 @@ export class FinanceFlightSearchQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+}
+
+const BOOKING_STATUSES = [
+  'DRAFT',
+  'HELD',
+  'PAID',
+  'TICKETED',
+  'CANCELLED',
+  'EXPIRED',
+  'REFUNDED',
+  'FLOWN',
+  'NO_SHOW',
+] as const;
+const CABINS = ['ECONOMY', 'COMFORT', 'BUSINESS', 'FIRST'] as const;
+const CHANNELS = ['SYSTEM', 'AGENCY', 'CHARTER'] as const;
+const PAYMENT_STATUSES = ['PENDING', 'PAID', 'REFUNDED', 'CANCELLED'] as const;
+
+export class FinanceSalesQueryDto {
+  @ApiPropertyOptional({ description: 'Inclusive booking-date start' })
+  @IsOptional()
+  @IsDateString()
+  bookedFrom?: string;
+
+  @ApiPropertyOptional({ description: 'Exclusive booking-date end' })
+  @IsOptional()
+  @IsDateString()
+  bookedTo?: string;
+
+  @ApiPropertyOptional({ description: 'Inclusive flight-date start' })
+  @IsOptional()
+  @IsDateString()
+  flightFrom?: string;
+
+  @ApiPropertyOptional({ description: 'Exclusive flight-date end' })
+  @IsOptional()
+  @IsDateString()
+  flightTo?: string;
+
+  @ApiPropertyOptional({ enum: BOOKING_STATUSES })
+  @IsOptional()
+  @IsIn(BOOKING_STATUSES)
+  bookingStatus?: (typeof BOOKING_STATUSES)[number];
+
+  @ApiPropertyOptional({ enum: PAYMENT_STATUSES })
+  @IsOptional()
+  @IsIn(PAYMENT_STATUSES)
+  paymentStatus?: (typeof PAYMENT_STATUSES)[number];
+
+  @ApiPropertyOptional({ maxLength: 10 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  originCode?: string;
+
+  @ApiPropertyOptional({ maxLength: 10 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  destCode?: string;
+
+  @ApiPropertyOptional({ enum: CABINS })
+  @IsOptional()
+  @IsIn(CABINS)
+  cabin?: (typeof CABINS)[number];
+
+  @ApiPropertyOptional({ enum: CHANNELS })
+  @IsOptional()
+  @IsIn(CHANNELS)
+  channel?: (typeof CHANNELS)[number];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  agencyId?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 1000, default: 250 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  limit?: number;
+}
+
+export class FinanceSalesExportQueryDto extends FinanceSalesQueryDto {
+  @ApiProperty({ enum: FinanceExportFormat })
+  @IsEnum(FinanceExportFormat)
+  format!: FinanceExportFormat;
 }

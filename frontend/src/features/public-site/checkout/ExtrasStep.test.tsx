@@ -93,6 +93,8 @@ const SEATS: SeatMapCell[] = [
   { seatCode: '7D', row: 7, cabin: 'ECONOMY', status: 'FREE' },
   { seatCode: '7E', row: 7, cabin: 'ECONOMY', status: 'TAKEN' },
   { seatCode: '7F', row: 7, cabin: 'ECONOMY', status: 'FREE' },
+  { seatCode: '12D', row: 12, cabin: 'ECONOMY', status: 'FREE' },
+  { seatCode: '12E', row: 12, cabin: 'ECONOMY', status: 'TAKEN' },
 ];
 
 describe('ExtrasStep — design parity', () => {
@@ -110,7 +112,7 @@ describe('ExtrasStep — design parity', () => {
         businessLocked
         bookedCabin="ECONOMY"
         aircraftType="MD-80"
-        clubBalance={0}
+        clubBalance={15_000}
       />,
     );
 
@@ -157,6 +159,31 @@ describe('ExtrasStep — design parity', () => {
     expect(screen.getByTestId('checkout-seat-3F')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-seat-3A')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-seat-28A')).not.toBeInTheDocument();
+  });
+
+  it('prevents selecting seats outside the purchased cabin and already-taken seats', async () => {
+    const user = userEvent.setup();
+    render(
+      <ExtrasStep
+        locale="fa"
+        extras={testExtras()}
+        onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked={false}
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={15_000}
+      />,
+    );
+
+    await user.click(screen.getByTestId('checkout-seat-toggle'));
+    expect(screen.getByTestId('checkout-seat-3A')).toBeDisabled();
+    expect(screen.getByTestId('checkout-seat-12E')).toBeDisabled();
+    expect(screen.getByTestId('checkout-seat-12D')).toBeEnabled();
   });
 
   it('uses MD-80 PDF chart when API still returns legacy A320 lettering', async () => {

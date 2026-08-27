@@ -3849,3 +3849,22 @@ contracts and retires the production mock adapters.
 - [ ] Complete full-stack browser QA when the local browser can reach the host
   Vite/PostgreSQL/Redis stack.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
+
+# Booking cabin consistency, finance reports, tickets, and IT cartable (2026-08-27)
+
+- [x] Carry the purchased cabin and fare-class code through booking details,
+  customer tickets, booking management, agency invoices, and agency sales
+  exports.
+- [x] Restrict seat selection to the purchased cabin and keep sold/reserved
+  seats unavailable, with matching server-side transactional validation.
+- [x] Add the finance sales-report engine with server-side filters, summary and
+  detail rows, and CSV, Excel, and PDF exports.
+- [x] Make open, in-review, answered, and closed support-ticket status cards
+  interactive and searchable in the shared ticket experience.
+- [x] Add real status aggregates/filtering to the shared cartable and align the
+  IT manager with the organized management-panel shell.
+- [x] Document the API/schema behavior and feature acceptance criteria.
+- [x] Pass 901 frontend tests, 312 backend unit tests, both production builds,
+  frontend lint, targeted backend lint, PDF render verification, and
+  `git diff --check`.
+- [x] User approved commit, merge, push, and UAT deployment on 2026-08-27.

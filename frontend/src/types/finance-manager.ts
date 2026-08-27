@@ -54,6 +54,41 @@ export interface FinanceFlightDetail {
   }[];
 }
 
+export interface FinanceSalesRow {
+  bookingId: string;
+  pnr: string;
+  bookedAt: string;
+  bookingStatus: string;
+  paymentStatus: 'PENDING' | 'PAID' | 'REFUNDED' | 'CANCELLED';
+  channel: string;
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: string;
+  arrivalAt: string;
+  cabin: string;
+  fareClassCode: string | null;
+  passengerCount: number;
+  baseFareIrr: string;
+  taxIrr: string;
+  extrasIrr: string;
+  totalIrr: string;
+  agencyId: string | null;
+  agencyName: string | null;
+}
+
+export interface FinanceSalesResult {
+  rows: FinanceSalesRow[];
+  summary: {
+    orderCount: number;
+    passengerCount: number;
+    grossIrr: string;
+    netRevenueIrr: string;
+    averageOrderIrr: string;
+  };
+}
+
 export type FinancialProvider = 'HOLO' | 'SEPIDAR' | 'HESABFA' | 'RAHKARAN' | 'PARMIS';
 
 export interface FinancialIntegration {

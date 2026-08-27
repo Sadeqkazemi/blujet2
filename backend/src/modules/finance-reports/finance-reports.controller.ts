@@ -27,6 +27,8 @@ import {
   FinanceFlightSearchQueryDto,
   FinanceReportExportQueryDto,
   FinanceReportQueryDto,
+  FinanceSalesExportQueryDto,
+  FinanceSalesQueryDto,
 } from './dto/finance-report-query.dto';
 
 @ApiTags('finance-reports')
@@ -36,6 +38,32 @@ import {
 @Roles('FINANCE_MANAGER', 'EMPLOYEE')
 export class FinanceReportsController {
   constructor(private readonly reports: FinanceReportsService) {}
+
+  @Get('finance-sales')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_finance')
+  @ApiOperation({ summary: 'موتور گزارش تفصیلی فروش با فیلترهای مالی' })
+  async sales(@Query() query: FinanceSalesQueryDto) {
+    return { success: true, data: await this.reports.salesReport(query) };
+  }
+
+  @Get('finance-sales/export')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('rp_exports')
+  @ApiOperation({ summary: 'خروجی CSV، Excel یا PDF موتور گزارش فروش' })
+  @ApiProduces('text/csv', 'application/vnd.ms-excel', 'application/pdf')
+  async salesExport(
+    @Query() query: FinanceSalesExportQueryDto,
+    @Res() res: Response,
+  ) {
+    const file = await this.reports.salesExport(query, query.format);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="finance-sales.${file.extension}"`,
+    );
+    res.send(file.body);
+  }
 
   @Get('finance-reports')
   @Roles('FINANCE_MANAGER', 'EMPLOYEE')
@@ -51,8 +79,10 @@ export class FinanceReportsController {
   @Get('finance-reports/export')
   @Roles('FINANCE_MANAGER', 'EMPLOYEE')
   @RequiresPermission('rp_exports')
-  @ApiOperation({ summary: 'دانلود CSV یا Excel از گزارش فیلترشده مدیر مالی' })
-  @ApiProduces('text/csv', 'application/vnd.ms-excel')
+  @ApiOperation({
+    summary: 'دانلود CSV، Excel یا PDF از گزارش فیلترشده مدیر مالی',
+  })
+  @ApiProduces('text/csv', 'application/vnd.ms-excel', 'application/pdf')
   @ApiBadRequestResponse({ description: 'فرمت یا فیلتر گزارش نامعتبر است.' })
   async export(
     @Query() query: FinanceReportExportQueryDto,

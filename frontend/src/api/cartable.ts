@@ -2,6 +2,7 @@ import { apiGet, apiPatch, apiPost } from './http';
 import type {
   CartableCategory,
   CartableListResult,
+  CartableStatus,
   CartableTask,
   ChairPermission,
   EmployeeManagerRecipient,
@@ -16,10 +17,11 @@ import type {
   StaffDirectoryEntry,
 } from '../types/cartable';
 
-export function fetchCartable(query: { category?: CartableCategory; date?: string } = {}) {
+export function fetchCartable(query: { category?: CartableCategory; date?: string; status?: CartableStatus } = {}) {
   const params = new URLSearchParams();
   if (query.category) params.set('category', query.category);
   if (query.date) params.set('date', query.date);
+  if (query.status) params.set('status', query.status);
   const qs = params.toString();
   return apiGet<CartableListResult>(`/cartable${qs ? `?${qs}` : ''}`);
 }

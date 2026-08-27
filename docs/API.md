@@ -762,7 +762,26 @@ All routes in this section are `FINANCE_MANAGER` only and remain protected by
 | Method | Path                                                 | Request                                                                                                                  | Response / behavior                                                                                                                                                                                                                              |
 | ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | GET    | `/reporting/finance-reports`                         | `scope=AGENCIES\|CHARTERS\|CUSTOMERS`, `period=flight\|day\|month\|q3\|q6\|year`, `date?`, `month?`, `flightInstanceId?` | Real booking/ledger aggregates for the approved «گزارشات و خروجی» tabs. Returns `{ rows, summary, selectedPeriod }`; empty datasets return empty rows and zero totals.                                                                           |
-| GET    | `/reporting/finance-reports/export`                  | Same filters plus `format=csv\|excel`                                                                                    | Downloads UTF-8 CSV or SpreadsheetML Excel generated from the exact filtered result. No client-side sample rows are introduced.                                                                                                                  |
+| GET    | `/reporting/finance-reports/export`                  | Same filters plus `format=csv\|excel\|pdf`                                                                                | Downloads UTF-8 CSV, SpreadsheetML Excel or a PDF summary generated from the exact filtered result. No client-side sample rows are introduced.                                                                                                    |
+
+### Finance sales report engine v2
+
+- `GET /reporting/finance-sales` — server-side detailed sales report. Optional
+  filters: `bookedFrom`, `bookedTo`, `flightFrom`, `flightTo`, `bookingStatus`,
+  `paymentStatus`, `originCode`, `destCode`, `cabin`, `channel`, `agencyId`.
+  Returns `{ rows, summary }`; `rows` use immutable booking and
+  payment snapshots and `summary` contains order/passenger counts, gross/net
+  IRR and average-order IRR.
+- `GET /reporting/finance-sales/export` — the same filters plus
+  `format=csv|excel|pdf`. CSV and Excel contain detailed rows; PDF is the
+  finance summary. All aggregation stays on the server and requires
+  `rp_exports` (preview requires `rp_finance`).
+- Booking detail responses now include nullable `fareClassCode`; invoice,
+  ticket and manage-booking clients must render it beside the purchased
+  `cabin` when present.
+- `GET /cartable` accepts optional `status=OPEN|APPROVED|REJECTED|TRANSFERRED`
+  and returns both open category counts and all-status counts for the active
+  assignee. This powers the selectable cartable status strip.
 | GET    | `/reporting/finance-flight-search`                   | `q?`, `date?`, `month?`                                                                                                  | Completed/departed flights matching flight number or route, with real capacity, sold-seat and sales totals.                                                                                                                                      |
 | GET    | `/reporting/finance-flight-search/:flightInstanceId` | —                                                                                                                        | Selected flight summary plus per-agency sold seats, paid amount, and outstanding amount derived from bookings and ledger/invoices.                                                                                                               |
 | GET    | `/financial-integrations`                            | —                                                                                                                        | Five supported providers (`HOLO`, `SEPIDAR`, `HESABFA`, `RAHKARAN`, `PARMIS`) with connection status, masked key suffix, last real sync timestamp/status, and connected count. Secrets are never returned.                                       |

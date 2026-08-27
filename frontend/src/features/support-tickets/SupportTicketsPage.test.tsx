@@ -66,6 +66,23 @@ describe('SupportTicketsPage', () => {
     expect(screen.queryByText('مشکل در پرداخت')).not.toBeInTheDocument();
   });
 
+  it('filters the queue when a status KPI card is selected', async () => {
+    mockList([
+      TICKET,
+      row({ id: 't2', trackingCode: 'TKPROGRESS', status: 'IN_PROGRESS', subject: 'در حال بررسی پرداخت' }),
+      row({ id: 't3', trackingCode: 'TKCLOSED', status: 'CLOSED', subject: 'درخواست بسته' }),
+    ]);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage />);
+
+    await screen.findByText('مشکل در پرداخت');
+    await userEvent.click(screen.getByRole('button', { name: /^در حال بررسی ۱$/ }));
+
+    expect(screen.getByText('در حال بررسی پرداخت')).toBeInTheDocument();
+    expect(screen.queryByText('مشکل در پرداخت')).not.toBeInTheDocument();
+    expect(screen.queryByText('درخواست بسته')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state when no tickets exist', async () => {
     mockList([]);
     render(<SupportTicketsPage />);

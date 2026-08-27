@@ -36,6 +36,7 @@ export interface CartableTask {
 export interface CartableListResult {
   tasks: CartableTask[];
   counts: { ADMIN: number; AGENCY: number; MANAGER: number };
+  statusCounts?: Record<CartableStatus, number>;
   totalOpen: number;
 }
 

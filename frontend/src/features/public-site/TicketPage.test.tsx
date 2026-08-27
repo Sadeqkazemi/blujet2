@@ -54,6 +54,18 @@ describe('TicketPage', () => {
     expect(screen.queryByTestId('open-refund-form')).not.toBeInTheDocument();
   });
 
+  it('prints the immutable purchased fare class on the ticket', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue({
+      ...TICKETED,
+      cabin: 'ECONOMY',
+      fareClassCode: 'Y',
+    } as BookingDetail);
+
+    renderPage();
+    expect(await screen.findByText('Y')).toBeInTheDocument();
+    expect(screen.getByText('اکونومی')).toBeInTheDocument();
+  });
+
   it('renders English strings when locale is en', async () => {
     vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
     renderPage('en');

@@ -11,6 +11,7 @@ import {
   FinanceReportQueryDto,
   FinanceReportScope,
   FinanceFlightSearchQueryDto,
+  FinanceSalesQueryDto,
 } from './dto/finance-report-query.dto';
 
 type RawPartner = {
@@ -37,6 +38,29 @@ type RawFlight = {
   agencySeats: string;
 };
 
+type RawSale = {
+  bookingId: string;
+  pnr: string;
+  bookedAt: Date | string;
+  bookingStatus: string;
+  channel: string;
+  flightInstanceId: string;
+  flightNo: string;
+  originCode: string;
+  destCode: string;
+  departureAt: Date | string;
+  arrivalAt: Date | string;
+  cabin: string;
+  fareClassCode: string | null;
+  passengerCount: string;
+  baseFareIrr: string;
+  taxIrr: string;
+  extrasIrr: string;
+  totalIrr: string;
+  agencyId: string | null;
+  agencyName: string | null;
+};
+
 const PAID_BOOKING_STATUSES = ['PAID', 'TICKETED'];
 
 function bigintString(
@@ -56,6 +80,51 @@ function escapeXml(value: string | number): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function escapePdfText(value: string | number): string {
+  return String(value)
+    .replace(/[^\x20-\x7e]/g, '?')
+    .replace(/([\\()])/g, '\\$1');
+}
+
+/** Dependency-free, standards-compliant one-page PDF used for summary exports.
+ * Detailed Unicode data remains available in CSV/Excel; the final branded PDF
+ * layout will replace this renderer when product supplies its template. */
+function buildSummaryPdf(lines: (string | number)[]): Buffer {
+  const commands = [
+    'BT',
+    '/F1 14 Tf',
+    '50 790 Td',
+    ...lines
+      .flatMap((line, index) => [
+        index === 0 ? '' : '0 -22 Td',
+        `(${escapePdfText(line)}) Tj`,
+      ])
+      .filter(Boolean),
+    'ET',
+  ].join('\n');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${Buffer.byteLength(commands, 'ascii')} >>\nstream\n${commands}\nendstream`,
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(Buffer.byteLength(body, 'ascii'));
+    body += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+  const xrefOffset = Buffer.byteLength(body, 'ascii');
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  body += offsets
+    .slice(1)
+    .map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`)
+    .join('');
+  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(body, 'ascii');
 }
 
 @Injectable()
@@ -348,6 +417,240 @@ export class FinanceReportsService {
     };
   }
 
+  private assertPairedRange(from?: string, to?: string, label = 'بازه') {
+    if ((from && !to) || (!from && to)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `ابتدا و انتهای ${label} باید با هم ارسال شوند.`,
+      });
+    }
+    if (from && to && new Date(from) >= new Date(to)) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `انتهای ${label} باید بعد از ابتدای آن باشد.`,
+      });
+    }
+  }
+
+  private paymentStatusFor(bookingStatus: string) {
+    if (bookingStatus === 'REFUNDED') return 'REFUNDED';
+    if (['PAID', 'TICKETED', 'FLOWN', 'NO_SHOW'].includes(bookingStatus))
+      return 'PAID';
+    if (['CANCELLED', 'EXPIRED'].includes(bookingStatus)) return 'CANCELLED';
+    return 'PENDING';
+  }
+
+  async salesReport(query: FinanceSalesQueryDto) {
+    this.assertPairedRange(query.bookedFrom, query.bookedTo, 'تاریخ رزرو');
+    this.assertPairedRange(query.flightFrom, query.flightTo, 'تاریخ پرواز');
+    const qb = this.dataSource
+      .createQueryBuilder()
+      .select('b.id', 'bookingId')
+      .addSelect('b.pnr', 'pnr')
+      .addSelect('b."createdAt"', 'bookedAt')
+      .addSelect('b.status', 'bookingStatus')
+      .addSelect('b.channel', 'channel')
+      .addSelect('fi.id', 'flightInstanceId')
+      .addSelect('f."flightNo"', 'flightNo')
+      .addSelect('r."originCode"', 'originCode')
+      .addSelect('r."destCode"', 'destCode')
+      .addSelect('fi."departureAt"', 'departureAt')
+      .addSelect('fi."arrivalAt"', 'arrivalAt')
+      .addSelect('b.cabin', 'cabin')
+      .addSelect('b."fareClassCode"', 'fareClassCode')
+      .addSelect(
+        '(SELECT COUNT(*) FROM passengers p WHERE p."bookingId" = b.id AND p."deletedAt" IS NULL)',
+        'passengerCount',
+      )
+      .addSelect('b."priceIrr"', 'baseFareIrr')
+      .addSelect('b."taxIrr"', 'taxIrr')
+      .addSelect('b."extrasIrr"', 'extrasIrr')
+      .addSelect('(b."priceIrr" + b."taxIrr" + b."extrasIrr")', 'totalIrr')
+      .addSelect('b."agencyId"', 'agencyId')
+      .addSelect('u."fullName"', 'agencyName')
+      .from('bookings', 'b')
+      .innerJoin('flight_instances', 'fi', 'fi.id = b."flightInstanceId"')
+      .innerJoin('flights', 'f', 'f.id = fi."flightId"')
+      .innerJoin('routes', 'r', 'r.id = f."routeId"')
+      .leftJoin('users', 'u', 'u.id = b."agencyId"')
+      .where('b."deletedAt" IS NULL');
+
+    if (query.bookedFrom && query.bookedTo) {
+      qb.andWhere(
+        'b."createdAt" >= :bookedFrom AND b."createdAt" < :bookedTo',
+        {
+          bookedFrom: query.bookedFrom,
+          bookedTo: query.bookedTo,
+        },
+      );
+    }
+    if (query.flightFrom && query.flightTo) {
+      qb.andWhere(
+        'fi."departureAt" >= :flightFrom AND fi."departureAt" < :flightTo',
+        {
+          flightFrom: query.flightFrom,
+          flightTo: query.flightTo,
+        },
+      );
+    }
+    if (query.bookingStatus)
+      qb.andWhere('b.status = :bookingStatus', {
+        bookingStatus: query.bookingStatus,
+      });
+    if (query.originCode)
+      qb.andWhere('UPPER(r."originCode") = :originCode', {
+        originCode: query.originCode.trim().toUpperCase(),
+      });
+    if (query.destCode)
+      qb.andWhere('UPPER(r."destCode") = :destCode', {
+        destCode: query.destCode.trim().toUpperCase(),
+      });
+    if (query.cabin) qb.andWhere('b.cabin = :cabin', { cabin: query.cabin });
+    if (query.channel)
+      qb.andWhere('b.channel = :channel', { channel: query.channel });
+    if (query.agencyId)
+      qb.andWhere('b."agencyId" = :agencyId', { agencyId: query.agencyId });
+    if (query.paymentStatus) {
+      const statusMap = {
+        PAID: ['PAID', 'TICKETED', 'FLOWN', 'NO_SHOW'],
+        REFUNDED: ['REFUNDED'],
+        CANCELLED: ['CANCELLED', 'EXPIRED'],
+        PENDING: ['DRAFT', 'HELD'],
+      } as const;
+      qb.andWhere('b.status IN (:...paymentBookingStatuses)', {
+        paymentBookingStatuses: statusMap[query.paymentStatus],
+      });
+    }
+
+    const raw = await qb
+      .orderBy('b."createdAt"', 'DESC')
+      .limit(query.limit ?? 250)
+      .getRawMany<RawSale>();
+    const rows = raw.map((row) => ({
+      bookingId: row.bookingId,
+      pnr: row.pnr,
+      bookedAt: new Date(row.bookedAt).toISOString(),
+      bookingStatus: row.bookingStatus,
+      paymentStatus: this.paymentStatusFor(row.bookingStatus),
+      channel: row.channel,
+      flightInstanceId: row.flightInstanceId,
+      flightNo: row.flightNo,
+      originCode: row.originCode,
+      destCode: row.destCode,
+      departureAt: new Date(row.departureAt).toISOString(),
+      arrivalAt: new Date(row.arrivalAt).toISOString(),
+      cabin: row.cabin,
+      fareClassCode: row.fareClassCode,
+      passengerCount: Number(row.passengerCount),
+      baseFareIrr: bigintString(row.baseFareIrr),
+      taxIrr: bigintString(row.taxIrr),
+      extrasIrr: bigintString(row.extrasIrr),
+      totalIrr: bigintString(row.totalIrr),
+      agencyId: row.agencyId,
+      agencyName: row.agencyName,
+    }));
+    const grossIrr = rows.reduce((sum, row) => sum + BigInt(row.totalIrr), 0n);
+    const paidRows = rows.filter((row) => row.paymentStatus === 'PAID');
+    const netRevenueIrr = paidRows.reduce(
+      (sum, row) => sum + BigInt(row.totalIrr),
+      0n,
+    );
+    return {
+      rows,
+      summary: {
+        orderCount: rows.length,
+        passengerCount: rows.reduce((sum, row) => sum + row.passengerCount, 0),
+        grossIrr: grossIrr.toString(),
+        netRevenueIrr: netRevenueIrr.toString(),
+        averageOrderIrr: rows.length
+          ? (grossIrr / BigInt(rows.length)).toString()
+          : '0',
+      },
+    };
+  }
+
+  async salesExport(query: FinanceSalesQueryDto, format: FinanceExportFormat) {
+    const result = await this.salesReport({
+      ...query,
+      limit: query.limit ?? 1000,
+    });
+    const headers = [
+      'Booking ID',
+      'PNR',
+      'Booked At',
+      'Booking Status',
+      'Payment Status',
+      'Channel',
+      'Flight',
+      'Origin',
+      'Destination',
+      'Departure',
+      'Arrival',
+      'Cabin',
+      'Fare Class',
+      'Passengers',
+      'Base Fare IRR',
+      'Tax IRR',
+      'Ancillary IRR',
+      'Grand Total IRR',
+      'Agency',
+    ];
+    const rows = result.rows.map((row) => [
+      row.bookingId,
+      row.pnr,
+      row.bookedAt,
+      row.bookingStatus,
+      row.paymentStatus,
+      row.channel,
+      row.flightNo,
+      row.originCode,
+      row.destCode,
+      row.departureAt,
+      row.arrivalAt,
+      row.cabin,
+      row.fareClassCode ?? '',
+      row.passengerCount,
+      row.baseFareIrr,
+      row.taxIrr,
+      row.extrasIrr,
+      row.totalIrr,
+      row.agencyName ?? '',
+    ]);
+    if (format === FinanceExportFormat.PDF) {
+      return {
+        body: buildSummaryPdf([
+          'Blujet Detailed Sales Summary',
+          `Orders: ${result.summary.orderCount}`,
+          `Passengers: ${result.summary.passengerCount}`,
+          `Gross IRR: ${result.summary.grossIrr}`,
+          `Net revenue IRR: ${result.summary.netRevenueIrr}`,
+          `Average order IRR: ${result.summary.averageOrderIrr}`,
+          `Generated: ${new Date().toISOString()}`,
+        ]),
+        contentType: 'application/pdf',
+        extension: 'pdf',
+      };
+    }
+    if (format === FinanceExportFormat.CSV) {
+      return {
+        body: `\ufeff${[headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`,
+        contentType: 'text/csv; charset=utf-8',
+        extension: 'csv',
+      };
+    }
+    const xmlRows = [headers, ...rows]
+      .map(
+        (row) =>
+          `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`).join('')}</Row>`,
+      )
+      .join('');
+    return {
+      body: `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Sales"><Table>${xmlRows}</Table></Worksheet></Workbook>`,
+      contentType: 'application/vnd.ms-excel; charset=utf-8',
+      extension: 'xls',
+    };
+  }
+
   async export(query: FinanceReportQueryDto, format: FinanceExportFormat) {
     const result = await this.report(query);
     const partner = result.kind === 'partners';
@@ -383,6 +686,25 @@ export class FinanceReportsService {
           row.soldSeats,
           row.unsoldSeats,
         ]);
+    if (format === FinanceExportFormat.PDF) {
+      const total = result.summary.totalIrr;
+      const secondary = partner
+        ? `Paid IRR: ${result.summary.paidIrr}`
+        : `Sold seats: ${result.summary.soldSeats}`;
+      return {
+        body: buildSummaryPdf([
+          'Blujet Finance Report',
+          `Scope: ${query.scope}`,
+          `Period: ${query.period}`,
+          `Rows: ${rows.length}`,
+          `Total IRR: ${total}`,
+          secondary,
+          `Generated: ${new Date().toISOString()}`,
+        ]),
+        contentType: 'application/pdf',
+        extension: 'pdf',
+      };
+    }
     if (format === FinanceExportFormat.CSV) {
       return {
         body: `\ufeff${[headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`,

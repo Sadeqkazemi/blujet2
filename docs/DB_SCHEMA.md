@@ -199,6 +199,22 @@ decisions (marked ⚑) are product decisions surfaced for approval, not
 silently invented.
 
 - `CartableTask { id, assigneeId→User, category: ADMIN|AGENCY|MANAGER, title, description, senderId→User?, senderLabelFa? (display fallback when no User row backs the sender), sourceType?: MANAGER_MESSAGE|MANAGER_REFERRAL|AGENCY_REQUEST|CHAIR_PERMISSION, sourceId?, status: OPEN|APPROVED|REJECTED|TRANSFERRED, resolutionNote?, transferredToId→User?, resolvedAt?, createdAt }`
+
+### Current reporting and booking read models
+
+- Finance sales reports are derived read models over existing `Booking`,
+  `Passenger`, `FlightInstance`, route, agency and ledger/payment data. No
+  report row is persisted and no migration is required for CSV/Excel/PDF
+  export.
+- `Booking.cabin` and nullable `Booking.fareClassCode` are immutable
+  purchase-time classifications. They are returned together in booking detail
+  and must never be recomputed from the current fare-rule catalog.
+- Seat selection keeps its existing authoritative persistence in
+  `Passenger.seatCode`/`extraSeatCode`. Availability is derived from paid,
+  ticketed and unexpired held bookings plus active seat locks; cabin membership
+  comes from the aircraft seat map. No duplicate invoice-class column is added.
+- Cartable status counters are query-time aggregates over existing
+  `CartableTask.status`; no schema change is required.
 - A chair-permission source may have one OPEN `CartableTask` per active
   `BOARD_CHAIR` account. The permission row is the authoritative decision:
   the first conditional `PENDING → APPROVED|REJECTED` update wins and all OPEN
