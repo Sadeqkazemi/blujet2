@@ -636,7 +636,26 @@ export default function AddFlightPage({
           seats: String(c.capacity),
         });
       }
-      if (rows.length > 0) setCabinRows(rows);
+      if (rows.length > 0) {
+        setCabinRows(rows);
+        const capacityByCabin = new Map(
+          rows.map((row) => [row.cabin, Number(latinDigits(row.seats)) || 0]),
+        );
+        setFares((current) => {
+          const kept = current.filter((fare) => {
+            const cabinCapacity = capacityByCabin.get(fare.cabin);
+            return cabinCapacity != null && fare.seatsAllocated <= cabinCapacity;
+          });
+          if (kept.length !== current.length) {
+            setFareEditingId(null);
+            setFareFormOpen(false);
+            setError(
+              "کلاس‌های نرخی ناسازگار با ظرفیت هواپیمای جدید حذف شدند؛ آن‌ها را بر اساس کابین‌های همین هواپیما دوباره تعریف کنید.",
+            );
+          }
+          return kept;
+        });
+      }
     } catch {
       const match = aircraftTypes.find((a) => a.aircraftType === type);
       if (match && match.capacity > 0) {
@@ -644,6 +663,13 @@ export default function AddFlightPage({
         setCabinRows([
           { key: "cab-auto", cabin: "ECONOMY", seats: String(match.capacity) },
         ]);
+        setFares((current) =>
+          current.filter(
+            (fare) =>
+              fare.cabin === "ECONOMY" &&
+              fare.seatsAllocated <= match.capacity,
+          ),
+        );
       }
     }
   }

@@ -80,6 +80,12 @@ export interface AgencyMessage {
   senderId: string;
   senderIsAgency: boolean;
   body: string;
+  attachments?: {
+    id: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+  }[];
   createdAt: string;
 }
 
@@ -149,6 +155,8 @@ export interface AgencySeatInquiry {
   cabin: "ECONOMY" | "COMFORT" | "BUSINESS" | "FIRST";
   fareClassCode: string;
   requestedSeats: number;
+  suggestedSeats: number;
+  canFulfillRequested: boolean;
   capacity: number;
   soldSeats: number;
   heldSeats: number;

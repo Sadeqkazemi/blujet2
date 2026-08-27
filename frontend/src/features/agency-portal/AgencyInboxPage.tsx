@@ -6,6 +6,9 @@ import { useLocale, type StoredLocale } from '../../hooks/useLocale';
 import type { AgencyMessage } from '../../types/agency-portal';
 import type { MySupportTicketRow } from '../../types/support-tickets';
 import Modal from '../../components/Modal';
+import AttachmentPicker from '../../components/AttachmentPicker';
+import AttachmentList from '../../components/AttachmentList';
+import type { ReferralAttachment } from '../../types/cartable';
 
 function messageParts(message: AgencyMessage) {
   const lines = message.body.split(/\r?\n/);
@@ -114,6 +117,8 @@ export default function AgencyInboxPage() {
   const [requesterName, setRequesterName] = useState('');
   const [requesterPhone, setRequesterPhone] = useState('');
   const [ticketNotice, setTicketNotice] = useState<string | null>(null);
+  const [ticketAttachments, setTicketAttachments] = useState<ReferralAttachment[]>([]);
+  const [replyAttachments, setReplyAttachments] = useState<ReferralAttachment[]>([]);
 
   function reload() {
     fetchInbox()
@@ -174,11 +179,13 @@ export default function AgencyInboxPage() {
         requesterPhone: requesterPhone.trim(),
         subject: subject.trim(),
         body: body.trim(),
+        attachmentIds: ticketAttachments.map((file) => file.id),
       });
       setBody('');
       setSubject('');
       setRequesterName('');
       setRequesterPhone('');
+      setTicketAttachments([]);
       setComposeOpen(false);
       setTicketNotice(`${t.ticketSuccess} ${created.trackingCode}`);
       reloadTickets();
@@ -194,8 +201,12 @@ export default function AgencyInboxPage() {
     setSending(true);
     setValidationError(null);
     try {
-      await postInboxMessage(`${t.subject}: ${replySubject}\n\n${replyBody.trim()}`);
+      await postInboxMessage(
+        `${t.subject}: ${replySubject}\n\n${replyBody.trim()}`,
+        replyAttachments.map((file) => file.id),
+      );
       setReplyBody('');
+      setReplyAttachments([]);
       reload();
     } catch {
       setError(t.sendErrorFallback);
@@ -254,9 +265,19 @@ export default function AgencyInboxPage() {
                 </div>
                 <h3 className="mt-5 text-base font-black text-[#0d2640]">{parts.subject || fallbackSubject}</h3>
                 <p className="mt-4 whitespace-pre-line text-sm leading-8 text-[#526174]">{parts.body}</p>
+                {selected.attachments?.length ? (
+                  <AttachmentList attachments={selected.attachments} />
+                ) : null}
                 <div className="mt-6 flex gap-2 border-t border-[#edf0f5] pt-4">
                   <input value={replyBody} onChange={(event) => setReplyBody(event.target.value)} placeholder={replyPlaceholder} className="h-12 min-w-0 flex-1 rounded-xl border border-[#e1e6ee] bg-[#fafbfd] px-4 text-sm outline-none focus:border-[#1668c4]" />
                   <button type="button" disabled={!replyBody.trim() || sending} onClick={() => void onReply(parts.subject || fallbackSubject)} className="h-12 rounded-xl bg-[#1668c4] px-5 text-sm font-black text-white disabled:opacity-50">{t.sendBtn}</button>
+                </div>
+                <div className="mt-3">
+                  <AttachmentPicker
+                    value={replyAttachments}
+                    onChange={setReplyAttachments}
+                    disabled={sending}
+                  />
                 </div>
               </section>
             );
@@ -296,6 +317,11 @@ export default function AgencyInboxPage() {
         <label className="block text-xs font-bold text-muted">{t.requesterPhone}<input dir="ltr" inputMode="tel" value={requesterPhone} onChange={(e) => setRequesterPhone(e.target.value)} placeholder={t.phonePlaceholder} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
         <label className="block text-xs font-bold text-muted">{t.subject}<input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t.subjectPlaceholder} className="mt-2 h-12 w-full rounded-xl border border-border bg-[#fafbfd] px-3 text-sm outline-none focus:border-accent" /></label>
         <label className="block text-xs font-bold text-muted">{t.placeholder}<textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={t.placeholder} rows={5} className="mt-2 w-full rounded-xl border border-border bg-[#fafbfd] p-3 text-sm outline-none focus:border-accent" /></label>
+        <AttachmentPicker
+          value={ticketAttachments}
+          onChange={setTicketAttachments}
+          disabled={sending}
+        />
         {validationError && <p role="alert" className="text-xs text-danger">{validationError}</p>}
         <div className="flex gap-2"><button type="submit" disabled={sending} className="h-12 flex-1 rounded-xl bg-accent px-5 text-sm font-bold text-white disabled:opacity-60">{t.sendBtn}</button><button type="button" onClick={() => { setComposeOpen(false); setValidationError(null); }} className="h-12 rounded-xl bg-[#f1f3f7] px-5 text-sm font-bold text-muted">{t.cancel}</button></div>
       </form></Modal>}

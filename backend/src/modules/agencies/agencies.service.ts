@@ -32,6 +32,7 @@ import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { AuditService } from '../audit/audit.service';
 import { CartableService } from '../cartable/cartable.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -129,6 +130,8 @@ export class AgenciesService {
     private readonly invoiceRepo: Repository<AgencyInvoice>,
     @InjectRepository(AgencyMessage)
     private readonly messageRepo: Repository<AgencyMessage>,
+    @InjectRepository(StoredFile)
+    private readonly storedFileRepo: Repository<StoredFile>,
     @InjectRepository(AgencyCreditRequest)
     private readonly creditRequestRepo: Repository<AgencyCreditRequest>,
     @InjectRepository(AgencyWebserviceRequest)
@@ -1640,7 +1643,11 @@ export class AgenciesService {
           classCode: request.fareClassCode,
         })
         .getOne();
-      if (!rule || !rule.agencyReleasePriceIrr || rule.agencySeatsReleased < 1) {
+      if (
+        !rule ||
+        !rule.agencyReleasePriceIrr ||
+        rule.agencySeatsReleased < 1
+      ) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
           message: 'سهمیه این کلاس توسط مدیر بازرگانی بسته یا حذف شده است.',
@@ -1666,10 +1673,7 @@ export class AgenciesService {
         (sum, allotment) => sum + allotment.seatsAllocated,
         0,
       );
-      const hardLimit = Math.min(
-        rule.agencySeatsReleased,
-        rule.seatsAllocated,
-      );
+      const hardLimit = Math.min(rule.agencySeatsReleased, rule.seatsAllocated);
       if (used + request.seats > hardLimit) {
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
@@ -1830,10 +1834,7 @@ export class AgenciesService {
 
     return {
       id: result.row.id,
-      status: result.row.status as
-        | 'PENDING_FINANCE'
-        | 'APPROVED'
-        | 'REJECTED',
+      status: result.row.status as 'PENDING_FINANCE' | 'APPROVED' | 'REJECTED',
     };
   }
 
@@ -2004,10 +2005,45 @@ export class AgenciesService {
 
   async listMessages(id: string) {
     await this.getProfileOrThrow(id);
-    return this.messageRepo.find({
+    const messages = await this.messageRepo.find({
       where: { agencyId: id },
       order: { createdAt: 'ASC' },
     });
+    const attachmentIds = [
+      ...new Set(
+        messages.flatMap((message) =>
+          Array.isArray(message.attachments)
+            ? message.attachments.filter(
+                (value): value is string => typeof value === 'string',
+              )
+            : [],
+        ),
+      ),
+    ];
+    const files = attachmentIds.length
+      ? await this.storedFileRepo.findBy({ id: In(attachmentIds) })
+      : [];
+    const byId = new Map(files.map((file) => [file.id, file]));
+    return messages.map((message) => ({
+      ...message,
+      attachments: (Array.isArray(message.attachments)
+        ? message.attachments
+        : []
+      ).flatMap((id) => {
+        if (typeof id !== 'string') return [];
+        const file = byId.get(id);
+        return file
+          ? [
+              {
+                id: file.id,
+                fileName: file.fileName,
+                mimeType: file.mimeType,
+                sizeBytes: file.sizeBytes,
+              },
+            ]
+          : [];
+      }),
+    }));
   }
 
   async postMessage(
@@ -2015,14 +2051,27 @@ export class AgenciesService {
     id: string,
     body: string,
     senderIsAgency = false,
+    attachmentIds?: string[],
   ) {
     await this.getProfileOrThrow(id);
+    if (attachmentIds?.length) {
+      const owned = await this.storedFileRepo.count({
+        where: { id: In(attachmentIds), ownerId: actor.id },
+      });
+      if (owned !== attachmentIds.length) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'فایل پیوست معتبر نیست.',
+        });
+      }
+    }
     return this.messageRepo.save(
       this.messageRepo.create({
         agencyId: id,
         senderId: actor.id,
         senderIsAgency,
         body,
+        attachments: attachmentIds ?? [],
       }),
     );
   }

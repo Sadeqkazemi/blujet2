@@ -111,6 +111,7 @@ export interface CommercialFareClassControl {
   revenueIrr: string;
   basePriceIrr: string;
   sitePriceIrr: string | null;
+  siteSeatsReleased: number;
   agencySeatsReleased: number;
   agencyReleasePriceIrr: string | null;
   agencySpecialOffer: boolean;

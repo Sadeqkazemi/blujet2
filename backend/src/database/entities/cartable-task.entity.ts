@@ -51,6 +51,9 @@ export class CartableTask {
   @Column({ type: 'text' })
   description!: string;
 
+  @Column({ type: 'jsonb', nullable: true })
+  attachments!: string[] | null;
+
   @Column({ type: 'text', nullable: true })
   senderId!: string | null;
 

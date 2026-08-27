@@ -1,15 +1,26 @@
-import { commercialCabinCapacity } from './commercial-cabin-capacity';
+import {
+  commercialCabinCapacity,
+  maximumChannelRelease,
+  releasedChannelSeatsLeft,
+} from './commercial-cabin-capacity';
 
-describe('commercialCabinCapacity', () => {
-  it('uses the commercial manager fare allocations as the sellable cabin cap', () => {
-    expect(commercialCabinCapacity(140, [20, 30])).toBe(50);
+describe('commercial cabin channel inventory', () => {
+  it('keeps fare allocations below the physical ceiling', () => {
+    expect(commercialCabinCapacity(140, [50, 40])).toBe(90);
+    expect(commercialCabinCapacity(90, [80, 30])).toBe(90);
   });
 
-  it('never exceeds the configured physical cabin capacity', () => {
-    expect(commercialCabinCapacity(40, [30, 30])).toBe(40);
+  it('shows only the unsold portion explicitly released to the site', () => {
+    expect(releasedChannelSeatsLeft(80, 20, 7)).toBe(13);
   });
 
-  it('keeps the physical capacity when no fare class was defined', () => {
-    expect(commercialCabinCapacity(124, [])).toBe(124);
+  it('never exceeds physical remaining seats or goes below zero', () => {
+    expect(releasedChannelSeatsLeft(3, 20, 7)).toBe(3);
+    expect(releasedChannelSeatsLeft(50, 5, 9)).toBe(0);
+  });
+
+  it('reserves the other channel share inside the fare allocation ceiling', () => {
+    expect(maximumChannelRelease(30, 8)).toBe(22);
+    expect(maximumChannelRelease(5, 9)).toBe(0);
   });
 });

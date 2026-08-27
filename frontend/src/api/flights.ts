@@ -145,7 +145,7 @@ export function updateFlightSalesVisibility(instanceId: string, enabled: boolean
 export function updateFareClassSitePrice(
   instanceId: string,
   ruleId: string,
-  payload: { priceIrr: string; reason: string },
+  payload: { priceIrr: string; reason: string; seats?: number },
 ) {
   return apiPatch<FareRuleRow>(`/flights/${instanceId}/fare-rules/${ruleId}/site-price`, payload);
 }

@@ -21,7 +21,10 @@ import {
   type PublishStatus,
 } from '../flights/definition-sellability';
 import type { CabinClass } from '../../database/enums';
-import { resolveCommercialCabinCapacity } from './commercial-cabin-capacity';
+import {
+  resolveCommercialCabinCapacity,
+  resolveSiteCabinAvailability,
+} from './commercial-cabin-capacity';
 
 const ACTIVE_BOOKING_STATUSES = ['DRAFT', 'HELD', 'PAID', 'TICKETED'] as const;
 const SEARCH_CABINS: readonly CabinClass[] = [
@@ -73,7 +76,7 @@ export class SearchService {
   }
 
   async cabins(): Promise<CabinClass[]> {
-    const cacheKey = 'search:cabins';
+    const cacheKey = 'search:cabins:v3';
     const cached = await this.redis.get<CabinClass[]>(cacheKey);
     if (cached) return cached;
 
@@ -89,7 +92,14 @@ export class SearchService {
     const found = new Set<CabinClass>();
     for (const instance of instances) {
       for (const row of serializeCabinCapacities(instance.cabinCapacities)) {
-        if (row.seats > 0) found.add(row.cabin);
+        if (row.seats <= 0) continue;
+        const siteAvailability = await resolveSiteCabinAvailability(
+          this.flightInstanceRepo.manager,
+          instance.id,
+          row.cabin,
+          row.seats,
+        );
+        if (siteAvailability.releasedSeats > 0) found.add(row.cabin);
       }
     }
     const ordered = SEARCH_CABINS.filter((cabin) => found.has(cabin));
@@ -327,13 +337,20 @@ export class SearchService {
           instance.id,
           cabin,
         );
-        const seatsLeft = this.seatsLeftForCabin(
+        const physicalSeatsLeft = this.seatsLeftForCabin(
           capacity,
           cabin,
           seats,
           taken,
           committed,
         );
+        const siteAvailability = await resolveSiteCabinAvailability(
+          this.flightInstanceRepo.manager,
+          instance.id,
+          cabin,
+          physicalSeatsLeft,
+        );
+        if (siteAvailability.seatsLeft <= 0) continue;
         cabins.push({
           cabin,
           priceIrr: await getCabinPrice(
@@ -341,9 +358,11 @@ export class SearchService {
             instance.id,
             cabin,
           ),
-          seatsLeft,
+          seatsLeft: siteAvailability.seatsLeft,
         });
       }
+
+      if (cabins.length === 0) continue;
 
       results.push({
         flightInstanceId: instance.id,
@@ -507,14 +526,24 @@ export class SearchService {
             leg.id,
             cabin,
           );
-          const left = this.seatsLeftForCabin(
+          const physicalLeft = this.seatsLeftForCabin(
             capacity,
             cabin,
             legSeats,
             await this.takenSeatCodes(leg.id),
             legCommitted,
           );
-          seatsLeft = Math.min(seatsLeft, left);
+          const siteAvailability = await resolveSiteCabinAvailability(
+            this.flightInstanceRepo.manager,
+            leg.id,
+            cabin,
+            physicalLeft,
+          );
+          if (siteAvailability.seatsLeft <= 0) {
+            ok = false;
+            break;
+          }
+          seatsLeft = Math.min(seatsLeft, siteAvailability.seatsLeft);
           priceSum += await getCabinPrice(
             this.flightInstanceRepo.manager,
             leg.id,
@@ -523,6 +552,7 @@ export class SearchService {
         }
         if (ok) cabins.push({ cabin, priceIrr: priceSum, seatsLeft });
       }
+      if (cabins.length === 0) continue;
       out.push({
         flightInstanceId: a.id,
         flightNo: `${a.flight.flightNo}+${b.flight.flightNo}`,

@@ -3829,3 +3829,23 @@ contracts and retires the production mock adapters.
 - [x] Pass 868 frontend tests, 276 backend unit tests, 15 support-ticket integration tests, lint, and both production builds.
 - [ ] Complete visual browser verification when localhost browser access is available.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
+
+# Channel inventory, message attachments, and aircraft alignment (2026-08-27)
+
+- [x] Connect public result inventory and checkout enforcement to the exact
+  per-fare-class seat quantity released to the site by Commercial Management.
+- [x] Keep site and agency releases inside the shared fare allocation ceiling
+  and keep agency inquiry/order quantities tied to the live agency release.
+- [x] Start agency inquiries blank and turn oversized responses red; confirming
+  the response uses the server-suggested quantity in the order.
+- [x] Add owned attachment upload/history support to agency inbox and all direct
+  cartable message forms while retaining the existing customer-ticket upload.
+- [x] Keep only the customer name in the public header trigger and move tier,
+  points, and phone details into the account card.
+- [x] Reconcile cabins/fares with the selected aircraft definition and derive
+  public cabin choices from actual sellable aircraft inventory.
+- [x] Add migration, API/schema/acceptance documentation, focused regression
+  tests, readable lint, and successful production builds for both applications.
+- [ ] Complete full-stack browser QA when the local browser can reach the host
+  Vite/PostgreSQL/Redis stack.
+- [ ] Commit/push, merge, and deploy only after explicit user approval.

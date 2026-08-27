@@ -6,6 +6,7 @@ import { ManagerReferralReport } from '../../database/entities/manager-referral-
 import { ManagerMessage } from '../../database/entities/manager-message.entity';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
 import { SupportTicket } from '../../database/entities/support-ticket.entity';
+import { AgencyMessage } from '../../database/entities/agency-message.entity';
 import { FilesController } from './files.controller';
 import { FilesService } from './files.service';
 import { AuditModule } from '../audit/audit.module';
@@ -19,6 +20,7 @@ import { AuditModule } from '../audit/audit.module';
       ManagerMessage,
       CartableTask,
       SupportTicket,
+      AgencyMessage,
     ]),
     AuditModule,
   ],

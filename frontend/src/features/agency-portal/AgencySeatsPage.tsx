@@ -126,7 +126,7 @@ export default function AgencySeatsPage() {
   const [originCode, setOriginCode] = useState("");
   const [destCode, setDestCode] = useState("");
   const [requestFlightId, setRequestFlightId] = useState("");
-  const [requestedSeats, setRequestedSeats] = useState(1);
+  const [requestedSeats, setRequestedSeats] = useState(0);
   const [seatInquiryState, setSeatInquiryState] = useState<
     "idle" | "ready" | "confirmed"
   >("idle");
@@ -262,15 +262,16 @@ export default function AgencySeatsPage() {
         ),
       )
     : 0;
-  const effectiveRequestAvailable = seatInquiry
-    ? Math.min(requestAvailable, seatInquiry.availableToRequest)
-    : requestAvailable;
+  const orderSeatCount =
+    seatInquiryState === "confirmed" && seatInquiry
+      ? seatInquiry.suggestedSeats
+      : requestedSeats;
   const selectableOccurrences = useMemo(
     () =>
       requestOccurrences.filter(
-        (occurrence) => occurrence.availableToRequest >= requestedSeats,
+        (occurrence) => occurrence.availableToRequest >= orderSeatCount,
       ),
-    [requestOccurrences, requestedSeats],
+    [orderSeatCount, requestOccurrences],
   );
   const activeWeekdays = useMemo(
     () =>
@@ -317,7 +318,7 @@ export default function AgencySeatsPage() {
   );
   const selectedOrderTotalIrr =
     BigInt(requestFlight?.pricePerSeatIrr ?? "0") *
-    BigInt(requestedSeats) *
+    BigInt(orderSeatCount) *
     BigInt(selectedOccurrences.length);
   const hasEnoughCredit = Boolean(
     agencyCredit && BigInt(agencyCredit.remainingIrr) >= selectedOrderTotalIrr,
@@ -332,8 +333,7 @@ export default function AgencySeatsPage() {
     if (
       !requestFlight ||
       requestedSeats < 1 ||
-      requestAvailable < 1 ||
-      requestedSeats > requestAvailable
+      requestAvailable < 1
     ) {
       setSeatInquiryLoading(false);
       return;
@@ -407,7 +407,7 @@ export default function AgencySeatsPage() {
   }
 
   async function submitSeatRequest() {
-    if (!requestFlight || requestedSeats < 1) return;
+    if (!requestFlight || orderSeatCount < 1) return;
     setBusy(true);
     setError(null);
     try {
@@ -415,7 +415,7 @@ export default function AgencySeatsPage() {
         flightInstanceId: requestFlight.flightInstanceId,
         cabin: requestFlight.cabin,
         fareClassCode: requestFlight.fareClassCode,
-        seats: requestedSeats,
+        seats: orderSeatCount,
         selectedFlightInstanceIds: selectedOccurrenceIds,
         preferredWeekdays,
         termMonths,
@@ -428,7 +428,7 @@ export default function AgencySeatsPage() {
             ? "تم إرسال طلب المقاعد إلى المدير التجاري."
             : "درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.",
       );
-      setRequestedSeats(1);
+      setRequestedSeats(0);
       setSeatInquiryState("idle");
       setSeatInquiry(null);
       setSeatInquiryError(null);
@@ -852,12 +852,10 @@ export default function AgencySeatsPage() {
                   <input
                     type="number"
                     min={1}
-                    max={effectiveRequestAvailable}
-                    value={requestedSeats}
+                    value={requestedSeats || ""}
+                    placeholder="مثلاً ۱۰"
                     onChange={(event) => {
-                      setRequestedSeats(
-                        Math.max(1, Number(event.target.value) || 1),
-                      );
+                      setRequestedSeats(Math.max(0, Number(event.target.value) || 0));
                       setSeatInquiryState("idle");
                     }}
                     className="mt-2 h-12 w-full rounded-xl border border-[#9aa9bb] bg-white px-4 text-sm font-bold outline-none transition focus:border-[#1668c4] focus:ring-2 focus:ring-[#d8e9ff]"
@@ -881,7 +879,7 @@ export default function AgencySeatsPage() {
                       type="button"
                       disabled={
                         requestAvailable < 1 ||
-                        requestedSeats > requestAvailable ||
+                        requestedSeats < 1 ||
                         seatInquiryLoading
                       }
                       onClick={() => setSeatInquiryNonce((value) => value + 1)}
@@ -915,14 +913,22 @@ export default function AgencySeatsPage() {
                   )}
                   {seatInquiry && seatInquiryState !== "idle" && (
                     <div
-                      className="min-h-12 rounded-xl border border-[#bfe4d3] bg-[#eefaf4] px-3 py-2 text-[#23895f]"
+                      className={`min-h-12 rounded-xl border px-3 py-2 ${
+                        seatInquiry.canFulfillRequested
+                          ? "border-[#bfe4d3] bg-[#eefaf4] text-[#23895f]"
+                          : "border-red-300 bg-red-50 text-red-700"
+                      }`}
                       data-testid="agency-seat-inquiry-result"
                     >
                       <div className="flex items-center justify-between gap-2 font-black">
                         <span>
-                          ✓ {locale === "fa"
-                            ? `${localeDigits(seatInquiry.requestedSeats, locale)} صندلی موجود است`
-                            : `${seatInquiry.requestedSeats} seats are available`}
+                          {seatInquiry.canFulfillRequested ? "✓" : "!"} {locale === "fa"
+                            ? seatInquiry.canFulfillRequested
+                              ? `${localeDigits(seatInquiry.requestedSeats, locale)} صندلی موجود است`
+                              : `${localeDigits(seatInquiry.suggestedSeats, locale)} صندلی در حال حاضر قابل ارائه است`
+                            : seatInquiry.canFulfillRequested
+                              ? `${seatInquiry.requestedSeats} seats are available`
+                              : `${seatInquiry.suggestedSeats} seats are currently available`}
                           <span className="sr-only">
                             {locale === "fa"
                               ? `${localeDigits(seatInquiry.requestedSeats, locale)} صندلی درخواستی`
@@ -953,7 +959,11 @@ export default function AgencySeatsPage() {
                 </div>
                 <button
                   type="button"
-                  disabled={seatInquiryState !== "ready"}
+                  disabled={
+                    seatInquiryState !== "ready" ||
+                    !seatInquiry ||
+                    seatInquiry.suggestedSeats < 1
+                  }
                   onClick={() => setSeatInquiryState("confirmed")}
                   className="h-12 min-w-20 rounded-xl bg-[#eef5fd] px-5 text-xs font-black text-[#1668c4] disabled:cursor-not-allowed disabled:opacity-45"
                   data-testid="agency-seat-inquiry-confirm"
@@ -1207,8 +1217,8 @@ export default function AgencySeatsPage() {
                 <div className="flex items-center justify-between rounded-xl border border-[#e8eef6] bg-[#f8fafc] p-4 text-xs text-[#687587]">
                   <span>
                     {locale === "fa"
-                      ? `${localeMoney(requestFlight.pricePerSeatIrr ?? "0", locale)} × ${localeDigits(requestedSeats, locale)} صندلی × ${localeDigits(selectedOccurrences.length, locale)} پرواز`
-                      : `${requestedSeats} seats × ${selectedOccurrences.length} flights`}
+                      ? `${localeMoney(requestFlight.pricePerSeatIrr ?? "0", locale)} × ${localeDigits(orderSeatCount, locale)} صندلی × ${localeDigits(selectedOccurrences.length, locale)} پرواز`
+                      : `${orderSeatCount} seats × ${selectedOccurrences.length} flights`}
                   </span>
                   <b className="text-base text-[#0d2640]">
                     {localeMoney(selectedOrderTotalIrr.toString(), locale)}
@@ -1220,7 +1230,7 @@ export default function AgencySeatsPage() {
                     seatInquiryState !== "confirmed" ||
                     busy ||
                     selectedOccurrences.length === 0 ||
-                    requestedSeats > effectiveRequestAvailable ||
+                    orderSeatCount < 1 ||
                     requestAvailable < 1 ||
                     (payMethod === "CREDIT" && !hasEnoughCredit)
                   }

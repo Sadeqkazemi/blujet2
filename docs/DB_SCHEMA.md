@@ -2996,3 +2996,16 @@ value only through the allowlisted rules projection.
 for a seat order. The request total is calculated from persisted occurrences,
 seat count and fare rule price. Credit authorization reads the immutable agency
 ledger/credit-line projection and is rechecked transactionally by the server.
+
+## Channel inventory and message attachments (2026-08-27)
+
+- `fare_rules.siteSeatsReleased integer NOT NULL DEFAULT 0` is the commercial
+  manager's explicit public-site quota for one flight/cabin/fare class.
+  `siteSeatsReleased + agencySeatsReleased <= seatsAllocated` is enforced by
+  the transactional command handlers that update either channel.
+- `agency_messages.attachments jsonb NULL` stores an ordered array of
+  `stored_files.id` values. Ownership is validated before the message is
+  inserted; responses resolve the ids to immutable file metadata.
+- `cartable_tasks.attachments jsonb NULL` stores the same ordered id array for
+  direct employee/manager messages and manager broadcasts delivered into a
+  recipient's cartable. File read authorization follows task participation.

@@ -23,6 +23,13 @@ export class PostInboxMessageDto {
   @IsString()
   @MinLength(1)
   body: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  attachmentIds?: string[];
 }
 
 export class RequestCreditIncreaseDto {

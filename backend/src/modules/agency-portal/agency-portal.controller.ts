@@ -140,7 +140,11 @@ export class AgencyPortalController {
   ) {
     return {
       success: true,
-      data: await this.portal.postInboxMessage(actor, dto.body),
+      data: await this.portal.postInboxMessage(
+        actor,
+        dto.body,
+        dto.attachmentIds,
+      ),
     };
   }
 
@@ -165,7 +169,9 @@ export class AgencyPortalController {
   }
 
   @Post('seat-inquiry')
-  @ApiOperation({ summary: 'استعلام واقعی ظرفیت و تقاضای رزرو پرواز برای آژانس' })
+  @ApiOperation({
+    summary: 'استعلام واقعی ظرفیت و تقاضای رزرو پرواز برای آژانس',
+  })
   async seatInquiry(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: AgencySeatInquiryDto,

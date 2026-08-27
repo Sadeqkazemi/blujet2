@@ -42,6 +42,7 @@ export default function CommercialFareClassControls({
   const [sitePriceInputs, setSitePriceInputs] = useState<Record<string, string>>(
     {},
   );
+  const [siteSeats, setSiteSeats] = useState<Record<string, string>>({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [agencySeats, setAgencySeats] = useState<Record<string, string>>({});
   const [agencyPrices, setAgencyPrices] = useState<Record<string, string>>({});
@@ -60,6 +61,11 @@ export default function CommercialFareClassControls({
             row.ruleId,
             irrToTomanInput(row.sitePriceIrr ?? row.basePriceIrr),
           ]),
+        ),
+      );
+      setSiteSeats(
+        Object.fromEntries(
+          next.fareClasses.map((row) => [row.ruleId, String(row.siteSeatsReleased)]),
         ),
       );
       setAgencySeats(
@@ -131,6 +137,12 @@ export default function CommercialFareClassControls({
   async function saveSitePrice(row: CommercialFareClassControl) {
     const priceIrr = parseTomanToRialString(sitePriceInputs[row.ruleId] ?? "");
     const reason = (reasons[row.ruleId] ?? "").trim();
+    const seats = Number(siteSeats[row.ruleId] ?? 0);
+    const maximum = Math.max(row.seatsAllocated - row.agencySeatsReleased, 0);
+    if (!Number.isInteger(seats) || seats < 0 || seats > maximum) {
+      onError(`تعداد صندلی سایت باید بین صفر و ${maximum} باشد.`);
+      return;
+    }
     if (!priceIrr || reason.length < 2) {
       onError("قیمت معتبر و دلیل تغییر قیمت کلاس را وارد کنید.");
       return;
@@ -140,6 +152,7 @@ export default function CommercialFareClassControls({
       await updateFareClassSitePrice(instanceId, row.ruleId, {
         priceIrr,
         reason,
+        seats,
       });
       setReasons((current) => ({ ...current, [row.ruleId]: "" }));
       await load();
@@ -153,12 +166,13 @@ export default function CommercialFareClassControls({
 
   async function saveAgencyRelease(row: CommercialFareClassControl) {
     const seats = Number(agencySeats[row.ruleId] ?? 0);
+    const maximum = Math.max(row.seatsAllocated - row.siteSeatsReleased, 0);
     const priceIrr =
       seats === 0
         ? "0"
         : parseTomanToRialString(agencyPrices[row.ruleId] ?? "");
-    if (!Number.isInteger(seats) || seats < 0 || seats > row.remainingSeats) {
-      onError(`تعداد سهمیه باید بین صفر و ${row.remainingSeats} باشد.`);
+    if (!Number.isInteger(seats) || seats < 0 || seats > maximum) {
+      onError(`تعداد سهمیه باید بین صفر و ${maximum} باشد.`);
       return;
     }
     if (!priceIrr) {
@@ -227,7 +241,7 @@ export default function CommercialFareClassControls({
                 فروش {faDigits(row.soldSeats)} از {faDigits(row.seatsAllocated)} · مانده {faDigits(row.remainingSeats)}
               </div>
             </div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid gap-2 sm:grid-cols-4">
               <input
                 value={sitePriceInputs[row.ruleId] ?? ""}
                 onChange={(event) =>
@@ -239,6 +253,16 @@ export default function CommercialFareClassControls({
                 disabled={!canManage}
                 inputMode="numeric"
                 placeholder="قیمت سایت (تومان)"
+                className="rounded-lg border border-panel-border-2 bg-panel-surface px-3 py-2 text-xs text-panel-ink outline-none"
+              />
+              <input
+                value={siteSeats[row.ruleId] ?? "0"}
+                onChange={(event) =>
+                  setSiteSeats((current) => ({ ...current, [row.ruleId]: event.target.value }))
+                }
+                disabled={!canManage}
+                inputMode="numeric"
+                placeholder="صندلی آزادشده برای سایت"
                 className="rounded-lg border border-panel-border-2 bg-panel-surface px-3 py-2 text-xs text-panel-ink outline-none"
               />
               <input

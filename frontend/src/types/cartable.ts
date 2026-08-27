@@ -28,6 +28,7 @@ export interface CartableTask {
   status: CartableStatus;
   resolutionNote: string | null;
   createdAt: string;
+  attachments?: ReferralAttachment[];
   history?: CartableHistoryEntry[];
   readAt?: string | null;
 }
@@ -139,5 +140,6 @@ export interface SentEmployeeManagerMessage {
   id: string;
   toName: string;
   body: string;
+  attachments?: ReferralAttachment[];
   createdAt: string;
 }

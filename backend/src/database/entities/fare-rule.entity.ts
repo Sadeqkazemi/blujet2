@@ -56,6 +56,10 @@ export class FareRule {
   @Column({ type: 'int' })
   seatsAllocated!: number;
 
+  /** Seats explicitly released by Commercial Management to public sales. */
+  @Column({ type: 'int', default: 0 })
+  siteSeatsReleased!: number;
+
   @Column({ type: 'int', default: 0 })
   agencySeatsReleased!: number;
 

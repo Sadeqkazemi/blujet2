@@ -63,6 +63,12 @@ import {
 
 const SOLD_STATUSES = ['PAID', 'TICKETED'] as const;
 
+function settingsRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : {};
+}
+
 export type DefinitionSnapshot = {
   flightNo: string;
   originCode: string;
@@ -666,12 +672,7 @@ export class FlightDefinitionService {
           });
         }
 
-        await this.replaceChargeRules(
-          manager,
-          target.id,
-          chargeInputs,
-          false,
-        );
+        await this.replaceChargeRules(manager, target.id, chargeInputs, false);
         await manager.delete(FareRule, { flightInstanceId: target.id });
         await manager.save(
           dto.fareRules.map((fare) =>
@@ -681,6 +682,7 @@ export class FlightDefinitionService {
               classCode: fare.classCode,
               priceIrr: fare.priceIrr,
               sitePriceIrr: null,
+              siteSeatsReleased: 0,
               seatsAllocated: fare.seatsAllocated,
               agencySeatsReleased: 0,
               agencyReleasePriceIrr: null,
@@ -739,9 +741,9 @@ export class FlightDefinitionService {
         target.definitionStatus = FlightDefinitionStatus.PENDING_OPERATIONS;
         target.publicSaleEnabled = false;
         target.commercialPanelSettings = {
-          ...((target.commercialPanelSettings ?? {}) as Record<string, unknown>),
+          ...settingsRecord(target.commercialPanelSettings),
           siteVisible: false,
-        } as typeof target.commercialPanelSettings;
+        };
         target.rejectionReason = null;
         target.version += 1;
         await manager.save(target);
@@ -1360,9 +1362,9 @@ export class FlightDefinitionService {
     // newly approved flight immediately discoverable by the public search.
     instance.publicSaleEnabled = true;
     instance.commercialPanelSettings = {
-      ...((instance.commercialPanelSettings ?? {}) as Record<string, unknown>),
+      ...settingsRecord(instance.commercialPanelSettings),
       siteVisible: true,
-    } as typeof instance.commercialPanelSettings;
+    };
     instance.rejectionReason = null;
     instance.publishedAt = new Date();
     instance.publishedByUserId = publishedByUserId ?? null;

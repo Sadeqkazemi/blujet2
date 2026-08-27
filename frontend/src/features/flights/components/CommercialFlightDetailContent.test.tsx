@@ -40,6 +40,7 @@ const control: CommercialFlightControl = {
       revenueIrr: "1520000000",
       basePriceIrr: "38000000",
       sitePriceIrr: "38000000",
+      siteSeatsReleased: 12,
       agencySeatsReleased: 8,
       agencyReleasePriceIrr: "35000000",
       agencySpecialOffer: false,
@@ -183,6 +184,7 @@ describe("CommercialFlightDetailContent", () => {
       expect(priceSpy).toHaveBeenCalledWith("fi-1", "rule-y", {
         priceIrr: "42000000",
         reason: "تقاضای آخر هفته",
+        seats: 12,
       }),
     );
 

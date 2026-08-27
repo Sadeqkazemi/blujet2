@@ -73,6 +73,7 @@ export default function CommercialFlightDetailContent({
   const [releasePrices, setReleasePrices] = useState<Record<string, string>>({});
   const [specialOffers, setSpecialOffers] = useState<Record<string, boolean>>({});
   const [sitePrices, setSitePrices] = useState<Record<string, string>>({});
+  const [siteSeats, setSiteSeats] = useState<Record<string, string>>({});
   const [priceReasons, setPriceReasons] = useState<Record<string, string>>({});
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -122,6 +123,11 @@ export default function CommercialFlightDetailContent({
           ]),
         ),
       );
+      setSiteSeats(
+        Object.fromEntries(
+          next.fareClasses.map((row) => [row.ruleId, String(row.siteSeatsReleased)]),
+        ),
+      );
       setOpenRelease((current) => current ?? next.fareClasses[0]?.ruleId ?? null);
     } catch (error) {
       setControl(null);
@@ -167,8 +173,9 @@ export default function CommercialFlightDetailContent({
     const seats = Number(latinDigits(releaseSeats[row.ruleId] ?? ""));
     const priceIrr =
       seats === 0 ? "0" : parseTomanToRialString(releasePrices[row.ruleId] ?? "");
-    if (!Number.isInteger(seats) || seats < 0 || seats > row.seatsAllocated) {
-      onError(`تعداد صندلی باید بین صفر و ${faDigits(row.seatsAllocated)} باشد.`);
+    const maximum = Math.max(row.seatsAllocated - row.siteSeatsReleased, 0);
+    if (!Number.isInteger(seats) || seats < 0 || seats > maximum) {
+      onError(`تعداد صندلی باید بین صفر و ${faDigits(maximum)} باشد.`);
       return;
     }
     if (!priceIrr) {
@@ -194,13 +201,19 @@ export default function CommercialFlightDetailContent({
   async function saveSitePrice(row: CommercialFareClassControl) {
     const priceIrr = parseTomanToRialString(sitePrices[row.ruleId] ?? "");
     const reason = (priceReasons[row.ruleId] ?? "").trim();
+    const seats = Number(latinDigits(siteSeats[row.ruleId] ?? "0"));
+    const maximum = Math.max(row.seatsAllocated - row.agencySeatsReleased, 0);
+    if (!Number.isInteger(seats) || seats < 0 || seats > maximum) {
+      onError(`تعداد صندلی سایت باید بین صفر و ${faDigits(maximum)} باشد.`);
+      return;
+    }
     if (!priceIrr || reason.length < 2) {
       onError("قیمت معتبر و دلیل تغییر قیمت را وارد کنید.");
       return;
     }
     setBusyKey(`price-${row.ruleId}`);
     try {
-      await updateFareClassSitePrice(detail.id, row.ruleId, { priceIrr, reason });
+      await updateFareClassSitePrice(detail.id, row.ruleId, { priceIrr, reason, seats });
       setPriceReasons((current) => ({ ...current, [row.ruleId]: "" }));
       setOpenPrice(null);
       await Promise.all([load(), Promise.resolve(onChanged())]);
@@ -589,6 +602,9 @@ export default function CommercialFlightDetailContent({
                     <div className="mt-1 font-num text-sm font-black text-white">
                       {faMoney(row.sitePriceIrr ?? row.basePriceIrr)} تومان
                     </div>
+                    <div className="mt-1 text-[9px] text-[#80b7ff]">
+                      {faDigits(row.siteSeatsReleased)} صندلی آزادشده برای سایت
+                    </div>
                   </div>
                   <div className="text-left">
                     <div className="text-[9px] text-[#78879d]">{faDigits(row.remainingSeats)} صندلی باقی‌مانده</div>
@@ -604,7 +620,7 @@ export default function CommercialFlightDetailContent({
                   </div>
                 </div>
                 {editing && (
-                  <div className="mt-2 grid gap-1.5 border-t border-[#27334a] pt-2 sm:grid-cols-[1fr_1.3fr_auto]">
+                  <div className="mt-2 grid gap-1.5 border-t border-[#27334a] pt-2 sm:grid-cols-[1fr_1fr_1.3fr_auto]">
                     <input
                       value={sitePrices[row.ruleId] ?? ""}
                       onChange={(event) =>
@@ -616,6 +632,19 @@ export default function CommercialFlightDetailContent({
                       inputMode="numeric"
                       aria-label={`قیمت سایت ${classTitle(row)}`}
                       placeholder="قیمت جدید (تومان)"
+                      className="rounded-md border border-[#34415a] bg-[#141d2e] px-2.5 py-1.5 text-[10px] text-white outline-none"
+                    />
+                    <input
+                      value={siteSeats[row.ruleId] ?? "0"}
+                      onChange={(event) =>
+                        setSiteSeats((current) => ({
+                          ...current,
+                          [row.ruleId]: latinDigits(event.target.value),
+                        }))
+                      }
+                      inputMode="numeric"
+                      aria-label={`تعداد صندلی سایت ${classTitle(row)}`}
+                      placeholder="تعداد صندلی سایت"
                       className="rounded-md border border-[#34415a] bg-[#141d2e] px-2.5 py-1.5 text-[10px] text-white outline-none"
                     />
                     <input

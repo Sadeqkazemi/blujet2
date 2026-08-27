@@ -22,6 +22,7 @@ import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
+import { StoredFile } from '../../database/entities/stored-file.entity';
 import { AgenciesController } from './agencies.controller';
 import { AgencyRequestsPublicController } from './agency-requests-public.controller';
 import { AgenciesService } from './agencies.service';
@@ -57,6 +58,7 @@ import { SmsModule } from '../sms/sms.module';
       Passenger,
       AuditLog,
       RefreshToken,
+      StoredFile,
     ]),
     PanelsModule,
     AuditModule,

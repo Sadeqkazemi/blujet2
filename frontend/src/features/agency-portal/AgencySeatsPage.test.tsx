@@ -55,6 +55,8 @@ beforeEach(() => {
       cabin: dto.cabin,
       fareClassCode: dto.fareClassCode,
       requestedSeats: dto.seats,
+      suggestedSeats: dto.seats,
+      canFulfillRequested: true,
       capacity: 180,
       soldSeats: 20,
       heldSeats: 2,
@@ -121,6 +123,7 @@ describe("AgencySeatsPage", () => {
 
     expect(screen.getAllByText(/XY1235/)).toHaveLength(1);
     await user.click(screen.getByTestId("agency-request-route-fi-xy-sep"));
+    await user.type(screen.getByTestId("agency-request-seat-count"), "1");
     await screen.findByTestId("agency-seat-inquiry-result");
     await user.click(screen.getByTestId("agency-seat-inquiry-confirm"));
 
@@ -190,6 +193,7 @@ describe("AgencySeatsPage", () => {
       await screen.findByTestId("agency-request-flight-detail"),
     ).toBeInTheDocument();
     const seats = screen.getByTestId("agency-request-seat-count");
+    expect(seats).toHaveValue(null);
     await user.click(seats);
     await user.keyboard("{Control>}a{/Control}12");
     expect(screen.getByTestId("agency-submit-seat-request")).toBeDisabled();
@@ -239,6 +243,84 @@ describe("AgencySeatsPage", () => {
         "درخواست صندلی با موفقیت برای مدیر بازرگانی ارسال شد.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("shows an over-capacity suggestion in red and orders the suggested count", async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: "fi-limited",
+      flightNo: "BJ-212",
+      originCode: "THR",
+      destCode: "MHD",
+      departureAt: "2026-09-02T05:00:00.000Z",
+      aircraftType: "Airbus A320",
+      cabin: "ECONOMY",
+      fareClassCode: "Y",
+      capacity: 180,
+      agencySeatsReleased: 7,
+      agencyAllocated: 0,
+      ownAllocated: 0,
+      availableToRequest: 7,
+      pricePerSeatIrr: "30000000",
+      specialOffer: false,
+      definitionStatus: "PUBLISHED",
+    };
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+    vi.spyOn(portalApi, "fetchAllotments").mockResolvedValue([]);
+    vi.mocked(portalApi.inquireAgencySeats).mockResolvedValue({
+      flightInstanceId: option.flightInstanceId,
+      cabin: option.cabin,
+      fareClassCode: option.fareClassCode,
+      requestedSeats: 24,
+      suggestedSeats: 7,
+      canFulfillRequested: false,
+      capacity: 180,
+      soldSeats: 0,
+      heldSeats: 0,
+      agencyAllocated: 0,
+      agencySoldSeats: 0,
+      reservedAgencySeats: 0,
+      availableSeats: 180,
+      availableToRequest: 7,
+      totalAgencies: 0,
+      agenciesWithDemand: 0,
+      historicalAgencyBookings: 0,
+      historicalAgencySeatsSold: 0,
+      season: "تابستان",
+      occasion: null,
+      demandLevel: "LOW",
+      recommendation: "7 صندلی در حال حاضر قابل ارائه است.",
+      pricePerSeatIrr: "30000000",
+      totalPriceIrr: "210000000",
+    });
+    const request = vi.spyOn(portalApi, "requestAgencySeats").mockResolvedValue({
+      id: "request-limited",
+      status: "SUBMITTED",
+      recipientCount: 1,
+      flightInstanceId: option.flightInstanceId,
+      cabin: option.cabin,
+      fareClassCode: option.fareClassCode,
+      seats: 7,
+      preferredWeekdays: [],
+      termMonths: 3,
+    });
+
+    render(<AgencySeatsPage />);
+    await user.selectOptions(await screen.findByTestId("agency-request-origin"), "THR");
+    await user.selectOptions(screen.getByTestId("agency-request-destination"), "MHD");
+    await user.click(screen.getByTestId("agency-request-route-fi-limited"));
+    await user.type(screen.getByTestId("agency-request-seat-count"), "24");
+
+    const result = await screen.findByTestId("agency-seat-inquiry-result");
+    expect(result).toHaveClass("border-red-300");
+    expect(result).toHaveTextContent("۷ صندلی در حال حاضر قابل ارائه است");
+    await user.click(screen.getByTestId("agency-seat-inquiry-confirm"));
+    await user.click(screen.getByTestId("agency-flight-date-fi-limited"));
+    await user.click(screen.getByTestId("agency-submit-seat-request"));
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(expect.objectContaining({ seats: 7 })),
+    );
   });
 
   it("keeps each route in its own card and opens inquiry controls inside only the selected card", async () => {
@@ -319,6 +401,8 @@ describe("AgencySeatsPage", () => {
       cabin: option.cabin,
       fareClassCode: option.fareClassCode,
       requestedSeats: seats,
+      suggestedSeats: seats,
+      canFulfillRequested: true,
       capacity: 180,
       soldSeats: 20,
       heldSeats: 2,
