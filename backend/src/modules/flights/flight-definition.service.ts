@@ -682,7 +682,10 @@ export class FlightDefinitionService {
               classCode: fare.classCode,
               priceIrr: fare.priceIrr,
               sitePriceIrr: null,
-              siteSeatsReleased: 0,
+              // The approved initial fare allocation starts as site inventory;
+              // Commercial Management can subsequently split it between site
+              // and agency channels from the active-flight sales tab.
+              siteSeatsReleased: fare.seatsAllocated,
               seatsAllocated: fare.seatsAllocated,
               agencySeatsReleased: 0,
               agencyReleasePriceIrr: null,

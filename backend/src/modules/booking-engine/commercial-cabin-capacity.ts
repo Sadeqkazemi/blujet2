@@ -106,6 +106,18 @@ export async function resolveSiteCabinAvailability(
     .andWhere('booking."deletedAt" IS NULL')
     .getRawOne<{ usedSeats: string }>();
   const usedSeats = Number(row?.usedSeats ?? 0);
+  // A legacy/simple flight may not have fare classes at all. In that case
+  // there is no commercial channel quota to enforce, so retain the historical
+  // physical-cabin availability. Once a fare class exists, its released seats
+  // become the authoritative public quota.
+  if (rules.length === 0) {
+    const seatsLeft = Math.max(0, Math.trunc(physicalSeatsLeft));
+    return {
+      releasedSeats: seatsLeft + Math.max(0, Math.trunc(usedSeats)),
+      usedSeats,
+      seatsLeft,
+    };
+  }
   return {
     releasedSeats,
     usedSeats,

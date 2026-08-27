@@ -1856,6 +1856,7 @@ export class FlightsService {
         classCode: dto.classCode,
         priceIrr: dto.priceIrr,
         seatsAllocated: dto.seatsAllocated,
+        siteSeatsReleased: dto.seatsAllocated,
         taxIrr: dto.taxIrr ?? ZERO_IRR,
         refundable: dto.refundable ?? true,
         changeable: dto.changeable ?? true,
