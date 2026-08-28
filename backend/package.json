@@ -37,6 +37,7 @@
     "accounts:rotate:temporary:prod": "node dist/database/rotate-temporary-panel-passwords.js",
     "accounts:extend:temporary:prod": "node dist/database/extend-temporary-panel-access.js",
     "accounts:extend:temporary:v2:prod": "node dist/database/extend-temporary-panel-access-v2.js",
+    "accounts:extend:temporary:v3:prod": "node dist/database/extend-temporary-panel-access-v3.js",
     "accounts:cleanup:temporary:prod": "node dist/database/cleanup-temporary-panel-accounts.js",
     "accounts:bootstrap:super-admin:prod": "node dist/database/bootstrap-owner-super-admin.js"
   },

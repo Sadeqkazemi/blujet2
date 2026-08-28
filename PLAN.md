@@ -3907,3 +3907,8 @@ contracts and retires the production mock adapters.
 - [x] Pass focused frontend/backend tests, source lint, production builds and
   automated rendered-DOM interaction coverage for the modal and paginator.
 - [ ] Commit/push, merge and deploy only after explicit user approval.
+# UAT sandbox access extension v3 (2026-08-28)
+
+- [x] Add a third owner-approved, one-time seven-day extension for every reserved UAT staff, agency, and customer identity.
+- [x] Fail closed outside production, require a v3-specific confirmation phrase, retain the 28-day absolute ceiling, revoke active refresh sessions, and write per-account security audit rows.
+- [x] Deploy through an independent root-only v3 audit artifact and sentinel so later releases cannot silently extend access again.

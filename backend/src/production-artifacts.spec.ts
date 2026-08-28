@@ -34,6 +34,10 @@ const uatFlightCatalogCleanupSource = readFileSync(
   join(backendRoot, 'src', 'database', 'uat-flight-catalog-cleanup.ts'),
   'utf8',
 );
+const temporaryAccessExtensionV3Source = readFileSync(
+  join(backendRoot, 'src', 'database', 'extend-temporary-panel-access-v3.ts'),
+  'utf8',
+);
 
 describe('production backend artifacts', () => {
   it('uses the JavaScript layout emitted by nest build', () => {
@@ -103,5 +107,26 @@ describe('production backend artifacts', () => {
       'TRUNCATE TABLE "routes", "airports" RESTART IDENTITY CASCADE',
     );
     expect(deployWorkflow).toContain('redis-cli FLUSHDB');
+  });
+
+  it('guards the third owner-approved UAT access extension', () => {
+    expect(packageJson.scripts['accounts:extend:temporary:v3:prod']).toContain(
+      'extend-temporary-panel-access-v3.js',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      "NODE_ENV !== 'production'",
+    );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V3',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'temporary-panel-access-extension-v3',
+    );
+    expect(deployWorkflow).toContain(
+      '.blujet-uat-temporary-access-extension-v3-complete',
+    );
+    expect(deployWorkflow).toContain(
+      'blujet-uat-temporary-access-extension-v3.json',
+    );
   });
 });
