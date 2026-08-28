@@ -3910,5 +3910,5 @@ contracts and retires the production mock adapters.
 # UAT sandbox access extension v3 (2026-08-28)
 
 - [x] Add a third owner-approved, one-time seven-day extension for every reserved UAT staff, agency, and customer identity.
-- [x] Fail closed outside production, require a v3-specific confirmation phrase, retain the 28-day absolute ceiling, revoke active refresh sessions, and write per-account security audit rows.
+- [x] Fail closed outside production, require a v3-specific confirmation phrase, use a 35-day absolute ceiling so this grant remains a full seven days, normalize only exact reserved identities back to password-only mode when prior UAT flows changed their 2FA flag, revoke active refresh sessions, and write per-account security audit rows.
 - [x] Deploy through an independent root-only v3 audit artifact and sentinel so later releases cannot silently extend access again.

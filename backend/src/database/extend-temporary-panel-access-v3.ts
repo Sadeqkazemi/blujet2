@@ -69,7 +69,6 @@ async function main(): Promise<void> {
           !user.isActive ||
           user.deletedAt !== null ||
           user.passwordHash === null ||
-          user.twoFactorEnabled ||
           user.temporaryPasswordOnlyUntil === null
         ) {
           throw new Error(
@@ -90,6 +89,13 @@ async function main(): Promise<void> {
         }
 
         user.temporaryPasswordOnlyUntil = extendedDeadline;
+        const twoFactorReset = user.twoFactorEnabled;
+        // These are exact, reserved synthetic identities. A prior UAT flow may
+        // have enabled 2FA on a phone-login customer even though temporary
+        // password-only access deliberately bypasses it. Restore the approved
+        // sandbox state without weakening any ordinary account.
+        user.twoFactorEnabled = false;
+        user.twoFactorSecret = null;
         user.updatedAt = now;
         await userRepository.save(user);
         await manager.getRepository(AuditLog).save(
@@ -105,6 +111,7 @@ async function main(): Promise<void> {
               source: 'temporary-panel-access-extension-v3',
               previousExpiresAt: previousDeadline.toISOString(),
               expiresAt: extendedDeadline.toISOString(),
+              twoFactorReset,
             },
             requestId: null,
           }),

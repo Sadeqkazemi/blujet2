@@ -122,6 +122,10 @@ describe('production backend artifacts', () => {
     expect(temporaryAccessExtensionV3Source).toContain(
       'temporary-panel-access-extension-v3',
     );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'user.twoFactorEnabled = false',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain('twoFactorReset');
     expect(deployWorkflow).toContain(
       '.blujet-uat-temporary-access-extension-v3-complete',
     );

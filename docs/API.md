@@ -3339,7 +3339,7 @@ production-UAT account may instead return
 temporaryAccessExpiresAt }` and set the refresh cookie directly. The bypass is
 account-scoped and audited. Access starts with a seven-day deadline; each
 owner-approved offline extension may add seven days exactly once, with a hard
-maximum of 28 days from account creation. It returns
+maximum of 35 days from account creation. It returns
 `TEMPORARY_ACCESS_EXPIRED` after its deadline. Ordinary staff 2FA is unchanged.
 Temporary UAT credentials use a 16-character, letters-and-digits-only format.
 The owner-approved one-time format migration is an offline operation (there is

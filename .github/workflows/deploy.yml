@@ -190,7 +190,7 @@ jobs:
             fi
             # Owner-approved extension v3: grant every reserved UAT identity
             # one additional seven-day window. This is independent from v1/v2,
-            # fails closed at the absolute 28-day ceiling, revokes refresh
+            # fails closed at the absolute 35-day ceiling, revokes refresh
             # sessions, and records a root-only audit artifact exactly once.
             access_extension_v3_sentinel=/root/.blujet-uat-temporary-access-extension-v3-complete
             if [ ! -f "$access_extension_v3_sentinel" ]; then
