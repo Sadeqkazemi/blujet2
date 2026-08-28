@@ -55,6 +55,9 @@ describe("OperationsCartablePage", () => {
     render(<OperationsCartablePage />);
 
     expect(await screen.findByText(/XY1234/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "کارتابل داخلی" })).toBeInTheDocument();
+    expect(screen.getByText("در انتظار بررسی")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "جستجو در کارتابل داخلی" })).toBeInTheDocument();
     expect(screen.getByText("پیشنهاد آزمایشی بازرگانی", { exact: false })).toBeInTheDocument();
     expect(screen.getByText(/این تصمیم برای هر ۳ روز پرواز/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "تأیید و ارسال به مدیر عامل" }));
@@ -79,5 +82,14 @@ describe("OperationsCartablePage", () => {
     expect(
       await screen.findByText("پرواز برای تأیید نهایی مدیر عامل ارسال شد."),
     ).toBeInTheDocument();
+  });
+
+  it("filters the operations queue as internal work", async () => {
+    const user = userEvent.setup();
+    render(<OperationsCartablePage />);
+    const search = await screen.findByRole("searchbox", { name: "جستجو در کارتابل داخلی" });
+    await user.type(search, "پرواز ناموجود");
+    expect(screen.queryByText(/XY1234/)).not.toBeInTheDocument();
+    expect(screen.getByText("موردی با این جستجو یافت نشد.")).toBeInTheDocument();
   });
 });

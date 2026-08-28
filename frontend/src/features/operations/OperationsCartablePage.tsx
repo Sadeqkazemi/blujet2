@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   decideFlightOperations,
   fetchOperationsQueue,
@@ -7,6 +7,7 @@ import { faDigits, faMoney } from "../../lib/fa-format";
 import { formatJalaliDate } from "../../lib/jalali";
 import type { OperationsFlightRow } from "../../types/flights";
 import { operationsRouteLabel } from "./operations-ui";
+import InternalCartableDashboard from "../cartable/InternalCartableDashboard";
 
 export default function OperationsCartablePage() {
   const [rows, setRows] = useState<OperationsFlightRow[]>([]);
@@ -14,6 +15,7 @@ export default function OperationsCartablePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const load = () =>
     fetchOperationsQueue()
@@ -52,17 +54,60 @@ export default function OperationsCartablePage() {
 
   const money = (value: string | null | undefined) =>
     value ? `${faMoney(value)} تومان` : "—";
+  const normalizedQuery = query.trim().toLocaleLowerCase("fa");
+  const filteredRows = useMemo(
+    () =>
+      normalizedQuery
+        ? rows.filter((row) =>
+            [
+              row.flightNo,
+              row.originCode,
+              row.destCode,
+              row.aircraftType,
+              row.proposal?.proposedBy?.fullName,
+              row.proposal?.note,
+              row.proposal?.operationsNote,
+            ]
+              .filter(Boolean)
+              .some((value) => String(value).toLocaleLowerCase("fa").includes(normalizedQuery)),
+          )
+        : rows,
+    [normalizedQuery, rows],
+  );
 
   return (
     <div className="p-6 md:p-8">
-      <h1 className="text-xl font-black text-white">کارتابل</h1>
-      <p className="mt-1 text-xs text-[#6b7b94]">بررسی پرواز و پیشنهاد قیمت مدیر بازرگانی پیش از ارسال به مدیر عامل</p>
+      <InternalCartableDashboard
+        description="بررسی داخلی پرواز و پیشنهاد قیمت پیش از ارسال به مدیر عامل"
+        query={query}
+        onQueryChange={setQuery}
+        cards={[
+          { key: "pending", label: "در انتظار بررسی", count: rows.length, tone: "amber" },
+          {
+            key: "schedules",
+            label: "برنامه‌های چندروزه",
+            count: rows.filter((row) => (row.scheduleGroup?.occurrenceCount ?? 0) > 1).length,
+            tone: "blue",
+          },
+          {
+            key: "capacity",
+            label: "ظرفیت کل",
+            count: rows.reduce((sum, row) => sum + row.capacity, 0),
+          },
+          {
+            key: "proposals",
+            label: "پیشنهاد قیمت",
+            count: rows.filter((row) => Boolean(row.proposal)).length,
+            tone: "green",
+          },
+        ]}
+      />
       {error && <p role="alert" className="mt-4 rounded-xl bg-rose-400/10 p-3 text-xs text-rose-300">{error}</p>}
       {notice && <p className="mt-4 rounded-xl bg-emerald-400/10 p-3 text-xs text-emerald-300">{notice}</p>}
 
-      <div className="mt-6 space-y-5">
-        {rows.length === 0 && !error && <p className="rounded-2xl border border-[#24304a] bg-[#141d2e] p-8 text-center text-xs text-[#6b7b94]">موردی در انتظار بررسی نیست.</p>}
-        {rows.map((row) => (
+      <div className="mt-5 space-y-5">
+        {filteredRows.length === 0 && !error && <p className="rounded-2xl border border-[#24304a] bg-[#141d2e] p-8 text-center text-xs text-[#6b7b94]">{query.trim() ? "موردی با این جستجو یافت نشد." : "موردی در انتظار بررسی نیست."}</p>}
+        {filteredRows.map((row) => (
           <article key={row.id} className="rounded-2xl border border-[#24304a] bg-[#141d2e] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

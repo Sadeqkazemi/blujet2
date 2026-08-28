@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import {
   approveCartableTask,
@@ -19,6 +19,7 @@ import JalaliDatePicker from '../../components/JalaliDatePicker';
 import ComposeMessageModal from './ComposeMessageModal';
 import AttachmentList from '../../components/AttachmentList';
 import ConversationHistory from '../../components/ConversationHistory';
+import InternalCartableDashboard from './InternalCartableDashboard';
 import type {
   CartableCategory,
   CartableListResult,
@@ -125,7 +126,7 @@ const CATEGORY_META: Record<
 };
 
 const STATUS_FILTERS: { key: CartableStatus; label: string }[] = [
-  { key: 'OPEN', label: 'باز' },
+  { key: 'OPEN', label: 'کارهای باز' },
   { key: 'APPROVED', label: 'تأییدشده' },
   { key: 'REJECTED', label: 'ردشده' },
   { key: 'TRANSFERRED', label: 'منتقل‌شده' },
@@ -147,6 +148,7 @@ export default function CartablePage() {
   const [category, setCategory] = useState<CartableCategory | null>(null);
   const [status, setStatus] = useState<CartableStatus>('OPEN');
   const [filterDate, setFilterDate] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -233,28 +235,55 @@ export default function CartablePage() {
     }
   }
 
-  const tasks = result?.tasks ?? [];
-  const tasksPager = usePagination(tasks);
+  const tasks = useMemo(() => result?.tasks ?? [], [result?.tasks]);
+  const normalizedQuery = query.trim().toLocaleLowerCase('fa');
+  const filteredTasks = useMemo(
+    () =>
+      normalizedQuery
+        ? tasks.filter((task) =>
+            [task.title, task.description, task.senderLabelFa, task.sender?.fullName]
+              .filter(Boolean)
+              .some((value) => String(value).toLocaleLowerCase('fa').includes(normalizedQuery)),
+          )
+        : tasks,
+    [normalizedQuery, tasks],
+  );
+  const tasksPager = usePagination(filteredTasks);
   const filterLabel = category
     ? CATEGORY_CARDS.find((c) => c.key === category)?.label ?? ''
     : '';
 
   const shellClass = dark ? 'px-[21px] pb-[34px] pt-[18px]' : 'p-8';
-  const emptyText = category || filterDate ? 'موردی با این فیلتر یافت نشد.' : 'کارتابل خالی است ✓';
+  const emptyText = query.trim()
+    ? 'موردی با این جستجو یافت نشد.'
+    : category || filterDate
+      ? 'موردی با این فیلتر یافت نشد.'
+      : 'کارتابل خالی است ✓';
 
   return (
     <div className={shellClass}>
-      {dark ? (
-        <div className="mb-6">
-          <h1 className="text-[20.5px] font-black text-white">کارتابل</h1>
-          <p className="mt-1 text-[11.5px] text-[#6b7b94]">کارهای در انتظار اقدام شما</p>
-        </div>
-      ) : (
-        <div className="mb-6">
-          <h1 className="text-xl font-black text-ink">کارتابل من</h1>
-          <p className="mt-1 text-sm text-muted">درخواست‌های در انتظار بررسی شما</p>
-        </div>
-      )}
+      <InternalCartableDashboard
+        description="گردش کارهای سازمانی و پیام‌های داخلی در انتظار اقدام شما"
+        query={query}
+        onQueryChange={setQuery}
+        cards={STATUS_FILTERS.map((item) => ({
+          key: item.key,
+          label: item.label,
+          count:
+            result?.statusCounts?.[item.key] ??
+            (item.key === 'OPEN' ? result?.totalOpen ?? 0 : 0),
+          tone:
+            item.key === 'OPEN'
+              ? 'amber'
+              : item.key === 'APPROVED'
+                ? 'green'
+                : item.key === 'REJECTED'
+                  ? 'red'
+                  : 'blue',
+          selected: status === item.key,
+          onSelect: () => setStatus(item.key),
+        }))}
+      />
 
       {error && (
         <p
@@ -341,35 +370,6 @@ export default function CartablePage() {
                   </>
                 )}
               </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mb-[15px] grid grid-cols-2 gap-[9px] sm:grid-cols-4">
-        {STATUS_FILTERS.map((item) => {
-          const selected = status === item.key;
-          const count =
-            result?.statusCounts?.[item.key] ??
-            (item.key === 'OPEN' ? result?.totalOpen ?? 0 : 0);
-          return (
-            <button
-              key={item.key}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setStatus(item.key)}
-              className={`rounded-[12px] border px-3 py-2.5 text-start transition ${
-                dark
-                  ? selected
-                    ? 'border-[#3b82f6] bg-[rgba(59,130,246,.14)] text-[#60a5fa]'
-                    : 'border-[#1f2a3d] bg-[#141d2e] text-[#9fb0c7] hover:border-[#34435f]'
-                  : selected
-                    ? 'border-accent bg-accent/5 text-accent'
-                    : 'border-border bg-white text-text-2 hover:border-accent/40'
-              }`}
-            >
-              <span className="text-[11px] font-bold">{item.label}</span>
-              <span className="font-num mt-1 block text-lg font-black">{faDigits(count)}</span>
             </button>
           );
         })}
@@ -474,7 +474,7 @@ export default function CartablePage() {
             <p className={`py-10 text-center text-sm ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
               در حال بارگذاری…
             </p>
-          ) : tasks.length === 0 ? (
+          ) : filteredTasks.length === 0 ? (
             <p className={`px-3 py-7 text-center text-xs ${dark ? 'text-[#6b7b94]' : 'text-muted'}`}>
               {emptyText}
             </p>
