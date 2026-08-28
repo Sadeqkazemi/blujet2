@@ -155,4 +155,25 @@ describe('SupportConversationCenter', () => {
     expect(screen.queryByLabelText('پاسخ جدید')).not.toBeInTheDocument();
     expect(screen.getByText('این گفتگو بسته شده است.')).toBeInTheDocument();
   });
+
+  it('offers satisfaction feedback after a staff answer and keeps follow-up reply available', async () => {
+    const onFeedback = vi.fn().mockResolvedValue(undefined);
+    render(
+      <SupportConversationCenter
+        locale="fa"
+        tickets={tickets}
+        selectedId="ticket-1"
+        onSelect={vi.fn()}
+        onReply={vi.fn()}
+        onFeedback={onFeedback}
+        onNew={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('پاسخ جدید')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'از پاسخ راضی بودم' }));
+    expect(onFeedback).toHaveBeenCalledWith('ticket-1', true);
+    await userEvent.click(screen.getByRole('button', { name: 'از پاسخ راضی نیستم' }));
+    expect(onFeedback).toHaveBeenCalledWith('ticket-1', false);
+  });
 });

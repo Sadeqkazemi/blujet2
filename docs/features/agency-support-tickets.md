@@ -8,6 +8,8 @@
 - [x] A successful submission displays the tracking code, closes the composer, and refreshes the agency's ticket list.
 - [x] A failed ticket request does not break the existing commercial-message inbox and displays a localized error.
 - [x] Existing customer support-ticket behavior and agency commercial messaging remain unchanged.
+- [x] After a staff answer, the requester can mark the answer satisfactory or unsatisfactory; the former closes and the latter reopens the same tracked ticket.
+- [x] An answered ticket with no requester activity for five days closes automatically and remains searchable by tracking code.
 
 ## Regression coverage
 

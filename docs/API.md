@@ -4102,6 +4102,28 @@ Each target receives an ordinary recipient-owned notification with
 `entityType = AGENCY_BULLETIN`; the existing `/notifications` read and read-
 receipt endpoints remain the agency delivery API. No audience is inferred in
 the browser.
+
+## Requester ticket feedback and agency financial events (2026-08-28)
+
+- `PATCH /my/support-tickets/:id/feedback` accepts `{ satisfied: boolean }`
+  only from the authenticated USER or AGENCY that owns an `ANSWERED` ticket.
+  A satisfied response closes the ticket. A dissatisfied response reopens the
+  same ticket for staff follow-up without changing its tracking code,
+  assignee, conversation, or attachments.
+- An `ANSWERED` ticket with no requester response for five complete days is
+  closed automatically by the support lifecycle worker. Automatic and manual
+  feedback transitions are appended to history. Closed tickets remain in
+  `/my/support-tickets` and the staff queue and remain searchable by tracking
+  code.
+- Internal cartable messages continue to accept owned `attachmentIds`. Image
+  attachments are returned with MIME metadata and rendered as previews; other
+  documents remain downloadable. Manager-message access uses the `cartable`
+  panel permission rather than the unrelated support permission.
+- `GET /agency-portal/financial-events` returns a newest-first, read-only
+  timeline built only from persisted agency invoices, ledger entries, and
+  credit requests. Invoice issue/payment, sales, refunds, settlements,
+  commissions, commitments, and credit decisions are represented without
+  browser-generated or mock rows.
 # Public flight-search invariants
 
 - `GET /search/flights` accepts `origin`, `dest`, `date`, and `cabin`. The response contains only flights whose requested cabin is published and currently has capacity; the API does not substitute another cabin.

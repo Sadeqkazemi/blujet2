@@ -7,13 +7,13 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
-import { EXEC_ROLES } from '../../common/exec-roles';
+import { STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @ApiTags('manager-messages')
 @Controller('manager-messages')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard)
-@Roles(...EXEC_ROLES, 'SITE_ADMIN')
+@Roles(...STAFF_ROLES)
 export class ManagerMessagesController {
   constructor(private readonly messages: ManagerMessagesService) {}
 

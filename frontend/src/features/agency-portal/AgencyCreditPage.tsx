@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   fetchCredit,
   fetchInvoices,
-  fetchLedger,
+  fetchFinancialEvents,
   fetchMyCreditRequests,
   payInvoice,
   requestCreditIncrease,
@@ -16,7 +16,7 @@ import type {
   AgencyCredit,
   AgencyCreditRequest,
   AgencyInvoice,
-  AgencyLedgerEntry,
+  AgencyFinancialEvent,
 } from '../../types/agency-portal';
 
 // اعتبار و مانده — EN strings mostly extracted from design-reference-v2/
@@ -36,11 +36,17 @@ interface Tr {
   ar: string;
 }
 
-const LEDGER_LABEL: Record<AgencyLedgerEntry['type'], Tr> = {
+const EVENT_LABEL: Record<AgencyFinancialEvent['type'], Tr> = {
   SALE: { fa: 'فروش بلیط', en: 'Ticket Sale', ar: 'بيع تذكرة' },
   REFUND: { fa: 'استرداد', en: 'Refund', ar: 'استرداد' },
   SETTLEMENT: { fa: 'تسویه', en: 'Settlement', ar: 'تسوية' },
   COMMISSION: { fa: 'کمیسیون', en: 'Commission', ar: 'عمولة' },
+  COMMITMENT: { fa: 'تعهد صندلی', en: 'Seat commitment', ar: 'التزام المقاعد' },
+  INVOICE_ISSUED: { fa: 'صدور فاکتور', en: 'Invoice issued', ar: 'إصدار فاتورة' },
+  INVOICE_PAID: { fa: 'پرداخت فاکتور', en: 'Invoice paid', ar: 'دفع الفاتورة' },
+  CREDIT_REQUESTED: { fa: 'درخواست افزایش اعتبار', en: 'Credit increase requested', ar: 'طلب زيادة الائتمان' },
+  CREDIT_APPROVED: { fa: 'تأیید افزایش اعتبار', en: 'Credit increase approved', ar: 'الموافقة على زيادة الائتمان' },
+  CREDIT_REJECTED: { fa: 'رد افزایش اعتبار', en: 'Credit increase rejected', ar: 'رفض زيادة الائتمان' },
 };
 
 const INVOICE_STATUS_LOCAL: Record<AgencyInvoice['status'], { label: Tr; className: string }> = {
@@ -186,7 +192,7 @@ export default function AgencyCreditPage() {
   const t = STR[locale];
   const [credit, setCredit] = useState<AgencyCredit | null>(null);
   const [invoices, setInvoices] = useState<AgencyInvoice[]>([]);
-  const [ledger, setLedger] = useState<AgencyLedgerEntry[]>([]);
+  const [financialEvents, setFinancialEvents] = useState<AgencyFinancialEvent[]>([]);
   const [creditRequests, setCreditRequests] = useState<AgencyCreditRequest[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -199,11 +205,11 @@ export default function AgencyCreditPage() {
   const [invoiceQuery, setInvoiceQuery] = useState('');
 
   function reload() {
-    Promise.all([fetchCredit(), fetchInvoices(), fetchLedger(), fetchMyCreditRequests()])
+    Promise.all([fetchCredit(), fetchInvoices(), fetchFinancialEvents(), fetchMyCreditRequests()])
       .then(([c, i, l, r]) => {
         setCredit(c);
         setInvoices(i);
-        setLedger(l);
+        setFinancialEvents(l);
         setCreditRequests(r);
       })
       .catch(() => setError(t.errorFallback));
@@ -249,9 +255,9 @@ export default function AgencyCreditPage() {
   if (!credit) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
   const pageCopy = {
-    fa: { heading: 'اعتبار و مانده حساب', issued: 'فاکتورهای صادرشده توسط ایرلاین', unpaid: 'پرداخت‌نشده', paid: 'پرداخت‌شده', ledger: 'گردش حساب اخیر', search: 'جستجو بر اساس شماره یا عنوان فاکتور…', calendar: 'تقویم', pendingCount: 'فاکتور در انتظار پرداخت' },
-    en: { heading: 'Credit and account balance', issued: 'Invoices issued by the airline', unpaid: 'Unpaid', paid: 'Paid', ledger: 'Recent activity', search: 'Search invoice number or title…', calendar: 'Calendar', pendingCount: 'invoice awaiting payment' },
-    ar: { heading: 'الرصيد وكشف الحساب', issued: 'الفواتير الصادرة عن شركة الطيران', unpaid: 'غير مدفوع', paid: 'مدفوع', ledger: 'النشاط الأخير', search: 'ابحث برقم الفاتورة أو عنوانها…', calendar: 'التقويم', pendingCount: 'فاتورة بانتظار الدفع' },
+    fa: { heading: 'اعتبار و مانده حساب', issued: 'فاکتورهای صادرشده توسط ایرلاین', unpaid: 'پرداخت‌نشده', paid: 'پرداخت‌شده', ledger: 'گردش مالی کامل', search: 'جستجو بر اساس شماره یا عنوان فاکتور…', calendar: 'تقویم', pendingCount: 'فاکتور در انتظار پرداخت' },
+    en: { heading: 'Credit and account balance', issued: 'Invoices issued by the airline', unpaid: 'Unpaid', paid: 'Paid', ledger: 'Complete financial activity', search: 'Search invoice number or title…', calendar: 'Calendar', pendingCount: 'invoice awaiting payment' },
+    ar: { heading: 'الرصيد وكشف الحساب', issued: 'الفواتير الصادرة عن شركة الطيران', unpaid: 'غير مدفوع', paid: 'مدفوع', ledger: 'النشاط المالي الكامل', search: 'ابحث برقم الفاتورة أو عنوانها…', calendar: 'التقويم', pendingCount: 'فاتورة بانتظار الدفع' },
   }[locale];
   const visibleInvoices = invoices.filter((invoice) => {
     const statusMatch = activeTab === 'unpaid' ? invoice.status !== 'PAID' : activeTab === 'paid' ? invoice.status === 'PAID' : false;
@@ -309,14 +315,15 @@ export default function AgencyCreditPage() {
           </div>
         )}
         {activeTab === 'ledger' ? (
-          ledger.length === 0 ? <p className="py-10 text-center text-xs text-muted">{t.ledgerEmpty}</p> : (
+          financialEvents.length === 0 ? <p className="py-10 text-center text-xs text-muted">{t.ledgerEmpty}</p> : (
             <div>
-              {ledger.map((entry) => {
-                const creditEntry = Number(entry.signedAmountIrr) < 0;
+              {financialEvents.map((entry) => {
+                const creditEntry = entry.direction === 'CREDIT';
+                const informational = entry.direction === 'INFO';
                 return (
                   <div key={entry.id} className="flex items-center justify-between gap-4 border-b border-[#edf0f5] px-4 py-4 last:border-0">
-                    <div><div className="text-xs font-bold text-[#1a2d42]">{LEDGER_LABEL[entry.type][locale]}</div><div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(entry.occurredAt, locale)}</div></div>
-                    <span className={`text-xs font-black ${creditEntry ? 'text-[#23895f]' : 'text-[#e2583e]'}`}>{creditEntry ? '+' : '−'}{localeMoney(Math.abs(Number(entry.signedAmountIrr)), locale)} {t.toman}</span>
+                    <div><div className="text-xs font-bold text-[#1a2d42]">{EVENT_LABEL[entry.type][locale]}</div><div className="mt-1 text-[10px] text-muted">{formatLocaleDateTime(entry.occurredAt, locale)}{entry.reference ? ` · ${entry.reference}` : ''}</div></div>
+                    {entry.amountIrr != null && <span className={`text-xs font-black ${informational ? 'text-[#1668c4]' : creditEntry ? 'text-[#23895f]' : 'text-[#e2583e]'}`}>{informational ? '' : creditEntry ? '+' : '−'}{localeMoney(entry.amountIrr, locale)} {t.toman}</span>}
                   </div>
                 );
               })}

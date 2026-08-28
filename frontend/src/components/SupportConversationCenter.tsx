@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { downloadFile } from '../api/files';
 import { formatLocaleDateTime } from '../lib/locale-format';
 import type { StoredLocale } from '../hooks/useLocale';
 import type { ReferralAttachment } from '../types/cartable';
@@ -8,6 +7,7 @@ import type {
   SupportTicketStatus,
 } from '../types/support-tickets';
 import AttachmentPicker from './AttachmentPicker';
+import AttachmentList from './AttachmentList';
 
 const STATUS_ORDER: SupportTicketStatus[] = [
   'OPEN',
@@ -34,6 +34,8 @@ const COPY = {
     replyPlaceholder: 'پیام خود را بنویسید…',
     send: 'ارسال پیام',
     closedNotice: 'این گفتگو بسته شده است.',
+    satisfied: 'از پاسخ راضی بودم',
+    dissatisfied: 'از پاسخ راضی نیستم',
     attach: 'پیوست‌ها',
     search: 'جستجو با شماره تیکت یا موضوع…',
     noResults: 'تیکتی با این شماره یا موضوع پیدا نشد.',
@@ -55,6 +57,8 @@ const COPY = {
     replyPlaceholder: 'Write your message…',
     send: 'Send message',
     closedNotice: 'This conversation is closed.',
+    satisfied: 'I am satisfied',
+    dissatisfied: 'I am not satisfied',
     attach: 'Attachments',
     search: 'Search by ticket number or subject…',
     noResults: 'No ticket matches this number or subject.',
@@ -76,6 +80,8 @@ const COPY = {
     replyPlaceholder: 'اكتب رسالتك…',
     send: 'إرسال الرسالة',
     closedNotice: 'هذه المحادثة مغلقة.',
+    satisfied: 'أنا راضٍ عن الإجابة',
+    dissatisfied: 'لست راضياً عن الإجابة',
     attach: 'المرفقات',
     search: 'ابحث برقم التذكرة أو الموضوع…',
     noResults: 'لم يتم العثور على تذكرة مطابقة.',
@@ -97,6 +103,7 @@ export default function SupportConversationCenter({
   selectedId,
   onSelect,
   onReply,
+  onFeedback,
   onNew,
   newLabel,
   busy = false,
@@ -108,6 +115,7 @@ export default function SupportConversationCenter({
   selectedId: string | null;
   onSelect: (id: string) => void;
   onReply: (id: string, body: string, attachmentIds: string[]) => Promise<void>;
+  onFeedback?: (id: string, satisfied: boolean) => Promise<void>;
   onNew: () => void;
   newLabel?: string;
   busy?: boolean;
@@ -175,6 +183,18 @@ export default function SupportConversationCenter({
     }
   }
 
+  const replyComposer = active && active.status !== 'CLOSED' ? (
+    <div className={`border-t pt-4 ${light ? 'border-[#e6edf4]' : 'border-[#1d2738]'}`}>
+      <label className="sr-only" htmlFor={`support-reply-${active.id}`}>{t.reply}</label>
+      <textarea id={`support-reply-${active.id}`} aria-label={t.reply} value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t.replyPlaceholder} rows={3} className={`w-full resize-none rounded-xl border p-3 text-xs leading-6 outline-none focus:border-[#4f82e8] ${light ? 'border-[#cedbe8] bg-[#fbfdff] text-[#102a43] placeholder:text-[#8797a8]' : 'border-[#1c293b] bg-[#07111a] text-white placeholder:text-[#66758a]'}`} />
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <AttachmentPicker value={attachments} onChange={(files) => setAttachments(files.slice(-1))} disabled={busy} />
+        <button type="button" disabled={busy || reply.trim().length < 2} onClick={() => void sendReply()} className="h-11 rounded-xl bg-[#4f82e8] px-5 text-xs font-black text-white disabled:opacity-50">{t.send}</button>
+      </div>
+      {sendError && <p role="alert" className="mt-2 text-xs text-[#d44f61]">{sendError}</p>}
+    </div>
+  ) : null;
+
   return (
     <section
       data-testid="support-conversation-center"
@@ -215,12 +235,19 @@ export default function SupportConversationCenter({
               <div key={message.id} className={`max-w-[88%] rounded-2xl border px-4 py-3 ${message.senderType === 'STAFF' ? light ? 'self-start border-[#d8e2ec] bg-[#f1f5f9]' : 'self-start border-[#364052] bg-[#29313f]' : light ? 'self-end border-[#b9d3f3] bg-[#eaf3ff]' : 'self-end border-[#274b84] bg-[#142743]'}`}>
                 {message.senderLabel && <div className={`mb-2 text-[10px] font-black ${light ? 'text-[#2563b9]' : 'text-[#75a8ff]'}`}>{message.senderLabel}</div>}
                 <p className={`m-0 whitespace-pre-wrap text-xs leading-7 ${light ? 'text-[#29445e]' : 'text-[#d7dfeb]'}`}>{message.body}</p>
-                {message.attachments.length > 0 && <div className="mt-3 flex flex-wrap gap-2" aria-label={t.attach}>{message.attachments.map((file) => <button key={file.id} type="button" onClick={() => void downloadFile(file.id, file.fileName)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-bold ${light ? 'bg-white text-[#2563b9]' : 'bg-[#0e1725] text-[#79aaff]'}`}>📎 {file.fileName}</button>)}</div>}
+                {message.attachments.length > 0 && <div aria-label={t.attach}><AttachmentList attachments={message.attachments} /></div>}
                 <time className={`font-num mt-2 block text-[9px] ${light ? 'text-[#71859a]' : 'text-[#738196]'}`}>{formatLocaleDateTime(message.createdAt, locale)}</time>
               </div>
             ))}
           </div>
-          {active.status === 'CLOSED' ? <p className={`rounded-xl px-4 py-3 text-center text-xs font-bold ${light ? 'bg-[#fff1f2] text-[#c84d5e]' : 'bg-[#26171b] text-[#f08b98]'}`}>{t.closedNotice}</p> : <div className={`border-t pt-4 ${light ? 'border-[#e6edf4]' : 'border-[#1d2738]'}`}><label className="sr-only" htmlFor={`support-reply-${active.id}`}>{t.reply}</label><textarea id={`support-reply-${active.id}`} aria-label={t.reply} value={reply} onChange={(event) => setReply(event.target.value)} placeholder={t.replyPlaceholder} rows={3} className={`w-full resize-none rounded-xl border p-3 text-xs leading-6 outline-none focus:border-[#4f82e8] ${light ? 'border-[#cedbe8] bg-[#fbfdff] text-[#102a43] placeholder:text-[#8797a8]' : 'border-[#1c293b] bg-[#07111a] text-white placeholder:text-[#66758a]'}`} /><div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]"><AttachmentPicker value={attachments} onChange={(files) => setAttachments(files.slice(-1))} disabled={busy} /><button type="button" disabled={busy || reply.trim().length < 2} onClick={() => void sendReply()} className="h-11 rounded-xl bg-[#4f82e8] px-5 text-xs font-black text-white disabled:opacity-50">{t.send}</button></div>{sendError && <p role="alert" className="mt-2 text-xs text-[#d44f61]">{sendError}</p>}</div>}
+          {active.status === 'CLOSED' ? (
+            <p className={`rounded-xl px-4 py-3 text-center text-xs font-bold ${light ? 'bg-[#fff1f2] text-[#c84d5e]' : 'bg-[#26171b] text-[#f08b98]'}`}>{t.closedNotice}</p>
+          ) : (
+            <>
+              {active.status === 'ANSWERED' && onFeedback && <div className="mb-4 grid gap-3 sm:grid-cols-2"><button type="button" disabled={busy} onClick={() => void onFeedback(active.id, true)} className="h-11 rounded-xl bg-[#16845f] px-5 text-xs font-black text-white disabled:opacity-50">{t.satisfied}</button><button type="button" disabled={busy} onClick={() => void onFeedback(active.id, false)} className={`h-11 rounded-xl border px-5 text-xs font-black disabled:opacity-50 ${light ? 'border-[#e9a2aa] text-[#bb3e4d]' : 'border-[#7a3540] text-[#f08b98]'}`}>{t.dissatisfied}</button></div>}
+              {replyComposer}
+            </>
+          )}
         </article>
       ) : (
         <>

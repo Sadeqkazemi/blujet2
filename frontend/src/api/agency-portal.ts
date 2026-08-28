@@ -10,6 +10,7 @@ import type {
   AgencyDocument,
   AgencyDocumentType,
   AgencyInvoice,
+  AgencyFinancialEvent,
   AgencyLedgerEntry,
   AgencyMessage,
   AgencyProfile,
@@ -31,6 +32,10 @@ export function fetchCredit() {
 
 export function fetchLedger() {
   return apiGet<AgencyLedgerEntry[]>("/agency-portal/ledger");
+}
+
+export function fetchFinancialEvents() {
+  return apiGet<AgencyFinancialEvent[]>("/agency-portal/financial-events");
 }
 
 export function fetchInvoices() {

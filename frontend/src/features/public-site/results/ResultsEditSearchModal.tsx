@@ -17,6 +17,10 @@ import {
   type FlightSearchScope,
 } from '../../../lib/airport-search-scope';
 import {
+  airportsOutsideSelectedCity,
+  airportsShareCity,
+} from '../../../lib/airport-route-options';
+import {
   normalizePassengerMix,
   type PassengerMix,
 } from '../checkout/checkout-types';
@@ -397,7 +401,7 @@ export default function ResultsEditSearchModal({
   }
 
   function handleApply() {
-    if (draftOrigin === draftDest || applying) return;
+    if (airportsShareCity(scopedAirports, draftOrigin, draftDest) || applying) return;
     setApplying(true);
     const mix = normalizePassengerMix({
       adults: draftAdults,
@@ -502,10 +506,13 @@ export default function ResultsEditSearchModal({
             <AirportPicker
               label={copy.fromLabel}
               value={draftOrigin}
-              airports={scopedAirports}
+              airports={airportsOutsideSelectedCity(scopedAirports, draftDest)}
               locale={locale}
               copy={copy}
-              onChange={setDraftOrigin}
+              onChange={(code) => {
+                setDraftOrigin(code);
+                if (airportsShareCity(scopedAirports, code, draftDest)) setDraftDest('');
+              }}
             />
             <button
               type="button"
@@ -532,10 +539,13 @@ export default function ResultsEditSearchModal({
             <AirportPicker
               label={copy.toLabel}
               value={draftDest}
-              airports={scopedAirports}
+              airports={airportsOutsideSelectedCity(scopedAirports, draftOrigin)}
               locale={locale}
               copy={copy}
-              onChange={setDraftDest}
+              onChange={(code) => {
+                setDraftDest(code);
+                if (airportsShareCity(scopedAirports, draftOrigin, code)) setDraftOrigin('');
+              }}
             />
           </div>
 
@@ -833,7 +843,7 @@ export default function ResultsEditSearchModal({
           <button
             type="button"
             data-testid="edit-search-apply"
-            disabled={applying || draftOrigin === draftDest}
+            disabled={applying || !draftOrigin || !draftDest || airportsShareCity(scopedAirports, draftOrigin, draftDest)}
             onClick={handleApply}
             style={{
               marginTop: 22,
@@ -849,8 +859,8 @@ export default function ResultsEditSearchModal({
               fontSize: 14.5,
               fontWeight: 800,
               border: 'none',
-              cursor: applying || draftOrigin === draftDest ? 'not-allowed' : 'pointer',
-              opacity: applying || draftOrigin === draftDest ? 0.7 : 1,
+              cursor: applying || !draftOrigin || !draftDest || airportsShareCity(scopedAirports, draftOrigin, draftDest) ? 'not-allowed' : 'pointer',
+              opacity: applying || !draftOrigin || !draftDest || airportsShareCity(scopedAirports, draftOrigin, draftDest) ? 0.7 : 1,
               fontFamily: 'inherit',
             }}
           >

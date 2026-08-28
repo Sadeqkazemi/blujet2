@@ -64,6 +64,12 @@ export class AgencyPortalController {
     return { success: true, data: await this.portal.ledger(actor) };
   }
 
+  @Get('financial-events')
+  @ApiOperation({ summary: 'تایم‌لاین واقعی همه رویدادهای مالی آژانس' })
+  async financialEvents(@CurrentUser() actor: AuthenticatedUser) {
+    return { success: true, data: await this.portal.financialEvents(actor) };
+  }
+
   @Get('invoices')
   @ApiOperation({ summary: 'فاکتورهای خودِ آژانس' })
   async invoices(@CurrentUser() actor: AuthenticatedUser) {

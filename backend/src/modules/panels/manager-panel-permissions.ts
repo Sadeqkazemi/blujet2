@@ -92,9 +92,8 @@ export function permissionForRequestPath(
   ) {
     return 'content';
   }
-  if (/^\/(?:manager-messages|support-tickets)(?:\/|$)/.test(path)) {
-    return 'support';
-  }
+  if (/^\/manager-messages(?:\/|$)/.test(path)) return 'cartable';
+  if (/^\/support-tickets(?:\/|$)/.test(path)) return 'support';
   if (/^\/it\/(?:employees|permissions)(?:\/|$)/.test(path)) return 'admins';
   if (/^\/it\/(?:services|security|backups)(?:\/|$)/.test(path))
     return 'settings';

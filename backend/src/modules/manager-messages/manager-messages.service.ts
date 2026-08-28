@@ -10,15 +10,15 @@ import { EXEC_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { ManagerMessageDept, Role } from '../../database/enums';
 
-/** Dept option → recipient role(s). SUPPORT/AGENCIES have no backing staff
- * role until Phase 8's employee/department model — accepted but flagged. */
 const DEPT_ROLES: Record<ManagerMessageDept, Role[]> = {
   FINANCE: ['FINANCE_MANAGER'],
   COMMERCIAL: ['COMMERCIAL_MANAGER'],
   CEO: ['CEO'],
   ALL_MANAGERS: [...EXEC_ROLES],
-  SUPPORT: [],
-  AGENCIES: [],
+  // External customer/agency support is mediated by the site admin. Internal
+  // senders never bypass that boundary by addressing an external account.
+  SUPPORT: ['SITE_ADMIN'],
+  AGENCIES: ['SITE_ADMIN'],
 };
 
 export const DEPT_LABELS_FA: Record<ManagerMessageDept, string> = {
@@ -106,8 +106,6 @@ export class ManagerMessagesService {
     return {
       message,
       deliveredCount,
-      // Documented PARTIAL_DELIVERY: dept accepted but no backing role yet.
-      ...(roles.length === 0 ? { warning: 'PARTIAL_DELIVERY' as const } : {}),
     };
   }
 

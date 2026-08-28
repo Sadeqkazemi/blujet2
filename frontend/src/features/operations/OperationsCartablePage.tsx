@@ -8,6 +8,7 @@ import { formatJalaliDate } from "../../lib/jalali";
 import type { OperationsFlightRow } from "../../types/flights";
 import { operationsRouteLabel } from "./operations-ui";
 import InternalCartableDashboard from "../cartable/InternalCartableDashboard";
+import ComposeMessageModal from "../cartable/ComposeMessageModal";
 
 export default function OperationsCartablePage() {
   const [rows, setRows] = useState<OperationsFlightRow[]>([]);
@@ -16,6 +17,7 @@ export default function OperationsCartablePage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const load = () =>
     fetchOperationsQueue()
@@ -102,6 +104,18 @@ export default function OperationsCartablePage() {
           },
         ]}
       />
+      <div className="mt-4 flex justify-end">
+        <button type="button" onClick={() => setComposeOpen(true)} className="rounded-xl bg-blue-500 px-5 py-3 text-xs font-black text-white">
+          ＋ ایجاد پیام
+        </button>
+      </div>
+      {composeOpen && (
+        <ComposeMessageModal
+          theme="dark"
+          onClose={() => setComposeOpen(false)}
+          onSent={(label) => setNotice(`پیام برای ${label} ارسال شد.`)}
+        />
+      )}
       {error && <p role="alert" className="mt-4 rounded-xl bg-rose-400/10 p-3 text-xs text-rose-300">{error}</p>}
       {notice && <p className="mt-4 rounded-xl bg-emerald-400/10 p-3 text-xs text-emerald-300">{notice}</p>}
 

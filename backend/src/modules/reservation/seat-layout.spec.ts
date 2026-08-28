@@ -33,13 +33,17 @@ describe('enumerateSeats', () => {
       findAdjacentSeatPair(map, 'ECONOMY', new Set(['1B', '1E', '1F'])),
     ).toEqual(['2A', '2B']);
   });
-  it('applies MD-80 column letters and excluded rear seats', () => {
+  it('applies the persisted MD-80 first/business/economy bands and rear exclusions', () => {
     const seats = enumerateSeats({
-      businessRowStart: 3,
-      businessRowEnd: 6,
+      firstRowStart: 3,
+      firstRowEnd: 6,
+      firstColsLeft: ['A', 'B'],
+      firstColsRight: ['E', 'F'],
+      businessRowStart: 7,
+      businessRowEnd: 11,
       businessColsLeft: ['A', 'B'],
-      businessColsRight: ['E', 'F'],
-      economyRowStart: 7,
+      businessColsRight: ['D', 'E', 'F'],
+      economyRowStart: 12,
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],
@@ -47,8 +51,9 @@ describe('enumerateSeats', () => {
     });
 
     expect(seats).toHaveLength(140);
-    expect(seats.find((s) => s.seatCode === '3E')?.cabin).toBe('BUSINESS');
-    expect(seats.find((s) => s.seatCode === '7D')?.cabin).toBe('ECONOMY');
+    expect(seats.find((s) => s.seatCode === '4E')?.cabin).toBe('FIRST');
+    expect(seats.find((s) => s.seatCode === '7D')?.cabin).toBe('BUSINESS');
+    expect(seats.find((s) => s.seatCode === '12D')?.cabin).toBe('ECONOMY');
     expect(seats.find((s) => s.seatCode === '3C')).toBeUndefined();
     expect(seats.find((s) => s.seatCode === '7C')).toBeUndefined();
     expect(seats.find((s) => s.seatCode === '28A')).toBeUndefined();

@@ -33,6 +33,7 @@ function mockLoads() {
   vi.spyOn(portalApi, 'fetchCredit').mockResolvedValue(CREDIT);
   vi.spyOn(portalApi, 'fetchInvoices').mockResolvedValue(INVOICES);
   vi.spyOn(portalApi, 'fetchLedger').mockResolvedValue([]);
+  vi.spyOn(portalApi, 'fetchFinancialEvents').mockResolvedValue([]);
   vi.spyOn(portalApi, 'fetchMyCreditRequests').mockResolvedValue([]);
 }
 

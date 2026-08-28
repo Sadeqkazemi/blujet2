@@ -3939,3 +3939,18 @@ contracts and retires the production mock adapters.
 - [x] Preserve 10-row pagination and internal task decisions, transfers, manager messages, employee completion and operations flight approval.
 - [x] Pass role-focused tests, all 924 frontend tests, frontend lint, production build and `git diff --check`.
 - [ ] Complete signed-in local visual verification before requesting merge approval.
+## Agency notices, support lifecycle, cartable files, and finance audit (2026-08-28)
+
+- [x] Audit targeted agency bulletin delivery for one, multiple, and all active agencies.
+- [x] Add requester satisfaction/reopen feedback and five-day automatic closure while retaining tracking/search history.
+- [x] Normalize manager/employee cartable message permissions and attachment display.
+- [x] Render image attachments inline and keep non-image files downloadable.
+- [x] Add a real persisted-data agency financial event timeline.
+- [x] Run focused backend/frontend regression tests and local production builds.
+
+## Airline flow invariants follow-up (2026-08-28)
+
+- [x] Exclude every airport in the selected origin city from the destination picker and vice versa.
+- [x] Make origin-to-destination direction explicit in flight details for RTL and LTR locales.
+- [x] Align persisted MD-80 cabin bands with the approved seat map and migrate existing seat/catalog rows.
+- [x] Prove first-class seat selection and the shared search/edit-search city filter with regression tests.

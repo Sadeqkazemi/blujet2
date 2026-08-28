@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { SupportTicketsService } from './support-tickets.service';
@@ -9,6 +17,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   ReplySupportTicketDto,
   SubmitSupportTicketDto,
+  SupportTicketFeedbackDto,
 } from './dto/support-ticket.dtos';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
@@ -62,6 +71,19 @@ export class MySupportTicketsController {
     @Body() dto: ReplySupportTicketDto,
   ) {
     const data = await this.tickets.replyMine(actor, id, dto);
+    return { success: true, data };
+  }
+
+  @Patch(':id/feedback')
+  @ApiOperation({
+    summary: 'ثبت رضایت یا نارضایتی از پاسخ پشتیبانی توسط صاحب تیکت',
+  })
+  async feedback(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: SupportTicketFeedbackDto,
+  ) {
+    const data = await this.tickets.feedbackMine(actor, id, dto.satisfied);
     return { success: true, data };
   }
 }

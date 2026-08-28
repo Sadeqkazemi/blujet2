@@ -333,6 +333,100 @@ export class AgencyPortalService {
     });
   }
 
+  async financialEvents(actor: AuthenticatedUser) {
+    if (await this.isUatSandboxAgencyActor(actor)) return [];
+    await this.getOwnProfileOrThrow(actor);
+    const [ledger, invoices, creditRequests] = await Promise.all([
+      this.ledgerRepo.find({
+        where: { agencyId: actor.id },
+        order: { occurredAt: 'DESC' },
+        take: 100,
+      }),
+      this.agencies.listInvoices(actor.id),
+      this.creditRequestRepo.find({
+        where: { agencyId: actor.id },
+        order: { createdAt: 'DESC' },
+        take: 100,
+      }),
+    ]);
+
+    const events: Array<{
+      id: string;
+      type: string;
+      amountIrr: bigint | null;
+      direction: 'DEBIT' | 'CREDIT' | 'INFO';
+      reference: string | null;
+      status: string | null;
+      occurredAt: Date;
+    }> = [];
+
+    for (const entry of ledger) {
+      events.push({
+        id: `ledger:${entry.id}`,
+        type: entry.type,
+        amountIrr:
+          entry.signedAmountIrr < ZERO_IRR
+            ? -entry.signedAmountIrr
+            : entry.signedAmountIrr,
+        direction: entry.signedAmountIrr < ZERO_IRR ? 'CREDIT' : 'DEBIT',
+        reference: entry.bookingId,
+        status: null,
+        occurredAt: entry.occurredAt,
+      });
+    }
+    for (const invoice of invoices) {
+      events.push({
+        id: `invoice:${invoice.id}:issued`,
+        type: 'INVOICE_ISSUED',
+        amountIrr: invoice.amountIrr,
+        direction: 'DEBIT',
+        reference: invoice.invoiceNo,
+        status: invoice.status,
+        occurredAt: invoice.issuedAt,
+      });
+      if (invoice.paidAt) {
+        events.push({
+          id: `invoice:${invoice.id}:paid`,
+          type: 'INVOICE_PAID',
+          amountIrr: invoice.amountIrr,
+          direction: 'INFO',
+          reference: invoice.invoiceNo,
+          status: invoice.status,
+          occurredAt: invoice.paidAt,
+        });
+      }
+    }
+    for (const request of creditRequests) {
+      events.push({
+        id: `credit:${request.id}:requested`,
+        type: 'CREDIT_REQUESTED',
+        amountIrr: request.requestedLimitIrr,
+        direction: 'INFO',
+        reference: request.id,
+        status: request.status,
+        occurredAt: request.createdAt,
+      });
+      if (request.decidedAt) {
+        events.push({
+          id: `credit:${request.id}:decided`,
+          type:
+            request.status === 'APPROVED'
+              ? 'CREDIT_APPROVED'
+              : 'CREDIT_REJECTED',
+          amountIrr: request.requestedLimitIrr,
+          direction: 'INFO',
+          reference: request.id,
+          status: request.status,
+          occurredAt: request.decidedAt,
+        });
+      }
+    }
+
+    return events
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .slice(0, 100);
+  }
+
   // ── Credit & invoices ────────────────────────────────────────────────
 
   async credit(actor: AuthenticatedUser) {
