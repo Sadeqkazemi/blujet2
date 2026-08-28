@@ -125,7 +125,12 @@ describe('production backend artifacts', () => {
     expect(temporaryAccessExtensionV3Source).toContain(
       'user.twoFactorEnabled = false',
     );
-    expect(temporaryAccessExtensionV3Source).toContain('twoFactorReset');
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'temporary-panel-account-bootstrap',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain('restoredState');
+    expect(temporaryAccessExtensionV3Source).toContain('user.isActive = true');
+    expect(temporaryAccessExtensionV3Source).toContain('user.deletedAt = null');
     expect(deployWorkflow).toContain(
       '.blujet-uat-temporary-access-extension-v3-complete',
     );
