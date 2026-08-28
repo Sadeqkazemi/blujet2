@@ -6,6 +6,7 @@ import FinancePage from './FinancePage';
 import * as reportingApi from '../../api/reporting';
 import * as agenciesApi from '../../api/agencies';
 import * as reconciliationApi from '../../api/reconciliation';
+import * as panelsApi from '../../api/panels';
 import * as useAuthModule from '../../hooks/useAuth';
 import { mockAuthUserWithRole } from '../../test/mockAuthUser';
 import type { Role } from '../../types/auth';
@@ -118,6 +119,37 @@ function mockRole(role: Role) {
 }
 
 describe('FinancePage', () => {
+  it('EMPLOYEE sees only the finance sections granted by the IT manager', async () => {
+    mockRole('EMPLOYEE');
+    vi.spyOn(panelsApi, 'fetchEmployeeContext').mockResolvedValue({
+      dept: 'finance',
+      deptLabelFa: 'مالی',
+      rank: 'کارشناس',
+      permissionLabelsFa: ['داشبورد', 'مالی'],
+      permissionKeys: ['fn_dashboard', 'fn_transactions'],
+    });
+    vi.spyOn(reportingApi, 'fetchFinanceDashboardStats').mockResolvedValue({
+      activeAgencies: 5,
+      activeAgenciesTrendPct: 0,
+      passengersThisMonth: 12,
+      passengersTrendPct: 0,
+      ticketsSoldThisMonth: 9,
+      ticketsTrendPct: 0,
+      revenueThisMonthIrr: '5000000000',
+      revenueTrendPct: 0,
+    });
+    const transactions = vi.spyOn(reportingApi, 'fetchRecentTransactions').mockResolvedValue(TX);
+    const settlements = vi.spyOn(reportingApi, 'fetchAgencySettlements');
+
+    renderFinancePage();
+
+    expect(await screen.findByTestId('employee-finance-view')).toHaveTextContent('۵۰۰٬۰۰۰٬۰۰۰ تومان');
+    expect(screen.getByText('تراکنش‌های مالی اخیر')).toBeInTheDocument();
+    expect(screen.queryByText('تسویه‌حساب آژانس‌های همکار')).not.toBeInTheDocument();
+    expect(transactions).toHaveBeenCalledOnce();
+    expect(settlements).not.toHaveBeenCalled();
+  });
+
   it('FINANCE_MANAGER gets the finance-ops view: transactions, settlements, remind action', async () => {
     mockRole('FINANCE_MANAGER');
     vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);

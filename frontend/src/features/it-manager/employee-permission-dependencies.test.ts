@@ -39,4 +39,23 @@ describe('employee permission dependencies', () => {
       'sv_view',
     ]);
   });
+
+  it('expands the new commercial flight-sales permission chain', () => {
+    expect([...expandPermissionSelection(['fl_agency_allotments'])].sort()).toEqual([
+      'fl_agency_allotments',
+      'fl_sales_view',
+      'fl_view',
+    ]);
+  });
+
+  it('expands finance operations to the financial dashboard prerequisite', () => {
+    expect([...expandPermissionSelection(['fn_transactions'])].sort()).toEqual([
+      'fn_dashboard',
+      'fn_transactions',
+    ]);
+    expect([...expandPermissionSelection(['fn_settlements'])].sort()).toEqual([
+      'fn_dashboard',
+      'fn_settlements',
+    ]);
+  });
 });

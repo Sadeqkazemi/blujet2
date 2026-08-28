@@ -1,4 +1,4 @@
-import { apiGet, apiPatch, apiPost } from './http';
+import { apiGet, apiPatch, apiPost } from "./http";
 import type {
   CartableCategory,
   CartableListResult,
@@ -15,19 +15,25 @@ import type {
   SendMessageResult,
   SentEmployeeManagerMessage,
   StaffDirectoryEntry,
-} from '../types/cartable';
+} from "../types/cartable";
 
-export function fetchCartable(query: { category?: CartableCategory; date?: string; status?: CartableStatus } = {}) {
+export function fetchCartable(
+  query: {
+    category?: CartableCategory;
+    date?: string;
+    status?: CartableStatus;
+  } = {},
+) {
   const params = new URLSearchParams();
-  if (query.category) params.set('category', query.category);
-  if (query.date) params.set('date', query.date);
-  if (query.status) params.set('status', query.status);
+  if (query.category) params.set("category", query.category);
+  if (query.date) params.set("date", query.date);
+  if (query.status) params.set("status", query.status);
   const qs = params.toString();
-  return apiGet<CartableListResult>(`/cartable${qs ? `?${qs}` : ''}`);
+  return apiGet<CartableListResult>(`/cartable${qs ? `?${qs}` : ""}`);
 }
 
 export function fetchCartableUnreadCount() {
-  return apiGet<{ count: number }>('/cartable/unread-count');
+  return apiGet<{ count: number }>("/cartable/unread-count");
 }
 
 export function fetchCartableTask(id: string) {
@@ -46,21 +52,43 @@ export function transferCartableTask(id: string, toId: string, note: string) {
   return apiPatch<CartableTask>(`/cartable/${id}/transfer`, { toId, note });
 }
 
+export function replyCartableMessage(
+  id: string,
+  body: string,
+  attachmentIds?: string[],
+) {
+  return apiPost<CartableTask>(`/cartable/${id}/replies`, {
+    body,
+    attachmentIds,
+  });
+}
+
+export function sendDirectStaffMessage(dto: {
+  toId: string;
+  subject: string;
+  body: string;
+  attachmentIds?: string[];
+}) {
+  return apiPost<CartableTask>("/cartable/direct-message", dto);
+}
+
 export function requestChairPermission() {
-  return apiPost<ChairPermission>('/cartable/chair-permission');
+  return apiPost<ChairPermission>("/cartable/chair-permission");
 }
 
 export async function fetchChairPermission(): Promise<ChairPermission | null> {
-  const { latest } = await apiGet<{ latest: ChairPermission | null }>('/cartable/chair-permission');
+  const { latest } = await apiGet<{ latest: ChairPermission | null }>(
+    "/cartable/chair-permission",
+  );
   return latest;
 }
 
 export function fetchStaffDirectory() {
-  return apiGet<StaffDirectoryEntry[]>('/staff-directory');
+  return apiGet<StaffDirectoryEntry[]>("/staff-directory");
 }
 
 export function fetchReferrals() {
-  return apiGet<ReferralListResult>('/referrals');
+  return apiGet<ReferralListResult>("/referrals");
 }
 
 export function createReferral(dto: {
@@ -71,7 +99,7 @@ export function createReferral(dto: {
   dueAt?: string;
   attachmentIds?: string[];
 }) {
-  return apiPost<Referral>('/referrals', dto);
+  return apiPost<Referral>("/referrals", dto);
 }
 
 export function fetchReferralDetail(id: string) {
@@ -91,10 +119,14 @@ export function remindReferral(id: string) {
 }
 
 export function fetchMyReferrals() {
-  return apiGet<MyReferralListResult>('/referrals/mine');
+  return apiGet<MyReferralListResult>("/referrals/mine");
 }
 
-export function submitReferralReport(id: string, body: string, attachmentIds?: string[]) {
+export function submitReferralReport(
+  id: string,
+  body: string,
+  attachmentIds?: string[],
+) {
   return apiPost<Referral>(`/referrals/${id}/reports`, { body, attachmentIds });
 }
 
@@ -104,11 +136,11 @@ export function sendManagerMessage(dto: {
   body: string;
   attachmentIds?: string[];
 }) {
-  return apiPost<SendMessageResult>('/manager-messages', dto);
+  return apiPost<SendMessageResult>("/manager-messages", dto);
 }
 
 export function fetchManagerRecipients() {
-  return apiGet<EmployeeManagerRecipient[]>('/cartable/manager-recipients');
+  return apiGet<EmployeeManagerRecipient[]>("/cartable/manager-recipients");
 }
 
 export function sendEmployeeManagerMessage(dto: {
@@ -116,9 +148,9 @@ export function sendEmployeeManagerMessage(dto: {
   body: string;
   attachmentIds?: string[];
 }) {
-  return apiPost<{ id: string }>('/cartable/manager-message', dto);
+  return apiPost<{ id: string }>("/cartable/manager-message", dto);
 }
 
 export function fetchSentManagerMessages() {
-  return apiGet<SentEmployeeManagerMessage[]>('/cartable/manager-message/sent');
+  return apiGet<SentEmployeeManagerMessage[]>("/cartable/manager-message/sent");
 }

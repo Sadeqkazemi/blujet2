@@ -4,12 +4,14 @@ import { useOutletContext } from 'react-router-dom';
 import {
   fetchAgencySettlements,
   fetchCompletedFlightsSummary,
+  fetchFinanceDashboardStats,
   fetchFlightSales,
   fetchKpis,
   fetchRecentTransactions,
   fetchRevenueMix,
   fetchSalesChart,
 } from '../../api/reporting';
+import { fetchEmployeeContext } from '../../api/panels';
 import { fetchCommercialPricing, runAiAnalysis } from '../../api/pricing';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
@@ -32,6 +34,7 @@ import { useSalesChartQuery } from '../../hooks/useSalesChartQuery';
 import type {
   AgencySettlementsResult,
   CompletedFlightsSummary,
+  FinanceDashboardStats,
   FlightSalesRow,
   KpiResult,
   RecentTransactionsResult,
@@ -605,6 +608,94 @@ function FinanceOpsView() {
       </section>
 
       <ReconciliationQueueCard items={reconciliation} onResolve={onResolveReconciliation} />
+    </div>
+  );
+}
+
+function EmployeeFinanceView() {
+  const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [stats, setStats] = useState<FinanceDashboardStats | null>(null);
+  const [tx, setTx] = useState<RecentTransactionsResult | null>(null);
+  const [settlements, setSettlements] = useState<AgencySettlementsResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchEmployeeContext()
+      .then(async (context) => {
+        if (cancelled) return;
+        const keys = context.permissionKeys;
+        setPermissions(keys);
+        const [dashboardResult, transactionResult, settlementResult] = await Promise.all([
+          keys.includes('fn_dashboard') ? fetchFinanceDashboardStats() : Promise.resolve(null),
+          keys.includes('fn_transactions') ? fetchRecentTransactions() : Promise.resolve(null),
+          keys.includes('fn_settlements') ? fetchAgencySettlements() : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        setStats(dashboardResult);
+        setTx(transactionResult);
+        setSettlements(settlementResult);
+      })
+      .catch(() => {
+        if (!cancelled) setError('خطا در دریافت دسترسی‌ها یا اطلاعات مالی.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) {
+    return <p role="alert" className="rounded-xl bg-danger/10 p-4 text-sm text-[#f87171]">{error}</p>;
+  }
+  if (!permissions) {
+    return <p className="rounded-xl border border-white/10 bg-panel-surface p-8 text-center text-sm text-panel-muted">در حال بارگذاری…</p>;
+  }
+
+  return (
+    <div data-testid="employee-finance-view" className="flex flex-col gap-4">
+      {stats && (
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ['درآمد ماه جاری', `${faMoney(stats.revenueThisMonthIrr)} تومان`],
+            ['آژانس فعال', faDigits(stats.activeAgencies)],
+            ['مسافر ماه جاری', faDigits(stats.passengersThisMonth)],
+            ['بلیط فروخته‌شده', faDigits(stats.ticketsSoldThisMonth)],
+          ].map(([label, value]) => (
+            <article key={label} className="rounded-[14px] border border-white/10 bg-panel-surface p-4">
+              <div className="font-num text-xl font-black text-panel-ink">{value}</div>
+              <div className="mt-1 text-[11px] text-panel-muted">{label}</div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {tx && (
+        <section className="rounded-[14px] border border-white/10 bg-panel-surface p-4">
+          <h2 className="mb-3 text-sm font-extrabold text-panel-ink">تراکنش‌های مالی اخیر</h2>
+          <div className="divide-y divide-white/10">
+            {tx.rows.map((row) => (
+              <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs">
+                <span className="font-bold text-panel-ink">{row.titleFa} · {row.party}</span>
+                <span className="font-num text-panel-muted">{faMoney(row.signedAmountIrr)} تومان</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {settlements && (
+        <section className="rounded-[14px] border border-white/10 bg-panel-surface p-4">
+          <h2 className="mb-3 text-sm font-extrabold text-panel-ink">تسویه‌حساب آژانس‌های همکار</h2>
+          <div className="divide-y divide-white/10">
+            {settlements.rows.map((row) => (
+              <div key={row.agencyId} className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs">
+                <span className="font-bold text-panel-ink">{row.agencyName}</span>
+                <span className="font-num text-panel-muted">{faMoney(row.totalIrr)} تومان</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -1412,6 +1503,16 @@ function FinanceAnalyticView() {
 export default function FinancePage() {
   const { user } = useAuth();
   const isFinanceOps = user?.role === 'FINANCE_MANAGER';
+
+  if (user?.role === 'EMPLOYEE') {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <h1 className="mb-1 text-xl font-black text-panel-ink">مالی</h1>
+        <p className="mb-6 text-sm text-panel-muted">اطلاعات مالی مطابق دسترسی اعطاشده توسط مدیر فناوری اطلاعات</p>
+        <EmployeeFinanceView />
+      </div>
+    );
+  }
 
   if (isFinanceOps) {
     return (

@@ -1,6 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import {
   ALL_PANEL_KEYS,
+  EMPLOYEE_SECTION_NAV,
   PANEL_ACCESS_TOGGLE_RIGHTS,
   PANEL_NAV,
 } from './panel-nav.config';
@@ -30,6 +31,57 @@ describe('operations panel access contract', () => {
     expect(PANEL_NAV.SENIOR_MANAGER?.map((item) => item.key)).not.toContain(
       'aircraft',
     );
+  });
+
+  it('wires current commercial sales and finance operations into employee navigation', () => {
+    expect(EMPLOYEE_SECTION_NAV.flights.wiredKeys).toEqual(
+      expect.arrayContaining([
+        'fl_sales_view',
+        'fl_site_sales',
+        'fl_agency_sales',
+        'fl_agency_allotments',
+      ]),
+    );
+    expect(EMPLOYEE_SECTION_NAV.finance.wiredKeys).toEqual(
+      expect.arrayContaining([
+        'fn_dashboard',
+        'fn_transactions',
+        'fn_settlements',
+      ]),
+    );
+    expect(EMPLOYEE_SECTION_NAV['ancillary-services'].wiredKeys).toEqual(
+      expect.arrayContaining(['sv_view', 'sv_manage']),
+    );
+    expect(EMPLOYEE_SECTION_NAV['ancillary-services'].depts).toEqual(
+      expect.arrayContaining(['commercial', 'sales']),
+    );
+    expect(EMPLOYEE_SECTION_NAV.services.depts).toEqual(['it']);
+  });
+
+  it('maps the shared service permission key to the employee department surface', async () => {
+    const userRepo = {
+      findOne: jest.fn().mockResolvedValue({ dept: 'commercial' }),
+    };
+    const permissionRepo = {
+      find: jest.fn().mockResolvedValue([{ permission: { key: 'sv_view' } }]),
+    };
+    const service = new PanelsService(
+      userRepo as never,
+      permissionRepo as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const nav = await service.getNav({
+      id: 'employee-1',
+      role: 'EMPLOYEE',
+      fullName: 'کارمند بازرگانی',
+      isSuperAdmin: false,
+    });
+
+    expect(nav.map((item) => item.key)).toContain('ancillary-services');
+    expect(nav.map((item) => item.key)).not.toContain('services');
   });
 
   it('exposes manager creation and password management to the Board Chair panel', () => {

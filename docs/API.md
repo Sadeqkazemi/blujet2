@@ -94,7 +94,7 @@ set and chart shape across every panel report.
 | GET    | `/reporting/low-sales-alerts`          | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | Flights &lt;72h out with occupancy below threshold — the design's recurring amber banner, currently hardcoded in every panel; this endpoint replaces the hardcoded copy with a real query.                                                                                                                                                                                                                                                                                                                        |
 | GET    | `/reporting/commercial-overview`       | COMMERCIAL_MANAGER                                                    | Commercial dashboard KPI row: `{ activeAgencies, passengersThisMonth, pendingAgencyRequests }`.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | GET    | `/reporting/site-admin-overview`       | SITE_ADMIN                                                            | Site-admin dashboard KPI row (design «آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درخواست در انتظار اقدام»): `{ activeAgencies, passengersThisMonth, ticketsSoldThisMonth, pendingActionCount, agenciesTrendPct, passengersTrendPct, ticketsTrendPct }` — `pendingActionCount` = pending/referred agency requests + SUBMITTED/REVIEW refunds + OPEN/IN_PROGRESS support tickets; trend fields are MoM % (null when previous month is 0 / N/A).                                                                 |
-| GET    | `/reporting/finance-dashboard-stats`   | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER                     | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Widened beyond FINANCE_MANAGER so CEO/Chair/Senior dashboards can render آژانس فعال / مسافر این ماه / بلیط فروخته‌شده / درآمد without a duplicate endpoint.                                                                                                                                      |
+| GET    | `/reporting/finance-dashboard-stats`   | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER; EMPLOYEE with `fn_dashboard` | Dashboard KPI row matching the design cards: `{ activeAgencies, activeAgenciesTrendPct, passengersThisMonth, passengersTrendPct, ticketsSoldThisMonth, ticketsTrendPct, revenueThisMonthIrr, revenueTrendPct }`. Employee access is an explicit IT-manager grant and is enforced by `EmployeePermissionGuard`. |
 
 ### Manager activity / audit feed (`backend/src/modules/audit/`)
 
@@ -145,28 +145,44 @@ the parent resource.
 ## Phase 4 — Cartable, referrals, manager messaging
 
 See `docs/DB_SCHEMA.md` → Phase 4 for the wiring decisions (⚑) these
-endpoints implement — notably: cartable review = تأیید/رد/انتقال with a
-required «نظر مدیر» note; transfer routes a fresh task to the target;
-messages and referrals deliver INTO recipients' cartables (the design has
-no other inbox). `EXEC_ROLES` below = CEO, BOARD_CHAIR, SENIOR_MANAGER,
-FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
+endpoints implement. Administrative workflows keep تأیید/رد/انتقال, while
+internal staff messages use a two-way reply flow and stable conversation
+history. `STAFF_ROLES` means every authenticated manager or employee role;
+customer and agency accounts are excluded. Employees additionally need the
+documented `ct_list`/`ct_process` grants from the IT permission catalog.
 
 ### `backend/src/modules/cartable/`
 
 | Method | Path                         | Roles                               | Notes                                                                                                                                                                                                                                                                                                         |
 | ------ | ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/cartable`                  | EXEC_ROLES                          | Caller's own tasks. Query: `category?` (ADMIN\|AGENCY\|MANAGER — the 3 KPI filter cards), `date?` (ISO day, the Jalali calendar popover filter), `status?` (default OPEN). Returns rows + per-category counts for the KPI cards + total for the badge.                                                        |
-| PATCH  | `/cartable/:id/approve`      | EXEC_ROLES (assignee only)          | `{ note }` — required, per the design's «برای ثبت تصمیم، درج نظر مدیر الزامی است.». Resolving a task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED).                                                                                                                      |
+| GET    | `/cartable`                  | STAFF_ROLES                         | Caller's own tasks. Query: `category?` (ADMIN\|AGENCY\|MANAGER), `date?`, `status?` (default OPEN). Resolved items remain available through status filters; EMPLOYEE requires `ct_list`.                                                                                                                       |
+| GET    | `/cartable/:id`              | STAFF_ROLES (sender or assignee)    | Returns task detail plus the complete chronological conversation history. The first assignee view marks the item read; closure never removes history. EMPLOYEE requires `ct_list`.                                                                                                                          |
+| POST   | `/cartable/direct-message`   | STAFF_ROLES                         | Direct staff-to-staff delivery. Recipient must be another active staff account. EMPLOYEE requires `ct_process`.                                                                                                                                                                                             |
+| POST   | `/cartable/:id/replies`      | STAFF_ROLES (OPEN assignee only)    | Replies to an internal message, closes the current incoming item, and creates a reciprocal OPEN item in the same conversation. EMPLOYEE requires `ct_process`.                                                                                                                                               |
+| PATCH  | `/cartable/:id/approve`      | STAFF_ROLES (assignee only)         | `{ note }` — closes the current item. Resolving a workflow task whose `sourceType` has side effects triggers them (e.g. chair-permission APPROVED). EMPLOYEE requires `ct_process`.                                                                                                                           |
 | PATCH  | `/cartable/:id/reject`       | EXEC_ROLES (assignee only)          | `{ note }` required. The design's red button is labeled «انصراف» but behaves as reject — kept as reject server-side.                                                                                                                                                                                          |
 | PATCH  | `/cartable/:id/transfer`     | EXEC_ROLES (assignee only)          | `{ toId, note }` — creates a new OPEN task for `toId`, marks this one TRANSFERRED. 409 on already-resolved tasks (no double-resolution).                                                                                                                                                                      |
 | POST   | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | The gate banner's «درخواست مجوز از رئیس هیئت مدیره» — 409 if one is already PENDING/APPROVED; creates one cartable task for every active `BOARD_CHAIR` account. The first valid decision wins atomically and closes the sibling tasks with the same result, so stale duplicate decisions cannot overwrite it. |
 | GET    | `/cartable/chair-permission` | FINANCE_MANAGER, COMMERCIAL_MANAGER | Own latest request status — drives the banner's pending/approved state.                                                                                                                                                                                                                                       |
 
+### Two-way internal staff conversations (2026-08-28)
+
+| Method | Path | Roles | Notes |
+| --- | --- | --- | --- |
+| GET | `/staff-directory` | STAFF_ROLES | Active staff recipients excluding the caller. EMPLOYEE requires `ct_process`; USER and AGENCY are never returned. |
+| POST | `/cartable/direct-message` | STAFF_ROLES | `{ toId, subject, body, attachmentIds? }`; creates one recipient-owned OPEN internal cartable item with an isolated `conversationId`. EMPLOYEE requires `ct_process`. |
+| POST | `/cartable/:id/replies` | STAFF_ROLES (OPEN assignee only) | `{ body, attachmentIds? }`; valid only for `MANAGER_MESSAGE`/`EMPLOYEE_MESSAGE`. Atomically resolves the current incoming item and creates a reciprocal OPEN item in the same conversation. |
+| GET | `/cartable/:id` | conversation participant | Returns the task and the complete chronological conversation history. Resolved items remain readable and searchable through the existing status-filtered list. |
+
+Department broadcasts delivered by `/manager-messages` create a distinct
+conversation for each recipient. A reply therefore returns only to the sender
+and cannot leak into another recipient's history.
+
 ### `backend/src/modules/staff-directory/`
 
 | Method | Path               | Roles      | Notes                                                                                                                                                                          |
 | ------ | ------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/staff-directory` | EXEC_ROLES | Active staff users `{ id, fullName, role, roleLabelFa }` for the transfer picker, referral recipient chips, and Phase 3's deferred agency-request refer UI (wired this phase). |
+| GET    | `/staff-directory` | STAFF_ROLES | Active staff users `{ id, fullName, role, roleLabelFa }`, excluding the caller and all customer/agency accounts. EMPLOYEE requires at least one applicable cartable/referral/agency-request permission. |
 
 ### `backend/src/modules/referrals/`
 
@@ -184,8 +200,8 @@ FINANCE_MANAGER, COMMERCIAL_MANAGER (the 5 panels with a کارتابل tab).
 
 | Method | Path                     | Roles                  | Notes                                                                                                                                                                                                                                                                                                                                                                       |
 | ------ | ------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/manager-messages`      | EXEC_ROLES, SITE_ADMIN | `{ toDept, subject, body, attachmentIds? }` — compose modal; delivery = one recipient cartable task per active account in the selected role(s), excluding the sender. `deliveredCount` is the number of accounts actually reached, not the number of roles. SUPPORT/AGENCIES are accepted but undeliverable until a backed department exists and return `PARTIAL_DELIVERY`. |
-| GET    | `/manager-messages/sent` | EXEC_ROLES, SITE_ADMIN | Sender's own history (the mocks discard sent messages; the real system keeps the record).                                                                                                                                                                                                                                                                                   |
+| POST   | `/manager-messages`      | STAFF_ROLES | `{ toDept, subject, body, attachmentIds? }` — department broadcast. Delivery creates one isolated cartable conversation per active recipient, excluding the sender, so replies cannot leak between recipients. |
+| GET    | `/manager-messages/sent` | STAFF_ROLES | Sender's own broadcast history.                                                                                                                                                 |
 
 ### `backend/src/modules/files/`
 
@@ -730,9 +746,9 @@ panels that carry these tabs. Design findings that scope this phase:
 
 | Method | Path                             | Roles                                                                 | Notes                                                                                                                                                                                                                                                                                                                              |
 | ------ | -------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/reporting/recent-transactions` | FINANCE_MANAGER                                                       | Latest 20 `LedgerEntry` rows joined with party context (agency name via `agencyId`, passenger via `booking`) → `{ type, titleFa, party, occurredAt, signedAmountIrr }[]` + total count. Real rows only — the mock's static `txDefs` are replaced by the ledger.                                                                    |
+| GET    | `/reporting/recent-transactions` | FINANCE_MANAGER; EMPLOYEE with `fn_transactions`                     | Latest 20 `LedgerEntry` rows joined with party context (agency name via `agencyId`, passenger via `booking`) → `{ type, titleFa, party, occurredAt, signedAmountIrr }[]` + total count. Real rows only; delegated employee access is server-enforced. |
 | GET    | `/reporting/revenue-mix`         | CEO, BOARD_CHAIR, SENIOR_MANAGER, FINANCE_MANAGER, COMMERCIAL_MANAGER | «ترکیب درآمد» donut: per-channel SALE sums + pct over the same optional `granularity`/`periodKey` window as the KPIs.                                                                                                                                                                                                              |
-| GET    | `/reporting/agency-settlements`  | FINANCE_MANAGER                                                       | «تسویه‌حساب آژانس‌های همکار»: per-agency rows derived from Phase 3 invoices (`amount = SUM(invoices in period)`, `paidPct`, `due = earliest unpaid dueAt`, status تسویه شد/در انتظار/معوق + overdue days) + total outstanding. Remind action reuses Phase 3's `POST /agencies/:id/invoices/:invoiceId/remind` (no new write path). |
+| GET    | `/reporting/agency-settlements`  | FINANCE_MANAGER; EMPLOYEE with `fn_settlements`                      | «تسویه‌حساب آژانس‌های همکار»: per-agency rows derived from real invoices (`amount = SUM(invoices in period)`, `paidPct`, `due = earliest unpaid dueAt`, status تسویه شد/در انتظار/معوق + overdue days) + total outstanding. Delegated access is read-only and server-enforced. |
 
 ### `backend/src/modules/passenger-reports/` (new)
 

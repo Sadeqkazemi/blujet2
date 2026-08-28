@@ -828,6 +828,126 @@ describe('Cartable + referrals + messages (e2e)', () => {
     ).toBe(true);
   });
 
+  it('supports an IT -> finance -> IT internal reply loop and retains history after closure', async () => {
+    const it = await loginAs(app, 'itadmin');
+    const finance = await loginAs(app, 'finance');
+    const itId = await userId('itadmin');
+    const financeId = await userId('finance');
+
+    const sent = await request(app.getHttpServer())
+      .post('/manager-messages')
+      .set('Authorization', `Bearer ${it.accessToken}`)
+      .send({
+        toDept: 'FINANCE',
+        subject: 'هماهنگی مالی دوطرفه',
+        body: 'پیام مدیر فناوری اطلاعات',
+      });
+    expect(sent.status).toBe(201);
+
+    const incoming = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({
+        sourceType: 'MANAGER_MESSAGE',
+        sourceId: sent.body.data.message.id,
+        assigneeId: financeId,
+      });
+
+    const reply = await request(app.getHttpServer())
+      .post(`/cartable/${incoming.id}/replies`)
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .send({ body: 'پاسخ مدیر مالی به مدیر فناوری اطلاعات' });
+    expect(reply.status).toBe(201);
+    expect(reply.body.data.assigneeId).toBe(itId);
+    expect(reply.body.data.senderId).toBe(financeId);
+    expect(reply.body.data.status).toBe('OPEN');
+    expect(reply.body.data.conversationId).toBeTruthy();
+
+    const originalAfterReply = await dataSource
+      .getRepository(CartableTask)
+      .findOneByOrFail({ id: incoming.id });
+    expect(originalAfterReply.status).toBe('APPROVED');
+    expect(originalAfterReply.conversationId).toBe(
+      reply.body.data.conversationId,
+    );
+
+    const itDetail = await request(app.getHttpServer())
+      .get(`/cartable/${reply.body.data.id}`)
+      .set('Authorization', `Bearer ${it.accessToken}`);
+    expect(itDetail.status).toBe(200);
+    expect(
+      itDetail.body.data.history.map(
+        (entry: { detail: string }) => entry.detail,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'پیام مدیر فناوری اطلاعات',
+        'پاسخ مدیر مالی به مدیر فناوری اطلاعات',
+      ]),
+    );
+
+    const closed = await request(app.getHttpServer())
+      .patch(`/cartable/${reply.body.data.id}/approve`)
+      .set('Authorization', `Bearer ${it.accessToken}`)
+      .send({ note: 'گفتگو بسته شد' });
+    expect(closed.status).toBe(200);
+
+    const historyAfterClose = await request(app.getHttpServer())
+      .get(`/cartable/${reply.body.data.id}`)
+      .set('Authorization', `Bearer ${it.accessToken}`);
+    expect(historyAfterClose.status).toBe(200);
+    expect(historyAfterClose.body.data.status).toBe('APPROVED');
+    expect(historyAfterClose.body.data.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ detail: 'پیام مدیر فناوری اطلاعات' }),
+        expect.objectContaining({
+          detail: 'پاسخ مدیر مالی به مدیر فناوری اطلاعات',
+        }),
+      ]),
+    );
+  });
+
+  it('lets every staff role address another staff member directly but rejects external accounts', async () => {
+    const finance = await loginAs(app, 'finance');
+    const employeeId = await userId('sales.moradi');
+    const customer = await dataSource
+      .getRepository(User)
+      .findOneByOrFail({ role: 'USER' });
+
+    const delivered = await request(app.getHttpServer())
+      .post('/cartable/direct-message')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .send({
+        toId: employeeId,
+        subject: 'پیام مستقیم به کارمند',
+        body: 'متن پیام مستقیم',
+      });
+    expect(delivered.status).toBe(201);
+    expect(delivered.body.data.assigneeId).toBe(employeeId);
+
+    const external = await request(app.getHttpServer())
+      .post('/cartable/direct-message')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .send({
+        toId: customer.id,
+        subject: 'نباید ارسال شود',
+        body: 'متن',
+      });
+    expect(external.status).toBe(400);
+  });
+
+  it('allows the IT manager to load the complete internal staff recipient directory', async () => {
+    const it = await loginAs(app, 'itadmin');
+    const res = await request(app.getHttpServer())
+      .get('/staff-directory')
+      .set('Authorization', `Bearer ${it.accessToken}`);
+    expect(res.status).toBe(200);
+    const roles = (res.body.data as { role: string }[]).map((row) => row.role);
+    expect(roles).toContain('FINANCE_MANAGER');
+    expect(roles).toContain('EMPLOYEE');
+    expect(roles).not.toContain('USER');
+    expect(roles).not.toContain('AGENCY');
+  });
+
   // ── Staff directory & agency-request wiring ─────────────────────────
 
   it('staff-directory lists active staff (no customers/agencies, not the caller)', async () => {

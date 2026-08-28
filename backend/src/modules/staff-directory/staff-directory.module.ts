@@ -10,11 +10,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
-import {
-  EXEC_ROLES,
-  ROLE_LABELS_FA,
-  STAFF_ROLES,
-} from '../../common/exec-roles';
+import { ROLE_LABELS_FA, STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type { Role } from '../../database/enums';
 import { isTemporaryPanelUsername } from '../../database/temporary-panel-accounts';
@@ -26,14 +22,10 @@ export class StaffDirectoryService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
 
-  /** Active staff accounts for the transfer/refer/recipient pickers — never
-   * includes customers/agencies, never includes the caller themselves.
-   * EMPLOYEE callers only see exec managers (message-to-manager picker). */
-  async list(excludeUserId: string, actorRole?: AuthenticatedUser['role']) {
-    const roles: Role[] =
-      actorRole === 'EMPLOYEE'
-        ? [...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN']
-        : [...STAFF_ROLES];
+  /** Active staff accounts for direct-message/transfer/recipient pickers —
+   * never includes customers/agencies or the caller themselves. */
+  async list(excludeUserId: string) {
+    const roles: Role[] = [...STAFF_ROLES];
 
     const users = await this.userRepo.find({
       where: {
@@ -61,7 +53,7 @@ export class StaffDirectoryService {
 @ApiTags('staff-directory')
 @Controller('staff-directory')
 @UseGuards(JwtAuthGuard, RolesGuard, EmployeePermissionGuard)
-@Roles(...EXEC_ROLES, 'EMPLOYEE')
+@Roles(...STAFF_ROLES)
 export class StaffDirectoryController {
   constructor(private readonly staffDirectory: StaffDirectoryService) {}
 
@@ -69,7 +61,7 @@ export class StaffDirectoryController {
   @RequiresPermission('ct_process', 'rf_process', 'ag_requests')
   @ApiOperation({ summary: 'فهرست کارکنان فعال برای انتخاب مقصد انتقال/ارجاع' })
   async list(@CurrentUser() actor: AuthenticatedUser) {
-    const data = await this.staffDirectory.list(actor.id, actor.role);
+    const data = await this.staffDirectory.list(actor.id);
     return { success: true, data };
   }
 }

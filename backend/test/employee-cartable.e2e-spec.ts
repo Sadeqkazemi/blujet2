@@ -152,6 +152,45 @@ describe('EMPLOYEE cartable (e2e)', () => {
     expect(sent.body.data[0].body).toBe('پیام تست کارمند');
   });
 
+  it('lets an employee reply to a manager in the same retained conversation', async () => {
+    const { username, id: employeeId } = await createEmployeeWithPermissions([
+      'ct_list',
+      'ct_process',
+    ]);
+    const finance = await loginAs(app, 'finance');
+    const financeId = (
+      await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'finance' })
+    ).id;
+
+    const initial = await request(app.getHttpServer())
+      .post('/cartable/direct-message')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .send({
+        toId: employeeId,
+        subject: 'گفتگوی مدیر و کارمند',
+        body: 'پیام مدیر مالی',
+      });
+    expect(initial.status).toBe(201);
+
+    const employee = await loginAs(app, username);
+    const reply = await request(app.getHttpServer())
+      .post(`/cartable/${initial.body.data.id}/replies`)
+      .set('Authorization', `Bearer ${employee.accessToken}`)
+      .send({ body: 'پاسخ کارمند' });
+    expect(reply.status).toBe(201);
+    expect(reply.body.data.assigneeId).toBe(financeId);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/cartable/${reply.body.data.id}`)
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    expect(detail.status).toBe(200);
+    expect(
+      detail.body.data.history.map((entry: { detail: string }) => entry.detail),
+    ).toEqual(expect.arrayContaining(['پیام مدیر مالی', 'پاسخ کارمند']));
+  });
+
   it('GET /panels/employee-context returns dept and permission labels', async () => {
     const { accessToken } = await loginAs(app, 'sales.moradi');
     const res = await request(app.getHttpServer())
