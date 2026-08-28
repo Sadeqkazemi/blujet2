@@ -43,7 +43,7 @@ describe('SupportConversationCenter', () => {
         theme="light"
         locale="fa"
         tickets={tickets}
-        selectedId="ticket-1"
+        selectedId={null}
         onSelect={vi.fn()}
         onReply={vi.fn()}
         onNew={vi.fn()}
@@ -53,11 +53,27 @@ describe('SupportConversationCenter', () => {
     expect(screen.getByTestId('support-conversation-center')).toHaveAttribute('data-theme', 'light');
     expect(screen.getByTestId('support-conversation-center')).toHaveClass('bg-white');
     expect(screen.getByRole('heading', { name: 'تیکت‌های من' })).toHaveClass('text-[#102a43]');
+    expect(screen.getByTestId('support-ticket-id-header')).toHaveClass('text-center');
+    expect(screen.getByTestId('support-ticket-id')).toHaveClass('w-full', 'text-center');
+    expect(screen.getByTestId('support-ticket-id')).toHaveTextContent('#TK123');
   });
 
   it('renders status counters, ticket rows, the conversation, and sends a reply', async () => {
     const onReply = vi.fn().mockResolvedValue(undefined);
-    render(
+    const { rerender } = render(
+      <SupportConversationCenter
+        locale="fa"
+        tickets={tickets}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onReply={onReply}
+        onNew={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('support-status-ANSWERED')).toHaveTextContent('۱');
+    expect(screen.getByText('مشکل پرداخت')).toBeInTheDocument();
+    rerender(
       <SupportConversationCenter
         locale="fa"
         tickets={tickets}
@@ -67,9 +83,6 @@ describe('SupportConversationCenter', () => {
         onNew={vi.fn()}
       />,
     );
-
-    expect(screen.getByTestId('support-status-ANSWERED')).toHaveTextContent('۱');
-    expect(screen.getAllByText('مشکل پرداخت')).toHaveLength(2);
     expect(screen.getByText('متن اولیه')).toBeInTheDocument();
     expect(screen.getByText('پاسخ پشتیبانی')).toBeInTheDocument();
 
@@ -93,10 +106,38 @@ describe('SupportConversationCenter', () => {
       />,
     );
 
+    await userEvent.click(screen.getByRole('button', { name: 'جستجو با شماره تیکت یا موضوع…' }));
     const search = screen.getByPlaceholderText('جستجو با شماره تیکت یا موضوع…');
     await userEvent.type(search, 'TK999');
-    expect(screen.getAllByText('مشکل بار')).toHaveLength(2);
+    expect(screen.getByText('مشکل بار')).toBeInTheDocument();
     expect(screen.queryByText('مشکل پرداخت')).not.toBeInTheDocument();
+  });
+
+  it('filters tickets when a status card is selected and toggles back to all', async () => {
+    render(
+      <SupportConversationCenter
+        theme="light"
+        locale="fa"
+        tickets={[
+          ...tickets,
+          { ...tickets[0], id: 'ticket-2', trackingCode: 'TK999', subject: 'درخواست باز', status: 'OPEN' },
+        ]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        onReply={vi.fn()}
+        onNew={vi.fn()}
+      />,
+    );
+
+    const openFilter = screen.getByTestId('support-status-OPEN');
+    await userEvent.click(openFilter);
+    expect(openFilter).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('درخواست باز')).toBeInTheDocument();
+    expect(screen.queryByText('مشکل پرداخت')).not.toBeInTheDocument();
+
+    await userEvent.click(openFilter);
+    expect(openFilter).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByText('مشکل پرداخت')).toBeInTheDocument();
   });
 
   it('does not render a reply composer for a closed ticket', () => {

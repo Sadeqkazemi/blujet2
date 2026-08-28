@@ -1,284 +1,365 @@
-import { useEffect, useState } from 'react';
-import { downloadSalesExport, fetchApiKeys, fetchInvoices, fetchSales } from '../../api/agency-portal';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  downloadSalesExport,
+  fetchCredit,
+  fetchInvoices,
+  fetchProfile,
+  fetchSales,
+} from '../../api/agency-portal';
+import { useLocale, type StoredLocale } from '../../hooks/useLocale';
+import { AIRPORT_REFERENCE_CATALOG } from '../../lib/airport-reference-catalog';
 import { localeMoney } from '../../lib/fa-format';
 import { formatLocaleDate, localeDigits } from '../../lib/locale-format';
-import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { AgencySalesReport } from '../../types/agency-portal';
+import type {
+  AgencyCredit,
+  AgencyInvoice,
+  AgencyProfile,
+  AgencySalesReport,
+  AgencySalesTicket,
+} from '../../types/agency-portal';
 
-// فروش و گزارش — heading/section labels reuse
-// design-reference-v2/پنل آژانس.dc.html's own isEN vocabulary for this
-// exact tab ("Sales per flight", the reportKpis labels); AR has no
-// counterpart there and is hand-translated.
-interface Tr {
-  fa: string;
-  en: string;
-  ar: string;
-}
-
-const BOOKING_STATUS_LABEL: Record<string, Tr> = {
-  DRAFT: { fa: 'پیش‌نویس', en: 'Draft', ar: 'مسودة' },
-  HELD: { fa: 'رزرو موقت', en: 'Held', ar: 'محجوز مؤقتًا' },
-  PAID: { fa: 'پرداخت‌شده', en: 'Paid', ar: 'مدفوع' },
-  TICKETED: { fa: 'صادرشده', en: 'Ticketed', ar: 'تم إصدار التذكرة' },
-  CANCELLED: { fa: 'لغوشده', en: 'Cancelled', ar: 'ملغى' },
-  EXPIRED: { fa: 'منقضی‌شده', en: 'Expired', ar: 'منتهي الصلاحية' },
-  REFUNDED: { fa: 'مستردشده', en: 'Refunded', ar: 'تم الاسترداد' },
+type ReportTab = 'RTRD' | 'PSR' | 'PRR';
+type ReportBundle = {
+  report: AgencySalesReport;
+  profile: AgencyProfile;
+  credit: AgencyCredit;
+  invoices: AgencyInvoice[];
 };
 
-const STR: Record<StoredLocale, {
-  heading: string;
+const PAGE_SIZE = 10;
+const IRAN_AIRPORT_CODES = new Set(
+  AIRPORT_REFERENCE_CATALOG
+    .filter((airport) => airport.countryFa === 'ایران')
+    .map((airport) => airport.code),
+);
+
+const COPY: Record<StoredLocale, {
+  title: string;
   subtitle: string;
-  errorFallback: string;
-  loading: string;
-  kpiTotalSales: string;
-  kpiTicketsIssued: string;
-  kpiAvgFare: string;
-  kpiRefundRate: string;
-  perFlightHeading: string;
-  perFlightEmpty: string;
-  colFlight: string;
-  colRoute: string;
-  colTicketsCount: string;
-  colTotalSales: string;
-  ticketsHeading: string;
-  ticketsEmpty: string;
-  colPnr: string;
-  colDepartureDate: string;
-  colCabin: string;
-  colAmount: string;
-  colStatus: string;
-  toman: string;
-  exportExcel: string;
-  exportBusy: string;
+  back: string;
+  agency: string;
+  agencyCode: string;
+  currency: string;
+  period: string;
+  reportDate: string;
+  creditLimit: string;
+  creditUsed: string;
+  creditRemaining: string;
+  paidAmount: string;
+  payableAmount: string;
+  salesAmount: string;
+  salesCount: string;
+  modificationCount: string;
+  refundCount: string;
+  unsupported: string;
+  unsupportedNote: string;
+  search: string;
+  exportCsv: string;
+  exporting: string;
   exportError: string;
+  loading: string;
+  loadError: string;
+  retry: string;
+  titleColumn: string;
+  amountColumn: string;
+  type: string;
+  pnr: string;
+  ticketNo: string;
+  fare: string;
+  tax: string;
+  crcn: string;
+  commissionPct: string;
+  commission: string;
+  refundable: string;
+  routeType: string;
+  route: string;
+  rbd: string;
+  date: string;
+  status: string;
+  domestic: string;
+  international: string;
+  unknown: string;
+  sale: string;
+  refund: string;
+  empty: string;
+  total: string;
+  previous: string;
+  next: string;
+  page: string;
+  of: string;
+  toman: string;
 }> = {
   fa: {
-    heading: 'فروش و گزارش',
-    subtitle: 'تفکیک فروش آژانس شما بر اساس پرواز و بلیط',
-    errorFallback: 'خطا در دریافت گزارش فروش.',
-    loading: 'در حال بارگذاری…',
-    kpiTotalSales: 'کل فروش (تومان)',
-    kpiTicketsIssued: 'بلیط صادرشده',
-    kpiAvgFare: 'میانگین نرخ (تومان)',
-    kpiRefundRate: 'نرخ استرداد',
-    perFlightHeading: 'فروش هر پرواز',
-    perFlightEmpty: 'فروشی ثبت نشده است.',
-    colFlight: 'پرواز',
-    colRoute: 'مسیر',
-    colTicketsCount: 'تعداد بلیط',
-    colTotalSales: 'جمع فروش',
-    ticketsHeading: 'بلیط‌های صادرشده',
-    ticketsEmpty: 'بلیطی ثبت نشده است.',
-    colPnr: 'PNR',
-    colDepartureDate: 'تاریخ پرواز',
-    colCabin: 'کلاس پروازی',
-    colAmount: 'مبلغ',
-    colStatus: 'وضعیت',
-    toman: 'تومان',
-    exportExcel: 'خروجی Excel',
-    exportBusy: 'در حال آماده‌سازی…',
-    exportError: 'خطا در دریافت خروجی.',
+    title: 'جزئیات گزارش فروش', subtitle: 'تطبیق فروش، پرداخت و استرداد آژانس', back: 'بازگشت به گزارش فروش',
+    agency: 'آژانس', agencyCode: 'کد آژانس', currency: 'واحد پول', period: 'دوره', reportDate: 'تاریخ گزارش',
+    creditLimit: 'سقف اعتبار', creditUsed: 'اعتبار مصرف‌شده', creditRemaining: 'مانده اعتبار',
+    paidAmount: 'مبلغ واریزی', payableAmount: 'مبلغ قابل پرداخت', salesAmount: 'مبلغ فروش',
+    salesCount: 'تعداد فروش', modificationCount: 'تعداد اصلاح', refundCount: 'تعداد استرداد',
+    unsupported: 'ثبت نشده', unsupportedNote: 'اجزای مالی تفکیک‌نشده مانند مالیات، CRCN و کمیسیون در مدل فعلی با خط تیره نمایش داده می‌شوند و عدد نمونه جایگزین داده واقعی نشده است.',
+    search: 'جستجو در گزارش…', exportCsv: 'خروجی CSV', exporting: 'در حال آماده‌سازی…', exportError: 'دریافت خروجی انجام نشد.',
+    loading: 'در حال دریافت گزارش…', loadError: 'گزارش فروش دریافت نشد.', retry: 'تلاش مجدد',
+    titleColumn: 'عنوان', amountColumn: 'مبلغ', type: 'نوع', pnr: 'PNR', ticketNo: 'شماره بلیط الکترونیکی', fare: 'کرایه',
+    tax: 'مالیات', crcn: 'CRCN', commissionPct: 'درصد کمیسیون', commission: 'کمیسیون', refundable: 'قابل استرداد',
+    routeType: 'نوع مسیر', route: 'مسیر', rbd: 'RBD', date: 'تاریخ', status: 'وضعیت',
+    domestic: 'داخلی', international: 'بین‌المللی', unknown: 'نامشخص', sale: 'فروش', refund: 'استرداد', empty: 'ردیفی برای نمایش وجود ندارد.',
+    total: 'جمع', previous: 'قبلی', next: 'بعدی', page: 'صفحه', of: 'از', toman: 'تومان',
   },
   en: {
-    heading: 'Sales & Reports',
-    subtitle: 'A breakdown of your agency sales by flight and ticket',
-    errorFallback: 'Error loading the sales report.',
-    loading: 'Loading…',
-    kpiTotalSales: 'Total Sales (Toman)',
-    kpiTicketsIssued: 'Tickets Issued',
-    kpiAvgFare: 'Average Fare (Toman)',
-    kpiRefundRate: 'Refund Rate',
-    perFlightHeading: 'Sales per Flight',
-    perFlightEmpty: 'No sales recorded yet.',
-    colFlight: 'Flight',
-    colRoute: 'Route',
-    colTicketsCount: 'Tickets',
-    colTotalSales: 'Total Sales',
-    ticketsHeading: 'Issued Tickets',
-    ticketsEmpty: 'No tickets recorded yet.',
-    colPnr: 'PNR',
-    colDepartureDate: 'Departure Date',
-    colCabin: 'Cabin / Fare class',
-    colAmount: 'Amount',
-    colStatus: 'Status',
-    toman: 'Toman',
-    exportExcel: 'Export Excel',
-    exportBusy: 'Preparing…',
-    exportError: 'Error downloading the export.',
+    title: 'Sales Report Details', subtitle: 'Agency sales, payment, and refund reconciliation', back: 'Back to sales report',
+    agency: 'Agency', agencyCode: 'Agency code', currency: 'Currency', period: 'Period', reportDate: 'Report date',
+    creditLimit: 'Credit limit', creditUsed: 'Credit used', creditRemaining: 'Credit remaining',
+    paidAmount: 'Paid amount', payableAmount: 'Amount payable', salesAmount: 'Sales amount',
+    salesCount: 'Sales count', modificationCount: 'Modification count', refundCount: 'Refund count',
+    unsupported: 'Not recorded', unsupportedNote: 'Financial components not stored separately, such as tax, CRCN, and commission, are shown as dashes; no sample value replaces real data.',
+    search: 'Search report…', exportCsv: 'Export CSV', exporting: 'Preparing…', exportError: 'Export could not be downloaded.',
+    loading: 'Loading report…', loadError: 'Sales report could not be loaded.', retry: 'Try again',
+    titleColumn: 'Title', amountColumn: 'Amount', type: 'Type', pnr: 'PNR', ticketNo: 'E-ticket number', fare: 'Fare',
+    tax: 'Tax', crcn: 'CRCN', commissionPct: 'Commission %', commission: 'Commission', refundable: 'Refundable',
+    routeType: 'Route type', route: 'Route', rbd: 'RBD', date: 'Date', status: 'Status',
+    domestic: 'Domestic', international: 'International', unknown: 'Unknown', sale: 'Sale', refund: 'Refund', empty: 'No rows to display.',
+    total: 'Total', previous: 'Previous', next: 'Next', page: 'Page', of: 'of', toman: 'Toman',
   },
   ar: {
-    heading: 'المبيعات والتقارير',
-    subtitle: 'تفصيل مبيعات وكالتك حسب الرحلة والتذكرة',
-    errorFallback: 'خطأ في تحميل تقرير المبيعات.',
-    loading: 'جارٍ التحميل…',
-    kpiTotalSales: 'إجمالي المبيعات (تومان)',
-    kpiTicketsIssued: 'التذاكر الصادرة',
-    kpiAvgFare: 'متوسط السعر (تومان)',
-    kpiRefundRate: 'معدل الاسترداد',
-    perFlightHeading: 'المبيعات لكل رحلة',
-    perFlightEmpty: 'لا توجد مبيعات مسجّلة بعد.',
-    colFlight: 'الرحلة',
-    colRoute: 'المسار',
-    colTicketsCount: 'عدد التذاكر',
-    colTotalSales: 'إجمالي المبيعات',
-    ticketsHeading: 'التذاكر الصادرة',
-    ticketsEmpty: 'لا توجد تذاكر مسجّلة بعد.',
-    colPnr: 'رمز الحجز',
-    colDepartureDate: 'تاريخ الرحلة',
-    colCabin: 'درجة السفر',
-    colAmount: 'المبلغ',
-    colStatus: 'الحالة',
-    toman: 'تومان',
-    exportExcel: 'تصدير Excel',
-    exportBusy: 'جارٍ التحضير…',
-    exportError: 'خطأ في تنزيل التصدير.',
+    title: 'تفاصيل تقرير المبيعات', subtitle: 'مطابقة مبيعات الوكالة والمدفوعات والاستردادات', back: 'العودة إلى تقرير المبيعات',
+    agency: 'الوكالة', agencyCode: 'رمز الوكالة', currency: 'العملة', period: 'الفترة', reportDate: 'تاريخ التقرير',
+    creditLimit: 'حد الائتمان', creditUsed: 'الائتمان المستخدم', creditRemaining: 'الرصيد المتبقي',
+    paidAmount: 'المبلغ المدفوع', payableAmount: 'المبلغ المستحق', salesAmount: 'مبلغ المبيعات',
+    salesCount: 'عدد المبيعات', modificationCount: 'عدد التعديلات', refundCount: 'عدد الاستردادات',
+    unsupported: 'غير مسجل', unsupportedNote: 'تظهر المكونات المالية غير المفصّلة مثل الضريبة وCRCN والعمولة بشرطة، ولم تستبدل بيانات حقيقية بأرقام نموذجية.',
+    search: 'البحث في التقرير…', exportCsv: 'تصدير CSV', exporting: 'جارٍ التحضير…', exportError: 'تعذر تنزيل الملف.',
+    loading: 'جارٍ تحميل التقرير…', loadError: 'تعذر تحميل تقرير المبيعات.', retry: 'إعادة المحاولة',
+    titleColumn: 'العنوان', amountColumn: 'المبلغ', type: 'النوع', pnr: 'PNR', ticketNo: 'رقم التذكرة الإلكترونية', fare: 'الأجرة',
+    tax: 'الضريبة', crcn: 'CRCN', commissionPct: 'نسبة العمولة', commission: 'العمولة', refundable: 'قابل للاسترداد',
+    routeType: 'نوع المسار', route: 'المسار', rbd: 'RBD', date: 'التاريخ', status: 'الحالة',
+    domestic: 'داخلي', international: 'دولي', unknown: 'غير معروف', sale: 'بيع', refund: 'استرداد', empty: 'لا توجد صفوف للعرض.',
+    total: 'المجموع', previous: 'السابق', next: 'التالي', page: 'صفحة', of: 'من', toman: 'تومان',
   },
 };
 
+const STATUS: Record<string, Record<StoredLocale, string>> = {
+  DRAFT: { fa: 'پیش‌نویس', en: 'Draft', ar: 'مسودة' },
+  HELD: { fa: 'رزرو موقت', en: 'Held', ar: 'حجز مؤقت' },
+  PAID: { fa: 'پرداخت‌شده', en: 'Paid', ar: 'مدفوع' },
+  TICKETED: { fa: 'صادرشده', en: 'Ticketed', ar: 'صادرة' },
+  CANCELLED: { fa: 'لغوشده', en: 'Cancelled', ar: 'ملغاة' },
+  EXPIRED: { fa: 'منقضی', en: 'Expired', ar: 'منتهية' },
+  REFUNDED: { fa: 'مستردشده', en: 'Refunded', ar: 'مستردة' },
+};
+
+function sumIrr(values: string[]): string {
+  return values.reduce((sum, value) => sum + BigInt(value || '0'), 0n).toString();
+}
+
+function routeCodes(route: string): [string, string] | null {
+  const codes = route.toUpperCase().match(/[A-Z]{3}/g);
+  return codes && codes.length >= 2 ? [codes[0]!, codes[1]!] : null;
+}
+
+function Pagination({ page, total, locale, onChange }: { page: number; total: number; locale: StoredLocale; onChange: (page: number) => void }) {
+  const t = COPY[locale];
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e6ebf1] px-4 py-3 text-[11px] text-[#66788d]">
+      <span>{t.page} {localeDigits(page, locale)} {t.of} {localeDigits(pages, locale)} · {localeDigits(total, locale)} {t.total}</span>
+      <div className="flex gap-2">
+        <button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} className="rounded-lg border border-[#dbe3ed] px-3 py-1.5 font-bold disabled:opacity-40">{t.previous}</button>
+        <button type="button" disabled={page >= pages} onClick={() => onChange(page + 1)} className="rounded-lg border border-[#dbe3ed] px-3 py-1.5 font-bold disabled:opacity-40">{t.next}</button>
+      </div>
+    </div>
+  );
+}
 export default function AgencySalesPage() {
   const { locale } = useLocale();
-  const t = STR[locale];
-  const [data, setData] = useState<AgencySalesReport | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const t = COPY[locale];
+  const [bundle, setBundle] = useState<ReportBundle | null>(null);
+  const [error, setError] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [tab, setTab] = useState<ReportTab>('RTRD');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [exportBusy, setExportBusy] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
-  const [extraKpis, setExtraKpis] = useState({ activeWebservices: 0, unpaidInvoices: 0 });
+  const [exportError, setExportError] = useState(false);
 
   useEffect(() => {
-    fetchSales()
-      .then(setData)
-      .catch(() => setError(t.errorFallback));
-    Promise.allSettled([fetchApiKeys(), fetchInvoices()]).then(([keysResult, invoicesResult]) => {
-      setExtraKpis({
-        activeWebservices: keysResult.status === 'fulfilled' ? keysResult.value.filter((key) => key.status === 'ACTIVE').length : 0,
-        unpaidInvoices: invoicesResult.status === 'fulfilled' ? invoicesResult.value.filter((invoice) => invoice.status !== 'PAID').length : 0,
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+    setError(false);
+    setBundle(null);
+    Promise.all([fetchSales(), fetchProfile(), fetchCredit(), fetchInvoices()])
+      .then(([report, profile, credit, invoices]) => {
+        if (active) setBundle({ report, profile, credit, invoices });
+      })
+      .catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [reload]);
 
-  if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
-  if (!data) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
+  useEffect(() => setPage(1), [query, tab]);
 
-  const screenshotLabels = {
-    fa: { routes: 'فروش هر پرواز', services: 'وب‌سرویس‌های خریداری‌شده', invoices: 'فاکتورهای پرداخت‌نشده', routeUnit: 'مسیر فعال', serviceUnit: 'سرویس', invoiceUnit: 'فاکتور' },
-    en: { routes: 'Sales per Flight', services: 'Purchased Web Services', invoices: 'Unpaid Invoices', routeUnit: 'active routes', serviceUnit: 'services', invoiceUnit: 'invoices' },
-    ar: { routes: 'المبيعات لكل رحلة', services: 'خدمات الويب المشتراة', invoices: 'الفواتير غير المدفوعة', routeUnit: 'مسارات نشطة', serviceUnit: 'خدمات', invoiceUnit: 'فواتير' },
-  }[locale];
-  const kpis = [
-    { label: t.kpiTotalSales, value: `${localeMoney(data.summary.totalSalesIrr, locale)} ${t.toman}`, tone: 'blue' },
-    { label: screenshotLabels.routes, value: `${localeDigits(data.perFlight.length, locale)} ${screenshotLabels.routeUnit}`, tone: 'green' },
-    { label: screenshotLabels.services, value: `${localeDigits(extraKpis.activeWebservices, locale)} ${screenshotLabels.serviceUnit}`, tone: 'purple' },
-    { label: screenshotLabels.invoices, value: `${localeDigits(extraKpis.unpaidInvoices, locale)} ${screenshotLabels.invoiceUnit}`, tone: 'orange' },
-  ];
+  const derived = useMemo(() => {
+    if (!bundle) return null;
+    const { report, invoices } = bundle;
+    const dates = report.tickets.map((ticket) => ticket.departureAt).sort();
+    const refunded = report.tickets.filter((ticket) => ticket.status === 'REFUNDED');
+    const paidInvoices = invoices.filter((invoice) => invoice.status === 'PAID');
+    const payableInvoices = invoices.filter((invoice) => invoice.status !== 'PAID');
+    return {
+      period: dates.length === 0 ? '—' : `${formatLocaleDate(dates[0]!, locale)} — ${formatLocaleDate(dates.at(-1)!, locale)}`,
+      refunded,
+      refundAmountIrr: sumIrr(refunded.map((ticket) => ticket.priceIrr)),
+      paidAmountIrr: sumIrr(paidInvoices.map((invoice) => invoice.amountIrr)),
+      payableAmountIrr: sumIrr(payableInvoices.map((invoice) => invoice.amountIrr)),
+    };
+  }, [bundle, locale]);
 
   async function onExport() {
-    setExportError(null);
     setExportBusy(true);
+    setExportError(false);
     try {
       const blob = await downloadSalesExport();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'agency-sales.csv';
-      a.click();
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = 'blujet-agency-sales.csv';
+      anchor.click();
       URL.revokeObjectURL(url);
     } catch {
-      setExportError(t.exportError);
+      setExportError(true);
     } finally {
       setExportBusy(false);
     }
   }
 
-  return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-start justify-end gap-3">
-        <button
-          type="button"
-          data-testid="sales-export"
-          disabled={exportBusy}
-          onClick={() => void onExport()}
-          className="rounded-lg border border-border bg-white px-4 py-2 text-xs font-bold text-accent disabled:opacity-60"
-        >
-          {exportBusy ? t.exportBusy : t.exportExcel}
-        </button>
-      </div>
-      {exportError && <p className="mb-4 text-xs text-danger">{exportError}</p>}
-
-      <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {kpis.map((k) => (
-          <div key={k.label} className="rounded-2xl border border-[#e8edf3] bg-white p-5">
-            <div className="text-[11px] text-muted">{k.label}</div>
-            <div className="mt-2 text-xl font-black text-[#0d2640]">{k.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-6 rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.perFlightHeading}</div>
-        {data.perFlight.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.perFlightEmpty}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-border text-[10px] text-muted">
-                  <th className="py-2 font-bold">{t.colFlight}</th>
-                  <th className="py-2 font-bold">{t.colRoute}</th>
-                  <th className="py-2 font-bold">{t.colTicketsCount}</th>
-                  <th className="py-2 font-bold">{t.colTotalSales}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.perFlight.map((f) => (
-                  <tr key={f.flightNo} className="border-b border-border/60">
-                    <td className="ltr py-2.5">{f.flightNo}</td>
-                    <td className="ltr py-2.5">{f.route}</td>
-                    <td className="py-2.5">{localeDigits(f.ticketsCount, locale)}</td>
-                    <td className="py-2.5 font-bold">{localeMoney(f.salesIrr, locale)} {t.toman}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-xl border border-border bg-white p-5">
-        <div className="mb-4 text-sm font-bold text-ink">{t.ticketsHeading}</div>
-        {data.tickets.length === 0 ? (
-          <p className="py-4 text-center text-xs text-muted">{t.ticketsEmpty}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-right text-xs">
-              <thead>
-                <tr className="border-b border-border text-[10px] text-muted">
-                  <th className="py-2 font-bold">{t.colPnr}</th>
-                  <th className="py-2 font-bold">{t.colFlight}</th>
-                  <th className="py-2 font-bold">{t.colDepartureDate}</th>
-                  <th className="py-2 font-bold">{t.colCabin}</th>
-                  <th className="py-2 font-bold">{t.colAmount}</th>
-                  <th className="py-2 font-bold">{t.colStatus}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tickets.map((t2) => (
-                  <tr key={t2.pnr} className="border-b border-border/60">
-                    <td className="ltr py-2.5">{t2.pnr}</td>
-                    <td className="ltr py-2.5">
-                      {t2.flightNo} — {t2.route}
-                    </td>
-                    <td className="py-2.5">{formatLocaleDate(t2.departureAt, locale)}</td>
-                    <td className="ltr py-2.5">{t2.cabin ?? '—'}{t2.fareClassCode ? ` / ${t2.fareClassCode}` : ''}</td>
-                    <td className="py-2.5 font-bold">{localeMoney(t2.priceIrr, locale)} {t.toman}</td>
-                    <td className="py-2.5">{BOOKING_STATUS_LABEL[t2.status]?.[locale] ?? t2.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+  if (error) return (
+    <div className="grid min-h-[320px] place-items-center rounded-2xl border border-red-200 bg-white text-sm text-red-700">
+      <div className="text-center"><p>{t.loadError}</p><button type="button" className="mt-3 rounded-lg bg-[#326bc3] px-4 py-2 font-bold text-white" onClick={() => setReload((value) => value + 1)}>{t.retry}</button></div>
     </div>
+  );
+  if (!bundle || !derived) return <div className="grid min-h-[320px] place-items-center text-sm text-[#718198]">{t.loading}</div>;
+
+  const { report, profile, credit } = bundle;
+  const money = (value: string) => `${localeMoney(value, locale)} ${t.toman}`;
+  const summaryFields = [
+    [t.agency, profile.fullName], [t.agencyCode, profile.licenseNo || '—'], [t.currency, 'IRR'],
+    [t.period, derived.period], [t.reportDate, formatLocaleDate(new Date(), locale)], [t.salesAmount, money(report.summary.totalSalesIrr)],
+    [t.creditLimit, money(credit.limitIrr)], [t.creditUsed, money(credit.usedIrr)], [t.creditRemaining, money(credit.remainingIrr)],
+    [t.paidAmount, money(derived.paidAmountIrr)], [t.payableAmount, money(derived.payableAmountIrr)],
+  ];
+  const stats = [
+    [t.salesCount, localeDigits(report.summary.ticketsIssued, locale)],
+    [t.modificationCount, t.unsupported],
+    [t.refundCount, localeDigits(derived.refunded.length, locale)],
+  ];
+  const reconciliation: { title: string; amount: string | null }[] = [
+    { title: 'CrcnCommissionAmount', amount: null },
+    { title: 'EmdCommissionAmount', amount: null },
+    { title: 'EmdSalesAmount', amount: null },
+    { title: 'ModificationChargeAmount', amount: null },
+    { title: 'ModificationCommissionAmount', amount: null },
+    { title: 'ModificationGrossFareAmount', amount: null },
+    { title: 'ModificationTaxAmount', amount: null },
+    { title: 'RefundCommissionAmount', amount: null },
+    { title: 'RefundCrcnAmount', amount: null },
+    { title: 'RefundGrossFareAmount', amount: derived.refundAmountIrr },
+    { title: 'RefundTaxAmount', amount: null },
+    { title: 'SalesCommissionAmount', amount: null },
+    { title: 'SalesGrossFareAmount', amount: report.summary.totalSalesIrr },
+    { title: 'SalesTaxAmount', amount: null },
+    { title: 'PaidInvoiceAmount', amount: derived.paidAmountIrr },
+    { title: 'OutstandingInvoiceAmount', amount: derived.payableAmountIrr },
+    { title: 'CreditUsedAmount', amount: credit.usedIrr },
+    { title: 'CreditRemainingAmount', amount: credit.remainingIrr },
+  ];
+
+  const sourceTickets = tab === 'PRR' ? derived.refunded : report.tickets;
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTickets = sourceTickets.filter((ticket) => !normalizedQuery || [
+    ticket.pnr, ticket.flightNo, ticket.route, ticket.fareClassCode ?? '', ticket.cabin ?? '', ticket.status,
+  ].some((value) => value.toLowerCase().includes(normalizedQuery)));
+  const pageRows = filteredTickets.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const reconciliationPage = reconciliation.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const visibleAmount = tab === 'RTRD'
+    ? sumIrr(reconciliationPage.flatMap((row) => row.amount == null ? [] : [row.amount]))
+    : sumIrr(pageRows.map((ticket) => ticket.priceIrr));
+
+  function routeType(ticket: AgencySalesTicket): string {
+    const codes = routeCodes(ticket.route);
+    if (!codes) return t.unknown;
+    return IRAN_AIRPORT_CODES.has(codes[0]) && IRAN_AIRPORT_CODES.has(codes[1]) ? t.domestic : t.international;
+  }
+
+  return (
+    <section className="overflow-hidden rounded-[22px] border border-[#dde5ef] bg-white shadow-[0_12px_34px_rgba(13,38,64,0.06)]" dir={locale === 'en' ? 'ltr' : 'rtl'}>
+      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e6ebf2] px-5 py-5 sm:px-7">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#e7f5ef] text-xl text-[#23895f]">▣</span>
+          <div><h1 className="m-0 text-lg font-black text-[#0d2640]">{t.title}</h1><p className="mb-0 mt-1 text-[11px] text-[#7d8ca0]">{t.subtitle}</p></div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="hidden text-[10px] text-[#8796aa] sm:inline">{t.back}</span>
+          <button type="button" data-testid="sales-export" disabled={exportBusy} onClick={() => void onExport()} className="rounded-xl bg-[#326bc3] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{exportBusy ? t.exporting : t.exportCsv}</button>
+        </div>
+      </header>
+      {exportError && <p role="alert" className="mx-5 mt-4 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">{t.exportError}</p>}
+
+      <div className="p-4 sm:p-6">
+        <div className="grid grid-cols-1 gap-2 rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-3 sm:grid-cols-2 lg:grid-cols-3">
+          {summaryFields.map(([label, value]) => (
+            <div key={label} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-[#e5eaf1] bg-white px-4 py-3">
+              <span className="text-[10px] font-bold text-[#7a899d]">{label}</span><strong className="text-xs text-[#19334e]">{value}</strong>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {stats.map(([label, value], index) => (
+            <div key={label} className="rounded-xl border border-[#dfe7f0] bg-white px-4 py-3 text-center">
+              <span className="text-[10px] text-[#78889b]">{label}</span>
+              <div className={`mt-1 text-lg font-black ${index === 0 ? 'text-[#23895f]' : index === 2 ? 'text-[#d36d42]' : 'text-[#78889b]'}`}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 flex border-b border-[#dfe5ed]" role="tablist" aria-label={t.title}>
+          {(['RTRD', 'PSR', 'PRR'] as const).map((entry) => (
+            <button key={entry} type="button" role="tab" aria-selected={tab === entry} onClick={() => setTab(entry)} className={`min-w-24 border-b-2 px-5 py-3 text-sm font-black ${tab === entry ? 'border-[#2c7b69] text-[#173f38]' : 'border-transparent text-[#6f7e91]'}`}>{entry}</button>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          {tab !== 'RTRD' ? (
+            <label className="relative w-full max-w-sm"><span className="sr-only">{t.search}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.search} className="h-11 w-full rounded-xl border border-[#dce4ed] bg-[#fbfcfe] px-4 text-xs outline-none focus:border-[#326bc3]" /></label>
+          ) : <span className="text-[11px] text-[#7b8b9e]">RTRD Reconciliation</span>}
+          <span className="rounded-lg bg-[#fff8e9] px-3 py-2 text-[10px] leading-5 text-[#8b681e]">{t.unsupportedNote}</span>
+        </div>
+
+        <div className="mt-4 overflow-hidden rounded-xl border border-[#dfe6ee]">
+          <div className="overflow-x-auto">
+            {tab === 'RTRD' ? (
+              <table className="w-full min-w-[620px] text-xs">
+                <thead className="bg-[#f1f5f8] text-[#53677e]"><tr><th className="px-4 py-3 text-start">{t.titleColumn}</th><th className="px-4 py-3 text-start">{t.amountColumn}</th></tr></thead>
+                <tbody>{reconciliationPage.map((row) => <tr key={row.title} className="border-t border-[#e7ecf2] odd:bg-white even:bg-[#fafbfd]"><td className="px-4 py-3 font-medium text-[#30465d]" dir="ltr">{row.title}</td><td className="px-4 py-3 font-black text-[#1d405c]">{row.amount == null ? '—' : money(row.amount)}</td></tr>)}</tbody>
+                <tfoot><tr className="bg-[#d7f1e9] font-black text-[#185b4c]"><td className="px-4 py-3">{t.total}</td><td className="px-4 py-3">{money(visibleAmount)}</td></tr></tfoot>
+              </table>
+            ) : (
+              <table className="w-full min-w-[1280px] text-[11px]">
+                <thead className="bg-[#f1f5f8] text-[#53677e]"><tr>{[t.type, t.pnr, t.ticketNo, t.fare, t.tax, t.crcn, t.commissionPct, t.commission, t.refundable, t.routeType, t.route, t.rbd, t.date, t.status].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 text-start">{heading}</th>)}</tr></thead>
+                <tbody>
+                  {pageRows.map((ticket) => (
+                    <tr key={ticket.pnr} className="border-t border-[#e7ecf2] odd:bg-white even:bg-[#fafbfd]">
+                      <td className="px-3 py-3 font-bold">{ticket.status === 'REFUNDED' ? t.refund : t.sale}</td><td className="px-3 py-3" dir="ltr">{ticket.pnr}</td><td className="px-3 py-3">—</td>
+                      <td className="px-3 py-3 font-bold">{money(ticket.priceIrr)}</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td>
+                      <td className="px-3 py-3">{ticket.status === 'REFUNDED' ? money(ticket.priceIrr) : '—'}</td><td className="px-3 py-3">{routeType(ticket)}</td><td className="px-3 py-3" dir="ltr">{ticket.route}</td>
+                      <td className="px-3 py-3" dir="ltr">{ticket.fareClassCode || '—'}</td><td className="px-3 py-3">{formatLocaleDate(ticket.departureAt, locale)}</td><td className="px-3 py-3">{STATUS[ticket.status]?.[locale] ?? ticket.status}</td>
+                    </tr>
+                  ))}
+                  {pageRows.length === 0 && <tr><td colSpan={14} className="px-4 py-12 text-center text-[#7b8b9d]">{t.empty}</td></tr>}
+                </tbody>
+                <tfoot><tr className="bg-[#d7f1e9] font-black text-[#185b4c]"><td className="px-3 py-3">{t.total}</td><td className="px-3 py-3" colSpan={2}>{localeDigits(filteredTickets.length, locale)}</td><td className="px-3 py-3">{money(visibleAmount)}</td><td colSpan={10} /></tr></tfoot>
+              </table>
+            )}
+          </div>
+          <Pagination page={page} total={tab === 'RTRD' ? reconciliation.length : filteredTickets.length} locale={locale} onChange={setPage} />
+        </div>
+      </div>
+    </section>
   );
 }
