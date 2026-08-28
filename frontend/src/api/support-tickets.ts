@@ -43,6 +43,12 @@ export function replyMySupportTicket(
   return apiPost<MySupportTicketRow>(`/my/support-tickets/${id}/replies`, dto);
 }
 
+export function submitMySupportTicketFeedback(id: string, satisfied: boolean) {
+  return apiPatch<MySupportTicketRow>(`/my/support-tickets/${id}/feedback`, {
+    satisfied,
+  });
+}
+
 export function createAdminSupportTicket(dto: {
   subject: string;
   requesterName: string;

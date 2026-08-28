@@ -3,6 +3,7 @@ import { fetchInbox, postInboxMessage } from '../../api/agency-portal';
 import {
   fetchMySupportTickets,
   replyMySupportTicket,
+  submitMySupportTicketFeedback,
   submitMySupportTicket,
 } from '../../api/support-tickets';
 import { formatLocaleDateTime } from '../../lib/locale-format';
@@ -238,6 +239,19 @@ export default function AgencyInboxPage() {
     }
   }
 
+  async function onTicketFeedback(id: string, satisfied: boolean) {
+    setSending(true);
+    try {
+      const updated = await submitMySupportTicketFeedback(id, satisfied);
+      setTickets((current) => current?.map((ticket) => ticket.id === id ? updated : ticket) ?? [updated]);
+      setTicketNotice(satisfied
+        ? locale === 'fa' ? 'رضایت شما ثبت و تیکت بسته شد؛ شماره پیگیری همچنان قابل جستجو است.' : locale === 'ar' ? 'تم تسجيل رضاك وإغلاق التذكرة، ويبقى رقم التتبع قابلاً للبحث.' : 'Your feedback was recorded and the ticket was closed; its tracking number remains searchable.'
+        : locale === 'fa' ? 'نارضایتی شما ثبت شد و تیکت برای پیگیری مجدد باز شد.' : locale === 'ar' ? 'تم تسجيل عدم رضاك وأعيد فتح التذكرة للمتابعة.' : 'Your feedback was recorded and the ticket was reopened for follow-up.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   if (error) return <p className="p-8 text-sm text-danger">{error}</p>;
   if (!messages) return <p className="p-8 text-sm text-muted">{t.loading}</p>;
 
@@ -324,6 +338,7 @@ export default function AgencyInboxPage() {
             selectedId={selectedTicketId}
             onSelect={setSelectedTicketId}
             onReply={onTicketReply}
+            onFeedback={onTicketFeedback}
             onNew={() => setComposeOpen(true)}
             newLabel={t.newMessage}
             busy={sending}

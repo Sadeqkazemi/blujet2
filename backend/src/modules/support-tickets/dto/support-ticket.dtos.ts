@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsOptional,
   IsString,
@@ -9,6 +10,16 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+
+export class SupportTicketFeedbackDto {
+  @ApiProperty({
+    example: true,
+    description:
+      'true: پاسخ رضایت‌بخش بوده و تیکت بسته شود؛ false: تیکت برای پیگیری مجدد باز شود',
+  })
+  @IsBoolean()
+  satisfied: boolean;
+}
 
 export class SubmitSupportTicketDto {
   @ApiProperty({

@@ -28,6 +28,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 
 const AIRPORTS = [
   { id: 'a1', code: 'THR', cityFa: 'تهران', airportNameFa: 'فرودگاه مهرآباد', tz: 'Asia/Tehran', isInternational: false },
+  { id: 'a4', code: 'IKA', cityFa: 'تهران', airportNameFa: 'فرودگاه بین‌المللی امام خمینی', tz: 'Asia/Tehran', isInternational: false },
   { id: 'a2', code: 'MHD', cityFa: 'مشهد', airportNameFa: 'فرودگاه بین‌المللی مشهد', tz: 'Asia/Tehran', isInternational: false },
   { id: 'a3', code: 'DXB', cityFa: 'دبی', airportNameFa: 'فرودگاه بین‌المللی دبی', tz: 'Asia/Dubai', isInternational: true },
 ];
@@ -407,8 +408,15 @@ describe('ResultsPage', () => {
     await userEvent.click(screen.getByTestId('edit-search-origin'));
 
     expect(screen.getByTestId('edit-airport-option-THR')).toBeInTheDocument();
-    expect(screen.getByTestId('edit-airport-option-MHD')).toBeInTheDocument();
+    expect(screen.getByTestId('edit-airport-option-IKA')).toBeInTheDocument();
+    expect(screen.queryByTestId('edit-airport-option-MHD')).not.toBeInTheDocument();
     expect(screen.queryByTestId('edit-airport-option-DXB')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('edit-search-origin'));
+    await userEvent.click(screen.getByTestId('edit-search-dest'));
+    expect(screen.queryByTestId('edit-airport-option-THR')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('edit-airport-option-IKA')).not.toBeInTheDocument();
+    expect(screen.getByTestId('edit-airport-option-MHD')).toBeInTheDocument();
   });
 
   it('loads edit-search cabin choices from active public inventory', async () => {

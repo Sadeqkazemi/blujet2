@@ -110,6 +110,70 @@ describe('SupportTicketsService conversations', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('closes an answered ticket after positive requester feedback without changing its tracking code', async () => {
+    const ticket = { ...baseTicket(), status: SupportTicketStatus.ANSWERED };
+    const { service, ticketRepo } = buildService(ticket);
+
+    const result = await service.feedbackMine(ACTOR, ticket.id, true);
+
+    expect(ticket.status).toBe(SupportTicketStatus.CLOSED);
+    expect(ticket.trackingCode).toBe('TK12345678');
+    expect(ticket.history).toEqual(
+      expect.arrayContaining([expect.objectContaining({ step: 'satisfied' })]),
+    );
+    expect(ticketRepo.save).toHaveBeenCalledWith(ticket);
+    expect(result.trackingCode).toBe('TK12345678');
+  });
+
+  it('reopens an answered ticket after negative requester feedback and preserves its assignee', async () => {
+    const ticket = {
+      ...baseTicket(),
+      status: SupportTicketStatus.ANSWERED,
+      forwardedToId: 'assigned-manager-id',
+    };
+    const { service } = buildService(ticket);
+
+    await service.feedbackMine(ACTOR, ticket.id, false);
+
+    expect(ticket.status).toBe(SupportTicketStatus.OPEN);
+    expect(ticket.forwardedToId).toBe('assigned-manager-id');
+    expect(ticket.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ step: 'dissatisfied' }),
+      ]),
+    );
+  });
+
+  it('does not accept satisfaction feedback before a staff answer', async () => {
+    const ticket = baseTicket();
+    const { service } = buildService(ticket);
+
+    await expect(
+      service.feedbackMine(ACTOR, ticket.id, true),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('automatically closes answered tickets after five days without requester activity', async () => {
+    const ticket = {
+      ...baseTicket(),
+      status: SupportTicketStatus.ANSWERED,
+      updatedAt: new Date('2026-08-20T08:00:00.000Z'),
+    };
+    const { service, ticketRepo } = buildService(ticket);
+
+    await service.autoCloseAnsweredTickets(
+      new Date('2026-08-27T08:00:00.000Z'),
+    );
+
+    expect(ticket.status).toBe(SupportTicketStatus.CLOSED);
+    expect(ticket.history).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ step: 'auto_closed' }),
+      ]),
+    );
+    expect(ticketRepo.save).toHaveBeenCalledWith(ticket);
+  });
+
   it('records a staff reply and marks the ticket answered', async () => {
     const ticket = baseTicket();
     const { service } = buildService(ticket);

@@ -3066,3 +3066,20 @@ No new table or migration is required.
   from `AMENDMENT`. `recipientId` remains the tenant boundary and `readAt`
   remains the per-agency read receipt. Send provenance is additionally written
   to append-only `audit_logs`.
+
+## Ticket feedback, cartable media, and agency finance projection (2026-08-28)
+
+No schema migration is required.
+
+- Positive requester feedback writes `support_tickets.status = CLOSED`;
+  negative feedback writes `OPEN`. An answered ticket whose `updatedAt` is at
+  least five days old is closed by the lifecycle worker. Every transition is
+  appended to the existing JSON history while `trackingCode`, exact assignee,
+  conversation entries, and attachment ids are retained.
+- Cartable and support image previews use the MIME metadata already associated
+  with `stored_files`; file bytes and authorization remain in the existing
+  stored-file service.
+- The agency financial timeline is a read-only union of existing
+  `agency_invoices`, `ledger_entries`, and `agency_credit_requests`. These
+  source rows remain authoritative and no mutable reporting/event duplicate is
+  introduced.

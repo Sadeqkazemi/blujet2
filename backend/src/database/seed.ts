@@ -191,11 +191,13 @@ async function seedAircraftCatalog(
     seats.map((seat) => {
       const column = seat.seatCode.slice(String(seat.row).length);
       const colsLeft =
-        seat.cabin === 'BUSINESS'
-          ? seatMap.businessColsLeft
-          : seat.cabin === 'COMFORT'
-            ? seatMap.comfortColsLeft
-            : seatMap.economyColsLeft;
+        seat.cabin === 'FIRST'
+          ? seatMap.firstColsLeft
+          : seat.cabin === 'BUSINESS'
+            ? seatMap.businessColsLeft
+            : seat.cabin === 'COMFORT'
+              ? seatMap.comfortColsLeft
+              : seatMap.economyColsLeft;
       return repos.aircraftSeatRepo.create({
         aircraftDefinitionId: aircraft.id,
         row: seat.row,
@@ -1842,18 +1844,22 @@ async function main() {
   );
 
   // Public checkout seat map — design-reference-v2/MD-80-seatmap.pdf
-  // First Class 3–6: A B | E F; Economy 7–32: A B | D E F;
+  // First 3–6: A B | E F; Business 7–11 and Economy 12–32: A B | D E F;
   // rear exit/galley omits 28A/B, 29A/B, 30A/B → 140 seats.
   const md80SeatMap = await upsertBy(
     aircraftSeatMapRepo,
     { aircraftType: 'MD-80' },
     {
       aircraftType: 'MD-80',
-      businessRowStart: 3,
-      businessRowEnd: 6,
+      firstRowStart: 3,
+      firstRowEnd: 6,
+      firstColsLeft: ['A', 'B'],
+      firstColsRight: ['E', 'F'],
+      businessRowStart: 7,
+      businessRowEnd: 11,
       businessColsLeft: ['A', 'B'],
-      businessColsRight: ['E', 'F'],
-      economyRowStart: 7,
+      businessColsRight: ['D', 'E', 'F'],
+      economyRowStart: 12,
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],
@@ -1862,11 +1868,15 @@ async function main() {
       updatedAt: new Date(),
     },
     {
-      businessRowStart: 3,
-      businessRowEnd: 6,
+      firstRowStart: 3,
+      firstRowEnd: 6,
+      firstColsLeft: ['A', 'B'],
+      firstColsRight: ['E', 'F'],
+      businessRowStart: 7,
+      businessRowEnd: 11,
       businessColsLeft: ['A', 'B'],
-      businessColsRight: ['E', 'F'],
-      economyRowStart: 7,
+      businessColsRight: ['D', 'E', 'F'],
+      economyRowStart: 12,
       economyRowEnd: 32,
       economyColsLeft: ['A', 'B'],
       economyColsRight: ['D', 'E', 'F'],

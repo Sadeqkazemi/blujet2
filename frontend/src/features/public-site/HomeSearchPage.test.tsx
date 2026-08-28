@@ -340,6 +340,7 @@ describe('HomeSearchPage', () => {
     await pickAirport('home-origin', 'THR');
     await userEvent.click(screen.getByTestId('home-dest'));
     expect(screen.queryByTestId('airport-option-THR')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('airport-option-IKA')).not.toBeInTheDocument();
     expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
   });
 

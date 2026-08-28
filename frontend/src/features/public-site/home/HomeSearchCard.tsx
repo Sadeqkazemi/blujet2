@@ -15,6 +15,10 @@ import { useMobileVisualViewport } from '../../../hooks/useMobileVisualViewport'
 import { useHorizontalDragScroll } from '../../../hooks/useHorizontalDragScroll';
 import { airportsForSearchScope } from '../../../lib/airport-search-scope';
 import {
+  airportsOutsideSelectedCity,
+  airportsShareCity,
+} from '../../../lib/airport-route-options';
+import {
   DomesticFlightIcon,
   IntlFlightIcon,
   PinIcon,
@@ -824,7 +828,7 @@ export default function HomeSearchCard({
       setError(t.missing);
       return;
     }
-    if (origin === dest) {
+    if (airportsShareCity(airportOptions, origin, dest)) {
       setError(t.sameCity);
       return;
     }
@@ -1123,8 +1127,11 @@ export default function HomeSearchCard({
                   label={t.lblOrigin}
                   value={origin}
                   display={originDisplay()}
-                  airports={airportOptions.filter((airport) => airport.code !== dest)}
-                  onPick={setOrigin}
+                  airports={airportsOutsideSelectedCity(airportOptions, dest)}
+                  onPick={(code) => {
+                    setOrigin(code);
+                    if (airportsShareCity(airportOptions, code, dest)) setDest('');
+                  }}
                   testId="home-origin"
                   fieldStyle={{
                     gridColumn: isMobile ? '1' : 'auto',
@@ -1180,8 +1187,11 @@ export default function HomeSearchCard({
                   label={t.lblDestination}
                   value={dest}
                   display={destDisplay()}
-                  airports={airportOptions.filter((airport) => airport.code !== origin)}
-                  onPick={setDest}
+                  airports={airportsOutsideSelectedCity(airportOptions, origin)}
+                  onPick={(code) => {
+                    setDest(code);
+                    if (airportsShareCity(airportOptions, origin, code)) setOrigin('');
+                  }}
                   testId="home-dest"
                   disabled={!origin}
                   onDisabledClick={() => setError(t.destNeedOriginPlaceholder)}

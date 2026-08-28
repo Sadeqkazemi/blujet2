@@ -29,3 +29,9 @@ export async function downloadFile(id: string, fileName: string) {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/** Reads an authorized file for an inline preview without bypassing the
+ * shared authenticated request/refresh path. */
+export function fetchFileBlob(id: string) {
+  return apiGetBlob(`/files/${id}`);
+}

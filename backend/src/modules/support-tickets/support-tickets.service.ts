@@ -1,11 +1,14 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as crypto from 'node:crypto';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { SupportTicket } from '../../database/entities/support-ticket.entity';
 import { User } from '../../database/entities/user.entity';
 import { StoredFile } from '../../database/entities/stored-file.entity';
@@ -24,6 +27,8 @@ import type {
 
 /** Staff-created tickets without a phone use this sentinel (schema requires a string). */
 const STAFF_TICKET_PHONE_SENTINEL = '09000000000';
+const ANSWER_INACTIVITY_DAYS = 5;
+const SUPPORT_LIFECYCLE_SWEEP_MS = 60 * 60 * 1000;
 
 function generateTrackingCode(): string {
   return `TK${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -43,7 +48,12 @@ const CUSTOMER_TICKET_SELECT = {
 } as const;
 
 @Injectable()
-export class SupportTicketsService {
+export class SupportTicketsService
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
+  private readonly logger = new Logger(SupportTicketsService.name);
+  private lifecycleTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     @InjectRepository(SupportTicket)
     private readonly ticketRepo: Repository<SupportTicket>,
@@ -54,6 +64,51 @@ export class SupportTicketsService {
     private readonly audit: AuditService,
     private readonly staffDirectory: StaffDirectoryService,
   ) {}
+
+  onApplicationBootstrap() {
+    void this.autoCloseAnsweredTickets().catch((error: unknown) => {
+      this.logger.error('Support ticket lifecycle sweep failed', error);
+    });
+    this.lifecycleTimer = setInterval(() => {
+      void this.autoCloseAnsweredTickets().catch((error: unknown) => {
+        this.logger.error('Support ticket lifecycle sweep failed', error);
+      });
+    }, SUPPORT_LIFECYCLE_SWEEP_MS);
+    this.lifecycleTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.lifecycleTimer) clearInterval(this.lifecycleTimer);
+    this.lifecycleTimer = null;
+  }
+
+  async autoCloseAnsweredTickets(now = new Date()) {
+    const inactivityThreshold = new Date(
+      now.getTime() - ANSWER_INACTIVITY_DAYS * 24 * 60 * 60 * 1000,
+    );
+    const staleTickets = await this.ticketRepo.find({
+      where: {
+        status: SupportTicketStatus.ANSWERED,
+        updatedAt: LessThanOrEqual(inactivityThreshold),
+      },
+    });
+    for (const ticket of staleTickets) {
+      if (ticket.status !== SupportTicketStatus.ANSWERED) continue;
+      const history = Array.isArray(ticket.history)
+        ? [...(ticket.history as unknown[])]
+        : [];
+      history.push({
+        step: 'auto_closed',
+        labelFa: 'بستن خودکار پس از ۵ روز بدون پاسخ درخواست‌کننده',
+        at: now.toISOString(),
+      });
+      ticket.history = history as JsonValue;
+      ticket.status = SupportTicketStatus.CLOSED;
+      ticket.updatedAt = now;
+      await this.ticketRepo.save(ticket);
+    }
+    return staleTickets.length;
+  }
 
   async submit(dto: SubmitSupportTicketDto) {
     const ticket = await this.ticketRepo.save(
@@ -344,6 +399,47 @@ export class SupportTicketsService {
       category: 'SYSTEM',
       action: 'پاسخ به تیکت پشتیبانی',
       detail: `پاسخ جدید در تیکت ${ticket.trackingCode} توسط ${actor.fullName} ثبت شد.`,
+      entityType: 'SupportTicket',
+      entityId: ticket.id,
+    });
+    return this.withResolvedAttachments(saved);
+  }
+
+  async feedbackMine(actor: AuthenticatedUser, id: string, satisfied: boolean) {
+    const ticket = await this.findOwnedTicket(actor, id);
+    if (ticket.status !== SupportTicketStatus.ANSWERED) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'ثبت رضایت فقط پس از پاسخ پشتیبانی امکان‌پذیر است.',
+      });
+    }
+
+    const history = Array.isArray(ticket.history)
+      ? [...(ticket.history as unknown[])]
+      : [];
+    history.push({
+      step: satisfied ? 'satisfied' : 'dissatisfied',
+      labelFa: satisfied
+        ? 'تأیید رضایت و بستن تیکت توسط درخواست‌کننده'
+        : 'ثبت نارضایتی و بازگشایی تیکت توسط درخواست‌کننده',
+      at: new Date().toISOString(),
+    });
+    ticket.history = history as JsonValue;
+    ticket.status = satisfied
+      ? SupportTicketStatus.CLOSED
+      : SupportTicketStatus.OPEN;
+    ticket.updatedAt = new Date();
+    const saved = await this.ticketRepo.save(ticket);
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: satisfied
+        ? 'ثبت رضایت از پاسخ پشتیبانی'
+        : 'ثبت نارضایتی از پاسخ پشتیبانی',
+      detail: satisfied
+        ? `تیکت ${ticket.trackingCode} با رضایت ${actor.fullName} بسته شد.`
+        : `تیکت ${ticket.trackingCode} با نارضایتی ${actor.fullName} برای پیگیری مجدد باز شد.`,
       entityType: 'SupportTicket',
       entityId: ticket.id,
     });

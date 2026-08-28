@@ -35,6 +35,7 @@ import { ApiRequestError } from '../../api/envelope';
 import {
   fetchMySupportTickets,
   replyMySupportTicket,
+  submitMySupportTicketFeedback,
   submitMySupportTicket,
 } from '../../api/support-tickets';
 import { deleteFile, uploadFile } from '../../api/files';
@@ -872,6 +873,19 @@ export default function AccountPage() {
     }
   }
 
+  async function onTicketFeedback(id: string, satisfied: boolean) {
+    setTicketReplyBusy(true);
+    try {
+      const updated = await submitMySupportTicketFeedback(id, satisfied);
+      setTickets((current) => current?.map((ticket) => ticket.id === id ? updated : ticket) ?? [updated]);
+      setTicketNotice(satisfied
+        ? locale === 'fa' ? 'رضایت شما ثبت و تیکت بسته شد؛ شماره پیگیری همچنان قابل جستجو است.' : locale === 'ar' ? 'تم تسجيل رضاك وإغلاق التذكرة، ويبقى رقم التتبع قابلاً للبحث.' : 'Your feedback was recorded and the ticket was closed; its tracking number remains searchable.'
+        : locale === 'fa' ? 'نارضایتی شما ثبت شد و تیکت برای پیگیری مجدد باز شد.' : locale === 'ar' ? 'تم تسجيل عدم رضاك وأعيد فتح التذكرة للمتابعة.' : 'Your feedback was recorded and the ticket was reopened for follow-up.');
+    } finally {
+      setTicketReplyBusy(false);
+    }
+  }
+
   async function onRemovePassenger(id: string) {
     setPassengerBusyId(id);
     try {
@@ -1467,6 +1481,7 @@ export default function AccountPage() {
               selectedId={expandedTicketId}
               onSelect={setExpandedTicketId}
               onReply={onReplyTicket}
+              onFeedback={onTicketFeedback}
               onNew={() => { setTicketSubmitError(null); setTicketNotice(null); setTicketComposerOpen(true); }}
               newLabel={t.ticketsCreateHeading}
               busy={ticketReplyBusy}

@@ -18,8 +18,25 @@ export interface AgencyDashboard {
 
 export interface AgencyLedgerEntry {
   id: string;
-  type: "SALE" | "REFUND" | "SETTLEMENT" | "COMMISSION";
+  type: "SALE" | "REFUND" | "SETTLEMENT" | "COMMISSION" | "COMMITMENT";
   signedAmountIrr: string;
+  occurredAt: string;
+}
+
+export type AgencyFinancialEventType = AgencyLedgerEntry['type']
+  | 'INVOICE_ISSUED'
+  | 'INVOICE_PAID'
+  | 'CREDIT_REQUESTED'
+  | 'CREDIT_APPROVED'
+  | 'CREDIT_REJECTED';
+
+export interface AgencyFinancialEvent {
+  id: string;
+  type: AgencyFinancialEventType;
+  amountIrr: string | null;
+  direction: 'DEBIT' | 'CREDIT' | 'INFO';
+  reference: string | null;
+  status: string | null;
   occurredAt: string;
 }
 

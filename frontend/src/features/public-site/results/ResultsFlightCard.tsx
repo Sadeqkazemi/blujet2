@@ -400,8 +400,21 @@ export default function ResultsFlightCard({
               </span>
             </div>
             <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 18 }}>
-              {copy.outboundLabel}: {cityName(flight.originCode)}{' '}
-              {copy.routeArrow} {cityName(flight.destCode)}
+              {copy.outboundLabel}:{' '}
+              <span
+                data-testid="flight-detail-route-flow"
+                dir="ltr"
+                style={{
+                  display: 'inline-flex',
+                  flexDirection: isRTL ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span data-route-point="origin">{cityName(flight.originCode)}</span>
+                <span aria-hidden="true">{isRTL ? '←' : '→'}</span>
+                <span data-route-point="destination">{cityName(flight.destCode)}</span>
+              </span>
             </div>
             <div style={{ display: 'flex', gap: 13 }}>
               <div
@@ -422,12 +435,28 @@ export default function ResultsFlightCard({
                 />
                 <span
                   style={{
+                    position: 'relative',
                     flex: 1,
                     width: 2,
                     background: '#d4e3f5',
                     minHeight: 54,
                   }}
-                />
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      bottom: -1,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      color: '#1668c4',
+                      fontSize: 11,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ▼
+                  </span>
+                </span>
                 <span
                   style={{
                     width: 11,
