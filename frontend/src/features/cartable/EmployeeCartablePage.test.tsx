@@ -52,7 +52,19 @@ describe('EmployeeCartablePage', () => {
   it('renders open tasks with the انجام شد button', async () => {
     render(<EmployeeCartablePage />);
     expect(await screen.findByText('بررسی قرارداد')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'کارتابل داخلی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /کارهای باز.*۱/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /تکمیل‌شده.*۰/ })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'جستجو در کارتابل داخلی' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'انجام شد ✓' })).toBeInTheDocument();
+  });
+
+  it('filters employee internal work without ticket behavior', async () => {
+    render(<EmployeeCartablePage />);
+    const search = await screen.findByRole('searchbox', { name: 'جستجو در کارتابل داخلی' });
+    await userEvent.type(search, 'عبارت ناموجود');
+    expect(screen.queryByText('بررسی قرارداد')).not.toBeInTheDocument();
+    expect(screen.getByText('موردی با این جستجو یافت نشد.')).toBeInTheDocument();
   });
 
   it('marks a task done via approve with the design note', async () => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   approveCartableTask,
   fetchCartable,
@@ -17,9 +17,11 @@ import type {
   EmployeeManagerRecipient,
   SentEmployeeManagerMessage,
   ReferralAttachment,
+  CartableStatus,
 } from '../../types/cartable';
 import AttachmentPicker from '../../components/AttachmentPicker';
 import ConversationHistory from '../../components/ConversationHistory';
+import InternalCartableDashboard from './InternalCartableDashboard';
 
 function initials(name: string): string {
   return name
@@ -38,6 +40,8 @@ export default function EmployeeCartablePage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [canProcess, setCanProcess] = useState(false);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<CartableStatus>('OPEN');
 
   const [msgTo, setMsgTo] = useState('');
   const [msgText, setMsgText] = useState('');
@@ -45,10 +49,11 @@ export default function EmployeeCartablePage() {
   const [msgAttachments, setMsgAttachments] = useState<ReferralAttachment[]>([]);
 
   const load = useCallback(async () => {
+    setLoading(true);
     setError(null);
     try {
       const [cartable, context] = await Promise.all([
-        fetchCartable(),
+        fetchCartable({ status: statusFilter }),
         fetchEmployeeContext(),
       ]);
       setResult(cartable);
@@ -75,7 +80,7 @@ export default function EmployeeCartablePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [statusFilter]);
 
   useEffect(() => {
     void load();
@@ -121,16 +126,64 @@ export default function EmployeeCartablePage() {
     }
   }
 
-  const tasks = result?.tasks ?? [];
-  const tasksPager = usePagination(tasks);
+  const tasks = useMemo(() => result?.tasks ?? [], [result?.tasks]);
+  const normalizedQuery = query.trim().toLocaleLowerCase('fa');
+  const filteredTasks = useMemo(
+    () =>
+      tasks.filter((task) => {
+        const matchesQuery =
+          !normalizedQuery ||
+          [task.title, task.description, task.senderLabelFa, task.sender?.fullName]
+            .filter(Boolean)
+            .some((value) => String(value).toLocaleLowerCase('fa').includes(normalizedQuery));
+        return matchesQuery;
+      }),
+    [normalizedQuery, tasks],
+  );
+  const tasksPager = usePagination(filteredTasks);
   const canSend = msgTo && msgText.trim().length > 0;
 
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
-      <div className="mb-5">
-        <h1 className="m-0 text-[20.5px] font-black text-white">کارتابل من</h1>
-        <p className="mt-1 text-[11.5px] text-[#6b7b94]">کارهای در انتظار اقدام شما</p>
-      </div>
+      <InternalCartableDashboard
+        description="کارها و پیام‌های داخلی ارجاع‌شده به شما"
+        query={query}
+        onQueryChange={setQuery}
+        cards={[
+          {
+            key: 'OPEN',
+            label: 'کارهای باز',
+            count: result?.statusCounts?.OPEN ?? result?.totalOpen ?? 0,
+            tone: 'amber',
+            selected: statusFilter === 'OPEN',
+            onSelect: () => setStatusFilter('OPEN'),
+          },
+          {
+            key: 'APPROVED',
+            label: 'تکمیل‌شده',
+            count: result?.statusCounts?.APPROVED ?? 0,
+            tone: 'green',
+            selected: statusFilter === 'APPROVED',
+            onSelect: () => setStatusFilter('APPROVED'),
+          },
+          {
+            key: 'REJECTED',
+            label: 'ردشده',
+            count: result?.statusCounts?.REJECTED ?? 0,
+            tone: 'red',
+            selected: statusFilter === 'REJECTED',
+            onSelect: () => setStatusFilter('REJECTED'),
+          },
+          {
+            key: 'TRANSFERRED',
+            label: 'منتقل‌شده',
+            count: result?.statusCounts?.TRANSFERRED ?? 0,
+            tone: 'blue',
+            selected: statusFilter === 'TRANSFERRED',
+            onSelect: () => setStatusFilter('TRANSFERRED'),
+          },
+        ]}
+      />
 
       {error && (
         <p className="mb-4 rounded-[12px] border border-[#7f1d1d] bg-[#450a0a]/60 p-3 text-sm text-[#f87171]">
@@ -218,9 +271,9 @@ export default function EmployeeCartablePage() {
 
       {loading ? (
         <p className="py-10 text-center text-sm text-[#6b7b94]">در حال بارگذاری…</p>
-      ) : tasks.length === 0 ? (
+      ) : filteredTasks.length === 0 ? (
         <p className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] py-10 text-center text-sm text-[#6b7b94]">
-          کار بازی در کارتابل شما نیست.
+          {query.trim() ? 'موردی با این جستجو یافت نشد.' : statusFilter !== 'OPEN' ? 'موردی با این وضعیت یافت نشد.' : 'کار بازی در کارتابل شما نیست.'}
         </p>
       ) : (
         <ul className="space-y-3">

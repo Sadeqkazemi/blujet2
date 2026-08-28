@@ -3916,7 +3916,16 @@ contracts and retires the production mock adapters.
 # Internal cartable and agency bulletins (2026-08-28)
 
 - [x] Keep the complete customer/agency support queue exclusive to SITE_ADMIN and scope every other staff account to its exact forwarded tickets.
-- [x] Embed assigned-ticket conversation and reply handling in the internal cartable without a second support-ticket navigation tab.
+- [x] Keep assigned support tickets out of every internal cartable; SITE_ADMIN continues to handle them only in the dedicated support center.
 - [x] Add real SITE_ADMIN notice/amendment composition for all, one, or multiple active agencies with persisted history and audit.
 - [x] Connect targeted dispatches to the agency «اطلاعیه و اصلاحیه» page with per-agency read receipts.
 - [x] Pass focused tests, typecheck, production builds and `git diff --check` before requesting merge approval.
+
+# Management cartable redesign without embedded tickets (2026-08-28)
+
+- [x] Remove the embedded assigned-support-ticket workspace from SITE_ADMIN, executive, manager, operations and employee cartables without modifying support-ticket APIs or behavior.
+- [x] Use one shared ticket-inspired visual composition for internal-work headings, status summaries and search while retaining each role's existing cartable actions and permission boundaries.
+- [x] Add local search and explicit filtered-empty states to executive/SITE_ADMIN, employee and operations cartables.
+- [x] Preserve 10-row pagination and internal task decisions, transfers, manager messages, employee completion and operations flight approval.
+- [x] Pass role-focused tests, all 924 frontend tests, frontend lint, production build and `git diff --check`.
+- [ ] Complete signed-in local visual verification before requesting merge approval.

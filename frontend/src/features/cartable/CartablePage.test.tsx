@@ -56,7 +56,8 @@ describe('CartablePage', () => {
 
     renderPage();
 
-    expect(await screen.findByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'کارتابل داخلی' })).toBeInTheDocument();
+    expect(screen.getByText('گردش کارهای سازمانی و پیام‌های داخلی در انتظار اقدام شما')).toBeInTheDocument();
     expect(screen.getByText(/درخواست اداری/)).toBeInTheDocument();
     expect(screen.getByText(/همکاری آژانس/)).toBeInTheDocument();
     expect(screen.getByText(/درخواست مدیران/)).toBeInTheDocument();
@@ -65,8 +66,24 @@ describe('CartablePage', () => {
     expect(screen.getByText('درخواست گزارش فروش سه‌ماهه')).toBeInTheDocument();
     expect(screen.getByText('ارسال از: محمد رحیمی · مدیر ارشد')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'ایجاد پیام' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'جستجو در کارتابل داخلی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /کارهای باز.*۴/ })).toBeInTheDocument();
     // CEO never sees the chairman gate.
     expect(screen.queryByText('ارجاع و ارسال گزارش به رئیس هیئت مدیره')).not.toBeInTheDocument();
+  });
+
+  it('searches only the loaded internal cartable rows', async () => {
+    mockRole('CEO');
+    vi.spyOn(cartableApi, 'fetchCartable').mockResolvedValue(LIST);
+    vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
+    const { default: userEvent } = await import('@testing-library/user-event');
+
+    renderPage();
+    const search = await screen.findByRole('searchbox', { name: 'جستجو در کارتابل داخلی' });
+    await userEvent.type(search, 'عبارت ناموجود');
+
+    expect(screen.queryByText('درخواست گزارش فروش سه‌ماهه')).not.toBeInTheDocument();
+    expect(screen.getByText('موردی با این جستجو یافت نشد.')).toBeInTheDocument();
   });
 
   it('BOARD_CHAIR loads and can act on assigned cartable tasks', async () => {
@@ -101,8 +118,8 @@ describe('CartablePage', () => {
     vi.spyOn(cartableApi, 'fetchStaffDirectory').mockResolvedValue([]);
 
     renderPage();
-    expect(await screen.findByRole('heading', { name: 'کارتابل' })).toBeInTheDocument();
-    expect(screen.getByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'کارتابل داخلی' })).toBeInTheDocument();
+    expect(screen.getByText('گردش کارهای سازمانی و پیام‌های داخلی در انتظار اقدام شما')).toBeInTheDocument();
   });
 
   it('Finance Manager sees the chairman-permission gate with the request button', async () => {
@@ -222,8 +239,8 @@ describe('CartablePage', () => {
     const { default: userEvent } = await import('@testing-library/user-event');
     renderPage();
 
-    expect(await screen.findByText('کارتابل')).toBeInTheDocument();
-    expect(screen.getByText('کارهای در انتظار اقدام شما')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'کارتابل داخلی' })).toBeInTheDocument();
+    expect(screen.getByText('گردش کارهای سازمانی و پیام‌های داخلی در انتظار اقدام شما')).toBeInTheDocument();
     expect(screen.getByText('۲ درخواست اداری')).toBeInTheDocument();
     expect(screen.getByText('۲ همکاری آژانس')).toBeInTheDocument();
     expect(screen.getByText('۲ درخواست مدیران')).toBeInTheDocument();
