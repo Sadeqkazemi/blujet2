@@ -183,11 +183,11 @@ cat /root/blujet-temporary-panel-credentials.json
 
 The initial database deadline is exactly seven days after creation. The
 owner-approved extension v1 moved that existing deadline forward once by seven
-days. Owner-approved extension v2 adds another seven days to an active deadline
-or grants seven days from execution when the identity has already expired. The
-v2 absolute safety ceiling is 28 days from account creation so identities
-created during different rollout dates can receive the same controlled grant.
-Both extensions record a security audit row for every reserved identity,
+days. Owner-approved extensions v2 and v3 each add another seven days to an
+active deadline or grant seven days from execution when the identity has
+already expired. The absolute safety ceiling remains 28 days from account
+creation so identities created during different rollout dates can receive the
+same controlled grant. All extensions record a security audit row for every reserved identity,
 revoke current refresh sessions, and leave no credential material in logs.
 Repeated deploys do not
 recreate, rotate, or re-extend the accounts because
@@ -196,9 +196,11 @@ deadline, login and refresh are rejected even if the password is correct.
 
 The extension deployments write their non-secret audit output to
 `/root/blujet-uat-temporary-access-extension-v1.json` and
-`/root/blujet-uat-temporary-access-extension-v2.json`. Their matching
+`/root/blujet-uat-temporary-access-extension-v2.json`, and
+`/root/blujet-uat-temporary-access-extension-v3.json`. Their matching
 `.blujet-uat-temporary-access-extension-v1-complete` and
-`.blujet-uat-temporary-access-extension-v2-complete` root sentinels make each
+`.blujet-uat-temporary-access-extension-v2-complete`, and
+`.blujet-uat-temporary-access-extension-v3-complete` root sentinels make each
 grant one-time.
 
 The temporary passwords are 16-character values containing only English
