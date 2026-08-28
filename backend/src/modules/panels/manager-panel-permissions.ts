@@ -42,6 +42,7 @@ const NAV_PERMISSION_BY_KEY: Readonly<
   clubrules: 'club',
   vip: 'club',
   media: 'content',
+  notices: 'content',
   jobapps: 'content',
   tickets: 'support',
   admins: 'admins',
@@ -84,7 +85,11 @@ export function permissionForRequestPath(
   if (/^\/financial-integrations(?:\/|$)/.test(path)) return 'finance';
   if (/^\/refunds(?:\/|$)/.test(path)) return 'refunds';
   if (/^\/club(?:\/|$)/.test(path)) return 'club';
-  if (/^\/(?:site-content\/admin|blog\/admin|careers)(?:\/|$)/.test(path)) {
+  if (
+    /^\/(?:site-content\/admin|blog\/admin|careers|agency-bulletins)(?:\/|$)/.test(
+      path,
+    )
+  ) {
     return 'content';
   }
   if (/^\/(?:manager-messages|support-tickets)(?:\/|$)/.test(path)) {

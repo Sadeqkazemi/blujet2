@@ -12,6 +12,7 @@ describe('manager panel permission mapping', () => {
     expect(permissionForNavKey('reservation')).toBe('flights');
     expect(permissionForNavKey('survey')).toBe('reports');
     expect(permissionForNavKey('dashboard')).toBe('dashboard');
+    expect(permissionForNavKey('notices')).toBe('content');
   });
 
   it('normalizes API-prefixed request paths', () => {
@@ -32,5 +33,8 @@ describe('manager panel permission mapping', () => {
       'reports',
     );
     expect(permissionForRequestPath('/api/notifications')).toBeNull();
+    expect(permissionForRequestPath('/api/agency-bulletins/admin')).toBe(
+      'content',
+    );
   });
 });

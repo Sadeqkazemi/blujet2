@@ -3042,3 +3042,18 @@ read-only projection over existing `bookings`, `passengers`, `flight_instances`,
 and monetary fields continue to come from the immutable booking snapshot.
 Report tables paginate in the client at exactly 10 visible rows per page; no
 duplicate summary or mutable reporting table is introduced.
+
+## Internal cartable support assignment and agency bulletins (2026-08-28)
+
+No new table or migration is required.
+
+- `support_tickets.forwardedToId` is the authoritative single assignee. Only
+  SITE_ADMIN can change it. All non-site-admin staff reads and replies are
+  constrained by this value; a requester reply changes status but preserves
+  the assignee and conversation history.
+- Targeted agency notices use one existing `notifications` row per recipient.
+  `entityType = AGENCY_BULLETIN` marks the external agency-safe audience,
+  `entityId` is the shared dispatch UUID, and `action` distinguishes `NOTICE`
+  from `AMENDMENT`. `recipientId` remains the tenant boundary and `readAt`
+  remains the per-agency read receipt. Send provenance is additionally written
+  to append-only `audit_logs`.

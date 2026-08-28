@@ -417,7 +417,9 @@ export class SupportTicketsService {
       where: {
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.dept ? { dept: filters.dept } : {}),
-        ...(actor.role === 'EMPLOYEE' ? { forwardedToId: actor.id } : {}),
+        ...(!actor.isSuperAdmin && actor.role !== 'SITE_ADMIN'
+          ? { forwardedToId: actor.id }
+          : {}),
       },
       relations: { forwardedTo: true },
       order: { createdAt: 'DESC' },
@@ -444,7 +446,11 @@ export class SupportTicketsService {
 
   private async getAccessibleTicket(actor: AuthenticatedUser, id: string) {
     const ticket = await this.getOrThrow(id);
-    if (actor.role === 'EMPLOYEE' && ticket.forwardedToId !== actor.id) {
+    if (
+      !actor.isSuperAdmin &&
+      actor.role !== 'SITE_ADMIN' &&
+      ticket.forwardedToId !== actor.id
+    ) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'تیکت یافت نشد.',

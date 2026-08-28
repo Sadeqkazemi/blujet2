@@ -82,12 +82,12 @@ function matchesQuery(t: SupportTicketRow, raw: string): boolean {
  */
 export default function SupportTicketsPage({
   embedded = false,
-  employeeMode = false,
+  assignedMode = false,
 }: {
   embedded?: boolean;
-  employeeMode?: boolean;
+  assignedMode?: boolean;
 }) {
-  const isEmployee = employeeMode;
+  const siteAdminMode = !assignedMode;
   const [tickets, setTickets] = useState<SupportTicketRow[] | null>(null);
   const [detail, setDetail] = useState<SupportTicketRow | null>(null);
   const [targets, setTargets] = useState<ForwardTarget[]>([]);
@@ -125,12 +125,12 @@ export default function SupportTicketsPage({
 
   useEffect(() => {
     void load();
-    if (!isEmployee) {
+    if (siteAdminMode) {
       fetchForwardTargets()
         .then(setTargets)
         .catch(() => setTargets([]));
     }
-  }, [isEmployee, load]);
+  }, [siteAdminMode, load]);
 
   async function openDetail(id: string) {
     setError(null);
@@ -256,9 +256,11 @@ export default function SupportTicketsPage({
   return (
     <div data-testid="management-ticket-center" className={`flex flex-col gap-[15px] px-[21px] pb-[34px] ${embedded ? 'pt-[15px]' : 'pt-[18px]'}`}>
       <div>
-        <h1 className="m-0 text-[20.5px] font-black text-white">تیکت‌ها</h1>
+        <h1 className="m-0 text-[20.5px] font-black text-white">{assignedMode ? 'تیکت‌های ارجاع‌شده' : 'تیکت‌ها'}</h1>
         <p className="mt-1 text-[11.5px] text-[#6b7b94]">
-          ثبت، پیگیری و ارجاع تیکت‌های پشتیبانی
+          {assignedMode
+            ? 'گفتگوهای مشتریان و آژانس‌ها که ادمین سایت برای اقدام به شما ارجاع داده است'
+            : 'ثبت، پیگیری و ارجاع تیکت‌های پشتیبانی'}
         </p>
       </div>
 
@@ -329,7 +331,7 @@ export default function SupportTicketsPage({
               className="h-10 w-full rounded-[10px] border border-[#28344c] bg-[#18223a] py-0 pl-[11px] pr-[33px] text-[11.5px] text-[#e7ecf3] outline-none placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
             />
           </div>
-          {!isEmployee && <button
+          {siteAdminMode && <button
             type="button"
             onClick={() => {
               setCreateError(null);
@@ -433,7 +435,7 @@ export default function SupportTicketsPage({
         )}
       </section>
 
-      {!isEmployee && createOpen && (
+      {siteAdminMode && createOpen && (
         <Modal
           variant="dark"
           title="ایجاد تیکت جدید"
@@ -644,7 +646,7 @@ export default function SupportTicketsPage({
             </div>
           )}
 
-          {!isEmployee && <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+          {siteAdminMode && <div className="mb-3 rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
             <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">ارجاع به کارمند</h3>
             <div className="flex gap-2">
               <select
@@ -674,7 +676,7 @@ export default function SupportTicketsPage({
             )}
           </div>}
 
-          {!isEmployee && <div className="rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
+          {siteAdminMode && <div className="rounded-xl border border-[#22304a] bg-[#0f1726] p-3">
             <h3 className="mb-2 text-xs font-extrabold text-[#8fa1bb]">تغییر وضعیت</h3>
             <div className="flex flex-wrap gap-2">
               {(Object.keys(STATUS_META) as SupportTicketStatus[]).map((s) => (

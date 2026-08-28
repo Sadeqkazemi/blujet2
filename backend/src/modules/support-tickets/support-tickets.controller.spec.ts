@@ -26,6 +26,12 @@ const STAFF_ROLES = [
   'EMPLOYEE',
 ];
 
+const SITE_ADMIN = {
+  id: '44444444-4444-4444-8444-444444444444',
+  role: 'SITE_ADMIN',
+  fullName: 'ادمین سایت',
+} as const;
+
 describe('Support ticket reply controllers', () => {
   it('keeps requester reply routes restricted to USER and AGENCY and delegates with the actor', async () => {
     const service = {
@@ -79,5 +85,48 @@ describe('Support ticket reply controllers', () => {
       status: 'OPEN',
       dept: 'AGENCY',
     });
+  });
+
+  it('keeps ticket creation, forwarding and status control exclusive to site admin', () => {
+    const rolesFor = (methodName: string): unknown => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        SupportTicketsController.prototype,
+        methodName,
+      );
+      if (!descriptor || typeof descriptor.value !== 'function') {
+        throw new Error(`Missing controller method: ${methodName}`);
+      }
+      const controllerMethod = descriptor.value as (
+        ...args: unknown[]
+      ) => unknown;
+      const metadata: unknown = Reflect.getMetadata(
+        ROLES_KEY,
+        controllerMethod,
+      );
+      return metadata;
+    };
+
+    expect(rolesFor('createAsAdmin')).toEqual(['SITE_ADMIN']);
+    expect(rolesFor('forwardTargets')).toEqual(['SITE_ADMIN']);
+    expect(rolesFor('forward')).toEqual(['SITE_ADMIN']);
+    expect(rolesFor('updateStatus')).toEqual(['SITE_ADMIN']);
+  });
+
+  it('lets site admin forward an exact ticket to an exact staff account', async () => {
+    const service = {
+      forward: jest.fn().mockResolvedValue({ id: 'ticket-1' }),
+    };
+    const controller = new SupportTicketsController(service as never);
+
+    await expect(
+      controller.forward(SITE_ADMIN, 'ticket-1', {
+        targetUserId: EMPLOYEE.id,
+      }),
+    ).resolves.toEqual({ success: true, data: { id: 'ticket-1' } });
+    expect(service.forward).toHaveBeenCalledWith(
+      SITE_ADMIN,
+      'ticket-1',
+      EMPLOYEE.id,
+    );
   });
 });

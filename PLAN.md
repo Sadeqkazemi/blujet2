@@ -3912,3 +3912,11 @@ contracts and retires the production mock adapters.
 - [x] Add a third owner-approved, one-time seven-day extension for every reserved UAT staff, agency, and customer identity.
 - [x] Fail closed outside production, require a v3-specific confirmation phrase, use a 35-day absolute ceiling so this grant remains a full seven days, normalize only exact reserved identities back to password-only mode when prior UAT flows changed their 2FA flag, revoke active refresh sessions, and write per-account security audit rows.
 - [x] Deploy through an independent root-only v3 audit artifact and sentinel so later releases cannot silently extend access again.
+
+# Internal cartable and agency bulletins (2026-08-28)
+
+- [x] Keep the complete customer/agency support queue exclusive to SITE_ADMIN and scope every other staff account to its exact forwarded tickets.
+- [x] Embed assigned-ticket conversation and reply handling in the internal cartable without a second support-ticket navigation tab.
+- [x] Add real SITE_ADMIN notice/amendment composition for all, one, or multiple active agencies with persisted history and audit.
+- [x] Connect targeted dispatches to the agency «اطلاعیه و اصلاحیه» page with per-agency read receipts.
+- [x] Pass focused tests, typecheck, production builds and `git diff --check` before requesting merge approval.

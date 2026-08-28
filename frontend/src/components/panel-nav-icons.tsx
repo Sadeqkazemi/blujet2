@@ -173,6 +173,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M13 7v10" />
     </NavIcon>
   ),
+  notices: (
+    <NavIcon>
+      <path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M3 7l9 6 9-6" />
+      <path d="M17 3v4" />
+    </NavIcon>
+  ),
   blog: (
     <NavIcon>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
