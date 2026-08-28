@@ -117,7 +117,7 @@ describe('temporary panel accounts', () => {
 
   it('caps a v2 extension at the owner-approved absolute ceiling', () => {
     const createdAt = new Date('2026-08-05T00:00:00.000Z');
-    const previousDeadline = new Date('2026-09-01T00:00:00.000Z');
+    const previousDeadline = new Date('2026-09-05T00:00:00.000Z');
     const deadline = createTemporaryPanelV2ExtensionExpiry(
       createdAt,
       previousDeadline,
@@ -126,6 +126,18 @@ describe('temporary panel accounts', () => {
     expect(deadline.getTime()).toBe(
       createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS,
     );
+  });
+
+  it('leaves room for the v3 grant to provide a full seven-day window', () => {
+    expect(TEMPORARY_PANEL_ACCESS_MAX_MS).toBe(
+      TEMPORARY_PANEL_INITIAL_ACCESS_MS + 4 * TEMPORARY_PANEL_EXTENSION_MS,
+    );
+    const createdAt = new Date('2026-08-05T00:00:00.000Z');
+    const now = new Date('2026-08-28T00:00:00.000Z');
+    const expiredDeadline = new Date('2026-08-27T00:00:00.000Z');
+    expect(
+      createTemporaryPanelV2ExtensionExpiry(createdAt, expiredDeadline, now),
+    ).toEqual(new Date('2026-09-04T00:00:00.000Z'));
   });
 
   it('never treats ordinary or 2FA-enabled staff as password-only accounts', () => {

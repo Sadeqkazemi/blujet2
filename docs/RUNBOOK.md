@@ -185,9 +185,12 @@ The initial database deadline is exactly seven days after creation. The
 owner-approved extension v1 moved that existing deadline forward once by seven
 days. Owner-approved extensions v2 and v3 each add another seven days to an
 active deadline or grant seven days from execution when the identity has
-already expired. The absolute safety ceiling remains 28 days from account
+already expired. The absolute safety ceiling is 35 days from account
 creation so identities created during different rollout dates can receive the
-same controlled grant. All extensions record a security audit row for every reserved identity,
+same full seven-day controlled grant. Extension v3 also restores the exact
+reserved synthetic identities to password-only mode if a prior UAT flow changed
+their 2FA flag; this normalization is included in the audit metadata and never
+applies to ordinary accounts. All extensions record a security audit row for every reserved identity,
 revoke current refresh sessions, and leave no credential material in logs.
 Repeated deploys do not
 recreate, rotate, or re-extend the accounts because

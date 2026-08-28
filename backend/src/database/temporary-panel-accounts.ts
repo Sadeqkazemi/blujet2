@@ -4,12 +4,12 @@ import type { Role } from './enums';
 
 export const TEMPORARY_PANEL_INITIAL_ACCESS_MS = 7 * 24 * 60 * 60 * 1000;
 export const TEMPORARY_PANEL_EXTENSION_MS = 7 * 24 * 60 * 60 * 1000;
-/** Owner-approved UAT ceiling after extension v2. This is deliberately wider
+/** Owner-approved UAT ceiling after extension v3. This is deliberately wider
  * than the requested deadline so accounts created on different rollout dates
  * can all receive the same controlled seven-day continuation. Ordinary
  * accounts never use this path. */
 export const TEMPORARY_PANEL_ACCESS_MAX_MS =
-  TEMPORARY_PANEL_INITIAL_ACCESS_MS + 3 * TEMPORARY_PANEL_EXTENSION_MS;
+  TEMPORARY_PANEL_INITIAL_ACCESS_MS + 4 * TEMPORARY_PANEL_EXTENSION_MS;
 export const TEMPORARY_PANEL_USERNAME_PREFIX = 'uat.';
 export const TEMPORARY_PANEL_PASSWORD_LENGTH = 16;
 const TEMPORARY_PANEL_PASSWORD_ALPHABET =
