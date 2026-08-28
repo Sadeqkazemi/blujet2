@@ -98,6 +98,7 @@ import AdminLoansPage from './features/loans/AdminLoansPage';
 import SiteRulesPage from './features/site-content/SiteRulesPage';
 import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
 import FlightCancellationsPage from './features/flights/FlightCancellationsPage';
+import SiteAdminAgencyBulletinsPage from './features/agency-bulletins/SiteAdminAgencyBulletinsPage';
 
 export default function App() {
   return (
@@ -236,6 +237,9 @@ export default function App() {
               </Route>
               <Route path="tickets" element={<TabGate tabKey="tickets" />}>
                 <Route index element={<SupportTicketsPage />} />
+              </Route>
+              <Route path="notices" element={<TabGate tabKey="notices" />}>
+                <Route index element={<SiteAdminAgencyBulletinsPage />} />
               </Route>
               <Route path="jobapps" element={<TabGate tabKey="jobapps" />}>
                 <Route index element={<CareersAdminPage />} />

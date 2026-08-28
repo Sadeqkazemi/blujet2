@@ -165,6 +165,24 @@ describe('SupportTicketsPage', () => {
     expect(within(dialog).getByRole('region', { name: 'تاریخچه گفتگو' })).toBeInTheDocument();
   });
 
+  it('lets an assigned manager reply but hides site-admin create, forward and status controls', async () => {
+    mockList();
+    vi.mocked(ticketsApi.fetchForwardTargets).mockClear();
+    vi.spyOn(ticketsApi, 'fetchSupportTicketDetail').mockResolvedValue(TICKET);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    render(<SupportTicketsPage embedded assignedMode />);
+
+    expect(await screen.findByText('تیکت‌های ارجاع‌شده')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /ایجاد تیکت/ })).not.toBeInTheDocument();
+    expect(ticketsApi.fetchForwardTargets).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByText('حسین رضوی'));
+    const dialog = await screen.findByRole('dialog', { name: /TK1A2B3C4D/ });
+    expect(within(dialog).getByLabelText('پاسخ به تیکت')).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'ثبت ارجاع' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('تغییر وضعیت')).not.toBeInTheDocument();
+  });
+
   it('forwards a ticket to a picked staffer and shows the notice', async () => {
     mockList();
     vi.spyOn(ticketsApi, 'fetchSupportTicketDetail').mockResolvedValue(TICKET);

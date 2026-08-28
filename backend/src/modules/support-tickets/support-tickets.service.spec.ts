@@ -157,6 +157,46 @@ describe('SupportTicketsService conversations', () => {
     );
   });
 
+  it('scopes every non-site-admin manager to tickets forwarded to that exact account', async () => {
+    const ticket = { ...baseTicket(), forwardedToId: ACTOR.id };
+    const { service, ticketRepo } = buildService(ticket);
+    const manager = {
+      ...ACTOR,
+      role: 'FINANCE_MANAGER' as const,
+      isSuperAdmin: false,
+    };
+
+    await service.list(manager, {});
+
+    expect(ticketRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { forwardedToId: ACTOR.id } }),
+    );
+  });
+
+  it('does not expose another assignee ticket to a manager', async () => {
+    const ticket = { ...baseTicket(), forwardedToId: 'another-staff-id' };
+    const { service } = buildService(ticket);
+    const manager = {
+      ...ACTOR,
+      role: 'COMMERCIAL_MANAGER' as const,
+      isSuperAdmin: false,
+    };
+
+    await expect(service.detail(manager, ticket.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('preserves the exact staff assignee when the requester follows up', async () => {
+    const ticket = { ...baseTicket(), forwardedToId: 'assigned-manager-id' };
+    const { service } = buildService(ticket);
+
+    await service.replyMine(ACTOR, ticket.id, { body: 'پاسخ دوباره مشتری' });
+
+    expect(ticket.forwardedToId).toBe('assigned-manager-id');
+    expect(ticket.status).toBe(SupportTicketStatus.OPEN);
+  });
+
   it('rejects a requester attachment not owned by that account', async () => {
     const ticket = baseTicket();
     const { service } = buildService(ticket);
@@ -184,18 +224,23 @@ describe('SupportTicketsService conversations', () => {
     });
   });
 
-  it('preserves requester and staff replies in one chronological round trip', async () => {
-    const ticket = baseTicket();
-    const { service } = buildService(ticket);
-    const staff = {
+  it('lets the exact assigned manager reply again after a requester follow-up', async () => {
+    const assignedManager = {
       ...ACTOR,
-      role: 'SITE_ADMIN' as const,
-      fullName: 'ادمین سایت',
+      id: 'assigned-manager-id',
+      role: 'FINANCE_MANAGER' as const,
+      fullName: 'مدیر مالی',
+      isSuperAdmin: false,
     };
+    const ticket = {
+      ...baseTicket(),
+      forwardedToId: assignedManager.id,
+    };
+    const { service } = buildService(ticket);
 
     await service.replyMine(ACTOR, ticket.id, { body: 'پیگیری مجدد مشتری' });
-    const result = await service.replyAsStaff(staff, ticket.id, {
-      body: 'پاسخ نهایی ادمین',
+    const result = await service.replyAsStaff(assignedManager, ticket.id, {
+      body: 'پاسخ مجدد مدیر ارجاع‌گیرنده',
     });
 
     expect(
@@ -203,7 +248,9 @@ describe('SupportTicketsService conversations', () => {
     ).toEqual([
       ['REQUESTER', 'متن اولیه'],
       ['REQUESTER', 'پیگیری مجدد مشتری'],
-      ['STAFF', 'پاسخ نهایی ادمین'],
+      ['STAFF', 'پاسخ مجدد مدیر ارجاع‌گیرنده'],
     ]);
+    expect(ticket.forwardedToId).toBe(assignedManager.id);
+    expect(ticket.status).toBe(SupportTicketStatus.ANSWERED);
   });
 });

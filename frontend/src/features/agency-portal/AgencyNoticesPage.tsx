@@ -42,6 +42,7 @@ const COPY: Record<StoredLocale, {
   close: string;
   flightBadge: string;
   adminBadge: string;
+  amendmentBadge: string;
   notificationBadge: string;
   flightTitle: (flightNo: string) => string;
   flightSummary: (route: string, date: string) => string;
@@ -66,7 +67,7 @@ const COPY: Record<StoredLocale, {
     unread: 'خوانده‌نشده', empty: 'اطلاعیه‌ای در این بخش وجود ندارد.',
     partialError: 'بخشی از اطلاعات در دسترس نیست؛ موارد دریافت‌شده نمایش داده شده‌اند.',
     fullError: 'دریافت اطلاعیه‌ها انجام نشد. دوباره تلاش کنید.', retry: 'تلاش مجدد', close: 'بستن',
-    flightBadge: 'پرواز جدید', adminBadge: 'اطلاعیه سایت', notificationBadge: 'پیام سیستمی',
+    flightBadge: 'پرواز جدید', adminBadge: 'اطلاعیه ادمین', amendmentBadge: 'اصلاحیه ادمین', notificationBadge: 'پیام سیستمی',
     flightTitle: (flightNo) => `پرواز جدید ${flightNo}`,
     flightSummary: (route, date) => `${route} · ${date}`,
     flightInstruction: 'این پرواز برای درخواست خرید صندلی آژانس باز است. پس از بررسی ظرفیت، تعداد صندلی موردنیاز را در بخش صندلی‌های تخصیصی استعلام و درخواست خود را ثبت کنید.',
@@ -82,7 +83,7 @@ const COPY: Record<StoredLocale, {
     unread: 'Unread', empty: 'There are no notices in this section.',
     partialError: 'Some sources are unavailable; the received items are still shown.',
     fullError: 'Notices could not be loaded. Please try again.', retry: 'Try again', close: 'Close',
-    flightBadge: 'New flight', adminBadge: 'Site notice', notificationBadge: 'System message',
+    flightBadge: 'New flight', adminBadge: 'Admin notice', amendmentBadge: 'Admin amendment', notificationBadge: 'System message',
     flightTitle: (flightNo) => `New flight ${flightNo}`,
     flightSummary: (route, date) => `${route} · ${date}`,
     flightInstruction: 'This flight is open for agency seat requests. Check availability and submit the required seat count from Allocated Seats.',
@@ -98,7 +99,7 @@ const COPY: Record<StoredLocale, {
     unread: 'غير مقروء', empty: 'لا توجد إشعارات في هذا القسم.',
     partialError: 'بعض المصادر غير متاحة؛ تم عرض العناصر المستلمة.',
     fullError: 'تعذر تحميل الإشعارات. حاول مرة أخرى.', retry: 'إعادة المحاولة', close: 'إغلاق',
-    flightBadge: 'رحلة جديدة', adminBadge: 'إشعار الموقع', notificationBadge: 'رسالة النظام',
+    flightBadge: 'رحلة جديدة', adminBadge: 'إشعار الإدارة', amendmentBadge: 'تعديل الإدارة', notificationBadge: 'رسالة النظام',
     flightTitle: (flightNo) => `رحلة جديدة ${flightNo}`,
     flightSummary: (route, date) => `${route} · ${date}`,
     flightInstruction: 'هذه الرحلة متاحة لطلبات مقاعد الوكالات. تحقق من السعة ثم أرسل عدد المقاعد المطلوب من قسم المقاعد المخصصة.',
@@ -195,13 +196,17 @@ export default function AgencyNoticesPage() {
 
       if (notificationsResult.status === 'fulfilled') {
         notificationsResult.value.forEach((row) => {
+          const isAdminBulletin = row.entityType?.toUpperCase() === 'AGENCY_BULLETIN';
+          const isAmendment = row.action === 'AGENCY_AMENDMENT_PUBLISHED';
           next.push({
             id: `notification-${row.id}`,
-            kind: 'NOTIFICATION',
+            kind: isAdminBulletin ? 'SITE' : 'NOTIFICATION',
             title: row.title,
             summary: row.body,
             body: row.body,
-            badge: t.notificationBadge,
+            badge: isAdminBulletin
+              ? (isAmendment ? t.amendmentBadge : t.adminBadge)
+              : t.notificationBadge,
             createdAt: row.createdAt,
             unread: row.readAt == null,
             notification: row,
@@ -215,7 +220,7 @@ export default function AgencyNoticesPage() {
     });
 
     return () => { active = false; };
-  }, [locale, reloadKey, t.adminBadge, t.flightBadge, t.notificationBadge, t]);
+  }, [locale, reloadKey, t.adminBadge, t.amendmentBadge, t.flightBadge, t.notificationBadge, t]);
 
   const counts = useMemo(() => ({
     ALL: items.length,

@@ -11,6 +11,18 @@ describe('operations panel access contract', () => {
     expect(PANEL_NAV.IT_MANAGER?.map((item) => item.key)).toContain('cartable');
   });
 
+  it('keeps support and agency bulletins in the site-admin panel only', () => {
+    const siteAdminKeys = PANEL_NAV.SITE_ADMIN?.map((item) => item.key) ?? [];
+    expect(siteAdminKeys).toEqual(
+      expect.arrayContaining(['cartable', 'tickets', 'notices']),
+    );
+    for (const [role, items] of Object.entries(PANEL_NAV)) {
+      if (role === 'SITE_ADMIN') continue;
+      expect(items?.map((item) => item.key)).not.toContain('tickets');
+      expect(items?.map((item) => item.key)).not.toContain('notices');
+    }
+  });
+
   it('publishes aircraft definition only in commercial navigation', () => {
     expect(PANEL_NAV.COMMERCIAL_MANAGER?.map((item) => item.key)).toContain(
       'aircraft',

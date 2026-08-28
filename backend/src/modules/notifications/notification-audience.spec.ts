@@ -19,6 +19,9 @@ describe('notificationEntityVisibleToRole', () => {
     expect(notificationEntityVisibleToRole('AGENCY', 'AgencyApiKey')).toBe(
       true,
     );
+    expect(notificationEntityVisibleToRole('AGENCY', 'Agency_Bulletin')).toBe(
+      true,
+    );
     expect(notificationEntityVisibleToRole('AGENCY', 'FlightInstance')).toBe(
       false,
     );

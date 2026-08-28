@@ -113,6 +113,24 @@ describe('AgencyNoticesPage', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('ساعت پرواز شما به ۱۰:۳۰ تغییر کرد.');
   });
 
+  it('classifies a targeted site-admin dispatch as an admin amendment and opens it', async () => {
+    vi.mocked(notificationsApi.fetchNotifications).mockResolvedValueOnce([{
+      ...notification,
+      entityType: 'AGENCY_BULLETIN',
+      entityId: 'dispatch-1',
+      action: 'AGENCY_AMENDMENT_PUBLISHED',
+      title: 'اصلاحیه ساعت پرواز',
+      body: 'ساعت پرواز XY1235 اصلاح شد.',
+    }]);
+    renderPage();
+    const user = userEvent.setup();
+
+    const row = await screen.findByRole('button', { name: /اصلاحیه ساعت پرواز/ });
+    expect(row).toHaveTextContent('اصلاحیه ادمین');
+    await user.click(row);
+    expect(screen.getByRole('dialog')).toHaveTextContent('ساعت پرواز XY1235 اصلاح شد.');
+  });
+
   it('filters the list and keeps partial results when one source fails', async () => {
     vi.mocked(siteContentApi.fetchPublicHomeContent).mockRejectedValueOnce(new Error('offline'));
     renderPage();

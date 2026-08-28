@@ -4074,3 +4074,31 @@ only when the active agency credit line covers the server-computed total.
 - `GET /agency-portal/seat-request-options` and
   `POST /agency-portal/seat-inquiry` apply the agency visibility gate in
   addition to schedule, approval, departure, and sale-window checks.
+
+## Internal cartable support assignment and agency bulletins (2026-08-28)
+
+### Support-ticket boundary
+
+- `GET /support-tickets`, `GET /support-tickets/:id`, and
+  `POST /support-tickets/:id/replies` remain available to staff roles, but
+  SITE_ADMIN sees the complete support queue while every other manager or
+  employee is server-scoped to `forwardedToId = actor.id`.
+- `GET /support-tickets/forward-targets` and
+  `PATCH /support-tickets/:id/forward` are SITE_ADMIN-only. Creating a staff-side
+  ticket and changing support status are also SITE_ADMIN-only operations.
+- Requester replies do not clear the assignee. The exact assignee therefore
+  continues the same conversation from the internal cartable after a customer
+  or agency follow-up.
+
+### Agency notices — `SITE_ADMIN`
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/agency-bulletins/recipients` | Lists active, non-suspended agency accounts eligible to receive a bulletin. |
+| GET | `/agency-bulletins/admin` | Lists persisted notice/amendment dispatch history grouped by dispatch id. |
+| POST | `/agency-bulletins/admin` | Sends `NOTICE` or `AMENDMENT` to `ALL` active agencies or an exact validated `SELECTED` recipient list. |
+
+Each target receives an ordinary recipient-owned notification with
+`entityType = AGENCY_BULLETIN`; the existing `/notifications` read and read-
+receipt endpoints remain the agency delivery API. No audience is inferred in
+the browser.
