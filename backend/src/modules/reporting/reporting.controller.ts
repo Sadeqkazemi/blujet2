@@ -26,7 +26,14 @@ export class ReportingController {
   constructor(private readonly reporting: ReportingService) {}
 
   @Get('sales-chart')
-  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(
+    'CEO',
+    'BOARD_CHAIR',
+    'SENIOR_MANAGER',
+    'FINANCE_MANAGER',
+    'COMMERCIAL_MANAGER',
+    'EMPLOYEE',
+  )
   @RequiresPermission('rp_sales')
   @ApiOperation({
     summary:
@@ -38,7 +45,14 @@ export class ReportingController {
   }
 
   @Get('flight-sales')
-  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(
+    'CEO',
+    'BOARD_CHAIR',
+    'SENIOR_MANAGER',
+    'FINANCE_MANAGER',
+    'COMMERCIAL_MANAGER',
+    'EMPLOYEE',
+  )
   @RequiresPermission('rp_sales')
   @ApiOperation({
     summary:
@@ -80,7 +94,8 @@ export class ReportingController {
   }
 
   @Get('finance-dashboard-stats')
-  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER')
+  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_dashboard')
   @ApiOperation({
     summary:
       'کارت‌های داشبورد اجرایی/مالی — آژانس/مسافر/بلیط/درآمد ماه جاری با روند (پنل مدیر عامل و هم‌ترازها + مدیر مالی)',
@@ -114,7 +129,8 @@ export class ReportingController {
   }
 
   @Get('recent-transactions')
-  @Roles('FINANCE_MANAGER')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_transactions')
   @ApiOperation({
     summary: 'تراکنش‌های مالی اخیر — فقط پنل مدیر مالی (per design)',
   })
@@ -124,7 +140,14 @@ export class ReportingController {
   }
 
   @Get('revenue-mix')
-  @Roles('CEO', 'BOARD_CHAIR', 'SENIOR_MANAGER', 'FINANCE_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @Roles(
+    'CEO',
+    'BOARD_CHAIR',
+    'SENIOR_MANAGER',
+    'FINANCE_MANAGER',
+    'COMMERCIAL_MANAGER',
+    'EMPLOYEE',
+  )
   @RequiresPermission('rp_sales')
   @ApiOperation({ summary: 'ترکیب درآمد بر اساس کانال فروش' })
   async revenueMix(@Query() query: PeriodQueryDto) {
@@ -133,7 +156,8 @@ export class ReportingController {
   }
 
   @Get('agency-settlements')
-  @Roles('FINANCE_MANAGER')
+  @Roles('FINANCE_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fn_settlements')
   @ApiOperation({
     summary: 'تسویه‌حساب آژانس‌های همکار — فقط پنل مدیر مالی (per design)',
   })

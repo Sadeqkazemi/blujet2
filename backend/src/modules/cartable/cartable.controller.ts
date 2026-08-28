@@ -14,6 +14,8 @@ import { ListCartableQueryDto } from './dto/list-cartable-query.dto';
 import { ResolveCartableDto } from './dto/resolve-cartable.dto';
 import { TransferCartableDto } from './dto/transfer-cartable.dto';
 import { SendEmployeeManagerMessageDto } from './dto/send-employee-manager-message.dto';
+import { SendDirectStaffMessageDto } from './dto/send-direct-staff-message.dto';
+import { ReplyCartableMessageDto } from './dto/reply-cartable-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -21,23 +23,21 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PanelAccessGuard } from '../panels/panel-access.guard';
 import { EmployeePermissionGuard } from '../../common/guards/employee-permission.guard';
 import { RequiresPermission } from '../../common/decorators/requires-permission.decorator';
-import { EXEC_ROLES } from '../../common/exec-roles';
+import { EXEC_ROLES, STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 
 @ApiTags('cartable')
 @Controller('cartable')
 @UseGuards(JwtAuthGuard, RolesGuard, PanelAccessGuard, EmployeePermissionGuard)
-// SITE_ADMIN added here directly (not into the shared EXEC_ROLES constant,
-// which also backs manager-messages/staff-directory — widening those isn't
-// part of this design's siteAdmin.access list). "کارتابل من" is
-// self-scoped (actor.id-filtered), so this is a safe read/act-on-own-items
-// grant. EMPLOYEE is method-scoped with @RequiresPermission(ct_*).
-@Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN')
+// Every internal staff role uses the same self-scoped cartable. EMPLOYEE is
+// still method-scoped with @RequiresPermission(ct_*) so the IT permission
+// catalog remains the server-side source of truth for employee access.
+@Roles(...STAFF_ROLES)
 export class CartableController {
   constructor(private readonly cartable: CartableService) {}
 
   @Get()
-  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...STAFF_ROLES)
   @RequiresPermission('ct_list')
   @ApiOperation({
     summary: 'کارتابل من — فقط موارد خود کاربر + شمارنده کارت‌ها',
@@ -51,7 +51,7 @@ export class CartableController {
   }
 
   @Get('unread-count')
-  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...STAFF_ROLES)
   @RequiresPermission('ct_list')
   @ApiOperation({ summary: 'شمارندهٔ موارد دیده‌نشدهٔ کارتابل من' })
   async unreadCount(@CurrentUser() actor: AuthenticatedUser) {
@@ -62,7 +62,7 @@ export class CartableController {
   @Get('manager-recipients')
   @Roles('EMPLOYEE')
   @RequiresPermission('ct_process')
-  @ApiOperation({ summary: 'فهرست مدیران برای ارسال پیام — کارمند' })
+  @ApiOperation({ summary: 'فهرست کارکنان برای ارسال پیام داخلی — کارمند' })
   async managerRecipients(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.cartable.listManagerRecipients(actor);
     return { success: true, data };
@@ -72,7 +72,7 @@ export class CartableController {
   @Roles('EMPLOYEE')
   @RequiresPermission('ct_process')
   @ApiOperation({
-    summary: 'ارسال پیام مستقیم به مدیر — تحویل در کارتابل مدیر',
+    summary: 'ارسال پیام مستقیم داخلی — مسیر سازگار قدیمی کارمند',
   })
   async sendManagerMessage(
     @CurrentUser() actor: AuthenticatedUser,
@@ -88,6 +88,20 @@ export class CartableController {
   @ApiOperation({ summary: 'پیام‌های ارسالی کارمند به مدیران' })
   async sentManagerMessages(@CurrentUser() actor: AuthenticatedUser) {
     const data = await this.cartable.listSentEmployeeManagerMessages(actor);
+    return { success: true, data };
+  }
+
+  @Post('direct-message')
+  @Roles(...STAFF_ROLES)
+  @RequiresPermission('ct_process')
+  @ApiOperation({
+    summary: 'ارسال پیام مستقیم دوطرفه به یک مدیر یا کارمند',
+  })
+  async sendDirectMessage(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: SendDirectStaffMessageDto,
+  ) {
+    const data = await this.cartable.sendDirectStaffMessage(actor, dto);
     return { success: true, data };
   }
 
@@ -113,7 +127,7 @@ export class CartableController {
   // matches routes in declaration order, and a wildcard segment here would
   // otherwise swallow 'unread-count', 'manager-recipients', etc.
   @Get(':id')
-  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...STAFF_ROLES)
   @RequiresPermission('ct_list')
   @ApiOperation({
     summary:
@@ -128,7 +142,7 @@ export class CartableController {
   }
 
   @Patch(':id/approve')
-  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN', 'EMPLOYEE')
+  @Roles(...STAFF_ROLES)
   @RequiresPermission('ct_process')
   @ApiOperation({ summary: 'تأیید — نظر مدیر الزامی' })
   async approve(
@@ -140,7 +154,23 @@ export class CartableController {
     return { success: true, data };
   }
 
+  @Post(':id/replies')
+  @Roles(...STAFF_ROLES)
+  @RequiresPermission('ct_process')
+  @ApiOperation({
+    summary: 'پاسخ به پیام داخلی؛ بستن مورد فعلی و تحویل پاسخ به فرستنده',
+  })
+  async reply(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ReplyCartableMessageDto,
+  ) {
+    const data = await this.cartable.replyToInternalMessage(actor, id, dto);
+    return { success: true, data };
+  }
+
   @Patch(':id/reject')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'OPERATIONS_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'رد (دکمه «انصراف» طراحی) — نظر مدیر الزامی' })
   async reject(
     @CurrentUser() actor: AuthenticatedUser,
@@ -152,6 +182,7 @@ export class CartableController {
   }
 
   @Patch(':id/transfer')
+  @Roles(...EXEC_ROLES, 'IT_MANAGER', 'OPERATIONS_MANAGER', 'SITE_ADMIN')
   @ApiOperation({
     summary: 'انتقال به مدیر دیگر — مورد جدید برای مقصد ساخته می‌شود',
   })

@@ -529,6 +529,50 @@ describe('ResultsPage', () => {
     });
   });
 
+  it('uses an airplane marker between origin and destination in expanded flight details', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+    await screen.findByTestId('result-card');
+    await expandFirstCard();
+
+    const route = screen.getByTestId('flight-detail-route-flow');
+    const points = route.querySelectorAll('[data-route-point]');
+    expect(points[0]).toHaveAttribute('data-route-point', 'origin');
+    expect(points[1]).toHaveAttribute('data-route-point', 'destination');
+    expect(screen.getByTestId('flight-detail-route-airplane')).toBeInTheDocument();
+    expect(route).not.toHaveTextContent('←');
+    expect(route).not.toHaveTextContent('→');
+  });
+
+  it('renders the flight schedule as a horizontal origin-to-destination journey', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage();
+    await screen.findByTestId('result-card');
+    await expandFirstCard();
+
+    const schedule = screen.getByTestId('flight-detail-schedule');
+    expect(schedule).toHaveStyle({ gridTemplateColumns: 'minmax(0, 1fr) minmax(150px, 1.3fr) minmax(0, 1fr)' });
+    expect(schedule.querySelector('[data-schedule-point="origin"]')).toHaveTextContent('THR');
+    expect(schedule.querySelector('[data-schedule-point="destination"]')).toHaveTextContent('MHD');
+    expect(screen.getByTestId('flight-detail-schedule-airplane')).toBeInTheDocument();
+    expect(screen.getByTestId('flight-detail-origin-dot')).toHaveStyle({
+      background: '#1668c4',
+    });
+    expect(screen.getByTestId('flight-detail-destination-dot')).toHaveStyle({
+      background: '#fff',
+    });
+    expect(screen.getByText('بار مجاز').parentElement).toHaveStyle({
+      alignItems: 'center',
+    });
+    expect(screen.getByText('بار مجاز')).toHaveStyle({ textAlign: 'right' });
+    expect(screen.getByText('20 kg')).toHaveStyle({ textAlign: 'center' });
+    expect(screen.queryByText('▼')).not.toBeInTheDocument();
+  });
+
   it('dismisses the AI radar with its close button on mobile results', async () => {
     mockLocale('fa');
     mockSearchApis();

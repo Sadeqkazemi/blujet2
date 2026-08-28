@@ -1,7 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
@@ -82,11 +79,18 @@ export class PanelsService {
       select: { permission: { key: true } },
     });
     const grantedKeys = new Set(grants.map((g) => g.permission.key));
+    const employee = await this.userRepo.findOne({
+      where: { id: user.id },
+      select: { dept: true },
+    });
 
     const items: PanelNavItem[] = [
       { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
     ];
     for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      if (section.depts && !section.depts.includes(employee?.dept ?? '')) {
+        continue;
+      }
       const hasAccess = section.wiredKeys.some((key) => grantedKeys.has(key));
       if (hasAccess) {
         items.push({
@@ -175,6 +179,9 @@ export class PanelsService {
 
     const grantedSectionKeys = new Set<string>();
     for (const [sectionKey, section] of Object.entries(EMPLOYEE_SECTION_NAV)) {
+      if (section.depts && !section.depts.includes(employee.dept ?? '')) {
+        continue;
+      }
       if (
         section.wiredKeys.some((key) =>
           grants.some((g) => g.permission.key === key),

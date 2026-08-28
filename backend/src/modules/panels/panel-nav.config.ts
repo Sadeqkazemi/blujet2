@@ -173,17 +173,13 @@ export const PANEL_ACCESS_TOGGLE_RIGHTS: Partial<Record<Role, string[]>> = {
  * action. IT capabilities are also real, narrowly scoped employee surfaces
  * (see the controller comments), not access to the complete IT Manager role.
  *
- * fn_invoices' real UI surface is the per-agency invoice list on
- * AgencyDetailPage (reached via the `agencies` tab, same as ag_settle) —
- * NOT FinancePage.tsx's FINANCE_MANAGER-only company-wide financial
- * dashboard (revenue/profit/all-transactions), which stays unwidened:
- * fn_invoices's catalog label ("مشاهده و مدیریت فاکتورها") is scoped to
- * invoices, and granting that full dashboard would be a real
- * over-broad-access risk, not a mechanical nav wiring.
+ * fn_invoices' real UI surface remains the per-agency invoice list on
+ * AgencyDetailPage. Company-wide finance data is separately delegated by
+ * fn_dashboard/fn_transactions/fn_settlements, each enforced on its API.
  */
 export const EMPLOYEE_SECTION_NAV: Record<
   string,
-  { labelFa: string; wiredKeys: string[] }
+  { labelFa: string; wiredKeys: string[]; depts?: string[] }
 > = {
   // Order follows the owning manager panels. A grant changes both this live
   // navigation response and the matching @RequiresPermission API guard.
@@ -232,6 +228,11 @@ export const EMPLOYEE_SECTION_NAV: Record<
     labelFa: 'استرداد بلیط',
     wiredKeys: ['rf_list', 'rf_details', 'rf_process'],
   },
+  finance: {
+    labelFa: 'مالی',
+    wiredKeys: ['fn_dashboard', 'fn_transactions', 'fn_settlements'],
+    depts: ['finance'],
+  },
   reports: {
     labelFa: 'گزارش‌ها',
     wiredKeys: ['rp_sales', 'rp_passengers', 'rp_finance', 'rp_exports'],
@@ -255,9 +256,15 @@ export const EMPLOYEE_SECTION_NAV: Record<
     labelFa: 'رمزها و امنیت',
     wiredKeys: ['sc_manage', 'sc_view', 'sc_sessions'],
   },
+  'ancillary-services': {
+    labelFa: 'خدمات',
+    wiredKeys: ['sv_view', 'sv_manage'],
+    depts: ['commercial', 'sales'],
+  },
   services: {
     labelFa: 'سرویس‌های سایت',
-    wiredKeys: ['sv_view', 'sv_manage', 'sv_control', 'sv_config'],
+    wiredKeys: ['sv_view', 'sv_control', 'sv_config'],
+    depts: ['it'],
   },
   club: {
     labelFa: 'قوانین باشگاه مشتریان',

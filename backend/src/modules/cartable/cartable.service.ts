@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, IsNull, Not, Raw, Repository } from 'typeorm';
 import { CartableTask } from '../../database/entities/cartable-task.entity';
@@ -18,11 +19,7 @@ import { findOneOrThrow } from '../../database/utils/find-one-or-throw';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ErrorCode } from '../../common/errors';
-import {
-  EXEC_ROLES,
-  ROLE_LABELS_FA,
-  STAFF_ROLES,
-} from '../../common/exec-roles';
+import { ROLE_LABELS_FA, STAFF_ROLES } from '../../common/exec-roles';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import type {
   CartableCategory,
@@ -75,6 +72,36 @@ export class CartableService {
       });
     }
     return task;
+  }
+
+  private isInternalMessage(task: CartableTask): boolean {
+    return (
+      task.sourceType === 'MANAGER_MESSAGE' ||
+      task.sourceType === 'EMPLOYEE_MESSAGE'
+    );
+  }
+
+  private isActiveStaff(user: User | null | undefined): user is User {
+    return Boolean(
+      user?.isActive &&
+      STAFF_ROLES.includes(user.role as (typeof STAFF_ROLES)[number]),
+    );
+  }
+
+  private async assertOwnedAttachments(
+    actorId: string,
+    attachmentIds: string[] | undefined,
+  ) {
+    if (!attachmentIds?.length) return;
+    const owned = await this.storedFileRepo.count({
+      where: { id: In(attachmentIds), ownerId: actorId },
+    });
+    if (owned !== attachmentIds.length) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'فایل پیوست معتبر نیست.',
+      });
+    }
   }
 
   async list(
@@ -154,7 +181,10 @@ export class CartableService {
    * task read; repeat views are a no-op (idempotent). */
   async getById(actor: AuthenticatedUser, id: string) {
     const task = await this.taskRepo.findOne({
-      where: { id, assigneeId: actor.id },
+      where: [
+        { id, assigneeId: actor.id },
+        { id, senderId: actor.id },
+      ],
       relations: { sender: true, transferredTo: true },
       select: {
         sender: { id: true, fullName: true, role: true },
@@ -168,7 +198,7 @@ export class CartableService {
       });
     }
 
-    if (!task.readAt) {
+    if (task.assigneeId === actor.id && !task.readAt) {
       const now = new Date();
       await this.taskRepo.update({ id, readAt: IsNull() }, { readAt: now });
       task.readAt = now;
@@ -178,26 +208,69 @@ export class CartableService {
     // resolve()/transfer() logged with entityType 'CartableTask') — not the
     // linked source entity's separate history (e.g. AgencyMembershipRequest
     // exposes its own full trail via GET /agencies/requests/:id).
+    const conversationTasks = task.conversationId
+      ? await this.taskRepo.find({
+          where: { conversationId: task.conversationId },
+          relations: { sender: true },
+          select: {
+            sender: { id: true, fullName: true, role: true },
+          },
+          order: { createdAt: 'ASC' },
+        })
+      : [task];
+    const taskIds = conversationTasks.map((row) => row.id);
     const auditHistory = await this.auditLogRepo.find({
-      where: { entityType: 'CartableTask', entityId: id },
+      where: { entityType: 'CartableTask', entityId: In(taskIds) },
       order: { createdAt: 'ASC' },
     });
 
+    const allAttachmentIds = [
+      ...new Set(
+        conversationTasks.flatMap((row) =>
+          Array.isArray(row.attachments)
+            ? row.attachments.filter(
+                (value): value is string => typeof value === 'string',
+              )
+            : [],
+        ),
+      ),
+    ];
+    const files = allAttachmentIds.length
+      ? await this.storedFileRepo.findBy({ id: In(allAttachmentIds) })
+      : [];
+    const byId = new Map(files.map((file) => [file.id, file]));
+    const attachmentMetadata = (ids: string[] | null) =>
+      (Array.isArray(ids) ? ids : []).flatMap((fileId) => {
+        const file = byId.get(fileId);
+        return file
+          ? [
+              {
+                id: file.id,
+                fileName: file.fileName,
+                mimeType: file.mimeType,
+                sizeBytes: file.sizeBytes,
+              },
+            ]
+          : [];
+      });
+
     const history = [
-      {
-        id: `created-${task.id}`,
-        action: 'ثبت و ارسال پیام',
-        detail: task.description,
-        actorLabel: task.senderLabelFa ?? task.sender?.fullName ?? null,
-        actorRole: task.sender?.role ?? null,
-        createdAt: task.createdAt,
-      },
+      ...conversationTasks.map((row, index) => ({
+        id: `message-${row.id}`,
+        action: index === 0 ? 'ثبت و ارسال پیام' : 'پاسخ به پیام',
+        detail: row.description,
+        actorLabel: row.senderLabelFa ?? row.sender?.fullName ?? null,
+        actorRole: row.sender?.role ?? null,
+        attachments: attachmentMetadata(row.attachments),
+        createdAt: row.createdAt,
+      })),
       ...auditHistory.map((entry) => ({
         id: entry.id,
         action: entry.action,
         detail: entry.detail,
         actorLabel: null,
         actorRole: entry.actorRole,
+        attachments: [],
         createdAt: entry.createdAt,
       })),
     ].sort(
@@ -206,28 +279,7 @@ export class CartableService {
         new Date(right.createdAt).getTime(),
     );
 
-    const attachmentIds = Array.isArray(task.attachments)
-      ? task.attachments.filter(
-          (value): value is string => typeof value === 'string',
-        )
-      : [];
-    const files = attachmentIds.length
-      ? await this.storedFileRepo.findBy({ id: In(attachmentIds) })
-      : [];
-    const byId = new Map(files.map((file) => [file.id, file]));
-    const attachments = attachmentIds.flatMap((fileId) => {
-      const file = byId.get(fileId);
-      return file
-        ? [
-            {
-              id: file.id,
-              fileName: file.fileName,
-              mimeType: file.mimeType,
-              sizeBytes: file.sizeBytes,
-            },
-          ]
-        : [];
-    });
+    const attachments = attachmentMetadata(task.attachments);
 
     return { ...task, attachments, history };
   }
@@ -403,6 +455,8 @@ export class CartableService {
           senderLabelFa: task.senderLabelFa,
           sourceType: task.sourceType,
           sourceId: task.sourceId,
+          conversationId: task.conversationId,
+          attachments: task.attachments,
         }),
       );
     });
@@ -540,6 +594,7 @@ export class CartableService {
       | 'CHAIR_PERMISSION'
       | 'EMPLOYEE_MESSAGE';
     sourceId?: string;
+    conversationId?: string;
     attachments?: string[];
   }) {
     return this.taskRepo.save(this.taskRepo.create(input));
@@ -560,7 +615,13 @@ export class CartableService {
       select: { id: true },
     });
     for (const r of recipients) {
-      await this.createTask({ ...input, assigneeId: r.id });
+      await this.createTask({
+        ...input,
+        assigneeId: r.id,
+        conversationId:
+          input.conversationId ??
+          (input.sourceType === 'MANAGER_MESSAGE' ? randomUUID() : undefined),
+      });
     }
     return recipients.length;
   }
@@ -582,8 +643,9 @@ export class CartableService {
 
     const managers = await this.userRepo.find({
       where: {
-        role: In([...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN']),
+        role: In([...STAFF_ROLES]),
         isActive: true,
+        id: Not(actor.id),
       },
       select: { id: true, fullName: true, role: true },
       order: { fullName: 'ASC' },
@@ -606,24 +668,15 @@ export class CartableService {
     if (
       !target ||
       !target.isActive ||
-      ![...EXEC_ROLES, 'IT_MANAGER', 'SITE_ADMIN'].includes(target.role)
+      !STAFF_ROLES.includes(target.role as (typeof STAFF_ROLES)[number]) ||
+      target.id === actor.id
     ) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
         message: 'گیرندهٔ پیام معتبر نیست.',
       });
     }
-    if (dto.attachmentIds?.length) {
-      const owned = await this.storedFileRepo.count({
-        where: { id: In(dto.attachmentIds), ownerId: actor.id },
-      });
-      if (owned !== dto.attachmentIds.length) {
-        throw new BadRequestException({
-          code: ErrorCode.VALIDATION_FAILED,
-          message: 'فایل پیوست معتبر نیست.',
-        });
-      }
-    }
+    await this.assertOwnedAttachments(actor.id, dto.attachmentIds);
 
     const task = await this.createTask({
       assigneeId: target.id,
@@ -633,6 +686,7 @@ export class CartableService {
       senderId: actor.id,
       senderLabelFa: `${actor.fullName} · کارمند`,
       sourceType: 'EMPLOYEE_MESSAGE',
+      conversationId: randomUUID(),
       attachments: dto.attachmentIds ?? [],
     });
 
@@ -652,6 +706,146 @@ export class CartableService {
       body: dto.body,
       createdAt: task.createdAt,
     };
+  }
+
+  async sendDirectStaffMessage(
+    actor: AuthenticatedUser,
+    dto: {
+      toId: string;
+      subject: string;
+      body: string;
+      attachmentIds?: string[];
+    },
+  ) {
+    const target = await this.userRepo.findOneBy({ id: dto.toId });
+    if (!this.isActiveStaff(target) || target.id === actor.id) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'گیرندهٔ پیام داخلی معتبر نیست.',
+      });
+    }
+    await this.assertOwnedAttachments(actor.id, dto.attachmentIds);
+
+    const task = await this.createTask({
+      assigneeId: target.id,
+      category: 'ADMIN',
+      title: dto.subject.trim(),
+      description: dto.body.trim(),
+      senderId: actor.id,
+      senderLabelFa: `${actor.fullName} · ${ROLE_LABELS_FA[actor.role]}`,
+      sourceType:
+        actor.role === 'EMPLOYEE' ? 'EMPLOYEE_MESSAGE' : 'MANAGER_MESSAGE',
+      conversationId: randomUUID(),
+      attachments: dto.attachmentIds ?? [],
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'ارسال پیام مستقیم داخلی',
+      detail: `${actor.fullName} پیام «${task.title}» را به ${target.fullName} ارسال کرد.`,
+      entityType: 'CartableTask',
+      entityId: task.id,
+      metadata: { recipientId: target.id, conversationId: task.conversationId },
+    });
+    await this.notifications.notify({
+      recipientId: target.id,
+      category: 'CARTABLE',
+      action: 'INTERNAL_MESSAGE',
+      title: task.title,
+      body: `پیام جدید از ${actor.fullName}`,
+      entityType: 'CartableTask',
+      entityId: task.id,
+      dedupeKey: `CartableTask:${task.id}:INTERNAL_MESSAGE:${target.id}`,
+    });
+
+    return task;
+  }
+
+  async replyToInternalMessage(
+    actor: AuthenticatedUser,
+    id: string,
+    dto: { body: string; attachmentIds?: string[] },
+  ) {
+    const task = await this.getOwnOpenTaskOrThrow(actor, id);
+    if (!this.isInternalMessage(task) || !task.senderId) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'این مورد از نوع پیام داخلی قابل پاسخ نیست.',
+      });
+    }
+
+    const target = await this.userRepo.findOneBy({ id: task.senderId });
+    if (!this.isActiveStaff(target) || target.id === actor.id) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'فرستندهٔ پیام برای دریافت پاسخ در دسترس نیست.',
+      });
+    }
+    await this.assertOwnedAttachments(actor.id, dto.attachmentIds);
+
+    const conversationId = task.conversationId ?? randomUUID();
+    const reply = await this.taskRepo.manager.transaction(async (tx) => {
+      const updated = await tx.update(
+        CartableTask,
+        { id: task.id, assigneeId: actor.id, status: 'OPEN' },
+        {
+          status: 'APPROVED',
+          resolutionNote: 'پاسخ ارسال شد',
+          resolvedAt: new Date(),
+          conversationId,
+        },
+      );
+      if (!updated.affected) {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این پیام قبلاً پاسخ داده شده یا بسته شده است.',
+        });
+      }
+
+      return tx.save(
+        tx.create(CartableTask, {
+          assigneeId: target.id,
+          category: task.category,
+          title: task.title,
+          description: dto.body.trim(),
+          senderId: actor.id,
+          senderLabelFa: `${actor.fullName} · ${ROLE_LABELS_FA[actor.role]}`,
+          sourceType: task.sourceType,
+          sourceId: task.sourceId,
+          conversationId,
+          attachments: dto.attachmentIds ?? [],
+        }),
+      );
+    });
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'پاسخ به پیام داخلی',
+      detail: `${actor.fullName} به پیام «${task.title}» پاسخ داد و مورد دریافتی را بست.`,
+      entityType: 'CartableTask',
+      entityId: task.id,
+      metadata: {
+        replyTaskId: reply.id,
+        recipientId: target.id,
+        conversationId,
+      },
+    });
+    await this.notifications.notify({
+      recipientId: target.id,
+      category: 'CARTABLE',
+      action: 'INTERNAL_REPLY',
+      title: `پاسخ: ${task.title}`,
+      body: `پاسخ جدید از ${actor.fullName}`,
+      entityType: 'CartableTask',
+      entityId: reply.id,
+      dedupeKey: `CartableTask:${reply.id}:INTERNAL_REPLY:${target.id}`,
+    });
+
+    return reply;
   }
 
   async listSentEmployeeManagerMessages(actor: AuthenticatedUser) {

@@ -166,7 +166,7 @@ export const RESULTS_COPY: Record<StoredLocale, ResultsCopy> = {
     destAirportLabel: 'فرودگاه مقصد',
     flightNoLabel: 'شماره پرواز',
     aircraftLabel: 'نوع هواپیما',
-    baggageLabel: 'مجاز بار',
+    baggageLabel: 'بار مجاز',
     cabinLabel: 'کلاس پروازی',
     economyLabel: 'اکونومی',
     comfortLabel: 'کامفورت',

@@ -1,11 +1,11 @@
-export type CartableCategory = 'ADMIN' | 'AGENCY' | 'MANAGER';
-export type CartableStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'TRANSFERRED';
+export type CartableCategory = "ADMIN" | "AGENCY" | "MANAGER";
+export type CartableStatus = "OPEN" | "APPROVED" | "REJECTED" | "TRANSFERRED";
 export type CartableSourceType =
-  | 'MANAGER_MESSAGE'
-  | 'MANAGER_REFERRAL'
-  | 'AGENCY_REQUEST'
-  | 'CHAIR_PERMISSION'
-  | 'EMPLOYEE_MESSAGE';
+  | "MANAGER_MESSAGE"
+  | "MANAGER_REFERRAL"
+  | "AGENCY_REQUEST"
+  | "CHAIR_PERMISSION"
+  | "EMPLOYEE_MESSAGE";
 
 export interface CartableHistoryEntry {
   id: string;
@@ -13,6 +13,7 @@ export interface CartableHistoryEntry {
   detail: string;
   actorLabel: string | null;
   actorRole: string | null;
+  attachments?: ReferralAttachment[];
   createdAt: string;
 }
 
@@ -25,6 +26,7 @@ export interface CartableTask {
   sender: { fullName: string; role: string } | null;
   sourceType: CartableSourceType | null;
   sourceId: string | null;
+  conversationId?: string | null;
   status: CartableStatus;
   resolutionNote: string | null;
   createdAt: string;
@@ -40,7 +42,7 @@ export interface CartableListResult {
   totalOpen: number;
 }
 
-export type ChairPermissionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type ChairPermissionStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface ChairPermission {
   id: string;
@@ -55,8 +57,8 @@ export interface StaffDirectoryEntry {
   roleLabelFa: string;
 }
 
-export type ReferralPriority = 'HIGH' | 'MEDIUM' | 'LOW';
-export type ReferralStatus = 'SENT' | 'REVIEWING' | 'REPORTED' | 'CLOSED';
+export type ReferralPriority = "HIGH" | "MEDIUM" | "LOW";
+export type ReferralStatus = "SENT" | "REVIEWING" | "REPORTED" | "CLOSED";
 
 export interface ReferralRecipient {
   recipientId: string;
@@ -94,7 +96,12 @@ export interface Referral {
 
 export interface ReferralListResult {
   referrals: Referral[];
-  kpis: { total: number; awaitingReport: number; reported: number; closed: number };
+  kpis: {
+    total: number;
+    awaitingReport: number;
+    reported: number;
+    closed: number;
+  };
 }
 
 export interface MyReferral {
@@ -116,17 +123,12 @@ export interface MyReferralListResult {
 }
 
 export type ManagerMessageDept =
-  | 'FINANCE'
-  | 'COMMERCIAL'
-  | 'SUPPORT'
-  | 'AGENCIES'
-  | 'CEO'
-  | 'ALL_MANAGERS';
+  "FINANCE" | "COMMERCIAL" | "SUPPORT" | "AGENCIES" | "CEO" | "ALL_MANAGERS";
 
 export interface SendMessageResult {
   message: { id: string; subject: string };
   deliveredCount: number;
-  warning?: 'PARTIAL_DELIVERY';
+  warning?: "PARTIAL_DELIVERY";
 }
 
 export interface EmployeeManagerRecipient {

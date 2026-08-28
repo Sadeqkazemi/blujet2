@@ -18,6 +18,16 @@ All money columns are `Int` (IRR, no decimals) per the Financial Rules.
 All `Jalali`-displayed dates are stored as UTC `DateTime`; Jalali conversion
 happens at the frontend edge only (`frontend/src/lib/jalali.ts`).
 
+## 2026-08-28 — Finance/commercial employee delegation hardening
+
+No schema migration is required. The existing `employee_permissions` relation
+stores the IT-manager grants. `fn_dashboard`, `fn_transactions`, and
+`fn_settlements` now unlock distinct real reporting endpoints, while the
+existing employee department keeps the duplicated `sv_view` permission scoped
+to either commercial ancillary services or IT site services. Finance and
+agency-finance screens continue to read immutable ledger entries, invoices,
+bookings, payments, and credit-request records; no mock rows are introduced.
+
 ---
 
 ## Finance-manager completion (2026-08-13) — exports and accounting connections
@@ -199,6 +209,12 @@ decisions (marked ⚑) are product decisions surfaced for approval, not
 silently invented.
 
 - `CartableTask { id, assigneeId→User, category: ADMIN|AGENCY|MANAGER, title, description, senderId→User?, senderLabelFa? (display fallback when no User row backs the sender), sourceType?: MANAGER_MESSAGE|MANAGER_REFERRAL|AGENCY_REQUEST|CHAIR_PERMISSION, sourceId?, status: OPEN|APPROVED|REJECTED|TRANSFERRED, resolutionNote?, transferredToId→User?, resolvedAt?, createdAt }`
+- `CartableTask.conversationId text NULL` groups reciprocal internal staff
+  messages. It is indexed with `createdAt` for chronological history reads.
+  Only `MANAGER_MESSAGE` and `EMPLOYEE_MESSAGE` use it. Each direct delivery
+  receives one UUID; every recipient of a department broadcast receives a
+  different UUID. Reply rows retain the same value while alternating sender
+  and assignee. Resolved rows are retained as immutable conversation history.
 
 ### Current reporting and booking read models
 

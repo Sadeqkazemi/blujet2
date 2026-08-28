@@ -359,47 +359,49 @@ export default function ResultsFlightCard({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 7,
-                marginBottom: 6,
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 9,
               }}
             >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 9,
+                    background: '#edf4fd',
+                    color: '#1668c4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 15,
+                    flex: 'none',
+                    transform: isRTL ? 'scaleX(-1)' : undefined,
+                  }}
+                >
+                  ✈
+                </span>
+                <span
+                  style={{ fontSize: 16, fontWeight: 900, color: '#16202e' }}
+                >
+                  {copy.flightDetailsLabel}
+                </span>
+              </div>
               <span
                 style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 7,
-                  background: '#eef4fb',
-                  color: '#1668c4',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 13,
-                  flex: 'none',
-                  transform: isRTL ? 'scaleX(-1)' : undefined,
-                }}
-              >
-                ✈
-              </span>
-              <span
-                style={{ fontSize: 14.5, fontWeight: 800, color: '#16202e' }}
-              >
-                {copy.flightDetailsLabel}
-              </span>
-              <span
-                style={{
-                  marginRight: 'auto',
-                  marginLeft: isRTL ? 'auto' : undefined,
                   fontSize: 12,
-                  color: '#7a8696',
+                  color: '#6f7d90',
                   background: '#f2f5f9',
-                  padding: '2px 8px',
-                  borderRadius: 10,
+                  padding: '4px 10px',
+                  borderRadius: 12,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {copy.automatedLabel}
               </span>
             </div>
-            <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 18 }}>
+            <div style={{ fontSize: 13.5, color: '#5a6678', marginBottom: 20 }}>
               {copy.outboundLabel}:{' '}
               <span
                 data-testid="flight-detail-route-flow"
@@ -408,116 +410,177 @@ export default function ResultsFlightCard({
                   display: 'inline-flex',
                   flexDirection: isRTL ? 'row-reverse' : 'row',
                   alignItems: 'center',
-                  gap: 6,
+                  gap: 7,
+                  color: '#253246',
+                  fontWeight: 700,
                 }}
               >
                 <span data-route-point="origin">{cityName(flight.originCode)}</span>
-                <span aria-hidden="true">{isRTL ? '←' : '→'}</span>
+                <span
+                  data-testid="flight-detail-route-airplane"
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-flex',
+                    width: 26,
+                    height: 26,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '50%',
+                    background: '#edf4fd',
+                    color: '#1668c4',
+                    fontSize: 13,
+                    transform: isRTL ? 'scaleX(-1)' : undefined,
+                  }}
+                >
+                  ✈
+                </span>
                 <span data-route-point="destination">{cityName(flight.destCode)}</span>
               </span>
             </div>
-            <div style={{ display: 'flex', gap: 13 }}>
+            <div
+              data-testid="flight-detail-schedule"
+              dir={isRTL ? 'rtl' : 'ltr'}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile
+                  ? 'minmax(0, 1fr) 96px minmax(0, 1fr)'
+                  : 'minmax(0, 1fr) minmax(150px, 1.3fr) minmax(0, 1fr)',
+                alignItems: 'center',
+                gap: isMobile ? 8 : 16,
+                padding: isMobile ? '12px 2px 17px' : '14px 8px 22px',
+              }}
+            >
+              <div
+                data-schedule-point="origin"
+                style={{ textAlign: isRTL ? 'right' : 'left', minWidth: 0 }}
+              >
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, color: '#10233e' }}>
+                  {dep}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 13, color: '#66758a' }}>
+                  {cityName(flight.originCode)} · <b dir="ltr">{flight.originCode}</b>
+                </div>
+                <div style={{ marginTop: 7, fontSize: 12.5, color: '#8793a4' }}>
+                  {dateShort}
+                </div>
+              </div>
+
               <div
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  paddingTop: 4,
+                  minWidth: 0,
+                  textAlign: 'center',
+                  padding: isMobile ? '5px 3px' : '7px 4px',
                 }}
               >
-                <span
+                <div
                   style={{
-                    width: 11,
-                    height: 11,
-                    border: '2px solid #1668c4',
-                    borderRadius: '50%',
+                    marginBottom: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 5,
+                    fontSize: isMobile ? 10.5 : 12.5,
+                    color: '#53657b',
+                    fontWeight: 800,
+                    lineHeight: 1.4,
+                    whiteSpace: 'nowrap',
                   }}
-                />
+                >
+                  <span aria-hidden="true" style={{ color: '#8aa0bb', fontSize: 13 }}>◷</span>
+                  {dur}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: 0 }}>
+                  <span
+                    data-testid="flight-detail-origin-dot"
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      background: '#1668c4',
+                      flex: 'none',
+                      boxShadow: '0 0 0 3px #e6f0fb',
+                    }}
+                  />
+                  <span style={{ height: 1, flex: 1, background: '#b9cce4' }} />
+                  <span
+                    data-testid="flight-detail-schedule-airplane"
+                    aria-hidden="true"
+                    style={{
+                      width: isMobile ? 31 : 38,
+                      height: isMobile ? 31 : 38,
+                      borderRadius: '50%',
+                      border: '4px solid #fff',
+                      background: '#1668c4',
+                      color: '#fff',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: 'none',
+                      fontSize: isMobile ? 14 : 17,
+                      boxShadow: '0 5px 16px rgba(22,104,196,.25)',
+                      transform: isRTL ? 'scaleX(-1)' : undefined,
+                    }}
+                  >
+                    ✈
+                  </span>
+                  <span style={{ height: 1, flex: 1, background: '#b9cce4' }} />
+                  <span
+                    data-testid="flight-detail-destination-dot"
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: '50%',
+                      border: '2px solid #9db8da',
+                      background: '#fff',
+                      flex: 'none',
+                    }}
+                  />
+                </div>
                 <span
                   style={{
-                    position: 'relative',
-                    flex: 1,
-                    width: 2,
-                    background: '#d4e3f5',
-                    minHeight: 54,
+                    display: 'inline-flex',
+                    marginTop: 11,
+                    padding: 0,
+                    borderRadius: 0,
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#268252',
+                    fontSize: isMobile ? 10.5 : 11.5,
+                    fontWeight: 800,
+                    whiteSpace: 'nowrap',
+                    gap: 5,
+                    alignItems: 'center',
                   }}
                 >
                   <span
                     aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      bottom: -1,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      color: '#1668c4',
-                      fontSize: 11,
-                      lineHeight: 1,
-                    }}
-                  >
-                    ▼
-                  </span>
+                    style={{ width: 6, height: 6, borderRadius: '50%', background: '#35a267' }}
+                  />
+                  {stops}
                 </span>
-                <span
-                  style={{
-                    width: 11,
-                    height: 11,
-                    background: '#1668c4',
-                    borderRadius: '50%',
-                  }}
-                />
               </div>
+
               <div
-                style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: 13,
-                }}
+                data-schedule-point="destination"
+                style={{ textAlign: isRTL ? 'left' : 'right', minWidth: 0 }}
               >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 17, fontWeight: 800 }}>{dep}</div>
-                    <div style={{ fontSize: 13, color: '#6b7787' }}>
-                      {copy.originAirportLabel} · {flight.originCode}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 13, color: '#6b7787' }}>
-                    {dateShort}
-                  </div>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 900, color: '#10233e' }}>
+                  {arr}
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 17, fontWeight: 800 }}>{arr}</div>
-                    <div style={{ fontSize: 13, color: '#6b7787' }}>
-                      {copy.destAirportLabel} · {flight.destCode}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 13, color: '#6b7787' }}>
-                    {dateShort}
-                  </div>
+                <div style={{ marginTop: 4, fontSize: 13, color: '#66758a' }}>
+                  {cityName(flight.destCode)} · <b dir="ltr">{flight.destCode}</b>
+                </div>
+                <div style={{ marginTop: 7, fontSize: 12.5, color: '#8793a4' }}>
+                  {dateShort}
                 </div>
               </div>
             </div>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '10px 18px',
-                marginTop: 20,
-                paddingTop: 13,
+                gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
+                gap: 8,
+                paddingTop: 14,
                 borderTop: '1px solid #eef1f5',
               }}
             >
@@ -530,13 +593,37 @@ export default function ResultsFlightCard({
                 <div
                   key={label}
                   style={{
+                    background: '#f8fafc',
+                    border: '1px solid #edf1f6',
+                    borderRadius: 10,
+                    padding: '9px 10px',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: 13.5,
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                    fontSize: 13,
                   }}
                 >
-                  <span style={{ color: '#6b7787' }}>{label}</span>
-                  <span style={{ fontWeight: 600, color: '#16202e' }} dir="ltr">
+                  <span
+                    style={{
+                      width: '100%',
+                      color: '#7a8798',
+                      fontSize: 11.5,
+                      textAlign: isRTL ? 'right' : 'left',
+                    }}
+                  >
+                    {label}
+                  </span>
+                  <span
+                    style={{
+                      width: '100%',
+                      fontWeight: 800,
+                      color: '#16202e',
+                      textAlign: 'center',
+                    }}
+                    dir="ltr"
+                  >
                     {value}
                   </span>
                 </div>

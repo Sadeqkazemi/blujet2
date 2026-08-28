@@ -7,6 +7,10 @@ const PERMISSION_DEPENDENCIES: Readonly<Record<string, readonly string[]>> = {
   fl_cities: ['fl_view'],
   fl_costs: ['fl_view'],
   fl_history: ['fl_view'],
+  fl_sales_view: ['fl_view'],
+  fl_site_sales: ['fl_sales_view'],
+  fl_agency_sales: ['fl_sales_view'],
+  fl_agency_allotments: ['fl_sales_view'],
   rt_create: ['rt_view'],
   rt_manage: ['rt_view'],
   ac_manage: ['ac_view'],
@@ -18,6 +22,8 @@ const PERMISSION_DEPENDENCIES: Readonly<Record<string, readonly string[]>> = {
   ag_debtors: ['ag_list'],
   cr_manage: ['cr_view'],
   rp_exports: ['rp_finance'],
+  fn_transactions: ['fn_dashboard'],
+  fn_settlements: ['fn_dashboard'],
   // IT employee actions stay independent; selecting one must not silently
   // grant the section-wide users/security capability.
   sv_config: ['sv_view'],

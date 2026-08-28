@@ -15,4 +15,23 @@ describe('CartableController access', () => {
       Reflect.getMetadata(ROLES_KEY, CartableController.prototype.getById),
     ).toContain('IT_MANAGER');
   });
+
+  it('keeps every internal staff role authorized at controller scope', () => {
+    const roles = Reflect.getMetadata(
+      ROLES_KEY,
+      CartableController,
+    ) as string[];
+    expect(roles).toEqual(
+      expect.arrayContaining([
+        'EMPLOYEE',
+        'IT_MANAGER',
+        'OPERATIONS_MANAGER',
+        'FINANCE_MANAGER',
+        'COMMERCIAL_MANAGER',
+        'SITE_ADMIN',
+      ]),
+    );
+    expect(roles).not.toContain('USER');
+    expect(roles).not.toContain('AGENCY');
+  });
 });

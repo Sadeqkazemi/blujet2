@@ -15,6 +15,10 @@ import { User } from './user.entity';
 @Index('cartable_tasks_assigneeId_status_idx', ['assigneeId', 'status'])
 @Index('cartable_tasks_sourceType_sourceId_idx', ['sourceType', 'sourceId'])
 @Index('cartable_tasks_assigneeId_readAt_idx', ['assigneeId', 'readAt'])
+@Index('cartable_tasks_conversationId_createdAt_idx', [
+  'conversationId',
+  'createdAt',
+])
 @Entity('cartable_tasks')
 export class CartableTask {
   @PrimaryColumn({
@@ -77,6 +81,9 @@ export class CartableTask {
 
   @Column({ type: 'text', nullable: true })
   sourceId!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  conversationId!: string | null;
 
   @Column({
     type: 'enum',
