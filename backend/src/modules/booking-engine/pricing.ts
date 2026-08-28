@@ -15,6 +15,25 @@ const FALLBACK_ECONOMY_PRICE_IRR: Irr = 38_000_000n;
  * percent (180 = ×1.8) — a documented placeholder until commercial pricing
  * owns per-cabin fares directly. */
 const BUSINESS_MULTIPLIER_PCT = 180;
+const COMFORT_MULTIPLIER_PCT = 125;
+const FIRST_MULTIPLIER_PCT = 250;
+
+export function fallbackCabinPrice(
+  economyPrice: Irr,
+  cabin: CabinClass,
+): Irr {
+  const multiplier =
+    cabin === 'FIRST'
+      ? FIRST_MULTIPLIER_PCT
+      : cabin === 'BUSINESS'
+        ? BUSINESS_MULTIPLIER_PCT
+        : cabin === 'COMFORT'
+          ? COMFORT_MULTIPLIER_PCT
+          : 100;
+  return multiplier === 100
+    ? economyPrice
+    : roundIrrTo(pctOfIrr(economyPrice, multiplier), 100_000n);
+}
 
 /**
  * Pricing is separate from availability (CLAUDE.md) — the single source of
@@ -53,14 +72,7 @@ export async function getCabinPrice(
       ? (pricing.registeredPriceIrr as Irr)
       : ((instance?.basePriceIrr as Irr | null) ?? FALLBACK_ECONOMY_PRICE_IRR);
 
-  if (cabin === 'BUSINESS') {
-    return roundIrrTo(
-      pctOfIrr(economyPrice, BUSINESS_MULTIPLIER_PCT),
-      100_000n,
-    );
-  }
-  // ECONOMY and COMFORT share the economy base when no CabinFare / fare-class row exists.
-  return economyPrice;
+  return fallbackCabinPrice(economyPrice, cabin);
 }
 
 /**

@@ -30,8 +30,8 @@ export function fetchAirports() {
   return apiGet<Airport[]>('/search/airports');
 }
 
-export function searchFlights(origin: string, dest: string, date: string) {
-  const q = new URLSearchParams({ origin, dest, date });
+export function searchFlights(origin: string, dest: string, date: string, cabin: CabinClass) {
+  const q = new URLSearchParams({ origin, dest, date, cabin });
   return apiGet<SearchFlightResult[]>(`/search/flights?${q.toString()}`);
 }
 
@@ -43,13 +43,15 @@ export function fetchSearchAdvisory(
   origin: string,
   dest: string,
   date: string,
+  cabin: CabinClass,
 ) {
-  const q = new URLSearchParams({ origin, dest, date });
+  const q = new URLSearchParams({ origin, dest, date, cabin });
   return apiGet<SearchAdvisoryResult>(`/search/advisory?${q.toString()}`);
 }
 
-export function fetchPriceCalendar(origin: string, dest: string, date: string) {
+export function fetchPriceCalendar(origin: string, dest: string, date: string, cabin?: CabinClass) {
   const q = new URLSearchParams({ origin, dest, date });
+  if (cabin) q.set('cabin', cabin);
   return apiGet<PriceCalendarDay[]>(`/search/price-calendar?${q.toString()}`);
 }
 

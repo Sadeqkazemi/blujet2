@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPassengersFromMix,
+  extraDescription,
+  extraTitle,
   passengerTotalIrr,
   passengerTypeOrdinal,
   seatCountForMix,
@@ -8,6 +10,27 @@ import {
 } from './checkout-types';
 
 describe('passenger pricing helpers', () => {
+  it('uses localized ancillary text without Persian fallback in English or Arabic', () => {
+    const extra = {
+      id: 'e1',
+      code: 'EXTRA_BAGGAGE' as const,
+      titleFa: 'بار اضافه',
+      titleEn: 'Extra baggage',
+      titleAr: 'أمتعة إضافية',
+      descriptionFa: 'شرح فارسی',
+      descriptionEn: 'Extra baggage allowance',
+      descriptionAr: 'وزن أمتعة إضافي',
+      billingUnit: 'PER_KG' as const,
+      priceIrr: '1000',
+      selected: false,
+      quantity: 1,
+    };
+
+    expect(extraTitle(extra, 'en')).toBe('Extra baggage');
+    expect(extraTitle(extra, 'ar')).toBe('أمتعة إضافية');
+    expect(extraDescription(extra, 'en')).toBe('Extra baggage allowance');
+    expect(extraDescription(extra, 'ar')).toBe('وزن أمتعة إضافي');
+  });
   it('calculates system adult, child and infant totals', () => {
     expect(
       passengerTotalIrr('1000000', { adults: 1, children: 1, infants: 1 }),

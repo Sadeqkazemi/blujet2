@@ -152,7 +152,7 @@ export default function ResultsBuyModal({
         <div className="grid gap-0 md:grid-cols-[1fr_280px]">
           <div className="border-b border-[#e6eaf0] bg-white p-4 sm:p-5 md:border-b-0 md:border-e">
             <div className="mb-3 text-sm font-extrabold text-[#0d2640]">
-              {cityName(flight.originCode)} → {cityName(flight.destCode)} ·{' '}
+              {cityName(flight.originCode)} {locale === 'en' ? '→' : '←'} {cityName(flight.destCode)} ·{' '}
               {formatFlightClock(flight.departureAt, locale)}
             </div>
             <p className="mb-3 text-xs leading-relaxed text-[#96701a]">{copy.seatSelectionHint}</p>

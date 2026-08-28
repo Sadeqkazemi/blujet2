@@ -1123,7 +1123,7 @@ export default function HomeSearchCard({
                   label={t.lblOrigin}
                   value={origin}
                   display={originDisplay()}
-                  airports={airportOptions}
+                  airports={airportOptions.filter((airport) => airport.code !== dest)}
                   onPick={setOrigin}
                   testId="home-origin"
                   fieldStyle={{
@@ -1180,7 +1180,7 @@ export default function HomeSearchCard({
                   label={t.lblDestination}
                   value={dest}
                   display={destDisplay()}
-                  airports={airportOptions}
+                  airports={airportOptions.filter((airport) => airport.code !== origin)}
                   onPick={setDest}
                   testId="home-dest"
                   disabled={!origin}

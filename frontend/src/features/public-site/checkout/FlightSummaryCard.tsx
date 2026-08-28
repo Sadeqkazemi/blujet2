@@ -5,7 +5,9 @@ import type { FlightSnapshot } from './checkout-types';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
+  COMFORT: { fa: 'کامفورت', en: 'Comfort', ar: 'كومفورت' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
+  FIRST: { fa: 'فرست', en: 'First', ar: 'الدرجة الأولى' },
 };
 
 export default function FlightSummaryCard({
@@ -35,6 +37,7 @@ export default function FlightSummaryCard({
     <section
       className="flex min-h-[110px] flex-wrap items-center justify-between gap-3.5 rounded-[15px] border border-[#eef1f5] bg-white px-[18px] py-6 md:min-h-[130px] md:py-8"
       data-testid="checkout-flight-summary"
+      dir={locale === 'en' ? 'ltr' : 'rtl'}
     >
       <div className="flex items-center gap-3">
         <span

@@ -9,7 +9,9 @@ import TicketBarcode from '../../components/public/TicketBarcode';
 
 const CABIN_LABEL: Record<string, Record<StoredLocale, string>> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
+  COMFORT: { fa: 'کامفورت', en: 'Comfort', ar: 'كومفورت' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
+  FIRST: { fa: 'فرست', en: 'First', ar: 'الدرجة الأولى' },
 };
 
 const STR: Record<
@@ -175,7 +177,11 @@ export default function TicketPage() {
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-4 px-6 py-5">
+          <div
+            className="flex items-center justify-between gap-4 px-6 py-5"
+            dir={locale === 'en' ? 'ltr' : 'rtl'}
+            data-testid="ticket-route"
+          >
             <div className="text-center">
               <div className="font-num text-2xl font-black text-[#0d2640]" dir="ltr">
                 {booking.originCode}
@@ -187,7 +193,10 @@ export default function TicketPage() {
                 {booking.flightNo}
               </div>
               <div className="relative border-t-2 border-dashed border-[#d5e1f0]">
-                <span className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-white px-1.5 text-sm text-[#1668c4]">
+                <span
+                  className="absolute -top-2.5 right-1/2 translate-x-1/2 bg-white px-1.5 text-sm text-[#1668c4]"
+                  style={{ transform: locale === 'en' ? 'translateX(50%)' : 'translateX(50%) scaleX(-1)' }}
+                >
                   ✈
                 </span>
               </div>

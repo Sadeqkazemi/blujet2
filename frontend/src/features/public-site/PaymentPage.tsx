@@ -182,6 +182,7 @@ function PaymentPricingAside({
   paxCount,
   ticketIrr,
   taxesIrr,
+  extras,
   priceDisplay,
   isClubMember,
   clubDisplay,
@@ -200,6 +201,7 @@ function PaymentPricingAside({
   paxCount: number;
   ticketIrr: number;
   taxesIrr: number;
+  extras: NonNullable<BookingDetail['extras']>;
   priceDisplay: string;
   isClubMember: boolean;
   clubDisplay: string;
@@ -248,6 +250,19 @@ function PaymentPricingAside({
             {localeMoney(taxesIrr, locale)}
           </span>
         </div>
+        {extras.map((extra) => {
+          const title = locale === 'en'
+            ? extra.titleEn || extra.code.replaceAll('_', ' ')
+            : locale === 'ar'
+              ? extra.titleAr || 'خدمة إضافية'
+              : extra.titleFa;
+          return (
+            <div key={extra.id} className="grid grid-cols-[1fr_auto] items-center gap-2 border-t border-[#eef1f5] px-3.5 py-2.5 text-[13px] text-[#5a6678]">
+              <span>{title}</span>
+              <span className="font-bold text-[#16202e]">{localeMoney(extra.totalIrr, locale)}</span>
+            </div>
+          );
+        })}
       </div>
 
       {isClubMember && (
@@ -514,7 +529,8 @@ export default function PaymentPage() {
   const taxesIrr = Number(
     booking.taxIrr ?? Math.round(Number(booking.priceIrr) * 0.084),
   );
-  const ticketIrr = Number(booking.priceIrr) - taxesIrr;
+  const extrasIrr = Number(booking.extrasIrr ?? '0');
+  const ticketIrr = Number(booking.priceIrr) - taxesIrr - extrasIrr;
   const priceDisplay = localeMoney(booking.priceIrr, locale);
   const walletDisplay =
     walletBalanceIrr !== null ? localeMoney(walletBalanceIrr, locale) : '—';
@@ -532,6 +548,7 @@ export default function PaymentPage() {
       paxCount={paxCount}
       ticketIrr={ticketIrr}
       taxesIrr={taxesIrr}
+      extras={booking.extras ?? []}
       priceDisplay={priceDisplay}
       isClubMember={isClubMember}
       clubDisplay={clubDisplay}

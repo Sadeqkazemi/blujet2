@@ -124,7 +124,9 @@ function formatHoldClock(secs: number, locale: StoredLocale): string {
 
 const CABIN_LABEL: Record<string, Tr> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
+  COMFORT: { fa: 'کامفورت', en: 'Comfort', ar: 'كومفورت' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
+  FIRST: { fa: 'فرست', en: 'First', ar: 'الدرجة الأولى' },
 };
 
 const LOCK_STATUS_LABEL: Record<string, StatusEntry> = {
@@ -1217,7 +1219,7 @@ export default function AccountPage() {
                 <div key={b.id} data-testid="account-trip" data-status={statusKey} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
-                      {b.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {b.destCode}
+                      {b.originCode} <span style={{ color: '#b9c2cf' }}>{locale === 'en' ? '→' : '←'}</span> {b.destCode}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
                       {b.flightNo} · {formatLocaleDateTime(b.departureAt, locale)} · {t.pnrLabel} <span dir="ltr">{b.pnr}</span>
@@ -1360,7 +1362,7 @@ export default function AccountPage() {
                 <div key={l.id} data-testid="account-price-lock" style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 800, color: '#0d2640' }}>
-                      {l.flight.originCode} <span style={{ color: '#b9c2cf' }}>←</span> {l.flight.destCode}
+                      {l.flight.originCode} <span style={{ color: '#b9c2cf' }}>{locale === 'en' ? '→' : '←'}</span> {l.flight.destCode}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#8a96a6', marginTop: 4 }}>
                       {l.flight.flightNo} · {formatLocaleDateTime(l.flight.departureAt, locale)} · {CABIN_LABEL[l.cabin]?.[locale] ?? l.cabin}

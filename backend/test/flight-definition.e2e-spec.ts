@@ -502,7 +502,7 @@ describe('Flight definition + charge rules + CEO approval (e2e)', () => {
 
     const search = await request(app.getHttpServer())
       .get('/search/flights')
-      .query({ origin: 'THR', dest: 'MHD', date });
+      .query({ origin: 'THR', dest: 'MHD', date, cabin: 'COMFORT' });
     expect(search.status).toBe(200);
     const row = (
       search.body.data as {

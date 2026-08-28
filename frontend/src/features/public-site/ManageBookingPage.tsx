@@ -31,7 +31,9 @@ interface Tr {
 
 const CABIN_LABEL: Record<string, Tr> = {
   ECONOMY: { fa: 'اکونومی', en: 'Economy', ar: 'اقتصادية' },
+  COMFORT: { fa: 'کامفورت', en: 'Comfort', ar: 'كومفورت' },
   BUSINESS: { fa: 'بیزینس', en: 'Business', ar: 'درجة الأعمال' },
+  FIRST: { fa: 'فرست', en: 'First', ar: 'الدرجة الأولى' },
 };
 
 const STR: Record<StoredLocale, {

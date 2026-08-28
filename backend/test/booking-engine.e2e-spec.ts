@@ -122,27 +122,34 @@ describe('Booking engine (e2e)', () => {
     );
   }
 
-  it('search returns the flight with both cabins priced and seatsLeft', async () => {
+  it('search returns only the exact requested cabin with its price and seatsLeft', async () => {
     const instance = await freshInstance();
     const date = instance.departureAt.toISOString().slice(0, 10);
 
-    const res = await request(app.getHttpServer())
+    const economyRes = await request(app.getHttpServer())
       .get('/search/flights')
-      .query({ origin: 'THR', dest: 'KIH', date });
+      .query({ origin: 'THR', dest: 'KIH', date, cabin: 'ECONOMY' });
 
-    expect(res.status).toBe(200);
-    const row = res.body.data.find(
+    expect(economyRes.status).toBe(200);
+    const economyRow = economyRes.body.data.find(
       (r: { flightInstanceId: string }) => r.flightInstanceId === instance.id,
     );
-    expect(row).toBeDefined();
-    expect(
-      row.cabins.find((c: { cabin: string }) => c.cabin === 'ECONOMY')
-        .seatsLeft,
-    ).toBe(6);
-    expect(
-      row.cabins.find((c: { cabin: string }) => c.cabin === 'BUSINESS')
-        .seatsLeft,
-    ).toBe(2);
+    expect(economyRow).toBeDefined();
+    expect(economyRow.cabins).toEqual([
+      expect.objectContaining({ cabin: 'ECONOMY', seatsLeft: 6 }),
+    ]);
+
+    const businessRes = await request(app.getHttpServer())
+      .get('/search/flights')
+      .query({ origin: 'THR', dest: 'KIH', date, cabin: 'BUSINESS' });
+    expect(businessRes.status).toBe(200);
+    const businessRow = businessRes.body.data.find(
+      (r: { flightInstanceId: string }) => r.flightInstanceId === instance.id,
+    );
+    expect(businessRow).toBeDefined();
+    expect(businessRow.cabins).toEqual([
+      expect.objectContaining({ cabin: 'BUSINESS', seatsLeft: 2 }),
+    ]);
   });
 
   it('lists cabin choices activated on currently sellable flight inventory', async () => {

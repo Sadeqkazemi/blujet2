@@ -110,6 +110,12 @@ const EXTRA_ICONS: Partial<Record<ExtraServiceState['code'], ReactNode>> = {
   CIP: <SvgCip />,
 };
 
+function seatServiceTitle(service: PublicAncillaryService, locale: StoredLocale): string {
+  if (locale === 'en') return service.titleEn || 'Seat option';
+  if (locale === 'ar') return service.titleAr || 'خيار المقعد';
+  return service.titleFa;
+}
+
 /** Left block is always 2 seats for generic maps; aisle before index 2. */
 const AISLE_BEFORE_INDEX = 2;
 
@@ -275,11 +281,15 @@ export default function ExtrasStep({
     void fetchPublicSiteRules(locale)
       .then((rules) => {
         if (!cancelled) {
-          setPetRulesText(rules.categories.find((category) => category.id === 'pets')?.text ?? '');
+          setPetRulesText(
+            locale === 'fa'
+              ? rules.categories.find((category) => category.id === 'pets')?.text ?? ''
+              : '',
+          );
         }
       })
       .catch(() => {
-        if (!cancelled) setPetRulesText('حمل حیوان خانگی فقط با قفس مناسب و مدارک سلامت معتبر امکان‌پذیر است.');
+        if (!cancelled) setPetRulesText('');
       });
     return () => {
       cancelled = true;
@@ -381,7 +391,7 @@ export default function ExtrasStep({
                   <div className="flex items-center gap-2" dir="ltr">
                     <button
                       type="button"
-                      aria-label="کاهش کیلوگرم"
+                      aria-label={locale === 'en' ? 'Decrease kilograms' : locale === 'ar' ? 'تقليل الكيلوغرامات' : 'کاهش کیلوگرم'}
                       onClick={() => onExtraQuantityChange(sv.id, Math.max(1, sv.quantity - 1))}
                       className="h-6 w-6 rounded bg-[#e8eef6] text-[#1668c4]"
                     >
@@ -392,7 +402,7 @@ export default function ExtrasStep({
                     </span>
                     <button
                       type="button"
-                      aria-label="افزایش کیلوگرم"
+                      aria-label={locale === 'en' ? 'Increase kilograms' : locale === 'ar' ? 'زيادة الكيلوغرامات' : 'افزایش کیلوگرم'}
                       onClick={() => onExtraQuantityChange(sv.id, Math.min(50, sv.quantity + 1))}
                       className="h-6 w-6 rounded bg-[#e8eef6] text-[#1668c4]"
                     >
@@ -545,7 +555,7 @@ export default function ExtrasStep({
                   if (!service) return null;
                   return (
                     <div key={key} className="rounded-xl border border-[#dce8f5] bg-[#f8fbff] px-3 py-2 text-[10.5px] text-[#53647a]">
-                      <span className="font-bold">{service.titleFa}</span>
+                      <span className="font-bold">{seatServiceTitle(service, locale)}</span>
                       <b className="font-num ms-2 text-[#1668c4]">{localeMoney(service.priceIrr, locale)} {t.toman}</b>
                     </div>
                   );
@@ -583,7 +593,10 @@ export default function ExtrasStep({
                 </b>
                 {selectedSeats.length > 0 && seatServices.length > 0 && (
                   <span className="ms-2 text-[10px] text-[#6b7787]" data-testid="checkout-seat-type-subtotal">
-                    ({selectedSeats.map((seatCode) => seatServiceByKey.get(classifySeatType(seatCode, aircraft))?.titleFa).filter(Boolean).join('، ')} · {localeMoney(selectedSeatTypesIrr.toString(), locale)} {t.toman})
+                    ({selectedSeats.map((seatCode) => {
+                      const service = seatServiceByKey.get(classifySeatType(seatCode, aircraft));
+                      return service ? seatServiceTitle(service, locale) : null;
+                    }).filter(Boolean).join(locale === 'en' ? ', ' : '، ')} · {localeMoney(selectedSeatTypesIrr.toString(), locale)} {t.toman})
                   </span>
                 )}
               </div>

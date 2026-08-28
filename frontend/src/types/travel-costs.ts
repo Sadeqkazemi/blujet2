@@ -20,6 +20,8 @@ export interface TravelCost {
   titleEn: string | null;
   titleAr: string | null;
   descriptionFa: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
   billingUnit: TravelExtraBillingUnit;
   priceIrr: string;
   active: boolean;
@@ -35,6 +37,8 @@ export interface TravelCostPayload {
   titleEn?: string;
   titleAr?: string;
   descriptionFa?: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
   billingUnit: TravelExtraBillingUnit;
   priceIrr: string;
   active?: boolean;
@@ -50,6 +54,8 @@ export type PublicTravelCost = Pick<
   | 'titleEn'
   | 'titleAr'
   | 'descriptionFa'
+  | 'descriptionEn'
+  | 'descriptionAr'
   | 'billingUnit'
   | 'priceIrr'
   | 'purchaseEnabled'

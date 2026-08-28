@@ -7,7 +7,7 @@ import {
   formatPriceCalendarPrice,
   priceCalendarCopy,
 } from '../../../lib/price-calendar';
-import type { PriceCalendarDay } from '../../../types/public-site';
+import type { CabinClass, PriceCalendarDay } from '../../../types/public-site';
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error' | 'empty';
 
@@ -24,6 +24,7 @@ export default function FlightPriceCalendar({
   dest,
   selectedDate,
   locale,
+  cabin,
   onSelectDate,
   compact = false,
 }: {
@@ -31,6 +32,7 @@ export default function FlightPriceCalendar({
   dest: string;
   selectedDate: string;
   locale: StoredLocale;
+  cabin?: CabinClass;
   onSelectDate: (isoDate: string) => void;
   /** Slightly tighter padding for embedding under the home search card. */
   compact?: boolean;
@@ -81,7 +83,9 @@ export default function FlightPriceCalendar({
     if (keepsCurrentStrip) setIsBrowsing(true);
     else setState('loading');
     try {
-      const data = await fetchPriceCalendar(origin, dest, calendarCenter);
+      const data = cabin
+        ? await fetchPriceCalendar(origin, dest, calendarCenter, cabin)
+        : await fetchPriceCalendar(origin, dest, calendarCenter);
       if (requestId !== requestSequenceRef.current) return;
       const sorted = [...data].sort((a, b) => a.date.localeCompare(b.date));
       daysRef.current = sorted;
@@ -100,7 +104,7 @@ export default function FlightPriceCalendar({
     } finally {
       if (requestId === requestSequenceRef.current) setIsBrowsing(false);
     }
-  }, [origin, dest, calendarCenter]);
+  }, [origin, dest, calendarCenter, cabin]);
 
   useEffect(() => {
     void load();

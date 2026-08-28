@@ -109,6 +109,23 @@ const unitLabels: Record<TravelExtraBillingUnit, string> = {
   PER_KG: 'برای هر کیلوگرم',
 };
 
+const serviceTranslations: Partial<Record<TravelExtraFixedCode, {
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+}>> = {
+  EXTRA_BAGGAGE: { titleEn: 'Extra baggage', titleAr: 'أمتعة إضافية', descriptionEn: 'Purchase baggage beyond the ticket allowance', descriptionAr: 'شراء وزن إضافي فوق المسموح في التذكرة' },
+  SPECIAL_MEAL: { titleEn: 'Special meal', titleAr: 'وجبة خاصة', descriptionEn: 'Choose a special in-flight meal', descriptionAr: 'اختيار وجبة خاصة على متن الطائرة' },
+  TRAVEL_INSURANCE: { titleEn: 'Travel insurance', titleAr: 'تأمين السفر', descriptionEn: 'Travel delay and loss protection', descriptionAr: 'تغطية تأخير الرحلة والخسائر' },
+  CIP: { titleEn: 'Airport CIP service', titleAr: 'خدمة كبار الشخصيات في المطار', descriptionEn: 'Dedicated airport reception and assistance', descriptionAr: 'استقبال ومساعدة خاصة في المطار' },
+  REFUND_FEE: { titleEn: 'Ticket refund', titleAr: 'استرداد التذكرة', descriptionEn: 'Ticket refund processing service', descriptionAr: 'خدمة معالجة استرداد التذكرة' },
+  PET: { titleEn: 'Pet travel', titleAr: 'سفر الحيوانات الأليفة', descriptionEn: 'Transport a pet in the cabin or hold', descriptionAr: 'نقل الحيوان الأليف في المقصورة أو مخزن الأمتعة' },
+  WHEELCHAIR: { titleEn: 'Wheelchair assistance', titleAr: 'خدمة الكرسي المتحرك', descriptionEn: 'Wheelchair assistance at the airport', descriptionAr: 'مساعدة الكرسي المتحرك في المطار' },
+  SEAT_SELECTION: { titleEn: 'Advance seat selection', titleAr: 'اختيار المقعد مسبقاً', descriptionEn: 'Choose a preferred seat during booking', descriptionAr: 'اختيار المقعد المفضل أثناء الحجز' },
+  DATE_CHANGE: { titleEn: 'Flight date change', titleAr: 'تغيير تاريخ الرحلة', descriptionEn: 'Service fee for changing the travel date', descriptionAr: 'رسوم خدمة تغيير تاريخ السفر' },
+};
+
 function ServiceIcon({ code }: { code: TravelExtraCode }) {
   return (
     <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[10px] bg-[#18223a] text-[#9fb0c7]">
@@ -151,6 +168,10 @@ export default function CommercialServicesPage() {
   const [addCode, setAddCode] = useState<AddServiceChoice>('EXTRA_BAGGAGE');
   const [addTitle, setAddTitle] = useState('');
   const [addDescription, setAddDescription] = useState('');
+  const [addTitleEn, setAddTitleEn] = useState('');
+  const [addTitleAr, setAddTitleAr] = useState('');
+  const [addDescriptionEn, setAddDescriptionEn] = useState('');
+  const [addDescriptionAr, setAddDescriptionAr] = useState('');
   const [addPrice, setAddPrice] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<TravelCost | null>(null);
 
@@ -220,6 +241,11 @@ export default function CommercialServicesPage() {
     const meta = code === 'CUSTOM' ? customServiceMeta : serviceMeta[code];
     setAddTitle(code === 'CUSTOM' ? '' : meta.label);
     setAddDescription(code === 'CUSTOM' ? '' : meta.description);
+    const translation = code === 'CUSTOM' ? undefined : serviceTranslations[code];
+    setAddTitleEn(translation?.titleEn ?? '');
+    setAddTitleAr(translation?.titleAr ?? '');
+    setAddDescriptionEn(translation?.descriptionEn ?? '');
+    setAddDescriptionAr(translation?.descriptionAr ?? '');
     setAddPrice('');
     setAddOpen(true);
     setError(null);
@@ -227,8 +253,8 @@ export default function CommercialServicesPage() {
 
   async function addService() {
     const priceIrr = parseTomanToRial(addPrice);
-    if (!addTitle.trim() || priceIrr == null) {
-      setError('عنوان و مبلغ معتبر را وارد کنید.');
+    if (!addTitle.trim() || !addTitleEn.trim() || !addTitleAr.trim() || priceIrr == null) {
+      setError('عنوان فارسی، انگلیسی، عربی و مبلغ معتبر را وارد کنید.');
       return;
     }
     setBusyId('new');
@@ -239,7 +265,11 @@ export default function CommercialServicesPage() {
         ? `CUSTOM_${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
         : addCode,
       titleFa: addTitle.trim(),
+      titleEn: addTitleEn.trim(),
+      titleAr: addTitleAr.trim(),
       descriptionFa: addDescription.trim() || meta.description,
+      descriptionEn: addDescriptionEn.trim(),
+      descriptionAr: addDescriptionAr.trim(),
       billingUnit: meta.billingUnit,
       priceIrr: String(priceIrr),
       active: true,
@@ -319,6 +349,11 @@ export default function CommercialServicesPage() {
                   const meta = code === 'CUSTOM' ? customServiceMeta : serviceMeta[code];
                   setAddTitle(code === 'CUSTOM' ? '' : meta.label);
                   setAddDescription(code === 'CUSTOM' ? '' : meta.description);
+                  const translation = code === 'CUSTOM' ? undefined : serviceTranslations[code];
+                  setAddTitleEn(translation?.titleEn ?? '');
+                  setAddTitleAr(translation?.titleAr ?? '');
+                  setAddDescriptionEn(translation?.descriptionEn ?? '');
+                  setAddDescriptionAr(translation?.descriptionAr ?? '');
                 }}
                 className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white"
               >
@@ -333,6 +368,22 @@ export default function CommercialServicesPage() {
             <label className="text-[11px] text-[#9fb0c7]">
               توضیح
               <input aria-label="توضیح خدمت" value={addDescription} onChange={(event) => setAddDescription(event.target.value)} className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white" />
+            </label>
+            <label className="text-[11px] text-[#9fb0c7]">
+              عنوان انگلیسی
+              <input dir="ltr" aria-label="عنوان انگلیسی خدمت" value={addTitleEn} onChange={(event) => setAddTitleEn(event.target.value)} className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white" />
+            </label>
+            <label className="text-[11px] text-[#9fb0c7]">
+              توضیح انگلیسی
+              <input dir="ltr" aria-label="توضیح انگلیسی خدمت" value={addDescriptionEn} onChange={(event) => setAddDescriptionEn(event.target.value)} className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white" />
+            </label>
+            <label className="text-[11px] text-[#9fb0c7]">
+              عنوان عربی
+              <input aria-label="عنوان عربی خدمت" value={addTitleAr} onChange={(event) => setAddTitleAr(event.target.value)} className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white" />
+            </label>
+            <label className="text-[11px] text-[#9fb0c7]">
+              توضیح عربی
+              <input aria-label="توضیح عربی خدمت" value={addDescriptionAr} onChange={(event) => setAddDescriptionAr(event.target.value)} className="mt-1.5 h-11 w-full rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white" />
             </label>
             <label className="text-[11px] text-[#9fb0c7]">
               قیمت (تومان)

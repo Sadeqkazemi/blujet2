@@ -144,6 +144,8 @@ export class Booking {
     id: string;
     code: string;
     titleFa: string;
+    titleEn?: string | null;
+    titleAr?: string | null;
     billingUnit: string;
     unitPriceIrr: string;
     quantity: number;

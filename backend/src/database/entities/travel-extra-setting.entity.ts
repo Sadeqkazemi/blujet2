@@ -72,6 +72,12 @@ export class TravelExtraSetting {
   @Column({ type: 'text', nullable: true })
   descriptionFa!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  descriptionEn!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  descriptionAr!: string | null;
+
   @Column({ type: 'text' })
   billingUnit!: TravelExtraBillingUnit;
 

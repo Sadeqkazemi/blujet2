@@ -67,11 +67,6 @@ async function pickAirport(testId: 'home-origin' | 'home-dest', code: string) {
   await userEvent.click(screen.getByTestId(`airport-option-${code}`));
 }
 
-async function pickToday() {
-  await userEvent.click(screen.getByTestId('home-date'));
-  await userEvent.click(screen.getByTestId('home-date-today'));
-}
-
 const CMS_HOME = {
   blocks: [
     {
@@ -333,7 +328,7 @@ describe('HomeSearchPage', () => {
     expect(screen.getByText('ابتدا مبدا را انتخاب کنید')).toBeInTheDocument();
   });
 
-  it('rejects identical origin and destination', async () => {
+  it('removes the selected origin from the destination choices', async () => {
     vi.spyOn(publicSiteApi, 'fetchAirports').mockResolvedValue(AIRPORTS);
     vi.spyOn(siteContentApi, 'fetchPublicHomeContent').mockResolvedValue(CMS_HOME);
     vi.spyOn(settingsApi, 'fetchPublicAppLinks').mockResolvedValue({
@@ -343,11 +338,9 @@ describe('HomeSearchPage', () => {
     await screen.findByTestId('home-origin');
 
     await pickAirport('home-origin', 'THR');
-    await pickAirport('home-dest', 'THR');
-    await pickToday();
-    await userEvent.click(screen.getByTestId('home-search-submit'));
-
-    expect(screen.getByText('مبدأ و مقصد نمی‌توانند یکسان باشند.')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('home-dest'));
+    expect(screen.queryByTestId('airport-option-THR')).not.toBeInTheDocument();
+    expect(screen.getByTestId('airport-option-MHD')).toBeInTheDocument();
   });
 
   it('renders translated marketing sections and Latin-digit toman prices in English', async () => {

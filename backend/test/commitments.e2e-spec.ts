@@ -441,10 +441,12 @@ describe('Charter / agency seat commitments (e2e)', () => {
     // Search results are cached 5-10min by route/date (CLAUDE.md); other
     // test runs against the same THR-KER route/date within the TTL would
     // otherwise serve a stale list missing this test's fresh instance.
-    await app.get(RedisService).del(`search:flights:THR:KER:${date}`);
+    await app
+      .get(RedisService)
+      .del(`search:flights:THR:KER:${date}:BUSINESS`);
     const res = await request(app.getHttpServer())
       .get('/search/flights')
-      .query({ origin: 'THR', dest: 'KER', date });
+      .query({ origin: 'THR', dest: 'KER', date, cabin: 'BUSINESS' });
     expect(res.status).toBe(200);
     const row = res.body.data.find(
       (r: { flightInstanceId: string }) => r.flightInstanceId === instance.id,
