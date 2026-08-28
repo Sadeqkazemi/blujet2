@@ -235,7 +235,10 @@ describe('Aircraft definition catalog (e2e)', () => {
     expect(md80After.economyColsRight).toEqual(md80Before.economyColsRight);
     expect(md80After.excludedSeatCodes).toEqual(md80Before.excludedSeatCodes);
     expect(md80After.comfortRowStart).toBeNull();
-    expect(md80After.firstRowStart).toBeNull();
+    expect(md80After.firstRowStart).toBe(md80Before.firstRowStart);
+    expect(md80After.firstRowEnd).toBe(md80Before.firstRowEnd);
+    expect(md80After.firstColsLeft).toEqual(md80Before.firstColsLeft);
+    expect(md80After.firstColsRight).toEqual(md80Before.firstColsRight);
   });
 
   describe('/flights/aircraft-definitions (canonical alias, PR #126)', () => {

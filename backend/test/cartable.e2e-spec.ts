@@ -779,7 +779,7 @@ describe('Cartable + referrals + messages (e2e)', () => {
     expect(res.body.data.deliveredCount).toBeGreaterThan(0);
   });
 
-  it('ALL_MANAGERS fans out to every active exec account except the sender; SUPPORT flags PARTIAL_DELIVERY', async () => {
+  it('ALL_MANAGERS fans out to every active exec account except the sender; SUPPORT routes through active site admins', async () => {
     const ceo = await loginAs(app, 'ceo');
     const ceoId = await userId('ceo');
     const expectedRecipients = await dataSource.getRepository(User).count({
@@ -801,8 +801,12 @@ describe('Cartable + referrals + messages (e2e)', () => {
       .set('Authorization', `Bearer ${ceo.accessToken}`)
       .send({ toDept: 'SUPPORT', subject: 'به پشتیبانی', body: 'متن' });
     expect(support.status).toBe(201);
-    expect(support.body.data.deliveredCount).toBe(0);
-    expect(support.body.data.warning).toBe('PARTIAL_DELIVERY');
+    const activeSiteAdmins = await dataSource.getRepository(User).countBy({
+      role: 'SITE_ADMIN',
+      isActive: true,
+    });
+    expect(support.body.data.deliveredCount).toBe(activeSiteAdmins);
+    expect(support.body.data.warning).toBeUndefined();
   });
 
   it('GET /manager-messages/sent returns only the caller’s messages', async () => {
