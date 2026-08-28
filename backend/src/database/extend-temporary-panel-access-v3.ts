@@ -23,6 +23,9 @@ async function main(): Promise<void> {
   const expectedRoles = new Map<string, Role>(
     accounts.map(({ username, role }) => [username, role] as const),
   );
+  const expectedAccounts = new Map<string, (typeof accounts)[number]>(
+    accounts.map((account) => [account.username, account] as const),
+  );
 
   if (!process.argv.includes('--execute')) {
     process.stdout.write(
@@ -66,6 +69,9 @@ async function main(): Promise<void> {
         const expectedRole = user.username
           ? expectedRoles.get(user.username)
           : undefined;
+        const expectedAccount = user.username
+          ? expectedAccounts.get(user.username)
+          : undefined;
         const bootstrapAuditCount = await manager
           .getRepository(AuditLog)
           .createQueryBuilder('audit')
@@ -75,15 +81,16 @@ async function main(): Promise<void> {
             source: 'temporary-panel-account-bootstrap',
           })
           .getCount();
-        if (
-          !user.username ||
-          expectedRole === undefined ||
-          user.isSuperAdmin ||
-          user.passwordHash === null ||
-          bootstrapAuditCount !== 1
-        ) {
+        const refusalReasons = [
+          !user.username || expectedRole === undefined || !expectedAccount
+            ? 'reserved identity mismatch'
+            : null,
+          user.passwordHash === null ? 'password hash missing' : null,
+          bootstrapAuditCount < 1 ? 'bootstrap audit missing' : null,
+        ].filter((reason): reason is string => reason !== null);
+        if (refusalReasons.length > 0 || !expectedAccount || !expectedRole) {
           throw new Error(
-            `Extension v3 refused: ${user.username ?? user.id} is not an eligible temporary account.`,
+            `Extension v3 refused: ${user.username ?? user.id} is not an eligible temporary account (${refusalReasons.join(', ')}).`,
           );
         }
 
@@ -108,10 +115,24 @@ async function main(): Promise<void> {
           deleted: user.deletedAt !== null,
           temporaryDeadline: previousDeadline === null,
           twoFactor: user.twoFactorEnabled || user.twoFactorSecret !== null,
+          superAdmin: user.isSuperAdmin,
+          panelPermissions: user.panelPermissions !== null,
+          fullName: user.fullName !== expectedAccount.fullName,
+          phone:
+            user.phone !==
+            ('phone' in expectedAccount ? expectedAccount.phone : null),
+          dept:
+            user.dept !==
+            ('dept' in expectedAccount ? expectedAccount.dept : null),
         };
         user.role = expectedRole;
+        user.fullName = expectedAccount.fullName;
+        user.phone = 'phone' in expectedAccount ? expectedAccount.phone : null;
+        user.dept = 'dept' in expectedAccount ? expectedAccount.dept : null;
         user.isActive = true;
         user.deletedAt = null;
+        user.isSuperAdmin = false;
+        user.panelPermissions = null;
         user.temporaryPasswordOnlyUntil = extendedDeadline;
         // These are exact, reserved synthetic identities. A prior UAT flow may
         // have changed lifecycle/role/2FA fields. Bootstrap audit provenance is
@@ -141,7 +162,7 @@ async function main(): Promise<void> {
           }),
         );
         extended.push({
-          username: user.username,
+          username: user.username!,
           previousExpiresAt: previousDeadline?.toISOString() ?? null,
           expiresAt: extendedDeadline.toISOString(),
         });

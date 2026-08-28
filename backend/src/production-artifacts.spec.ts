@@ -131,6 +131,12 @@ describe('production backend artifacts', () => {
     expect(temporaryAccessExtensionV3Source).toContain('restoredState');
     expect(temporaryAccessExtensionV3Source).toContain('user.isActive = true');
     expect(temporaryAccessExtensionV3Source).toContain('user.deletedAt = null');
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'user.isSuperAdmin = false',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'user.panelPermissions = null',
+    );
     expect(deployWorkflow).toContain(
       '.blujet-uat-temporary-access-extension-v3-complete',
     );
