@@ -13,6 +13,11 @@ import {
 } from './temporary-panel-accounts';
 
 const CONFIRMATION = 'EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V3';
+const TRUSTED_PROVENANCE_SOURCES = [
+  'temporary-panel-account-bootstrap',
+  'temporary-panel-access-extension-v1',
+  'temporary-panel-access-extension-v2',
+] as const;
 
 async function main(): Promise<void> {
   const accounts = [
@@ -72,13 +77,13 @@ async function main(): Promise<void> {
         const expectedAccount = user.username
           ? expectedAccounts.get(user.username)
           : undefined;
-        const bootstrapAuditCount = await manager
+        const trustedAuditCount = await manager
           .getRepository(AuditLog)
           .createQueryBuilder('audit')
           .where('audit.entityId = :entityId', { entityId: user.id })
           .andWhere('audit.entityType = :entityType', { entityType: 'User' })
-          .andWhere("audit.metadata ->> 'source' = :source", {
-            source: 'temporary-panel-account-bootstrap',
+          .andWhere("audit.metadata ->> 'source' IN (:...sources)", {
+            sources: TRUSTED_PROVENANCE_SOURCES,
           })
           .getCount();
         const refusalReasons = [
@@ -86,7 +91,7 @@ async function main(): Promise<void> {
             ? 'reserved identity mismatch'
             : null,
           user.passwordHash === null ? 'password hash missing' : null,
-          bootstrapAuditCount < 1 ? 'bootstrap audit missing' : null,
+          trustedAuditCount < 1 ? 'trusted UAT audit provenance missing' : null,
         ].filter((reason): reason is string => reason !== null);
         if (refusalReasons.length > 0 || !expectedAccount || !expectedRole) {
           throw new Error(

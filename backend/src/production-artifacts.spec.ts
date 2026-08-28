@@ -128,6 +128,12 @@ describe('production backend artifacts', () => {
     expect(temporaryAccessExtensionV3Source).toContain(
       'temporary-panel-account-bootstrap',
     );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'temporary-panel-access-extension-v1',
+    );
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'temporary-panel-access-extension-v2',
+    );
     expect(temporaryAccessExtensionV3Source).toContain('restoredState');
     expect(temporaryAccessExtensionV3Source).toContain('user.isActive = true');
     expect(temporaryAccessExtensionV3Source).toContain('user.deletedAt = null');
