@@ -25,4 +25,5 @@
 
 - [x] Backend controller/service tests cover role metadata, exact assignee scoping, replies after customer follow-up, audience validation, all/one/many delivery and persisted history.
 - [x] Frontend tests cover the cartable-only navigation, assigned-ticket controls, admin audience modes and agency notice opening/read receipt.
+- [x] The production nginx API allowlist proxies `/agency-bulletins`; `edge-routing.test.ts` verifies every controller prefix remains reachable after deployment.
 - [x] Backend/frontend typecheck, focused tests, production builds and `git diff --check` pass.
