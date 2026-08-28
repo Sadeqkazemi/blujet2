@@ -58,18 +58,29 @@ async function main(): Promise<void> {
       const now = new Date();
       const extended: Array<{
         username: string;
-        previousExpiresAt: string;
+        previousExpiresAt: string | null;
         expiresAt: string;
       }> = [];
 
       for (const user of users) {
+        const expectedRole = user.username
+          ? expectedRoles.get(user.username)
+          : undefined;
+        const bootstrapAuditCount = await manager
+          .getRepository(AuditLog)
+          .createQueryBuilder('audit')
+          .where('audit.entityId = :entityId', { entityId: user.id })
+          .andWhere('audit.entityType = :entityType', { entityType: 'User' })
+          .andWhere("audit.metadata ->> 'source' = :source", {
+            source: 'temporary-panel-account-bootstrap',
+          })
+          .getCount();
         if (
           !user.username ||
-          expectedRoles.get(user.username) !== user.role ||
-          !user.isActive ||
-          user.deletedAt !== null ||
+          expectedRole === undefined ||
+          user.isSuperAdmin ||
           user.passwordHash === null ||
-          user.temporaryPasswordOnlyUntil === null
+          bootstrapAuditCount !== 1
         ) {
           throw new Error(
             `Extension v3 refused: ${user.username ?? user.id} is not an eligible temporary account.`,
@@ -79,23 +90,36 @@ async function main(): Promise<void> {
         const previousDeadline = user.temporaryPasswordOnlyUntil;
         const extendedDeadline = createTemporaryPanelV2ExtensionExpiry(
           user.createdAt,
-          previousDeadline,
+          previousDeadline ?? now,
           now,
         );
-        if (extendedDeadline <= previousDeadline || extendedDeadline <= now) {
+        if (
+          (previousDeadline !== null && extendedDeadline <= previousDeadline) ||
+          extendedDeadline <= now
+        ) {
           throw new Error(
             `Extension v3 refused: ${user.username} already reached its controlled extension ceiling.`,
           );
         }
 
+        const restoredState = {
+          role: user.role !== expectedRole,
+          active: !user.isActive,
+          deleted: user.deletedAt !== null,
+          temporaryDeadline: previousDeadline === null,
+          twoFactor: user.twoFactorEnabled || user.twoFactorSecret !== null,
+        };
+        user.role = expectedRole;
+        user.isActive = true;
+        user.deletedAt = null;
         user.temporaryPasswordOnlyUntil = extendedDeadline;
-        const twoFactorReset = user.twoFactorEnabled;
         // These are exact, reserved synthetic identities. A prior UAT flow may
-        // have enabled 2FA on a phone-login customer even though temporary
-        // password-only access deliberately bypasses it. Restore the approved
-        // sandbox state without weakening any ordinary account.
+        // have changed lifecycle/role/2FA fields. Bootstrap audit provenance is
+        // required above before restoring the approved sandbox state, so no
+        // ordinary or look-alike account can enter this recovery path.
         user.twoFactorEnabled = false;
         user.twoFactorSecret = null;
+        user.mustChangePassword = false;
         user.updatedAt = now;
         await userRepository.save(user);
         await manager.getRepository(AuditLog).save(
@@ -109,16 +133,16 @@ async function main(): Promise<void> {
             entityId: user.id,
             metadata: {
               source: 'temporary-panel-access-extension-v3',
-              previousExpiresAt: previousDeadline.toISOString(),
+              previousExpiresAt: previousDeadline?.toISOString() ?? null,
               expiresAt: extendedDeadline.toISOString(),
-              twoFactorReset,
+              restoredState,
             },
             requestId: null,
           }),
         );
         extended.push({
           username: user.username,
-          previousExpiresAt: previousDeadline.toISOString(),
+          previousExpiresAt: previousDeadline?.toISOString() ?? null,
           expiresAt: extendedDeadline.toISOString(),
         });
       }
