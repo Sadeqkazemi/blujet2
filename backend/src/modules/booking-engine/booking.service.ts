@@ -539,6 +539,8 @@ export class BookingService {
         id: extra.id,
         code: extra.code,
         titleFa: extra.titleFa,
+        titleEn: extra.titleEn,
+        titleAr: extra.titleAr,
         billingUnit: extra.billingUnit,
         unitPriceIrr: extra.priceIrr.toString(),
         quantity,

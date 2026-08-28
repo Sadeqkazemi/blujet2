@@ -2962,6 +2962,15 @@ Cross-agency invoices still use `agency_invoices` only.
   Service guards prevent deletion or disabling while still allowing audited
   price changes.
 
+## Localized public travel extras (2026-08-28)
+
+- `travel_extra_settings` adds nullable `descriptionEn` and `descriptionAr`;
+  together with the existing `titleEn` and `titleAr`, every public checkout
+  service can carry immutable Persian, English and Arabic display copy.
+- `bookings.extrasSnapshot` remains JSONB and now stores optional `titleEn`
+  and `titleAr` beside `titleFa`, so payment review and historical invoices use
+  the purchase-time translation rather than a later mutable service record.
+
 ## Site-admin rules persistence (2026-08-20)
 
 No new table or migration is required. The seven ordered categories are stored

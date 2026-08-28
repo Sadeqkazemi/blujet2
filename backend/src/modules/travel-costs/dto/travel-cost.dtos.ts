@@ -58,6 +58,18 @@ export class CreateTravelCostDto {
   @MaxLength(300)
   descriptionFa?: string;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  descriptionEn?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  descriptionAr?: string;
+
   @ApiProperty({ enum: TRAVEL_EXTRA_BILLING_UNITS })
   @IsIn(TRAVEL_EXTRA_BILLING_UNITS)
   billingUnit!: TravelExtraBillingUnit;

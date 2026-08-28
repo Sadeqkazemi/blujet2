@@ -7,6 +7,7 @@ import { SearchAdvisoryService } from './search-advisory.service';
 import { SearchFlightsDto } from './dto/search-flights.dto';
 import { SearchAdvisoryDto } from './dto/search-advisory.dto';
 import { SearchPriceCalendarDto } from './dto/search-price-calendar.dto';
+import { CabinClass } from '../../database/enums';
 
 /** Fully public — no login required to browse flights, matching every
  * airline site's golden path (login only becomes necessary at booking). */
@@ -35,7 +36,12 @@ export class SearchController {
   @Get('flights')
   @ApiOperation({ summary: 'جستجوی پرواز بین دو فرودگاه در یک روز مشخص' })
   async flights(@Query() query: SearchFlightsDto) {
-    const data = await this.search.search(query.origin, query.dest, query.date);
+    const data = await this.search.search(
+      query.origin,
+      query.dest,
+      query.date,
+      query.cabin ?? CabinClass.ECONOMY,
+    );
     return { success: true, data };
   }
 
@@ -53,6 +59,8 @@ export class SearchController {
       query.origin,
       query.dest,
       query.date,
+      3,
+      query.cabin ?? CabinClass.ECONOMY,
     );
     return { success: true, data };
   }
@@ -68,6 +76,7 @@ export class SearchController {
       query.origin,
       query.dest,
       query.date,
+      query.cabin ?? CabinClass.ECONOMY,
       typeof requestId === 'string' ? requestId : undefined,
     );
     return { success: true, data };

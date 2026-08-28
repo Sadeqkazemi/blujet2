@@ -84,6 +84,10 @@ describe('CommercialServicesPage', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: 'نوع خدمت' }), 'CUSTOM');
     await user.type(screen.getByRole('textbox', { name: 'عنوان خدمت' }), 'خدمت سفارشی تست');
     await user.type(screen.getByRole('textbox', { name: 'توضیح خدمت' }), 'شرح خدمت سفارشی');
+    await user.type(screen.getByRole('textbox', { name: 'عنوان انگلیسی خدمت' }), 'Custom test service');
+    await user.type(screen.getByRole('textbox', { name: 'توضیح انگلیسی خدمت' }), 'Custom service description');
+    await user.type(screen.getByRole('textbox', { name: 'عنوان عربی خدمت' }), 'خدمة اختبار مخصصة');
+    await user.type(screen.getByRole('textbox', { name: 'توضیح عربی خدمت' }), 'وصف الخدمة المخصصة');
     await user.type(screen.getByRole('textbox', { name: 'قیمت خدمت جدید' }), '75000');
     await user.click(screen.getByRole('button', { name: 'ثبت خدمت' }));
 
@@ -91,7 +95,11 @@ describe('CommercialServicesPage', () => {
       expect(travelCostsApi.createTravelCost).toHaveBeenCalledWith({
         code: expect.stringMatching(/^CUSTOM_[A-Za-z0-9-]{8,64}$/),
         titleFa: 'خدمت سفارشی تست',
+        titleEn: 'Custom test service',
+        titleAr: 'خدمة اختبار مخصصة',
         descriptionFa: 'شرح خدمت سفارشی',
+        descriptionEn: 'Custom service description',
+        descriptionAr: 'وصف الخدمة المخصصة',
         billingUnit: 'PER_BOOKING',
         priceIrr: '750000',
         active: true,

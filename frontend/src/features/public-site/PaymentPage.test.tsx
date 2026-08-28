@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import PaymentPage from './PaymentPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useIsMobileModule from '../../hooks/useIsMobile';
+import * as useLocaleModule from '../../hooks/useLocale';
 import type { BookingDetail } from '../../types/public-site';
 
 const BOOKING: BookingDetail = {
@@ -45,6 +46,10 @@ function renderPage() {
   );
 }
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('PaymentPage', () => {
   it('renders payment methods and hold timer', async () => {
     vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue(BOOKING);
@@ -55,6 +60,25 @@ describe('PaymentPage', () => {
     expect(screen.getByTestId('payment-method-GATEWAY')).toBeInTheDocument();
     expect(screen.getByTestId('payment-tax-amount')).toHaveTextContent('۱٬۷۰۰٬۰۰۰');
     expect(screen.getByTestId('payment-ticket-amount')).toHaveTextContent('۳۶٬۳۰۰٬۰۰۰');
+  });
+
+  it('renders only the persisted selected extra with its English title and separates it from fare', async () => {
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'en', setLocale: vi.fn() });
+    vi.spyOn(publicSiteApi, 'fetchMyBooking').mockResolvedValue({
+      ...BOOKING,
+      extrasIrr: '20000000',
+      extras: [{
+        id: 'bag', code: 'EXTRA_BAGGAGE', titleFa: 'بار اضافه',
+        titleEn: 'Extra baggage', titleAr: 'أمتعة إضافية',
+        billingUnit: 'PER_BOOKING', unitPriceIrr: '20000000', quantity: 1,
+        totalIrr: '20000000',
+      }],
+    });
+    renderPage();
+
+    expect(await screen.findByText('Extra baggage')).toBeInTheDocument();
+    expect(screen.queryByText('بار اضافه')).not.toBeInTheDocument();
+    expect(screen.getByTestId('payment-ticket-amount')).toHaveTextContent('34,300,000');
   });
 
   it('pays successfully and navigates to the ticket page', async () => {

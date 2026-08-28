@@ -96,7 +96,12 @@ export function cabinKey(flightInstanceId: string, cabin: CabinClass): string {
 
 export function parseCabinParam(raw: string | null): CabinClass {
   const value = (raw ?? 'ECONOMY').toUpperCase();
-  if (value === 'BUSINESS' || value === 'COMFORT' || value === 'ECONOMY') {
+  if (
+    value === 'FIRST' ||
+    value === 'BUSINESS' ||
+    value === 'COMFORT' ||
+    value === 'ECONOMY'
+  ) {
     return value;
   }
   return 'ECONOMY';

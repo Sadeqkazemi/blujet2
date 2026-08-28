@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import ResultsPage from './ResultsPage';
 import * as publicSiteApi from '../../api/publicSite';
 import * as useAuthModule from '../../hooks/useAuth';
@@ -154,6 +154,32 @@ async function expandFirstCard(locale: 'fa' | 'en' | 'ar' = 'fa') {
 }
 
 describe('ResultsPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('sends the exact selected cabin to flight search', async () => {
+    mockLocale('en');
+    mockSearchApis();
+    const search = vi
+      .spyOn(publicSiteApi, 'searchFlights')
+      .mockResolvedValue([]);
+
+    renderPage(
+      'unauthenticated',
+      'origin=THR&dest=MHD&date=2026-08-01&cabin=FIRST',
+    );
+
+    await waitFor(() => {
+      expect(search).toHaveBeenCalledWith(
+        'THR',
+        'MHD',
+        '2026-08-01',
+        'FIRST',
+      );
+    });
+  });
+
   it('renders the price calendar and updates the search date on day select', async () => {
     mockLocale('fa');
     mockSearchApis();
@@ -176,7 +202,7 @@ describe('ResultsPage', () => {
 
     await userEvent.click(screen.getByTestId('price-calendar-day-2026-08-02'));
     await waitFor(() => {
-      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-02');
+      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-02', 'ECONOMY');
     });
     expect(screen.getByTestId('price-calendar-day-2026-08-02')).toHaveAttribute(
       'data-selected',
@@ -185,7 +211,12 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('price-calendar-day-2026-08-02')).toHaveStyle({
       background: '#1668c4',
     });
-    expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalledTimes(1);
+    expect(publicSiteApi.fetchPriceCalendar).toHaveBeenCalledWith(
+      'THR',
+      'MHD',
+      '2026-08-01',
+      'ECONOMY',
+    );
   });
 
   it('scrolls the Persian calendar one day without changing the selected search date', async () => {
@@ -201,7 +232,7 @@ describe('ResultsPage', () => {
       screen.getByTestId('price-calendar-next'),
     );
     await waitFor(() => {
-      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+      expect(search).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01', 'ECONOMY');
     });
     const searchCallsBeforeArrow = search.mock.calls.length;
 
@@ -212,10 +243,11 @@ describe('ResultsPage', () => {
         'THR',
         'MHD',
         '2026-08-02',
+        'ECONOMY',
       );
     });
     expect(search).toHaveBeenCalledTimes(searchCallsBeforeArrow);
-    expect(search).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-01');
+    expect(search).toHaveBeenLastCalledWith('THR', 'MHD', '2026-08-01', 'ECONOMY');
     expect(screen.getByTestId('price-calendar-day-2026-08-01')).toHaveAttribute(
       'data-selected',
       'true',
@@ -284,7 +316,7 @@ describe('ResultsPage', () => {
     expect(await screen.findByTestId('empty-results')).toBeInTheDocument();
     expect(screen.getByText('پروازی یافت نشد')).toBeInTheDocument();
     expect(screen.queryByTestId('result-card')).not.toBeInTheDocument();
-    expect(spy).toHaveBeenCalledWith('THR', 'DXB', '2026-08-01');
+    expect(spy).toHaveBeenCalledWith('THR', 'DXB', '2026-08-01', 'ECONOMY');
   });
 
   it('shows search error banner on search failure', async () => {
@@ -438,7 +470,7 @@ describe('ResultsPage', () => {
 
     await userEvent.click(screen.getByTestId('ai-ask'));
 
-    expect(advisorySpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01');
+    expect(advisorySpy).toHaveBeenCalledWith('THR', 'MHD', '2026-08-01', 'ECONOMY');
     expect(await screen.findByTestId('ai-result')).toHaveTextContent(
       'همین حالا بخرید',
     );
@@ -642,7 +674,7 @@ describe('ResultsPage', () => {
   });
 
   describe('COMFORT cabin', () => {
-    it('allows selecting COMFORT and navigating to checkout with cabin COMFORT', async () => {
+    it('preserves COMFORT and navigates to checkout with cabin COMFORT', async () => {
       mockLocale('fa');
       mockSearchApis();
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
@@ -660,7 +692,7 @@ describe('ResultsPage', () => {
 
       render(
         <MemoryRouter
-          initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01']}
+          initialEntries={['/results?origin=THR&dest=MHD&date=2026-08-01&cabin=COMFORT']}
         >
           <Routes>
             <Route path="/results" element={<ResultsPage />} />
@@ -675,8 +707,7 @@ describe('ResultsPage', () => {
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      expect(screen.getByTestId('cabin-selector')).toBeInTheDocument();
-      await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
+      expect(screen.getByTestId('selected-cabin-COMFORT')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'خرید بلیط' }));
 
       expect(await screen.findByTestId('checkout-page')).toBeInTheDocument();
@@ -689,7 +720,7 @@ describe('ResultsPage', () => {
       vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([
         RESULT_WITH_COMFORT,
       ]);
-      renderPage('unauthenticated');
+      renderPage('unauthenticated', 'origin=THR&dest=MHD&date=2026-08-01&cabin=COMFORT');
 
       await screen.findByTestId('result-card');
       await expandFirstCard();
@@ -730,11 +761,10 @@ describe('ResultsPage', () => {
             departureAt: '2026-08-01T05:00:00.000Z',
           },
         });
-      renderPage('authenticated');
+      renderPage('authenticated', 'origin=THR&dest=MHD&date=2026-08-01&cabin=COMFORT');
       await screen.findByTestId('result-card');
       await expandFirstCard();
 
-      await userEvent.click(screen.getByTestId('cabin-option-COMFORT'));
       await userEvent.click(screen.getByTestId('real-lock-fi-1-COMFORT'));
 
       expect(createLock).toHaveBeenCalledWith('fi-1', 'COMFORT');

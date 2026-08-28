@@ -4102,3 +4102,9 @@ Each target receives an ordinary recipient-owned notification with
 `entityType = AGENCY_BULLETIN`; the existing `/notifications` read and read-
 receipt endpoints remain the agency delivery API. No audience is inferred in
 the browser.
+# Public flight-search invariants
+
+- `GET /search/flights` accepts `origin`, `dest`, `date`, and `cabin`. The response contains only flights whose requested cabin is published and currently has capacity; the API does not substitute another cabin.
+- `GET /search/price-calendar` and `POST /search/advisory` accept the same cabin and compute alternatives only for that cabin; their cache keys include the cabin.
+- Public travel-extra, ancillary-service, and seat-service responses expose localized `titleFa`, `titleAr`, `titleEn`, `descriptionFa`, `descriptionAr`, and `descriptionEn` values when applicable, so checkout does not display Persian fallback content in Arabic/English.
+- Booking creation accepts only explicitly selected extras and priced seat selections. The booking snapshot persists localized extra labels; payment and invoice views render those persisted selected rows rather than reconstructing or charging the full service catalog.

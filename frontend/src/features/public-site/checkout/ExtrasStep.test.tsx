@@ -27,6 +27,8 @@ function testExtras(): ExtraServiceState[] {
       titleEn: 'Extra baggage',
       titleAr: null,
       descriptionFa: 'به ازای هر کیلوگرم',
+      descriptionEn: 'Per kilogram',
+      descriptionAr: 'لكل كيلوغرام',
       billingUnit: 'PER_KG',
       priceIrr: '4500000',
       selected: false,
@@ -39,6 +41,8 @@ function testExtras(): ExtraServiceState[] {
       titleEn: 'CIP',
       titleAr: null,
       descriptionFa: null,
+      descriptionEn: null,
+      descriptionAr: null,
       billingUnit: 'PER_BOOKING',
       priceIrr: '9000000',
       selected: false,
@@ -51,6 +55,8 @@ function testExtras(): ExtraServiceState[] {
       titleEn: 'Insurance',
       titleAr: null,
       descriptionFa: null,
+      descriptionEn: null,
+      descriptionAr: null,
       billingUnit: 'PER_PASSENGER',
       priceIrr: '1200000',
       selected: false,
@@ -63,6 +69,8 @@ function testExtras(): ExtraServiceState[] {
       titleEn: 'Seat selection',
       titleAr: null,
       descriptionFa: 'انتخاب صندلی پیش از پرواز',
+      descriptionEn: 'Choose a seat before the flight',
+      descriptionAr: 'اختر مقعداً قبل الرحلة',
       billingUnit: 'PER_PASSENGER',
       priceIrr: '1500000',
       selected: false,
@@ -75,6 +83,8 @@ function testExtras(): ExtraServiceState[] {
       titleEn: 'Pet travel',
       titleAr: null,
       descriptionFa: 'حمل حیوان با قفس مناسب',
+      descriptionEn: 'Pet transport in an approved carrier',
+      descriptionAr: 'نقل الحيوان في حاملة معتمدة',
       billingUnit: 'PER_BOOKING',
       priceIrr: '2500000',
       selected: false,
@@ -98,6 +108,30 @@ const SEATS: SeatMapCell[] = [
 ];
 
 describe('ExtrasStep — design parity', () => {
+  it('renders English service copy without falling back to Persian', () => {
+    render(
+      <ExtrasStep
+        locale="en"
+        extras={testExtras()}
+        onToggleExtra={vi.fn()}
+        onExtraQuantityChange={vi.fn()}
+        passengerCount={1}
+        seats={SEATS}
+        selectedSeats={[]}
+        onToggleSeat={vi.fn()}
+        businessLocked
+        bookedCabin="ECONOMY"
+        aircraftType="MD-80"
+        clubBalance={0}
+      />,
+    );
+
+    expect(screen.getByText('Extra baggage')).toBeInTheDocument();
+    expect(screen.getByText('Per kilogram')).toBeInTheDocument();
+    expect(screen.queryByText('بار اضافه')).not.toBeInTheDocument();
+    expect(screen.queryByText('به ازای هر کیلوگرم')).not.toBeInTheDocument();
+  });
+
   it('renders design service titles, descriptions and prices', () => {
     render(
       <ExtrasStep

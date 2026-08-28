@@ -94,12 +94,19 @@ export class AncillaryServicesService implements OnModuleInit {
     });
     return rows
       .filter((row) => row.key !== 'pet')
-      .map((row) => ({
-        key: row.key,
-        titleFa: row.titleFa,
-        descriptionFa: row.descriptionFa,
-        priceIrr: row.priceIrr.toString(),
-      }));
+      .map((row) => {
+        const localized = TRAVEL_EXTRA_LOCALIZATION[row.key] ?? null;
+        return {
+          key: row.key,
+          titleFa: row.titleFa,
+          titleEn: localized?.titleEn ?? null,
+          titleAr: localized?.titleAr ?? null,
+          descriptionFa: row.descriptionFa,
+          descriptionEn: localized?.descriptionEn ?? null,
+          descriptionAr: localized?.descriptionAr ?? null,
+          priceIrr: row.priceIrr.toString(),
+        };
+      });
   }
 
   async listPublicSeatServices() {
@@ -130,10 +137,13 @@ export class AncillaryServicesService implements OnModuleInit {
     }
     return [...grouped.entries()].map(([key, codes]) => {
       const service = byKey.get(key)!;
+      const localized = SEAT_SERVICE_LOCALIZATION[key] ?? null;
       return {
         id: `seat-type:${key}`,
         code: key.toUpperCase().replace(/-/g, '_'),
         titleFa: service.titleFa,
+        titleEn: localized?.titleEn ?? null,
+        titleAr: localized?.titleAr ?? null,
         billingUnit: 'PER_SEAT',
         unitPriceIrr: service.priceIrr.toString(),
         quantity: codes.length,
@@ -290,6 +300,7 @@ export class AncillaryServicesService implements OnModuleInit {
   private async syncTravelExtra(row: AncillaryService) {
     const mapping = ANCILLARY_TRAVEL_EXTRA_BY_KEY.get(row.key);
     if (!mapping) return;
+    const localized = TRAVEL_EXTRA_LOCALIZATION[row.key] ?? null;
     let extra = await this.travelExtraRepo.findOneBy({ code: mapping.code });
     if (!extra) {
       // Older installations can have the permanent ancillary catalogue row
@@ -298,9 +309,11 @@ export class AncillaryServicesService implements OnModuleInit {
       extra = this.travelExtraRepo.create({
         code: mapping.code,
         titleFa: row.titleFa,
-        titleEn: null,
-        titleAr: null,
+        titleEn: localized?.titleEn ?? null,
+        titleAr: localized?.titleAr ?? null,
         descriptionFa: row.descriptionFa || null,
+        descriptionEn: localized?.descriptionEn ?? null,
+        descriptionAr: localized?.descriptionAr ?? null,
         billingUnit: mapping.billingUnit,
         priceIrr: row.priceIrr,
         active: row.enabled,
@@ -315,7 +328,11 @@ export class AncillaryServicesService implements OnModuleInit {
     extra.active = row.enabled;
     extra.purchaseEnabled = row.enabled;
     extra.titleFa = row.titleFa;
+    extra.titleEn = localized?.titleEn ?? extra.titleEn;
+    extra.titleAr = localized?.titleAr ?? extra.titleAr;
     extra.descriptionFa = row.descriptionFa || extra.descriptionFa;
+    extra.descriptionEn = localized?.descriptionEn ?? extra.descriptionEn;
+    extra.descriptionAr = localized?.descriptionAr ?? extra.descriptionAr;
     extra.updatedById = row.updatedById;
     await this.travelExtraRepo.save(extra);
   }
@@ -338,9 +355,12 @@ export class AncillaryServicesService implements OnModuleInit {
   }
 
   private toSeatRow(row: AncillaryService) {
+    const localized = SEAT_SERVICE_LOCALIZATION[row.key] ?? null;
     return {
       key: row.key,
       titleFa: row.titleFa,
+      titleEn: localized?.titleEn ?? null,
+      titleAr: localized?.titleAr ?? null,
       descriptionFa: row.descriptionFa,
       priceIrr: row.priceIrr.toString(),
       enabled: row.enabled,
@@ -354,3 +374,40 @@ export class AncillaryServicesService implements OnModuleInit {
     };
   }
 }
+
+const SEAT_SERVICE_LOCALIZATION: Record<string, { titleEn: string; titleAr: string }> = {
+  'seat-normal': { titleEn: 'Standard seat', titleAr: 'مقعد عادي' },
+  'seat-legroom': { titleEn: 'Extra-legroom seat', titleAr: 'مقعد بمساحة إضافية للساقين' },
+  'seat-window-aisle': { titleEn: 'Window or aisle seat', titleAr: 'مقعد نافذة أو ممر' },
+};
+
+const TRAVEL_EXTRA_LOCALIZATION: Record<string, { titleEn: string; titleAr: string; descriptionEn: string; descriptionAr: string }> = {
+  baggage: {
+    titleEn: 'Extra baggage', titleAr: 'أمتعة إضافية',
+    descriptionEn: 'Each 5 kg above the baggage allowance', descriptionAr: 'كل 5 كغ إضافية فوق الوزن المسموح',
+  },
+  meal: {
+    titleEn: 'Special meal', titleAr: 'وجبة خاصة',
+    descriptionEn: 'A hot meal on eligible flights', descriptionAr: 'وجبة ساخنة على الرحلات المؤهلة',
+  },
+  insurance: {
+    titleEn: 'Travel insurance', titleAr: 'تأمين السفر',
+    descriptionEn: 'Travel insurance cover for each passenger', descriptionAr: 'تغطية تأمين السفر لكل مسافر',
+  },
+  cip: {
+    titleEn: 'Airport CIP service', titleAr: 'خدمة كبار الشخصيات في المطار',
+    descriptionEn: 'Private airport transfer and lounge', descriptionAr: 'نقل خاص وصالة مميزة في المطار',
+  },
+  pet: {
+    titleEn: 'Pet travel', titleAr: 'سفر الحيوانات الأليفة',
+    descriptionEn: 'Pet transport in the cabin or hold', descriptionAr: 'نقل الحيوانات الأليفة في المقصورة أو مخزن الأمتعة',
+  },
+  'seat-selection': {
+    titleEn: 'Advance seat selection', titleAr: 'اختيار المقعد مسبقاً',
+    descriptionEn: 'Select a seat during booking', descriptionAr: 'اختيار رقم المقعد أثناء الحجز',
+  },
+  'refund-fee': {
+    titleEn: 'Refund fee', titleAr: 'رسوم الاسترداد',
+    descriptionEn: 'Deducted according to the ticket rules', descriptionAr: 'تخصم وفقاً لقواعد التذكرة',
+  },
+};

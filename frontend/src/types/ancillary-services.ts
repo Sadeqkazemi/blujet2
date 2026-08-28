@@ -23,6 +23,8 @@ export interface AncillaryServiceRow {
 export interface PublicAncillaryService {
   key: string;
   titleFa: string;
+  titleEn?: string | null;
+  titleAr?: string | null;
   descriptionFa: string;
   priceIrr: string;
 }

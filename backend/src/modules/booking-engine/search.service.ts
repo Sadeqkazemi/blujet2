@@ -59,7 +59,7 @@ export class SearchService {
 
   async airports() {
     // v4 excludes UAT test fixtures in both the database query and cache.
-    const cacheKey = 'search:airports:v4';
+    const cacheKey = 'search:airports:v5';
     const cached = await this.redis.get<unknown>(cacheKey);
     if (cached) return cached;
 
@@ -114,12 +114,12 @@ export class SearchService {
    * Cached briefly (SEARCH_TTL_SECONDS): a cache hit can serve a slightly
    * stale seatsLeft count, which is fine since the buy flow always
    * re-validates the seat map / re-prices against Postgres directly. */
-  async search(origin: string, dest: string, date: string) {
-    const cacheKey = `search:flights:${origin.toUpperCase()}:${dest.toUpperCase()}:${date}`;
+  async search(origin: string, dest: string, date: string, cabin?: CabinClass) {
+    const cacheKey = `search:flights:${origin.toUpperCase()}:${dest.toUpperCase()}:${date}:${cabin ?? 'ALL'}`;
     const cached = await this.redis.get<unknown[]>(cacheKey);
     if (cached) return cached;
 
-    const results = await this.searchUncached(origin, dest, date);
+    const results = await this.searchUncached(origin, dest, date, cabin);
     await this.redis.set(cacheKey, results, SEARCH_TTL_SECONDS);
     return results;
   }
@@ -128,9 +128,10 @@ export class SearchService {
     originCode: string,
     destCode: string,
     departureAt: Date,
+    cabin?: CabinClass,
   ): string {
     const date = departureAt.toISOString().slice(0, 10);
-    return `search:flights:${originCode.toUpperCase()}:${destCode.toUpperCase()}:${date}`;
+    return `search:flights:${originCode.toUpperCase()}:${destCode.toUpperCase()}:${date}:${cabin ?? 'ALL'}`;
   }
 
   /** Called right after a booking mutates seat availability/pricing for an
@@ -145,11 +146,16 @@ export class SearchService {
       .where('fi.id = :id', { id: flightInstanceId })
       .getOne();
     if (!instance) return;
-    await this.redis.del(
-      this.searchCacheKey(
-        instance.flight.route.originCode,
-        instance.flight.route.destCode,
-        instance.departureAt,
+    await Promise.all(
+      [undefined, ...SEARCH_CABINS].map((cabin) =>
+        this.redis.del(
+          this.searchCacheKey(
+            instance.flight.route.originCode,
+            instance.flight.route.destCode,
+            instance.departureAt,
+            cabin,
+          ),
+        ),
       ),
     );
   }
@@ -165,8 +171,12 @@ export class SearchService {
     destCode: string,
     departureAt: Date,
   ): Promise<void> {
-    await this.redis.del(
-      this.searchCacheKey(originCode, destCode, departureAt),
+    await Promise.all(
+      [undefined, ...SEARCH_CABINS].map((cabin) =>
+        this.redis.del(
+          this.searchCacheKey(originCode, destCode, departureAt, cabin),
+        ),
+      ),
     );
   }
 
@@ -272,7 +282,12 @@ export class SearchService {
     return { capacity, seatsLeft };
   }
 
-  private async searchUncached(origin: string, dest: string, date: string) {
+  private async searchUncached(
+    origin: string,
+    dest: string,
+    date: string,
+    requestedCabin?: CabinClass,
+  ) {
     const dayStart = new Date(date);
     dayStart.setUTCHours(0, 0, 0, 0);
     const dayEnd = new Date(dayStart);
@@ -318,7 +333,7 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of SEARCH_CABINS) {
+      for (const cabin of requestedCabin ? [requestedCabin] : SEARCH_CABINS) {
         const physicalCapacity = this.physicalCabinCapacity(
           instance,
           cabin,
@@ -388,7 +403,7 @@ export class SearchService {
     const connections =
       results.length > 0
         ? []
-        : await this.findConnections(origin, dest, dayStart, dayEnd);
+        : await this.findConnections(origin, dest, dayStart, dayEnd, requestedCabin);
 
     return [...results, ...connections];
   }
@@ -402,6 +417,7 @@ export class SearchService {
     dest: string,
     dayStart: Date,
     dayEnd: Date,
+    requestedCabin?: CabinClass,
   ) {
     const now = new Date();
     const firstLegsQb = this.flightInstanceRepo
@@ -493,7 +509,7 @@ export class SearchService {
         priceIrr: Irr;
         seatsLeft: number;
       }[] = [];
-      for (const cabin of SEARCH_CABINS) {
+      for (const cabin of requestedCabin ? [requestedCabin] : SEARCH_CABINS) {
         let priceSum: Irr = 0n;
         let seatsLeft = Number.MAX_SAFE_INTEGER;
         let ok = true;
@@ -690,6 +706,7 @@ export class SearchService {
     dest: string,
     centerDate: string,
     radiusDays = 3,
+    cabin: CabinClass = 'ECONOMY',
   ): Promise<
     {
       date: string;
@@ -711,13 +728,13 @@ export class SearchService {
       const day = new Date(center);
       day.setUTCDate(day.getUTCDate() + offset);
       const iso = day.toISOString().slice(0, 10);
-      const flights = (await this.search(origin, dest, iso)) as {
+      const flights = (await this.search(origin, dest, iso, cabin)) as {
         cabins: { cabin: CabinClass; priceIrr: Irr; seatsLeft: number }[];
       }[];
       let min: bigint | null = null;
       for (const f of flights) {
-        const econ = f.cabins.find((c) => c.cabin === 'ECONOMY');
-        const price = BigInt(econ?.priceIrr ?? f.cabins[0]?.priceIrr ?? '0');
+        const selected = f.cabins.find((c) => c.cabin === cabin);
+        const price = BigInt(selected?.priceIrr ?? '0');
         if (price > 0n && (min === null || price < min)) min = price;
       }
       rows.push({

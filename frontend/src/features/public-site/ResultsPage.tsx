@@ -188,7 +188,7 @@ export default function ResultsPage() {
       if (!cancelled) setResults((prev) => (prev === null ? [] : prev));
     }, 12_000);
 
-    searchFlights(searchOrigin, searchDest, searchDate)
+    searchFlights(searchOrigin, searchDest, searchDate, cabinClass)
       .then((found) => {
         if (!cancelled) setResults(filterSellableSearchFlights(found));
       })
@@ -206,7 +206,7 @@ export default function ResultsPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
-  }, [searchOrigin, searchDest, searchDate, copy.searchError, searchNonce]);
+  }, [searchOrigin, searchDest, searchDate, cabinClass, copy.searchError, searchNonce]);
 
   useEffect(
     () => onSearchResultsInvalidate(() => setSearchNonce((n) => n + 1)),
@@ -282,7 +282,7 @@ export default function ResultsPage() {
   async function askAi() {
     setAiState('loading');
     try {
-      const data = await fetchSearchAdvisory(origin, dest, date);
+      const data = await fetchSearchAdvisory(origin, dest, date, cabinClass);
       if (!data.available) {
         setAdvisory(null);
         setAiState('unavailable');
@@ -654,6 +654,7 @@ export default function ResultsPage() {
           dest={dest}
           selectedDate={date}
           locale={locale}
+          cabin={cabinClass}
           onSelectDate={(nextDate) => {
             const next = new URLSearchParams(params);
             next.set('date', nextDate);

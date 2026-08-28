@@ -19,6 +19,16 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Exact public cabin, localized route and selected-only checkout charges
+  (2026-08-28)** — public search, price calendar and advisory now preserve the
+  requested cabin and never substitute another published class. Results,
+  checkout, payment, account, booking management and issued tickets keep the
+  origin/destination direction correct for RTL/LTR locales. Public extras and
+  paid seat services carry Persian/Arabic/English labels, and only selected
+  services are snapshotted and charged. Airport pickers exclude the opposite
+  endpoint and reference data includes IKA. Verification and acceptance:
+  `docs/features/public-flight-selection-localization.md`.
+
 - [x] **Agency RTRD / PSR / PRR sales-report redesign (2026-08-28)** —
   rebuilt `/agency/sales` from the supplied reconciliation screenshots using
   only tenant-scoped sales, profile, credit and invoice APIs. The page now has

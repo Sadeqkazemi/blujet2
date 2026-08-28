@@ -70,6 +70,8 @@ export interface ExtraServiceState {
   titleEn: string | null;
   titleAr: string | null;
   descriptionFa: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
   billingUnit: TravelExtraBillingUnit;
   priceIrr: string;
   selected: boolean;
@@ -245,17 +247,19 @@ export function extraTitle(
   extra: ExtraServiceState,
   locale: 'fa' | 'en' | 'ar',
 ): string {
-  if (locale === 'en') return extra.titleEn || extra.titleFa;
-  if (locale === 'ar') return extra.titleAr || extra.titleFa;
+  if (locale === 'en') {
+    return extra.titleEn || extra.code.replace(/^CUSTOM_/, '').replaceAll('_', ' ');
+  }
+  if (locale === 'ar') return extra.titleAr || 'خدمة إضافية';
   return extra.titleFa;
 }
 
-/** Public travel-cost API exposes `descriptionFa` only; fall back for en/ar. */
 export function extraDescription(
   extra: ExtraServiceState,
-  _locale: 'fa' | 'en' | 'ar',
+  locale: 'fa' | 'en' | 'ar',
 ): string | null {
-  if (!extra.descriptionFa) return null;
+  if (locale === 'en') return extra.descriptionEn;
+  if (locale === 'ar') return extra.descriptionAr;
   return extra.descriptionFa;
 }
 

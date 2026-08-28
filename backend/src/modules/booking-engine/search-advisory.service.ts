@@ -5,6 +5,7 @@ import {
   type PriceSuggestionProvider,
 } from '../ai/price-suggestion.provider';
 import { SearchService } from './search.service';
+import { CabinClass } from '../../database/enums';
 
 export type SearchAdvisoryRecommendation = 'buy' | 'wait';
 
@@ -31,10 +32,11 @@ export class SearchAdvisoryService {
     origin: string,
     dest: string,
     date: string,
+    cabin: CabinClass,
     requestId?: string,
   ): Promise<SearchAdvisoryResult> {
-    const calendar = await this.search.priceCalendar(origin, dest, date, 3);
-    const dayResults = (await this.search.search(origin, dest, date)) as {
+    const calendar = await this.search.priceCalendar(origin, dest, date, 3, cabin);
+    const dayResults = (await this.search.search(origin, dest, date, cabin)) as {
       cabins: { cabin: string; priceIrr: string }[];
     }[];
 
@@ -44,12 +46,12 @@ export class SearchAdvisoryService {
 
     const cheapestToday = dayResults.reduce(
       (min, row) => {
-        const econ = row.cabins.find((c) => c.cabin === 'ECONOMY');
-        const p = BigInt(econ?.priceIrr ?? row.cabins[0].priceIrr);
+        const selected = row.cabins.find((c) => c.cabin === cabin);
+        const p = BigInt(selected?.priceIrr ?? row.cabins[0].priceIrr);
         return p < min ? p : min;
       },
       BigInt(
-        dayResults[0].cabins.find((c) => c.cabin === 'ECONOMY')?.priceIrr ??
+        dayResults[0].cabins.find((c) => c.cabin === cabin)?.priceIrr ??
           dayResults[0].cabins[0].priceIrr,
       ),
     );

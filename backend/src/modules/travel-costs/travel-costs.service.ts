@@ -42,6 +42,8 @@ export class TravelCostsService {
         titleEn: true,
         titleAr: true,
         descriptionFa: true,
+        descriptionEn: true,
+        descriptionAr: true,
         billingUnit: true,
         priceIrr: true,
         purchaseEnabled: true,
@@ -74,6 +76,8 @@ export class TravelCostsService {
         titleEn: dto.titleEn?.trim() || null,
         titleAr: dto.titleAr?.trim() || null,
         descriptionFa: dto.descriptionFa?.trim() || null,
+        descriptionEn: dto.descriptionEn?.trim() || null,
+        descriptionAr: dto.descriptionAr?.trim() || null,
         billingUnit: dto.billingUnit,
         priceIrr: dto.priceIrr,
         active: dto.active ?? true,
@@ -117,6 +121,10 @@ export class TravelCostsService {
     if (dto.titleAr !== undefined) row.titleAr = dto.titleAr.trim() || null;
     if (dto.descriptionFa !== undefined)
       row.descriptionFa = dto.descriptionFa.trim() || null;
+    if (dto.descriptionEn !== undefined)
+      row.descriptionEn = dto.descriptionEn.trim() || null;
+    if (dto.descriptionAr !== undefined)
+      row.descriptionAr = dto.descriptionAr.trim() || null;
     if (dto.billingUnit !== undefined) row.billingUnit = dto.billingUnit;
     if (dto.priceIrr !== undefined) row.priceIrr = dto.priceIrr;
     if (dto.active !== undefined) row.active = dto.active;
