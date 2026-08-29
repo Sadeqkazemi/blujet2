@@ -74,6 +74,20 @@ describe('TicketPage', () => {
     expect(screen.queryByText('Request ticket refund')).not.toBeInTheDocument();
   });
 
+  it('keeps route direction origin→destination per locale', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
+    const view = renderPage('fa');
+    expect(await screen.findByTestId('ticket-route')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByText('THR')).toBeInTheDocument();
+
+    view.unmount();
+    vi.restoreAllMocks();
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
+    renderPage('en');
+    expect(await screen.findAllByTestId('ticket-route')).toHaveLength(1);
+    expect(screen.getByTestId('ticket-route')).toHaveAttribute('dir', 'ltr');
+  });
+
   it('blocks the boarding-pass view for unpaid HELD bookings', async () => {
     vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue({
       ...TICKETED,

@@ -2,6 +2,10 @@
   overflow: visible;
 }
 
+.results-edit-search-route {
+  position: relative;
+}
+
 @media (max-width: 640px) {
   .results-edit-search-overlay {
     align-items: flex-end !important;
@@ -47,7 +51,7 @@
   .results-edit-search-route {
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
-    gap: 0 !important;
+    row-gap: 20px !important;
     align-items: stretch !important;
     padding: 12px;
     border: 1px solid #e4eaf2;
@@ -69,15 +73,17 @@
   }
 
   .results-edit-search-swap {
-    position: relative;
+    position: absolute !important;
+    inset-inline-start: 50%;
+    top: 50%;
     z-index: 3;
     width: 40px !important;
     height: 40px !important;
-    margin: -8px auto !important;
+    margin: 0 !important;
     border-color: #cfe0f4 !important;
     background: #eef5ff !important;
     box-shadow: 0 4px 12px rgba(22, 104, 196, 0.13);
-    transform: rotate(90deg);
+    transform: translate(-50%, -50%) rotate(90deg) !important;
   }
 
   .results-edit-search-airport-menu {

@@ -67,6 +67,11 @@ export interface SeatLockView {
   releasedById: string | null;
   releasedAt: string | null;
   createdAt: string;
+  approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  expiresAt?: string;
+  classification?: 'PAYABLE' | 'FREE' | 'DISCOUNTED';
 }
 
 export type BookingStatus =

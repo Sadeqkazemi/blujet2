@@ -31,6 +31,7 @@ export function lockSeat(
     passengerName?: string;
     passengerNationalId?: string;
     passengerMobile?: string;
+    companyBlock?: boolean;
   },
 ) {
   return apiPost<SeatLockView>(`/reservation/seatmap/${flightInstanceId}/lock`, dto);
@@ -38,6 +39,16 @@ export function lockSeat(
 
 export function releaseLock(lockId: string) {
   return apiPatch<SeatLockView>(`/reservation/seatmap/locks/${lockId}/release`);
+}
+
+export function approveSeatLock(lockId: string) {
+  return apiPatch<SeatLockView>(`/reservation/seatmap/locks/${lockId}/approve`);
+}
+
+export function rejectSeatLock(lockId: string, rejectionReason: string) {
+  return apiPatch<SeatLockView>(`/reservation/seatmap/locks/${lockId}/reject`, {
+    rejectionReason,
+  });
 }
 
 export function fetchPnrList(q?: string, status?: string) {

@@ -131,6 +131,8 @@ export interface BookingDetail {
   holdExpiresAt: string | null;
   flightInstanceId: string;
   flightNo: string;
+  /** Effective aircraft model captured from the flight instance for the e-ticket. */
+  aircraftType?: string | null;
   originCode: string;
   destCode: string;
   departureAt: string;
