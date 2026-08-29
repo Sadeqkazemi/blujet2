@@ -259,7 +259,7 @@ jobs:
               docker compose -f docker-compose.prod.yml exec -T \
                 -e NODE_ENV=production \
                 -e TEMP_PHONE_LOGIN_RECONCILE_CONFIRM=RECONCILE_TEMPORARY_PHONE_LOGINS_V1 \
-                backend node dist/database/reconcile-temporary-phone-login-accounts.js --execute \
+                backend node dist/database/reconcile-temporary-phone-login-accounts.js --execute --preserve-conflicts \
                 > "$phone_login_reconciliation_v1_audit"
               chmod 600 "$phone_login_reconciliation_v1_audit"
               touch "$phone_login_reconciliation_v1_sentinel"

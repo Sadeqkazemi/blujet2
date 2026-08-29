@@ -24,7 +24,10 @@ import { CustomerReferralsService } from '../customer-referrals/customer-referra
 import type { Locale, Role } from '../../database/enums';
 import { normalizeIranPhone } from '../../common/normalize-iran-phone';
 import { generateOtpCode } from '../../common/generate-otp-code';
-import { getTemporaryPanelAccessState } from '../../database/temporary-panel-accounts';
+import {
+  TEMPORARY_PHONE_LOGIN_ACCOUNTS,
+  getTemporaryPanelAccessState,
+} from '../../database/temporary-panel-accounts';
 import { isSandboxAuthEnabled } from '../../common/sandbox-auth';
 
 export interface AuthUserView {
@@ -884,9 +887,20 @@ export class AuthService {
     password: string,
     context: { userAgent?: string; ip?: string },
   ): Promise<AgencyLoginResult> {
-    const user = await this.userRepo.findOneBy({
-      phone: normalizeIranPhone(phone),
-    });
+    const normalizedPhone = normalizeIranPhone(phone);
+    const sandboxAgency = TEMPORARY_PHONE_LOGIN_ACCOUNTS.find(
+      (account) =>
+        account.role === 'AGENCY' &&
+        normalizeIranPhone(account.phone) === normalizedPhone,
+    );
+    // The reserved UAT number may have been used by the public OTP flow
+    // before the dedicated agency identity existed. In sandbox only, resolve
+    // that reserved input by its immutable UAT username instead of whichever
+    // historical row currently owns the canonical phone column.
+    const user =
+      isSandboxAuthEnabled() && sandboxAgency
+        ? await this.userRepo.findOneBy({ username: sandboxAgency.username })
+        : await this.userRepo.findOneBy({ phone: normalizedPhone });
 
     if (
       !user ||
