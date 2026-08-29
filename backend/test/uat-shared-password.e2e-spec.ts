@@ -422,7 +422,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         const result = reconcilePhoneLogins();
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain(
-          'canonical reserved UAT phone is owned by another account',
+          'canonical reserved UAT phone is owned by an ineligible account',
         );
         expect(
           await userRepository.findOneByOrFail({ username: 'uat.agency' }),
@@ -432,6 +432,59 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         ).toMatchObject({ phone: '+989000000002' });
       } finally {
         await userRepository.delete(conflict.id);
+      }
+    });
+
+    it('releases an exact legacy passwordless OTP shadow while preserving its row and restoring the agency login', async () => {
+      const userRepository = dataSource.getRepository(User);
+      const refreshRepository = dataSource.getRepository(RefreshToken);
+      await userRepository.update(
+        { username: 'uat.agency' },
+        { phone: '09000000001' },
+      );
+      const canonicalPhone = '+989000000001';
+      const shadow = await userRepository.save(
+        userRepository.create({
+          role: Role.USER,
+          phone: canonicalPhone,
+          fullName: canonicalPhone,
+          updatedAt: new Date(),
+        }),
+      );
+      await refreshRepository.save(
+        refreshRepository.create({
+          userId: shadow.id,
+          tokenHash: `legacy-otp-shadow-${shadow.id}`,
+          expiresAt: new Date(Date.now() + 60_000),
+        }),
+      );
+
+      try {
+        const result = reconcilePhoneLogins();
+        expect(result.status).toBe(0);
+        expect(JSON.parse(result.stdout).releasedLegacyOtpShadowCount).toBe(1);
+        expect(
+          await userRepository.findOneByOrFail({ id: shadow.id }),
+        ).toMatchObject({
+          phone: null,
+          role: Role.USER,
+          fullName: canonicalPhone,
+        });
+        expect(
+          await refreshRepository.count({
+            where: { userId: shadow.id, revokedAt: IsNull() },
+          }),
+        ).toBe(0);
+
+        const agencyLogin = await request(app.getHttpServer())
+          .post('/auth/agency/login')
+          .send({ phone: '09000000001', password: STRONG_PASSWORD });
+        expect(agencyLogin.status).toBe(200);
+        expect(agencyLogin.body.data.accessToken).toBeDefined();
+      } finally {
+        await dataSource.getRepository(AuditLog).delete({ actorId: shadow.id });
+        await refreshRepository.delete({ userId: shadow.id });
+        await userRepository.delete(shadow.id);
       }
     });
   });

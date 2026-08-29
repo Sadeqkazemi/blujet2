@@ -20,6 +20,41 @@ const TRUSTED_PROVENANCE_SOURCES = [
   'temporary-panel-access-extension-v3',
 ] as const;
 
+/** Before the dedicated UAT phone identities existed, using one of their
+ * reserved numbers in the public OTP flow could create a passwordless USER
+ * shell. Keep that historical row (and every relation pointing at it), but
+ * allow the reserved phone to be released only when the row still has the
+ * exact minimal shape produced by AuthService.requestOtp(). */
+function isLegacyOtpShadowOwner(user: User, normalizedPhone: string): boolean {
+  return (
+    user.phone === normalizedPhone &&
+    user.role === 'USER' &&
+    user.username === null &&
+    user.passwordHash === null &&
+    user.email === null &&
+    user.fullName === normalizedPhone &&
+    user.twoFactorEnabled === false &&
+    user.twoFactorSecret === null &&
+    user.temporaryPasswordOnlyUntil === null &&
+    user.isActive === true &&
+    user.deletedAt === null &&
+    user.isSuperAdmin === false &&
+    user.panelPermissions === null &&
+    user.createdById === null &&
+    user.dept === null &&
+    user.mustChangePassword === false &&
+    user.rank === null &&
+    user.referralScope === null &&
+    user.nationalIdEnc === null &&
+    user.nationalIdHash === null &&
+    user.passportNoEnc === null &&
+    user.birthDate === null &&
+    user.addressEnc === null &&
+    user.emailVerifiedAt === null &&
+    user.referralCode === null
+  );
+}
+
 async function main(): Promise<void> {
   const expectedAccounts = TEMPORARY_PHONE_LOGIN_ACCOUNTS.map((account) => ({
     ...account,
@@ -90,12 +125,21 @@ async function main(): Promise<void> {
         },
       });
       const expectedUserIds = new Set(users.map(({ id }) => id));
-      const conflictingOwner = normalizedPhoneOwners.find(
+      const conflictingOwners = normalizedPhoneOwners.filter(
         ({ id }) => !expectedUserIds.has(id),
       );
-      if (conflictingOwner) {
+      const normalizedPhones = new Set(
+        expectedAccounts.map(({ normalizedPhone }) => normalizedPhone),
+      );
+      const ineligibleConflictingOwner = conflictingOwners.find(
+        (owner) =>
+          !owner.phone ||
+          !normalizedPhones.has(owner.phone) ||
+          !isLegacyOtpShadowOwner(owner, owner.phone),
+      );
+      if (ineligibleConflictingOwner) {
         throw new Error(
-          'Phone-login reconciliation refused: a canonical reserved UAT phone is owned by another account.',
+          'Phone-login reconciliation refused: a canonical reserved UAT phone is owned by an ineligible account.',
         );
       }
 
@@ -135,6 +179,35 @@ async function main(): Promise<void> {
         normalizedPhone: string;
         status: 'already_normalized' | 'reconciled';
       }>;
+
+      // Release only the exact passwordless OTP shells validated above. The
+      // rows and all of their business/history relations remain intact; only
+      // the owner-approved reserved test phone is moved to its dedicated UAT
+      // identity. Sessions are revoked below in the same transaction.
+      for (const shadowOwner of conflictingOwners) {
+        const previousPhone = shadowOwner.phone!;
+        shadowOwner.phone = null;
+        shadowOwner.updatedAt = now;
+        await userRepository.save(shadowOwner);
+        await manager.getRepository(AuditLog).save(
+          manager.getRepository(AuditLog).create({
+            actorId: shadowOwner.id,
+            actorRole: shadowOwner.role,
+            category: 'SECURITY',
+            action: 'Legacy UAT OTP shadow phone released',
+            detail:
+              'A reserved UAT phone was released from its legacy passwordless OTP shell.',
+            entityType: 'User',
+            entityId: shadowOwner.id,
+            metadata: {
+              source: 'temporary-phone-login-reconciliation-v1',
+              previousPhone,
+              status: 'legacy_otp_shadow_released',
+            },
+            requestId: null,
+          }),
+        );
+      }
       for (const account of expectedAccounts) {
         const user = usersByUsername.get(account.username)!;
         const status =
@@ -173,7 +246,10 @@ async function main(): Promise<void> {
 
       await manager.getRepository(RefreshToken).update(
         {
-          userId: In(users.map(({ id }) => id)),
+          userId: In([
+            ...users.map(({ id }) => id),
+            ...conflictingOwners.map(({ id }) => id),
+          ]),
           revokedAt: IsNull(),
         },
         { revokedAt: now },
@@ -182,6 +258,7 @@ async function main(): Promise<void> {
       return {
         version: 1,
         reconciledAt: now.toISOString(),
+        releasedLegacyOtpShadowCount: conflictingOwners.length,
         accounts: reconciled,
       };
     });
