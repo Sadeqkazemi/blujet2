@@ -29,6 +29,9 @@ import type {
 
 @Injectable()
 export class CartableService {
+  private static readonly INTERNAL_CONVERSATION_TTL_MS =
+    4 * 24 * 60 * 60 * 1000;
+
   constructor(
     @InjectRepository(CartableTask)
     private readonly taskRepo: Repository<CartableTask>,
@@ -81,6 +84,45 @@ export class CartableService {
     );
   }
 
+  /**
+   * Deterministic lazy sweep: every cartable read archives conversations whose
+   * last message is older than four days. This avoids a process-local timer and
+   * works consistently across multiple backend replicas.
+   */
+  private async closeInactiveInternalConversations(now = new Date()) {
+    const threshold = new Date(
+      now.getTime() - CartableService.INTERNAL_CONVERSATION_TTL_MS,
+    );
+    const rows = await this.taskRepo
+      .createQueryBuilder('task')
+      .select('task.conversationId', 'conversationId')
+      .where('task.conversationId IS NOT NULL')
+      .andWhere('task.status = :openStatus', { openStatus: 'OPEN' })
+      .andWhere('task.sourceType IN (:...sourceTypes)', {
+        sourceTypes: ['MANAGER_MESSAGE', 'EMPLOYEE_MESSAGE'],
+      })
+      .groupBy('task.conversationId')
+      .having('MAX(task.createdAt) <= :threshold', { threshold })
+      .getRawMany<{ conversationId: string }>();
+    const conversationIds = rows
+      .map((row) => row.conversationId)
+      .filter(Boolean);
+    if (conversationIds.length === 0) return;
+
+    await this.taskRepo.update(
+      {
+        conversationId: In(conversationIds),
+        sourceType: In(['MANAGER_MESSAGE', 'EMPLOYEE_MESSAGE']),
+        status: 'OPEN',
+      },
+      {
+        status: 'APPROVED',
+        resolutionNote: 'بسته‌شدن خودکار پس از ۴ روز عدم فعالیت',
+        resolvedAt: now,
+      },
+    );
+  }
+
   private isActiveStaff(user: User | null | undefined): user is User {
     return Boolean(
       user?.isActive &&
@@ -112,6 +154,7 @@ export class CartableService {
       status?: CartableStatus;
     },
   ) {
+    await this.closeInactiveInternalConversations();
     const status = query.status ?? 'OPEN';
     const where: FindOptionsWhere<CartableTask> = {
       assigneeId: actor.id,
@@ -180,6 +223,7 @@ export class CartableService {
    * stay reachable), plus per-task audit history. First view marks the
    * task read; repeat views are a no-op (idempotent). */
   async getById(actor: AuthenticatedUser, id: string) {
+    await this.closeInactiveInternalConversations();
     const task = await this.taskRepo.findOne({
       where: [
         { id, assigneeId: actor.id },
@@ -287,6 +331,7 @@ export class CartableService {
   /** Badge count for "کارتابل من" — never-viewed tasks regardless of
    * status, so a resolved-but-unseen item still counts. */
   async unreadCount(actor: AuthenticatedUser) {
+    await this.closeInactiveInternalConversations();
     const count = await this.taskRepo.count({
       where: { assigneeId: actor.id, readAt: IsNull() },
     });
@@ -846,6 +891,48 @@ export class CartableService {
     });
 
     return reply;
+  }
+
+  async closeInternalConversation(actor: AuthenticatedUser, id: string) {
+    const task = await this.taskRepo.findOne({
+      where: [
+        { id, assigneeId: actor.id },
+        { id, senderId: actor.id },
+      ],
+    });
+    if (!task || !this.isInternalMessage(task) || !task.conversationId) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'گفتگوی داخلی یافت نشد.',
+      });
+    }
+
+    const now = new Date();
+    await this.taskRepo.update(
+      {
+        conversationId: task.conversationId,
+        sourceType: In(['MANAGER_MESSAGE', 'EMPLOYEE_MESSAGE']),
+        status: 'OPEN',
+      },
+      {
+        status: 'APPROVED',
+        resolutionNote: 'گفتگو توسط کاربر بسته شد',
+        resolvedAt: now,
+      },
+    );
+
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'SYSTEM',
+      action: 'بستن گفتگوی داخلی',
+      detail: `${actor.fullName} گفتگوی «${task.title}» را بست.`,
+      entityType: 'CartableTask',
+      entityId: task.id,
+      metadata: { conversationId: task.conversationId },
+    });
+
+    return this.getById(actor, task.id);
   }
 
   async listSentEmployeeManagerMessages(actor: AuthenticatedUser) {

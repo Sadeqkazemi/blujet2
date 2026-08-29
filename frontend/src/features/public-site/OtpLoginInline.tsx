@@ -84,7 +84,7 @@ export default function OtpLoginInline({
   showHeader = true,
   checkoutStyle = false,
 }: {
-  onAuthenticated?: () => void;
+  onAuthenticated?: () => void | Promise<void>;
   embedded?: boolean;
   showHeader?: boolean;
   checkoutStyle?: boolean;
@@ -161,7 +161,7 @@ export default function OtpLoginInline({
     setBusy(true);
     try {
       await verifyOtp(challengeId!, normalizeIranMobile(code));
-      onAuthenticated?.();
+      await onAuthenticated?.();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.otpInvalid);
     } finally {

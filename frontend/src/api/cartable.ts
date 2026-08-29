@@ -63,6 +63,10 @@ export function replyCartableMessage(
   });
 }
 
+export function closeCartableConversation(id: string) {
+  return apiPatch<CartableTask>(`/cartable/${id}/close`);
+}
+
 export function sendDirectStaffMessage(dto: {
   toId: string;
   subject: string;

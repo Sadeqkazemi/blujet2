@@ -66,6 +66,8 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import MoneyInput from '../../components/MoneyInput';
 import SupportConversationCenter from '../../components/SupportConversationCenter';
 import { joinPersonName, splitPersonName } from '../../lib/person-name';
+import Pagination from '../../components/Pagination';
+import { usePagination } from '../../hooks/usePagination';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -632,6 +634,7 @@ export default function AccountPage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwNotice, setPwNotice] = useState<string | null>(null);
   const [pwSaving, setPwSaving] = useState(false);
+  const tripsPager = usePagination(bookings ?? []);
 
   const selectTab = (next: TabKey) => {
     setTab(next);
@@ -1224,7 +1227,7 @@ export default function AccountPage() {
                 </Link>
               </div>
             )}
-            {bookings?.map((b) => {
+            {tripsPager.pageItems.map((b) => {
               const statusKey = displayTripStatus(b);
               const st = STATUS_LABEL[statusKey] ?? { label: { fa: statusKey, en: statusKey, ar: statusKey }, bg: '#f1f4f8', color: '#5a6678' };
               const payable = isHoldPayable(b);
@@ -1284,6 +1287,14 @@ export default function AccountPage() {
                 </div>
               );
             })}
+            <Pagination
+              page={tripsPager.page}
+              totalPages={tripsPager.totalPages}
+              onChange={tripsPager.setPage}
+              variant="light"
+              previousLabel={locale === 'en' ? 'Previous page' : locale === 'ar' ? 'الصفحة السابقة' : 'صفحه قبل'}
+              nextLabel={locale === 'en' ? 'Next page' : locale === 'ar' ? 'الصفحة التالية' : 'صفحه بعد'}
+            />
           </div>
         )}
 
@@ -1333,14 +1344,19 @@ export default function AccountPage() {
                   </div>
                 )}
               </div>
-              <button
-                type="submit"
-                data-testid="wallet-topup-submit"
-                disabled={topupBusy}
-                style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+              <div
+                data-testid="wallet-topup-submit-cell"
+                style={{ display: 'flex', alignItems: 'flex-end', minHeight: 76 }}
               >
-                {t.topupSubmit}
-              </button>
+                <button
+                  type="submit"
+                  data-testid="wallet-topup-submit"
+                  disabled={topupBusy}
+                  style={{ border: 'none', borderRadius: 10, background: '#1668c4', color: '#fff', padding: '11px 22px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  {t.topupSubmit}
+                </button>
+              </div>
             </form>
           </div>
         )}

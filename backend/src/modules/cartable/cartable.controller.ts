@@ -169,6 +169,20 @@ export class CartableController {
     return { success: true, data };
   }
 
+  @Patch(':id/close')
+  @Roles(...STAFF_ROLES)
+  @RequiresPermission('ct_process')
+  @ApiOperation({
+    summary: 'بستن صریح کل گفتگوی داخلی و نگهداری تاریخچه در بایگانی',
+  })
+  async closeConversation(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('id') id: string,
+  ) {
+    const data = await this.cartable.closeInternalConversation(actor, id);
+    return { success: true, data };
+  }
+
   @Patch(':id/reject')
   @Roles(...EXEC_ROLES, 'IT_MANAGER', 'OPERATIONS_MANAGER', 'SITE_ADMIN')
   @ApiOperation({ summary: 'رد (دکمه «انصراف» طراحی) — نظر مدیر الزامی' })

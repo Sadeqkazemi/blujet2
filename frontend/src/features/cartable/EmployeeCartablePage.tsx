@@ -7,6 +7,7 @@ import {
   fetchSentManagerMessages,
   sendEmployeeManagerMessage,
   replyCartableMessage,
+  closeCartableConversation,
 } from "../../api/cartable";
 import { faDigits } from "../../lib/fa-format";
 import Pagination from "../../components/Pagination";
@@ -124,16 +125,31 @@ export default function EmployeeCartablePage() {
       return;
     }
     try {
+      const taskId = reviewTask.id;
       await replyCartableMessage(
         reviewTask.id,
         replyText.trim(),
         replyAttachments.map((file) => file.id),
       );
-      setNotice("پاسخ ارسال شد و مورد جاری بسته شد ✓");
-      setReviewTask(null);
+      setNotice("پاسخ ارسال شد ✓");
+      setReplyText("");
+      setReplyAttachments([]);
+      setReviewTask(await fetchCartableTask(taskId));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "خطا در ارسال پاسخ.");
+    }
+  }
+
+  async function onCloseConversation() {
+    if (!reviewTask) return;
+    try {
+      await closeCartableConversation(reviewTask.id);
+      setNotice("پیام بسته و در تاریخچه نگهداری شد ✓");
+      setReviewTask(null);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "خطا در بستن پیام.");
     }
   }
 
@@ -475,9 +491,22 @@ export default function EmployeeCartablePage() {
                   onClick={() => void onReply()}
                   className="rounded-[10px] bg-[#3b82f6] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#2563eb]"
                 >
-                  ارسال پاسخ و بستن
+                  ارسال پاسخ
                 </button>
               </div>
+            </div>
+          ) : null}
+          {(reviewTask.sourceType === "MANAGER_MESSAGE" ||
+            reviewTask.sourceType === "EMPLOYEE_MESSAGE") &&
+          reviewTask.conversationId ? (
+            <div className="mt-4 flex justify-end border-t border-[#28344c] pt-4">
+              <button
+                type="button"
+                onClick={() => void onCloseConversation()}
+                className="rounded-[10px] border border-[#ef4444]/60 px-4 py-2.5 text-xs font-bold text-[#f87171] hover:bg-[#450a0a]/30"
+              >
+                بستن پیام
+              </button>
             </div>
           ) : null}
         </Modal>

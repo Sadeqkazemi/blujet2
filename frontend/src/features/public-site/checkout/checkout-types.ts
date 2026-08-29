@@ -35,6 +35,8 @@ export interface CheckoutDraft {
   selectedSeats: string[];
   flight: FlightSnapshot;
   passengerMix: PassengerMix;
+  /** Guest-entered manifest, persisted while OTP authentication completes. */
+  passengers?: PassengerFormDraft[];
   /** Outbound leg when the user booked a round-trip return flight. */
   outboundLeg?: {
     flightInstanceId: string;

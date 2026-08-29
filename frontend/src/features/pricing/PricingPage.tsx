@@ -645,7 +645,7 @@ function CeoPricing() {
                         onClick={() => void onReject(p)}
                         className="rounded-[9px] bg-[#dc2626] px-[15px] py-2 text-xs font-extrabold text-white"
                       >
-                        ثبت رد
+                        ثبت درخواست
                       </button>
                       <button
                         type="button"

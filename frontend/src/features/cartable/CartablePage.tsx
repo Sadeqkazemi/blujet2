@@ -14,6 +14,7 @@ import {
   fetchStaffDirectory,
   rejectCartableTask,
   replyCartableMessage,
+  closeCartableConversation,
   requestChairPermission,
   transferCartableTask,
 } from "../../api/cartable";
@@ -272,25 +273,27 @@ export default function CartablePage() {
       return;
     }
     try {
+      const taskId = reviewTask.id;
       await replyCartableMessage(
         reviewTask.id,
         note.trim(),
         replyAttachments.map((file) => file.id),
       );
-      setNotice("پاسخ ارسال شد و مورد جاری بسته شد ✓");
-      setReviewTask(null);
+      setNotice("پاسخ ارسال شد ✓");
+      setNote("");
       setReplyAttachments([]);
+      setReviewTask(await fetchCartableTask(taskId));
       await load();
     } catch (e) {
       setReviewError(e instanceof Error ? e.message : "خطا در ارسال پاسخ.");
     }
   }
 
-  async function onCloseWithoutReply() {
+  async function onCloseConversation() {
     if (!reviewTask) return;
     try {
-      await approveCartableTask(reviewTask.id, "بسته شد بدون پاسخ");
-      setNotice("پیام بدون پاسخ بسته شد ✓");
+      await closeCartableConversation(reviewTask.id);
+      setNotice("پیام بسته و در تاریخچه نگهداری شد ✓");
       setReviewTask(null);
       await load();
     } catch (e) {
@@ -826,21 +829,10 @@ export default function CartablePage() {
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => void onCloseWithoutReply()}
-                  className={`rounded-lg border px-4 py-2 text-xs font-bold transition ${
-                    dark
-                      ? "border-[#28344c] text-[#9fb0c7] hover:bg-[#18223a]"
-                      : "border-border text-text-2 hover:bg-surface"
-                  }`}
-                >
-                  بستن بدون پاسخ
-                </button>
-                <button
-                  type="button"
                   onClick={() => void onReply()}
                   className="rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#2563eb]"
                 >
-                  ارسال پاسخ و بستن
+                  ارسال پاسخ
                 </button>
               </div>
             </>
@@ -939,6 +931,23 @@ export default function CartablePage() {
               ) : null}
             </div>
           )}
+          {(reviewTask.sourceType === "MANAGER_MESSAGE" ||
+            reviewTask.sourceType === "EMPLOYEE_MESSAGE") &&
+          reviewTask.conversationId ? (
+            <div className={`mt-4 flex justify-end border-t pt-4 ${dark ? "border-[#28344c]" : "border-border"}`}>
+              <button
+                type="button"
+                onClick={() => void onCloseConversation()}
+                className={`rounded-lg border px-4 py-2 text-xs font-bold transition ${
+                  dark
+                    ? "border-[#ef4444]/60 text-[#f87171] hover:bg-[#450a0a]/30"
+                    : "border-danger/50 text-danger hover:bg-danger/5"
+                }`}
+              >
+                بستن پیام
+              </button>
+            </div>
+          ) : null}
         </Modal>
       )}
     </div>

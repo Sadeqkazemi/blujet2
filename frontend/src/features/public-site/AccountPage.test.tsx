@@ -340,6 +340,22 @@ describe('AccountPage', () => {
     expect(screen.getByTestId('passenger-remove-sp-1')).toHaveTextContent('حذف');
   });
 
+  it('shows ten trips per page and keeps further records on the next page', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue(
+      Array.from({ length: 11 }, (_, index) => ({
+        ...BOOKING,
+        id: `booking-${index + 1}`,
+        pnr: `BJ${String(index + 1).padStart(5, '0')}`,
+      })),
+    );
+    renderPage('/account?tab=trips');
+
+    expect(await screen.findAllByTestId('account-trip')).toHaveLength(10);
+    await userEvent.click(screen.getByRole('button', { name: 'صفحه بعد' }));
+    expect(await screen.findAllByTestId('account-trip')).toHaveLength(1);
+  });
+
   it('adds a saved passenger from the modal', async () => {
     mockAuth('authenticated');
     const create = vi.spyOn(publicSiteApi, 'createSavedPassenger').mockResolvedValue({
@@ -658,6 +674,10 @@ describe('AccountPage', () => {
     await userEvent.type(screen.getByTestId('wallet-topup-amount'), '۵۰۰٬۰۰۰');
     expect(screen.getByTestId('wallet-topup-amount')).toHaveValue('۵۰۰٬۰۰۰');
     expect(screen.getByTestId('wallet-topup-amount-words')).toHaveTextContent('پانصد هزار تومان');
+    expect(screen.getByTestId('wallet-topup-submit-cell')).toHaveStyle({
+      alignItems: 'flex-end',
+      minHeight: '76px',
+    });
     await userEvent.click(screen.getByTestId('wallet-topup-submit'));
 
     await vi.waitFor(() => expect(topup).toHaveBeenCalledWith(5_000_000));

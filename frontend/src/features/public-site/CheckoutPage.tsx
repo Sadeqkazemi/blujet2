@@ -69,6 +69,7 @@ import {
 } from './checkout/md80-seat-layout';
 import { seatTypeTotalIrr } from './checkout/seat-type-pricing';
 import type { PublicAncillaryService } from '../../types/ancillary-services';
+import { syncGuestPrimaryProfile } from './checkout/checkout-guest-profile';
 
 const BUSINESS_SEAT_MIN_POINTS = 15_000;
 const STEP_ORDER: CheckoutWizardStep[] = ['pax', 'extras', 'review'];
@@ -193,9 +194,11 @@ export default function CheckoutPage() {
         selectedSeats: fromStorage?.selectedSeats ?? [],
         flight: mergeFlight(stateFlight),
         passengerMix,
+        passengers: fromStorage?.passengers,
         outboundLeg: fromStorage?.outboundLeg,
       };
       setDraft(d);
+      setPassengers(buildPassengersFromMix(d.passengerMix, d.passengers ?? []));
       saveCheckoutDraft(d);
       setSelectedSeats(d.selectedSeats);
       return;
@@ -211,6 +214,7 @@ export default function CheckoutPage() {
         passengerMix,
       };
       setDraft(d);
+      setPassengers(buildPassengersFromMix(d.passengerMix, d.passengers ?? []));
       saveCheckoutDraft(d);
       setSelectedSeats(d.selectedSeats);
       return;
@@ -232,6 +236,7 @@ export default function CheckoutPage() {
         }),
       };
       setDraft(d);
+      setPassengers(buildPassengersFromMix(d.passengerMix));
       saveCheckoutDraft(d);
       return;
     }
@@ -368,28 +373,43 @@ export default function CheckoutPage() {
 
   function changePassengers(next: PassengerFormDraft[]) {
     setPassengers(next);
+    if (draft) {
+      const updated = { ...draft, passengers: next };
+      setDraft(updated);
+      saveCheckoutDraft(updated);
+    }
     setError(null);
+  }
+
+  function validatePassengerStep(): boolean {
+    setShowPassengerErrors(true);
+    if (passengers.some((p) => !isPassengerValid(p))) {
+      setError(t.completePaxError);
+      return false;
+    }
+    if (nationalIdsExceedingSeatLimit(passengers).length > 0) {
+      setError(t.nidSeatLimitError);
+      return false;
+    }
+    const ageError = passengerAgeError();
+    if (ageError) {
+      setError(ageError);
+      return false;
+    }
+    return true;
+  }
+
+  function requestCheckoutLogin() {
+    setError(null);
+    if (!validatePassengerStep()) return;
+    setLoginOpen(true);
   }
 
   function goNext() {
     setError(null);
     if (step === 'pax') {
-      setShowPassengerErrors(true);
-      if (passengers.some((p) => !isPassengerValid(p))) {
-        setError(t.completePaxError);
-        return;
-      }
-      if (nationalIdsExceedingSeatLimit(passengers).length > 0) {
-        setError(t.nidSeatLimitError);
-        return;
-      }
-      const ageError = passengerAgeError();
-      if (ageError) {
-        setError(ageError);
-        return;
-      }
+      if (!validatePassengerStep()) return;
       if (status !== 'authenticated') {
-        setLoginOpen(true);
         return;
       }
       setStep('extras');
@@ -720,7 +740,8 @@ export default function CheckoutPage() {
     showPassengerErrors && passengerFormIncomplete ? t.completePaxError : null;
   // Passenger validation is intentionally submit-driven: customers can type
   // without the whole form turning red, then see precise errors after confirm.
-  const nextDisabled = busy;
+  const signInRequired = step === 'pax' && status !== 'authenticated';
+  const nextDisabled = busy || signInRequired;
 
   const loginModal = loginOpen ? (
     <div
@@ -762,10 +783,24 @@ export default function CheckoutPage() {
           embedded
           showHeader={false}
           checkoutStyle
-          onAuthenticated={() => {
-            setLoginOpen(false);
-            if (step === 'pax') setStep('extras');
-            else if (step === 'review') void submitBooking();
+          onAuthenticated={async () => {
+            try {
+              if (step === 'pax') {
+                await syncGuestPrimaryProfile(passengers, locale);
+                setStep('extras');
+              } else if (step === 'review') {
+                void submitBooking();
+              }
+              setLoginOpen(false);
+            } catch (syncError) {
+              setError(
+                syncError instanceof Error
+                  ? syncError.message
+                  : locale === 'en'
+                    ? 'Your profile could not be saved. Please try again.'
+                    : 'ذخیره اطلاعات حساب انجام نشد؛ لطفاً دوباره تلاش کنید.',
+              );
+            }
           }}
         />
         <button
@@ -788,9 +823,8 @@ export default function CheckoutPage() {
         departureAt={draft.flight.departureAt}
         onClose={() => setEditPaxOpen(false)}
         onSave={(next) => {
-          setPassengers(next);
+          changePassengers(next);
           setEditPaxOpen(false);
-          setError(null);
         }}
       />
     ) : null;
@@ -904,12 +938,15 @@ export default function CheckoutPage() {
             error={error}
             disabled={nextDisabled}
             disabledHint={passengerCompletionNotice}
+            signInRequired={signInRequired}
+            onSignIn={requestCheckoutLogin}
           />
         </div>
 
         <div
-          className="fixed bottom-0 left-0 right-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
+          className="sticky bottom-0 z-[80] flex items-center justify-between gap-2.5 border-t border-[#e6eaf0] bg-white px-4 py-2.5 shadow-[0_-8px_24px_-14px_rgba(13,38,102,.3)]"
           data-testid="checkout-mobile-sticky"
+          style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}
         >
           {step !== 'pax' && (
             <button
@@ -935,6 +972,16 @@ export default function CheckoutPage() {
           >
             {busy ? t.loading : nextLabel}
           </button>
+          {signInRequired && (
+            <button
+              type="button"
+              onClick={requestCheckoutLogin}
+              data-testid="checkout-sign-in-required-mobile"
+              className="flex h-12 max-w-[220px] flex-1 items-center justify-center rounded-xl border border-[#1668c4] bg-[#eef4fb] px-2 text-center text-[11px] font-extrabold text-[#1668c4]"
+            >
+              {locale === 'en' ? 'Sign in to continue' : locale === 'ar' ? 'تسجيل الدخول للمتابعة' : 'ورود برای ادامه'}
+            </button>
+          )}
         </div>
         {loginModal}
         {editPaxModal}
@@ -982,6 +1029,8 @@ export default function CheckoutPage() {
           error={error}
           disabled={nextDisabled}
           disabledHint={passengerCompletionNotice}
+          signInRequired={signInRequired}
+          onSignIn={requestCheckoutLogin}
         />
       </div>
       {loginModal}
