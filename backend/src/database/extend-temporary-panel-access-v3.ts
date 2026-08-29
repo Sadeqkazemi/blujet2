@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { DataSource, In, IsNull } from 'typeorm';
+import { normalizeIranPhone } from '../common/normalize-iran-phone';
 import { AuditLog } from './entities/audit-log.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
 import { User } from './entities/user.entity';
@@ -99,6 +100,11 @@ async function main(): Promise<void> {
           );
         }
 
+        const expectedPhone =
+          'phone' in expectedAccount
+            ? normalizeIranPhone(expectedAccount.phone)
+            : null;
+
         const previousDeadline = user.temporaryPasswordOnlyUntil;
         const extendedDeadline = createTemporaryPanelV2ExtensionExpiry(
           user.createdAt,
@@ -123,16 +129,14 @@ async function main(): Promise<void> {
           superAdmin: user.isSuperAdmin,
           panelPermissions: user.panelPermissions !== null,
           fullName: user.fullName !== expectedAccount.fullName,
-          phone:
-            user.phone !==
-            ('phone' in expectedAccount ? expectedAccount.phone : null),
+          phone: user.phone !== expectedPhone,
           dept:
             user.dept !==
             ('dept' in expectedAccount ? expectedAccount.dept : null),
         };
         user.role = expectedRole;
         user.fullName = expectedAccount.fullName;
-        user.phone = 'phone' in expectedAccount ? expectedAccount.phone : null;
+        user.phone = expectedPhone;
         user.dept = 'dept' in expectedAccount ? expectedAccount.dept : null;
         user.isActive = true;
         user.deletedAt = null;

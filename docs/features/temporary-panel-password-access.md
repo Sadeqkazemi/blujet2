@@ -229,6 +229,31 @@ non-secret results to
 `/root/blujet-uat-shared-password-reconciliation-v3.json`. It retains the same
 fail-closed identity, expiry, and session-revocation guarantees as v2.
 
+### UAT phone-login identity normalization repair
+
+The same incident exposed a separate identity-storage defect: access extension
+v3 restored the configured `09...` display/login value directly into
+`User.phone`, while agency and customer authentication always normalizes the
+submitted value to canonical `+98...` before querying. The password was valid,
+but the canonical lookup could not find either phone-login identity.
+
+- [x] Extension v3 always persists phone-login identities in the canonical
+  `+98...` form used by authentication —
+  `uat-shared-password.e2e-spec.ts` and source inspection.
+- [x] A guarded, one-time reconciliation repairs only the exact reserved
+  `uat.agency` and `uat.customer` identities, refuses role/lifecycle/provenance
+  mismatches or phone conflicts, and changes no password hash or deadline —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] Reconciliation revokes existing refresh sessions, records a non-secret
+  security audit, and leaves ordinary users untouched —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] After repair, the real agency and customer password-login endpoints both
+  return an access token for their `09...` login input —
+  `uat-shared-password.e2e-spec.ts`.
+- [x] Deployment runs the repair exactly once after the consumed v3 recovery
+  steps and stores root-only audit/sentinel files —
+  `production-artifacts.spec.ts`.
+
 ## Acceptance checklist
 
 - [ ] A controlled production bootstrap creates exactly one temporary account
