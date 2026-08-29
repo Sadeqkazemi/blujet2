@@ -54,7 +54,7 @@
        midpoint because each field includes its label. */
     display: flex !important;
     flex-direction: column !important;
-    gap: 16px !important;
+    gap: 4px !important;
     align-items: stretch !important;
     padding: 12px;
     border: 1px solid #e4eaf2;
@@ -88,13 +88,17 @@
     align-self: center !important;
     order: 2;
     z-index: 3;
-    width: 40px !important;
-    height: 40px !important;
-    margin: 0 !important;
+    width: 36px !important;
+    height: 36px !important;
+    margin-block: -6px !important;
+    margin-inline: 0 !important;
     border-color: #cfe0f4 !important;
     background: #eef5ff !important;
     box-shadow: 0 4px 12px rgba(22, 104, 196, 0.13);
-    transform: none !important;
+    /* The destination label occupies the upper part of the visual gap.
+       Shift the control by half that label height so it is centered between
+       the two input boxes themselves, not between their wrapper elements. */
+    transform: translateY(13px) !important;
   }
 
   .results-edit-search-swap-icon {
