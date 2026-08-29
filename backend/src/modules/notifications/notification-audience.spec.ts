@@ -10,6 +10,9 @@ describe('notificationEntityVisibleToRole', () => {
     expect(notificationEntityVisibleToRole('USER', 'FarePricingProposal')).toBe(
       false,
     );
+    expect(notificationEntityVisibleToRole('USER', 'FlightInstance')).toBe(
+      false,
+    );
   });
 
   it('keeps agency-domain notifications and rejects management workflow notifications', () => {

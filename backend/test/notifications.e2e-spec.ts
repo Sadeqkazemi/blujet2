@@ -329,4 +329,34 @@ describe('Notifications (e2e)', () => {
       .set('Authorization', `Bearer ${stranger.accessToken}`);
     expect(wrongMarkRead.status).toBe(404);
   });
+
+  it('never delivers flight-creation lifecycle noise to an agency bell', async () => {
+    const { user: agencyUser, phone } = await createFreshAgency();
+    const notifications = app.get(NotificationsService);
+    const managementOnly = await notifications.notify({
+      recipientId: agencyUser.id,
+      category: 'SYSTEM',
+      action: 'FLIGHT_PUBLISHED',
+      title: 'پرواز جدید ایجاد شد',
+      entityType: 'FlightInstance',
+      entityId: crypto.randomUUID(),
+      dedupeKey: `test-flight-noise:${crypto.randomUUID()}`,
+    });
+    const { accessToken } = await loginAsAgencyUser(agencyUser.id, phone);
+
+    const list = await request(app.getHttpServer())
+      .get('/notifications')
+      .set('Authorization', `Bearer ${accessToken}`);
+    const unread = await request(app.getHttpServer())
+      .get('/notifications/unread-count')
+      .set('Authorization', `Bearer ${accessToken}`);
+    const markRead = await request(app.getHttpServer())
+      .patch(`/notifications/${managementOnly.id}/read`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(list.status).toBe(200);
+    expect(list.body.data).toHaveLength(0);
+    expect(unread.body.data.total).toBe(0);
+    expect(markRead.status).toBe(404);
+  });
 });

@@ -9,6 +9,8 @@ export interface PaginationProps {
   className?: string;
   previousLabel?: string;
   nextLabel?: string;
+  /** Optional locale-aware page number formatter. Defaults to Persian digits for staff panels. */
+  formatPage?: (page: number) => string;
 }
 
 /**
@@ -23,6 +25,7 @@ export default function Pagination({
   className = '',
   previousLabel = 'قبلی',
   nextLabel = 'بعدی',
+  formatPage = (value) => faDigits(value),
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
@@ -62,7 +65,7 @@ export default function Pagination({
       {start > 1 && (
         <>
           <button type="button" onClick={() => onChange(1)} className={pageIdle}>
-            {faDigits(1)}
+            {formatPage(1)}
           </button>
           {start > 2 && <span className="px-1 text-[#6b7b94]">…</span>}
         </>
@@ -75,14 +78,14 @@ export default function Pagination({
           onClick={() => onChange(p)}
           className={p === page ? pageActive : pageIdle}
         >
-          {faDigits(p)}
+          {formatPage(p)}
         </button>
       ))}
       {end < totalPages && (
         <>
           {end < totalPages - 1 && <span className="px-1 text-[#6b7b94]">…</span>}
           <button type="button" onClick={() => onChange(totalPages)} className={pageIdle}>
-            {faDigits(totalPages)}
+            {formatPage(totalPages)}
           </button>
         </>
       )}

@@ -49,8 +49,8 @@ const BLOCK_META: Record<
     fields: ['title', 'subtitle', 'buttonText', 'badgeText'],
   },
   ANNOUNCEMENT_BAR: {
-    title: 'اطلاعیه سایت و پنل آژانس',
-    subtitle: 'متن فعال این بخش در صفحه اصلی و «اطلاعیه و اصلاحیه» پنل آژانس نمایش داده می‌شود',
+    title: 'نوار اطلاعیه سایت',
+    subtitle: 'متن فعال این بخش فقط در صفحه اصلی سایت نمایش داده می‌شود',
     fields: ['title', 'subtitle', 'buttonText'],
   },
   PROMO_BANNER: {
@@ -511,8 +511,8 @@ export default function MediaAdminPage() {
       <div className={cardClass()}>
         <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="m-0 text-[14.5px] font-extrabold text-white">اطلاعیه سایت و پنل آژانس</h3>
-            <p className="mt-0.5 text-[11px] text-[#6b7b94]">عنوان و دستورالعمل کامل برای سایت و بخش اطلاعیه آژانس</p>
+            <h3 className="m-0 text-[14.5px] font-extrabold text-white">نوار اطلاعیه سایت</h3>
+            <p className="mt-0.5 text-[11px] text-[#6b7b94]">عنوان و متن نوار اطلاعیه فقط برای صفحه اصلی سایت</p>
           </div>
           <div className="flex gap-2">
             <button

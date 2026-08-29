@@ -49,4 +49,19 @@ describe('Pagination', () => {
     await user.click(screen.getByRole('button', { name: '۴' }));
     expect(onChange).toHaveBeenCalledWith(4);
   });
+
+  it('uses the supplied locale formatter for page numbers', () => {
+    render(
+      <Pagination
+        page={1}
+        totalPages={3}
+        onChange={vi.fn()}
+        formatPage={(value) => String(value)}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '1' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: '3' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '۱' })).not.toBeInTheDocument();
+  });
 });

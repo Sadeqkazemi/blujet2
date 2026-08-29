@@ -397,6 +397,23 @@ describe('ResultsPage', () => {
     expect(screen.getByTestId('edit-search-calendar')).toBeInTheDocument();
   });
 
+  it('uses the redesigned mobile bottom-sheet structure without clipping route and search controls', async () => {
+    mockLocale('fa');
+    mockSearchApis();
+    vi.spyOn(publicSiteApi, 'searchFlights').mockResolvedValue([RESULT]);
+    renderPage('unauthenticated', 'origin=THR&dest=MHD&date=2026-08-01', true);
+    await screen.findByTestId('result-card');
+
+    await userEvent.click(screen.getByRole('button', { name: /ویرایش/ }));
+
+    expect(screen.getByRole('dialog')).toHaveClass('results-edit-search-dialog');
+    expect(screen.getByTestId('edit-search-route')).toHaveClass('results-edit-search-route');
+    expect(screen.getByTestId('edit-search-controls')).toHaveClass('results-edit-search-controls');
+    expect(screen.getByTestId('edit-search-origin')).toBeVisible();
+    expect(screen.getByTestId('edit-search-dest')).toBeVisible();
+    expect(screen.getByTestId('edit-search-cabin')).toBeVisible();
+  });
+
   it('limits edit-search airports to the current flight scope', async () => {
     mockLocale('fa');
     mockSearchApis();
@@ -570,6 +587,10 @@ describe('ResultsPage', () => {
     });
     expect(screen.getByText('بار مجاز')).toHaveStyle({ textAlign: 'right' });
     expect(screen.getByText('20 kg')).toHaveStyle({ textAlign: 'center' });
+    expect(screen.getByTestId('flight-detail-metadata')).toHaveStyle({
+      marginTop: '8px',
+      paddingTop: '22px',
+    });
     expect(screen.queryByText('▼')).not.toBeInTheDocument();
   });
 

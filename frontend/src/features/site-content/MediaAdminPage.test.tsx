@@ -136,7 +136,7 @@ describe('MediaAdminPage', () => {
     render(<MediaAdminPage />);
     expect(await screen.findByText('مدیریت سایت')).toBeInTheDocument();
     expect(screen.getByText('بنر اصلی سایت')).toBeInTheDocument();
-    expect(screen.getByText('اطلاعیه سایت و پنل آژانس')).toBeInTheDocument();
+    expect(screen.getByText('نوار اطلاعیه سایت')).toBeInTheDocument();
     expect(screen.getByText('دستورالعمل کامل آژانس')).toBeInTheDocument();
     expect(screen.getByText('بنر تبلیغاتی میانی')).toBeInTheDocument();
     expect(screen.getByText('مقاصد محبوب')).toBeInTheDocument();
@@ -226,7 +226,7 @@ describe('MediaAdminPage', () => {
   it('toggles announcement bar with design deactivate label', async () => {
     const user = userEvent.setup();
     render(<MediaAdminPage />);
-    await screen.findByText('اطلاعیه سایت و پنل آژانس');
+    await screen.findByText('نوار اطلاعیه سایت');
     await user.click(screen.getByRole('button', { name: 'غیرفعال کردن' }));
     await waitFor(() => {
       expect(siteContentApi.updateContentBlock).toHaveBeenCalledWith('ANNOUNCEMENT_BAR', {
@@ -235,10 +235,10 @@ describe('MediaAdminPage', () => {
     });
   });
 
-  it('allows the site admin to edit the full agency instruction', async () => {
+  it('allows the site admin to edit the public-site announcement bar', async () => {
     const user = userEvent.setup();
     render(<MediaAdminPage />);
-    await screen.findByText('اطلاعیه سایت و پنل آژانس');
+    await screen.findByText('نوار اطلاعیه سایت');
 
     await user.click(screen.getByTestId('edit-agency-announcement'));
     expect(screen.getByDisplayValue('دستورالعمل کامل آژانس')).toBeInTheDocument();
