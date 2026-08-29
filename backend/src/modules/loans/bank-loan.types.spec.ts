@@ -17,10 +17,18 @@ describe('bank loan status mapping', () => {
 
 describe('CircuitBreaker', () => {
   it('opens after threshold failures and cools down', () => {
-    const b = new CircuitBreaker(2, 10);
-    b.recordFailure();
-    expect(() => b.assertClosed()).not.toThrow();
-    b.recordFailure();
-    expect(() => b.assertClosed()).toThrow('CIRCUIT_OPEN');
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      const b = new CircuitBreaker(2, 10);
+      b.recordFailure();
+      expect(() => b.assertClosed()).not.toThrow();
+      b.recordFailure();
+      expect(() => b.assertClosed()).toThrow('CIRCUIT_OPEN');
+
+      now.mockReturnValue(1_010);
+      expect(() => b.assertClosed()).not.toThrow();
+    } finally {
+      now.mockRestore();
+    }
   });
 });
