@@ -447,7 +447,9 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         userRepository.create({
           role: Role.USER,
           phone: canonicalPhone,
-          fullName: canonicalPhone,
+          // Reproduce the legacy row: the phone was canonicalized later while
+          // its placeholder display name remained in local Iranian form.
+          fullName: '09000000001',
           updatedAt: new Date(),
         }),
       );
@@ -468,7 +470,7 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         ).toMatchObject({
           phone: null,
           role: Role.USER,
-          fullName: canonicalPhone,
+          fullName: '09000000001',
         });
         expect(
           await refreshRepository.count({

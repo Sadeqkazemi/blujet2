@@ -32,7 +32,10 @@ function isLegacyOtpShadowOwner(user: User, normalizedPhone: string): boolean {
     user.username === null &&
     user.passwordHash === null &&
     user.email === null &&
-    user.fullName === normalizedPhone &&
+    // Older requestOtp() revisions stored the caller's local `09...` input
+    // as fullName before the phone column was later canonicalized to E.164.
+    // Accept both phone representations, but reject every human/custom name.
+    normalizeIranPhone(user.fullName) === normalizedPhone &&
     user.twoFactorEnabled === false &&
     user.twoFactorSecret === null &&
     user.temporaryPasswordOnlyUntil === null &&
