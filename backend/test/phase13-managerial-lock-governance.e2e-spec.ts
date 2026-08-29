@@ -203,6 +203,37 @@ describe('Phase 13 Part D — managerial lock governance', () => {
     expect(hoursOut).toBeLessThan(49);
   });
 
+  it('company operational blocks are immediately active and do not enter managerial approval', async () => {
+    const blocked = await request(app.getHttpServer())
+      .post(`/reservation/seatmap/${instanceId}/lock`)
+      .set(auth(ceoToken))
+      .send({
+        seatCode: '5C',
+        reason: 'مسدودسازی عملیاتی شرکت',
+        classification: 'FREE',
+        companyBlock: true,
+      });
+
+    expect(blocked.status).toBe(201);
+    expect(blocked.body.data.approvalStatus).toBe('APPROVED');
+    expect(blocked.body.data.approvedById).toBeTruthy();
+
+    const seatmap = await request(app.getHttpServer())
+      .get(`/reservation/seatmap/${instanceId}`)
+      .set(auth(itToken));
+    const row = seatmap.body.data.rows.find(
+      (r: { row: number }) => r.row === 5,
+    );
+    expect(
+      row.seats.find((s: { seatCode: string }) => s.seatCode === '5C').status,
+    ).toBe('BLOCKED');
+
+    await request(app.getHttpServer())
+      .patch(`/reservation/seatmap/locks/${blocked.body.data.id}/release`)
+      .set(auth(ceoToken))
+      .expect(200);
+  });
+
   it('rejection frees the seat immediately (self-rejection allowed)', async () => {
     const requested = await request(app.getHttpServer())
       .post(`/reservation/seatmap/${instanceId}/lock`)

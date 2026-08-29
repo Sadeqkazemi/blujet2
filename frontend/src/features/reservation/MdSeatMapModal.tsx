@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  approveSeatLock,
   fetchPnrList,
   fetchSeatMap,
   fetchSeatLockAgencies,
   lockSeat,
   releaseLock,
+  rejectSeatLock,
 } from '../../api/reservation';
 import { airportCityName } from '../../lib/airport-cities';
 import { faDigits, faMoney } from '../../lib/fa-format';
@@ -285,6 +287,7 @@ export default function MdSeatMapModal({
           targetMode === 'PASSENGER' ? paxName.trim() || undefined : undefined,
         passengerNationalId:
           targetMode === 'PASSENGER' ? paxNid || undefined : undefined,
+        companyBlock: false,
       });
       onNotice(`صندلی ${lockSeatCode} برای تأیید مدیریتی قفل شد ✓`);
       setLockSeatCode(null);
@@ -307,6 +310,7 @@ export default function MdSeatMapModal({
         classification: 'FREE',
         passengerName: paxName.trim() || undefined,
         passengerNationalId: paxNid || undefined,
+        companyBlock: true,
       });
       onNotice(`صندلی ${lockSeatCode} توسط شرکت مسدود شد ✓`);
       setLockSeatCode(null);
@@ -327,6 +331,30 @@ export default function MdSeatMapModal({
       onChanged();
     } catch {
       onError('خطا در آزادسازی صندلی.');
+    }
+  }
+
+  async function onApprove(lockId: string) {
+    try {
+      await approveSeatLock(lockId);
+      onNotice('درخواست لاک صندلی تأیید شد و تا ۴۸ ساعت معتبر است ✓');
+      setInfoSeat(null);
+      await reload();
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'تأیید لاک صندلی ممکن نیست.');
+    }
+  }
+
+  async function onReject(lockId: string) {
+    try {
+      await rejectSeatLock(lockId, 'رد درخواست از پنل مدیریت');
+      onNotice('درخواست لاک صندلی رد و صندلی آزاد شد ✓');
+      setInfoSeat(null);
+      await reload();
+      onChanged();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'رد لاک صندلی ممکن نیست.');
     }
   }
 
@@ -547,13 +575,35 @@ export default function MdSeatMapModal({
                 </div>
               )}
               {(infoSeat.status === 'LOCKED' || infoSeat.status === 'BLOCKED') && infoSeat.lockId && canManage && (
-                <button
-                  type="button"
-                  onClick={() => void onRelease(infoSeat.lockId!)}
-                  className="mt-3 h-10 w-full rounded-[10px] border border-[#f87171] text-[12px] font-extrabold text-[#fca5a5]"
-                >
-                  آزادسازی این صندلی
-                </button>
+                <div className="mt-3 flex gap-2">
+                  {infoSeat.lockApprovalStatus === 'PENDING_APPROVAL' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => void onApprove(infoSeat.lockId!)}
+                        className="h-10 flex-1 rounded-[10px] bg-[#16a34a] text-[12px] font-extrabold text-white"
+                      >
+                        تأیید لاک
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void onReject(infoSeat.lockId!)}
+                        className="h-10 flex-1 rounded-[10px] border border-[#f87171] text-[12px] font-extrabold text-[#fca5a5]"
+                      >
+                        رد درخواست
+                      </button>
+                    </>
+                  )}
+                  {infoSeat.lockApprovalStatus !== 'PENDING_APPROVAL' && (
+                    <button
+                      type="button"
+                      onClick={() => void onRelease(infoSeat.lockId!)}
+                      className="h-10 w-full rounded-[10px] border border-[#f87171] text-[12px] font-extrabold text-[#fca5a5]"
+                    >
+                      آزادسازی این صندلی
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -569,7 +619,7 @@ export default function MdSeatMapModal({
                     key={s.seatCode}
                     className="flex items-center justify-between rounded-[10px] border border-[#1f2a3d] bg-[#141d2e] px-3 py-2"
                   >
-                    {canManage && <button
+                    {canManage && s.lockApprovalStatus !== 'PENDING_APPROVAL' && <button
                       type="button"
                       onClick={() => s.lockId && void onRelease(s.lockId)}
                       className="text-[10.5px] font-bold text-[#f87171]"
@@ -577,6 +627,16 @@ export default function MdSeatMapModal({
                     >
                       آزادسازی
                     </button>}
+                    {canManage && s.lockApprovalStatus === 'PENDING_APPROVAL' && (
+                      <button
+                        type="button"
+                        onClick={() => void onApprove(s.lockId!)}
+                        className="text-[10.5px] font-bold text-[#34d399]"
+                        title="تأیید درخواست"
+                      >
+                        تأیید
+                      </button>
+                    )}
                     <span className="font-num text-[13px] font-extrabold text-[#fcd34d]" dir="ltr">
                       {formatCountdown(s.lockExpiresAt, now)}
                     </span>

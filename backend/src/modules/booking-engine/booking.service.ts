@@ -334,6 +334,7 @@ export class BookingService {
       holdExpiresAt: b.holdExpiresAt,
       flightInstanceId: b.flightInstanceId,
       flightNo: b.flightInstance.flight.flightNo,
+      aircraftType: resolveAircraftType(b.flightInstance),
       originCode: b.flightInstance.flight.route.originCode,
       destCode: b.flightInstance.flight.route.destCode,
       departureAt: b.flightInstance.departureAt,

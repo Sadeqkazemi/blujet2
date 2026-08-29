@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsBoolean,
   IsIn,
   IsISO8601,
   IsInt,
@@ -58,6 +59,12 @@ export class LockSeatDto {
   @IsOptional()
   @IsString()
   passengerMobile?: string;
+
+  /** Company operational block: immediately active, without managerial approval. */
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  companyBlock?: boolean;
 }
 
 export class RejectLockDto {

@@ -156,8 +156,7 @@ function ItReservationView() {
   const canLock =
     user?.role === 'CEO' ||
     user?.role === 'BOARD_CHAIR' ||
-    user?.role === 'SENIOR_MANAGER' ||
-    user?.role === 'IT_MANAGER';
+    user?.role === 'SENIOR_MANAGER';
 
   const [subTab, setSubTab] = useState<ItSubTab>('dash');
   const [stats, setStats] = useState<ReservationDashboardStats | null>(null);
@@ -2178,7 +2177,7 @@ function SeatMapModal({
 
           {!dark && (
             <p className="mt-3 text-[10px] text-[#6b7b94]">
-              لاک صندلی فقط توسط مدیر عامل یا رئیس هیئت مدیره / مدیر IT مجاز است.
+              نقشه برای مدیر IT فقط خواندنی است؛ لاک دستی فقط توسط مدیرعامل، مدیر ارشد یا رئیس هیئت‌مدیره مجاز است.
             </p>
           )}
         </div>
