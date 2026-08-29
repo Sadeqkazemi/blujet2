@@ -248,6 +248,23 @@ jobs:
               touch "$shared_password_reconciliation_v3_sentinel"
               chmod 600 "$shared_password_reconciliation_v3_sentinel"
             fi
+            # Access extension v3 persisted the two phone-login identities in
+            # display form (09...) while auth looks them up canonically
+            # (+98...). Repair only those exact, trusted, active UAT rows once;
+            # the command refuses conflicts and revokes their existing sessions.
+            phone_login_reconciliation_v1_sentinel=/root/.blujet-uat-temporary-phone-login-reconciliation-v1-complete
+            if [ ! -f "$phone_login_reconciliation_v1_sentinel" ]; then
+              umask 077
+              phone_login_reconciliation_v1_audit=/root/blujet-uat-temporary-phone-login-reconciliation-v1.json
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e NODE_ENV=production \
+                -e TEMP_PHONE_LOGIN_RECONCILE_CONFIRM=RECONCILE_TEMPORARY_PHONE_LOGINS_V1 \
+                backend node dist/database/reconcile-temporary-phone-login-accounts.js --execute \
+                > "$phone_login_reconciliation_v1_audit"
+              chmod 600 "$phone_login_reconciliation_v1_audit"
+              touch "$phone_login_reconciliation_v1_sentinel"
+              chmod 600 "$phone_login_reconciliation_v1_sentinel"
+            fi
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
             # reference/configuration tables are retained by the purge policy.

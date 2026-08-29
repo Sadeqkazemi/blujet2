@@ -223,6 +223,19 @@ audit is written to `/root/blujet-uat-shared-password-reconciliation-v3.json`
 with mode `0600`; account expiry is still preserved and refresh sessions are
 revoked.
 
+Extension v3 originally restored the two phone-login identities using their
+`09...` input form, while agency/customer authentication queries canonical
+`+98...` values. Deployments therefore run one guarded phone normalization
+repair after the shared-password reconciliations. It accepts only the exact
+active, unexpired `uat.agency` and `uat.customer` rows with trusted bootstrap/
+extension audit provenance, refuses a phone owned by any other user, preserves
+password hashes and access deadlines, and revokes their current sessions. Its
+non-secret audit is stored at
+`/root/blujet-uat-temporary-phone-login-reconciliation-v1.json`; sentinel
+`/root/.blujet-uat-temporary-phone-login-reconciliation-v1-complete` prevents
+repetition. A failure leaves both accounts unchanged because the repair is one
+database transaction.
+
 The temporary passwords are 16-character values containing only English
 letters and digits. The owner-approved format migration is deployed once and
 uses `/root/.blujet-temporary-panel-password-format-v1-complete` as its

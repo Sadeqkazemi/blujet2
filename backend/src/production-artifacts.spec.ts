@@ -38,6 +38,15 @@ const temporaryAccessExtensionV3Source = readFileSync(
   join(backendRoot, 'src', 'database', 'extend-temporary-panel-access-v3.ts'),
   'utf8',
 );
+const temporaryPhoneLoginReconciliationSource = readFileSync(
+  join(
+    backendRoot,
+    'src',
+    'database',
+    'reconcile-temporary-phone-login-accounts.ts',
+  ),
+  'utf8',
+);
 
 describe('production backend artifacts', () => {
   it('uses the JavaScript layout emitted by nest build', () => {
@@ -195,5 +204,43 @@ describe('production backend artifacts', () => {
         reconciliationV3Index,
       ),
     ).toBeGreaterThan(reconciliationV3Index);
+  });
+
+  it('canonically reconciles the two reserved phone-login identities once after v3 recovery', () => {
+    const sharedPasswordV3Index = deployWorkflow.indexOf(
+      'shared_password_reconciliation_v3_sentinel=',
+    );
+    const phoneLoginIndex = deployWorkflow.indexOf(
+      'phone_login_reconciliation_v1_sentinel=',
+    );
+    expect(sharedPasswordV3Index).toBeGreaterThanOrEqual(0);
+    expect(phoneLoginIndex).toBeGreaterThan(sharedPasswordV3Index);
+    expect(
+      packageJson.scripts['accounts:reconcile:temporary-phone-logins:prod'],
+    ).toContain('reconcile-temporary-phone-login-accounts.js');
+    expect(temporaryAccessExtensionV3Source).toContain(
+      'normalizeIranPhone(expectedAccount.phone)',
+    );
+    expect(temporaryPhoneLoginReconciliationSource).toContain(
+      "NODE_ENV !== 'production'",
+    );
+    expect(temporaryPhoneLoginReconciliationSource).toContain(
+      'assertUatSandboxWriteAllowed()',
+    );
+    expect(temporaryPhoneLoginReconciliationSource).toContain(
+      'RECONCILE_TEMPORARY_PHONE_LOGINS_V1',
+    );
+    expect(temporaryPhoneLoginReconciliationSource).toContain(
+      'temporary-phone-login-reconciliation-v1',
+    );
+    expect(deployWorkflow).toContain(
+      '.blujet-uat-temporary-phone-login-reconciliation-v1-complete',
+    );
+    expect(deployWorkflow).toContain(
+      'blujet-uat-temporary-phone-login-reconciliation-v1.json',
+    );
+    expect(deployWorkflow).toContain(
+      'backend node dist/database/reconcile-temporary-phone-login-accounts.js --execute',
+    );
   });
 });

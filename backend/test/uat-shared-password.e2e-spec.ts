@@ -5,7 +5,7 @@ import { INestApplication } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { DataSource, In } from 'typeorm';
+import { DataSource, In, IsNull } from 'typeorm';
 import { AgencyCreditLine } from '../src/database/entities/agency-credit-line.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { AgencyDocument } from '../src/database/entities/agency-document.entity';
@@ -21,8 +21,10 @@ import {
   AgencySeatRequestPayMethod,
   AgencySeatRequestStatus,
   CabinClass,
+  Role,
 } from '../src/database/enums';
 import { getSandboxOtpCode } from '../src/common/sandbox-auth';
+import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 import {
   TEMPORARY_PANEL_ACCOUNTS,
   TEMPORARY_PHONE_LOGIN_ACCOUNTS,
@@ -34,6 +36,7 @@ const ALL_USERNAMES = [
   ...TEMPORARY_PANEL_ACCOUNTS.map(({ username }) => username),
   ...TEMPORARY_PHONE_LOGIN_ACCOUNTS.map(({ username }) => username),
 ];
+const ALL_USERNAME_SET = new Set<string>(ALL_USERNAMES);
 
 const STRONG_PASSWORD = 'Blujet@UAT-Shared1404!';
 const OTHER_STRONG_PASSWORD = 'Blujet@UAT-Shared1404-Rotated!';
@@ -90,11 +93,32 @@ function rotate(extraEnv: Record<string, string | undefined> = {}) {
   });
 }
 
+function extendV3(extraEnv: Record<string, string | undefined> = {}) {
+  return runScript('src/database/extend-temporary-panel-access-v3.ts', {
+    NODE_ENV: 'production',
+    AUTH_SANDBOX_ENABLED: 'true',
+    TEMP_PANEL_EXTENSION_CONFIRM: 'EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V3',
+    ...extraEnv,
+  });
+}
+
+function reconcilePhoneLogins(
+  extraEnv: Record<string, string | undefined> = {},
+) {
+  return runScript('src/database/reconcile-temporary-phone-login-accounts.ts', {
+    NODE_ENV: 'production',
+    AUTH_SANDBOX_ENABLED: 'true',
+    TEMP_PHONE_LOGIN_RECONCILE_CONFIRM: 'RECONCILE_TEMPORARY_PHONE_LOGINS_V1',
+    ...extraEnv,
+  });
+}
+
 describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared-uat-panel-password)', () => {
   let app: INestApplication<App>;
   let dataSource: DataSource;
+  let displacedReservedPhoneOwners: Array<{ id: string; phone: string }> = [];
 
-  async function resetTemporaryAccounts() {
+  async function cleanupTemporaryAccounts() {
     const userRepo = dataSource.getRepository(User);
     const existing = await userRepo.find({
       where: { username: In(ALL_USERNAMES) },
@@ -111,17 +135,41 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         .delete({ assigneeId: In(ids) });
       await userRepo.delete({ username: In(ALL_USERNAMES) });
     }
+    for (const displaced of displacedReservedPhoneOwners) {
+      await userRepo.update(
+        { id: displaced.id, phone: IsNull() },
+        { phone: displaced.phone },
+      );
+    }
+    displacedReservedPhoneOwners = [];
+  }
+
+  async function prepareTemporaryAccounts() {
+    await cleanupTemporaryAccounts();
+    const userRepo = dataSource.getRepository(User);
+    const normalizedReservedPhones = TEMPORARY_PHONE_LOGIN_ACCOUNTS.map(
+      ({ phone }) => normalizeIranPhone(phone),
+    );
+    const existingOwners = await userRepo.find({
+      where: { phone: In(normalizedReservedPhones) },
+    });
+    displacedReservedPhoneOwners = existingOwners
+      .filter(({ username }) => !username || !ALL_USERNAME_SET.has(username))
+      .map(({ id, phone }) => ({ id, phone: phone! }));
+    for (const displaced of displacedReservedPhoneOwners) {
+      await userRepo.update({ id: displaced.id }, { phone: null });
+    }
   }
 
   beforeEach(async () => {
     app = await createTestApp();
     dataSource = app.get(DataSource);
     // Start every test from a clean slate for the accounts under test.
-    await resetTemporaryAccounts();
+    await prepareTemporaryAccounts();
   });
 
   afterEach(async () => {
-    await resetTemporaryAccounts();
+    await cleanupTemporaryAccounts();
     await app.close();
   });
 
@@ -230,6 +278,162 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     const after = await userRepo.findOneByOrFail({ username: 'finance' });
     expect(after.passwordHash).toBe(before.passwordHash);
     expect(after.temporaryPasswordOnlyUntil).toBeNull();
+  });
+
+  describe('canonical phone-login identity recovery', () => {
+    beforeEach(() => {
+      const result = bootstrap();
+      expect(result.status).toBe(0);
+      process.env.AUTH_SANDBOX_ENABLED = 'true';
+    });
+
+    afterEach(() => {
+      delete process.env.AUTH_SANDBOX_ENABLED;
+    });
+
+    it('extension v3 preserves the canonical +98 phone representation used by login', async () => {
+      const result = extendV3();
+      expect(result.status).toBe(0);
+
+      const users = await dataSource.getRepository(User).find({
+        where: {
+          username: In(['uat.agency', 'uat.customer']),
+        },
+      });
+      expect(
+        new Map(users.map(({ username, phone }) => [username, phone])),
+      ).toEqual(
+        new Map([
+          ['uat.agency', '+989000000001'],
+          ['uat.customer', '+989000000002'],
+        ]),
+      );
+    });
+
+    it('repairs raw 09 identities atomically without changing password hashes or deadlines, revokes sessions, and restores both login endpoints', async () => {
+      const userRepository = dataSource.getRepository(User);
+      const refreshRepository = dataSource.getRepository(RefreshToken);
+      const before = await userRepository.find({
+        where: { username: In(['uat.agency', 'uat.customer']) },
+      });
+      const protectedState = new Map(
+        before.map((user) => [
+          user.username!,
+          {
+            passwordHash: user.passwordHash,
+            deadline: user.temporaryPasswordOnlyUntil!.toISOString(),
+          },
+        ]),
+      );
+      for (const user of before) {
+        await refreshRepository.save(
+          refreshRepository.create({
+            userId: user.id,
+            tokenHash: `phone-reconcile-${user.id}`,
+            expiresAt: new Date(Date.now() + 60_000),
+          }),
+        );
+      }
+      await userRepository.update(
+        { username: 'uat.agency' },
+        { phone: '09000000001' },
+      );
+      await userRepository.update(
+        { username: 'uat.customer' },
+        { phone: '09000000002' },
+      );
+
+      const result = reconcilePhoneLogins();
+      expect(result.status).toBe(0);
+      expect(JSON.parse(result.stdout).accounts).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            username: 'uat.agency',
+            normalizedPhone: '+989000000001',
+            status: 'reconciled',
+          }),
+          expect.objectContaining({
+            username: 'uat.customer',
+            normalizedPhone: '+989000000002',
+            status: 'reconciled',
+          }),
+        ]),
+      );
+
+      const after = await userRepository.find({
+        where: { username: In(['uat.agency', 'uat.customer']) },
+      });
+      for (const user of after) {
+        const expected = protectedState.get(user.username!)!;
+        expect(user.passwordHash).toBe(expected.passwordHash);
+        expect(user.temporaryPasswordOnlyUntil!.toISOString()).toBe(
+          expected.deadline,
+        );
+      }
+      expect(
+        new Map(after.map(({ username, phone }) => [username, phone])),
+      ).toEqual(
+        new Map([
+          ['uat.agency', '+989000000001'],
+          ['uat.customer', '+989000000002'],
+        ]),
+      );
+      expect(
+        await refreshRepository.count({
+          where: {
+            userId: In(after.map(({ id }) => id)),
+            revokedAt: IsNull(),
+          },
+        }),
+      ).toBe(0);
+
+      const agencyLogin = await request(app.getHttpServer())
+        .post('/auth/agency/login')
+        .send({ phone: '09000000001', password: STRONG_PASSWORD });
+      expect(agencyLogin.status).toBe(200);
+      expect(agencyLogin.body.data.accessToken).toBeDefined();
+
+      const customerLogin = await request(app.getHttpServer())
+        .post('/auth/customer/login-password')
+        .send({ phone: '09000000002', password: STRONG_PASSWORD });
+      expect(customerLogin.status).toBe(200);
+      expect(customerLogin.body.data.accessToken).toBeDefined();
+    });
+
+    it('refuses a canonical phone conflict before changing either temporary account', async () => {
+      const userRepository = dataSource.getRepository(User);
+      await userRepository.update(
+        { username: 'uat.agency' },
+        { phone: '09000000001' },
+      );
+      const conflict = await userRepository.save(
+        userRepository.create({
+          role: Role.USER,
+          phone: '+989000000001',
+          username: 'uat-phone-reconciliation-conflict',
+          passwordHash: await argon2.hash(OTHER_STRONG_PASSWORD),
+          email: null,
+          fullName: 'UAT phone conflict test',
+          updatedAt: new Date(),
+        }),
+      );
+
+      try {
+        const result = reconcilePhoneLogins();
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain(
+          'canonical reserved UAT phone is owned by another account',
+        );
+        expect(
+          await userRepository.findOneByOrFail({ username: 'uat.agency' }),
+        ).toMatchObject({ phone: '09000000001' });
+        expect(
+          await userRepository.findOneByOrFail({ username: 'uat.customer' }),
+        ).toMatchObject({ phone: '+989000000002' });
+      } finally {
+        await userRepository.delete(conflict.id);
+      }
+    });
   });
 
   describe('rotation', () => {
