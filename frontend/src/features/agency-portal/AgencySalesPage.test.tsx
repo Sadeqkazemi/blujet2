@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.spyOn(portalApi, 'fetchSales').mockResolvedValue(REPORT);
   vi.spyOn(portalApi, 'fetchProfile').mockResolvedValue({
     fullName: 'آژانس مسیر آسمان', managerName: 'مدیر آژانس', licenseNo: 'THR1537',
-    phone: '+989120000000', email: null, city: 'تهران', address: null, tier: null,
+    phone: '+989120000000', email: 'sales@skyroute.example', city: 'تهران', address: 'خیابان آزادی، پلاک ۱۲', tier: null,
     isActive: true, suspendedAt: null, suspendReason: null,
     joinedAt: '2026-01-01T00:00:00.000Z', isTemporaryReadOnly: false,
   });
@@ -58,6 +58,20 @@ describe('AgencySalesPage RTRD redesign', () => {
     expect(screen.getByRole('tab', { name: 'PRR' })).toBeInTheDocument();
     expect(screen.getByText('۷۶٬۰۰۰٬۰۰۰ تومان')).toBeInTheDocument();
     expect(screen.getByText('۱۵٬۰۰۰٬۰۰۰ تومان')).toBeInTheDocument();
+  });
+
+  it('shows immutable registration identity and contact fields from the authenticated agency profile', async () => {
+    render(<AgencySalesPage />);
+
+    const profile = await screen.findByTestId('agency-sales-registration-profile');
+    expect(profile).toHaveTextContent('آژانس مسیر آسمان');
+    expect(profile).toHaveTextContent('مدیر آژانس');
+    expect(profile).toHaveTextContent('THR1537');
+    expect(profile).toHaveTextContent('+989120000000');
+    expect(profile).toHaveTextContent('sales@skyroute.example');
+    expect(profile).toHaveTextContent('تهران');
+    expect(profile).toHaveTextContent('خیابان آزادی، پلاک ۱۲');
+    expect(within(profile).queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('shows sales rows in PSR and searches by PNR', async () => {

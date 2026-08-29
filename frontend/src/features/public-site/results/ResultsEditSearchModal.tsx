@@ -26,6 +26,7 @@ import {
 } from '../checkout/checkout-types';
 import type { ResultsCopy } from './results-copy';
 import { parseCabinParam } from './results-utils';
+import './ResultsEditSearchModal.css';
 
 type Props = {
   open: boolean;
@@ -117,11 +118,12 @@ function AirportPicker({
   }, [airports, query, locale]);
 
   return (
-    <div style={{ flex: 1, minWidth: 180, position: 'relative' }}>
+    <div className="results-edit-search-airport" style={{ flex: 1, minWidth: 180, position: 'relative' }}>
       <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{label}</div>
       <button
         type="button"
         data-testid={`edit-search-${label === copy.fromLabel ? 'origin' : 'dest'}`}
+        className="results-edit-search-airport-button"
         onClick={() => setOpen((v) => !v)}
         style={{
           width: '100%',
@@ -146,6 +148,7 @@ function AirportPicker({
       {open && (
         <>
           <div
+            className="results-edit-search-airport-menu"
             onClick={() => {
               setOpen(false);
               setQuery('');
@@ -422,6 +425,7 @@ export default function ResultsEditSearchModal({
 
   return (
     <div
+      className="results-edit-search-overlay"
       role="presentation"
       onClick={onClose}
       style={{
@@ -437,6 +441,7 @@ export default function ResultsEditSearchModal({
       }}
     >
       <div
+        className="results-edit-search-dialog"
         role="dialog"
         aria-modal="true"
         aria-label={copy.editSearchLabel}
@@ -451,6 +456,7 @@ export default function ResultsEditSearchModal({
         }}
       >
         <div
+          className="results-edit-search-header"
           style={{
             padding: '12px 16px',
             borderBottom: '1px solid #e6eaf0',
@@ -470,8 +476,8 @@ export default function ResultsEditSearchModal({
           </button>
         </div>
 
-        <div style={{ padding: '15px 16px' }}>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div className="results-edit-search-body" style={{ padding: '15px 16px' }}>
+          <div className="results-edit-search-trip-types" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {(
               [
                 ['oneway', copy.tripOneWay],
@@ -502,7 +508,7 @@ export default function ResultsEditSearchModal({
             })}
           </div>
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div data-testid="edit-search-route" className="results-edit-search-route" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
             <AirportPicker
               label={copy.fromLabel}
               value={draftOrigin}
@@ -521,6 +527,7 @@ export default function ResultsEditSearchModal({
                 setDraftDest(draftOrigin);
               }}
               aria-label={copy.changeSearch}
+              className="results-edit-search-swap"
               style={{
                 width: 44,
                 height: 44,
@@ -549,8 +556,8 @@ export default function ResultsEditSearchModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: tripType === 'round' ? 'repeat(4,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))', gap: 10, marginTop: 14 }}>
-            <div style={{ flex: 1, minWidth: 160, position: 'relative' }}>
+          <div data-testid="edit-search-controls" className="results-edit-search-controls" style={{ display: 'grid', gridTemplateColumns: tripType === 'round' ? 'repeat(4,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))', gap: 10, marginTop: 14 }}>
+            <div className="results-edit-search-date-control" style={{ flex: 1, minWidth: 160, position: 'relative' }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.departureDateLabel}</div>
               <button
                 type="button"
@@ -583,7 +590,7 @@ export default function ResultsEditSearchModal({
             </div>
 
             {tripType === 'round' && (
-              <div style={{ flex: 1, minWidth: 160, position: 'relative' }}>
+              <div className="results-edit-search-date-control" style={{ flex: 1, minWidth: 160, position: 'relative' }}>
                 <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.returnDateLabel}</div>
                 <button
                   type="button"
@@ -616,7 +623,7 @@ export default function ResultsEditSearchModal({
               </div>
             )}
 
-            <div style={{ position: 'relative', minWidth: 0 }}>
+            <div className="results-edit-search-passenger-control" style={{ position: 'relative', minWidth: 0 }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.paxCountLabel}</div>
               <button
                 type="button"
@@ -715,7 +722,7 @@ export default function ResultsEditSearchModal({
               )}
             </div>
 
-            <div style={{ flex: 1, minWidth: 140 }}>
+            <div className="results-edit-search-cabin-control" style={{ flex: 1, minWidth: 140 }}>
               <div style={{ fontSize: 13, color: '#8a96a6', marginBottom: 7, fontWeight: 600 }}>{copy.flightClassLabel}</div>
               <select
                 data-testid="edit-search-cabin"
@@ -747,7 +754,8 @@ export default function ResultsEditSearchModal({
 
           {calOpen && (
             <div
-              data-testid="edit-search-calendar"
+            data-testid="edit-search-calendar"
+              className="results-edit-search-calendar"
               style={{
                 marginTop: 12,
                 background: '#fff',
@@ -843,6 +851,7 @@ export default function ResultsEditSearchModal({
           <button
             type="button"
             data-testid="edit-search-apply"
+            className="results-edit-search-apply"
             disabled={applying || !draftOrigin || !draftDest || airportsShareCity(scopedAirports, draftOrigin, draftDest)}
             onClick={handleApply}
             style={{

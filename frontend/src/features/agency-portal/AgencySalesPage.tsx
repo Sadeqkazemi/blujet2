@@ -39,6 +39,14 @@ const COPY: Record<StoredLocale, {
   back: string;
   agency: string;
   agencyCode: string;
+  registrationDetails: string;
+  registrationLocked: string;
+  managerName: string;
+  phone: string;
+  email: string;
+  city: string;
+  address: string;
+  joinedAt: string;
   currency: string;
   period: string;
   reportDate: string;
@@ -91,7 +99,9 @@ const COPY: Record<StoredLocale, {
 }> = {
   fa: {
     title: 'جزئیات گزارش فروش', subtitle: 'تطبیق فروش، پرداخت و استرداد آژانس', back: 'بازگشت به گزارش فروش',
-    agency: 'آژانس', agencyCode: 'کد آژانس', currency: 'واحد پول', period: 'دوره', reportDate: 'تاریخ گزارش',
+    agency: 'نام آژانس', agencyCode: 'کد آژانس', registrationDetails: 'اطلاعات ثبت‌نام آژانس', registrationLocked: 'این اطلاعات از پروفایل ثبت‌نامی دریافت شده و در گزارش فروش قابل ویرایش نیست.',
+    managerName: 'مدیر آژانس', phone: 'شماره تماس', email: 'ایمیل', city: 'شهر', address: 'نشانی', joinedAt: 'تاریخ عضویت',
+    currency: 'واحد پول', period: 'دوره', reportDate: 'تاریخ گزارش',
     creditLimit: 'سقف اعتبار', creditUsed: 'اعتبار مصرف‌شده', creditRemaining: 'مانده اعتبار',
     paidAmount: 'مبلغ واریزی', payableAmount: 'مبلغ قابل پرداخت', salesAmount: 'مبلغ فروش',
     salesCount: 'تعداد فروش', modificationCount: 'تعداد اصلاح', refundCount: 'تعداد استرداد',
@@ -106,7 +116,9 @@ const COPY: Record<StoredLocale, {
   },
   en: {
     title: 'Sales Report Details', subtitle: 'Agency sales, payment, and refund reconciliation', back: 'Back to sales report',
-    agency: 'Agency', agencyCode: 'Agency code', currency: 'Currency', period: 'Period', reportDate: 'Report date',
+    agency: 'Agency name', agencyCode: 'Agency code', registrationDetails: 'Agency registration details', registrationLocked: 'These values come from the registered agency profile and cannot be edited in the sales report.',
+    managerName: 'Agency manager', phone: 'Phone', email: 'Email', city: 'City', address: 'Address', joinedAt: 'Joined',
+    currency: 'Currency', period: 'Period', reportDate: 'Report date',
     creditLimit: 'Credit limit', creditUsed: 'Credit used', creditRemaining: 'Credit remaining',
     paidAmount: 'Paid amount', payableAmount: 'Amount payable', salesAmount: 'Sales amount',
     salesCount: 'Sales count', modificationCount: 'Modification count', refundCount: 'Refund count',
@@ -121,7 +133,9 @@ const COPY: Record<StoredLocale, {
   },
   ar: {
     title: 'تفاصيل تقرير المبيعات', subtitle: 'مطابقة مبيعات الوكالة والمدفوعات والاستردادات', back: 'العودة إلى تقرير المبيعات',
-    agency: 'الوكالة', agencyCode: 'رمز الوكالة', currency: 'العملة', period: 'الفترة', reportDate: 'تاريخ التقرير',
+    agency: 'اسم الوكالة', agencyCode: 'رمز الوكالة', registrationDetails: 'بيانات تسجيل الوكالة', registrationLocked: 'تأتي هذه البيانات من ملف الوكالة المسجل ولا يمكن تعديلها في تقرير المبيعات.',
+    managerName: 'مدير الوكالة', phone: 'الهاتف', email: 'البريد الإلكتروني', city: 'المدينة', address: 'العنوان', joinedAt: 'تاريخ الانضمام',
+    currency: 'العملة', period: 'الفترة', reportDate: 'تاريخ التقرير',
     creditLimit: 'حد الائتمان', creditUsed: 'الائتمان المستخدم', creditRemaining: 'الرصيد المتبقي',
     paidAmount: 'المبلغ المدفوع', payableAmount: 'المبلغ المستحق', salesAmount: 'مبلغ المبيعات',
     salesCount: 'عدد المبيعات', modificationCount: 'عدد التعديلات', refundCount: 'عدد الاستردادات',
@@ -238,10 +252,19 @@ export default function AgencySalesPage() {
   const { report, profile, credit } = bundle;
   const money = (value: string) => `${localeMoney(value, locale)} ${t.toman}`;
   const summaryFields = [
-    [t.agency, profile.fullName], [t.agencyCode, profile.licenseNo || '—'], [t.currency, 'IRR'],
-    [t.period, derived.period], [t.reportDate, formatLocaleDate(new Date(), locale)], [t.salesAmount, money(report.summary.totalSalesIrr)],
+    [t.currency, 'IRR'], [t.period, derived.period], [t.reportDate, formatLocaleDate(new Date(), locale)], [t.salesAmount, money(report.summary.totalSalesIrr)],
     [t.creditLimit, money(credit.limitIrr)], [t.creditUsed, money(credit.usedIrr)], [t.creditRemaining, money(credit.remainingIrr)],
     [t.paidAmount, money(derived.paidAmountIrr)], [t.payableAmount, money(derived.payableAmountIrr)],
+  ];
+  const registrationFields: Array<{ label: string; value: string; ltr?: boolean }> = [
+    { label: t.agency, value: profile.fullName },
+    { label: t.managerName, value: profile.managerName || '—' },
+    { label: t.agencyCode, value: profile.licenseNo || '—', ltr: true },
+    { label: t.phone, value: profile.phone || '—', ltr: true },
+    { label: t.email, value: profile.email || '—', ltr: true },
+    { label: t.city, value: profile.city || '—' },
+    { label: t.address, value: profile.address || '—' },
+    { label: t.joinedAt, value: formatLocaleDate(profile.joinedAt, locale) },
   ];
   const stats = [
     [t.salesCount, localeDigits(report.summary.ticketsIssued, locale)],
@@ -301,6 +324,24 @@ export default function AgencySalesPage() {
       {exportError && <p role="alert" className="mx-5 mt-4 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-700">{t.exportError}</p>}
 
       <div className="p-4 sm:p-6">
+        <section data-testid="agency-sales-registration-profile" aria-labelledby="agency-sales-registration-title" className="mb-4 overflow-hidden rounded-2xl border border-[#dce6f1] bg-[#f7faff]">
+          <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e2e9f2] px-4 py-3 sm:px-5">
+            <div>
+              <h2 id="agency-sales-registration-title" className="m-0 text-sm font-black text-[#163552]">{t.registrationDetails}</h2>
+              <p className="mb-0 mt-1 text-[10px] leading-5 text-[#70839a]">{t.registrationLocked}</p>
+            </div>
+            <span className="rounded-full bg-[#e7f1ff] px-3 py-1 text-[10px] font-black text-[#2f68bd]" aria-hidden>🔒</span>
+          </header>
+          <dl className="grid grid-cols-1 gap-px bg-[#e6edf5] sm:grid-cols-2 lg:grid-cols-4">
+            {registrationFields.map((field) => (
+              <div key={field.label} className="min-w-0 bg-white px-4 py-3">
+                <dt className="text-[10px] font-bold text-[#7a899d]">{field.label}</dt>
+                <dd className="mb-0 mt-1 break-words text-xs font-extrabold text-[#19334e]" dir={field.ltr ? 'ltr' : undefined}>{field.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         <div className="grid grid-cols-1 gap-2 rounded-2xl border border-[#e2e8f0] bg-[#f8fafc] p-3 sm:grid-cols-2 lg:grid-cols-3">
           {summaryFields.map(([label, value]) => (
             <div key={label} className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-[#e5eaf1] bg-white px-4 py-3">

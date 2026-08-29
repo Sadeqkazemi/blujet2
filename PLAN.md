@@ -19,6 +19,17 @@ below for what's landed from that port so far.
 
 ## Status
 
+- [x] **Responsive search + agency sales/notices isolation QA (2026-08-29)** —
+  redesigned the results edit-search mobile sheet, lowered the expanded flight
+  metadata cards, and exposed authenticated agency registration values as
+  immutable sales-report fields. Agency notices now contain only targeted
+  Site Admin bulletin dispatches with 10-row locale-aware pagination; public
+  CMS announcements, automatic flight availability, and management-only
+  `FlightInstance` events cannot appear in customer/agency bells. Added the
+  missing local-dev `/notifications` proxy and verified the agency, finance,
+  commercial, Site Admin and notification role boundaries. Acceptance and
+  proof: `docs/features/agency-search-notices-sales-qa.md`.
+
 - [x] **Exact public cabin, localized route and selected-only checkout charges
   (2026-08-28)** — public search, price calendar and advisory now preserve the
   requested cabin and never substitute another published class. Results,

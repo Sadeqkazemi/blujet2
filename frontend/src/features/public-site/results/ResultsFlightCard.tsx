@@ -576,11 +576,13 @@ export default function ResultsFlightCard({
               </div>
             </div>
             <div
+              data-testid="flight-detail-metadata"
               style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
                 gap: 8,
-                paddingTop: 14,
+                marginTop: 8,
+                paddingTop: 22,
                 borderTop: '1px solid #eef1f5',
               }}
             >

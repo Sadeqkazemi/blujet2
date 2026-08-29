@@ -1,17 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { fetchSeatRequestOptions } from '../../api/agency-portal';
+import Pagination from '../../components/Pagination';
 import { fetchNotifications, markNotificationRead } from '../../api/notifications';
-import { fetchPublicHomeContent } from '../../api/site-content';
-import { publicCabinLabel } from '../../lib/flight-definition';
-import { localeMoney } from '../../lib/fa-format';
 import { formatLocaleDateTime, localeDigits } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { AgencySeatRequestOption } from '../../types/agency-portal';
 import type { NotificationRow } from '../../types/notifications';
 
-type NoticeKind = 'SITE' | 'FLIGHT' | 'NOTIFICATION';
+type NoticeKind = 'NOTICE' | 'AMENDMENT';
 type NoticeFilter = 'ALL' | NoticeKind;
+const PAGE_SIZE = 10;
 
 type NoticeItem = {
   id: string;
@@ -22,8 +18,7 @@ type NoticeItem = {
   badge: string;
   createdAt: string | null;
   unread: boolean;
-  notification?: NotificationRow;
-  flight?: AgencySeatRequestOption;
+  notification: NotificationRow;
 };
 
 const COPY: Record<StoredLocale, {
@@ -31,109 +26,58 @@ const COPY: Record<StoredLocale, {
   subtitle: string;
   loading: string;
   all: string;
-  flights: string;
-  admin: string;
-  notifications: string;
+  notices: string;
+  amendments: string;
   unread: string;
   empty: string;
   partialError: string;
   fullError: string;
   retry: string;
   close: string;
-  flightBadge: string;
   adminBadge: string;
   amendmentBadge: string;
-  notificationBadge: string;
-  flightTitle: (flightNo: string) => string;
-  flightSummary: (route: string, date: string) => string;
-  flightInstruction: string;
-  flightNo: string;
-  route: string;
-  departure: string;
-  aircraft: string;
-  cabin: string;
-  fareClass: string;
-  available: string;
-  seatUnit: string;
-  price: string;
-  toman: string;
-  openSeats: string;
+  previous: string;
+  next: string;
 }> = {
   fa: {
     title: 'اطلاعیه و اصلاحیه',
-    subtitle: 'اطلاعیه‌های ادمین سایت، پروازهای جدید و پیام‌های مرتبط با آژانس شما',
+    subtitle: 'اطلاعیه‌ها و اصلاحیه‌هایی که ادمین سایت برای آژانس شما ارسال کرده است',
     loading: 'در حال دریافت اطلاعیه‌ها…',
-    all: 'همه', flights: 'پروازها', admin: 'اطلاعیه ادمین', notifications: 'نوتیفیکیشن‌ها',
+    all: 'همه', notices: 'اطلاعیه‌ها', amendments: 'اصلاحیه‌ها',
     unread: 'خوانده‌نشده', empty: 'اطلاعیه‌ای در این بخش وجود ندارد.',
     partialError: 'بخشی از اطلاعات در دسترس نیست؛ موارد دریافت‌شده نمایش داده شده‌اند.',
     fullError: 'دریافت اطلاعیه‌ها انجام نشد. دوباره تلاش کنید.', retry: 'تلاش مجدد', close: 'بستن',
-    flightBadge: 'پرواز جدید', adminBadge: 'اطلاعیه ادمین', amendmentBadge: 'اصلاحیه ادمین', notificationBadge: 'پیام سیستمی',
-    flightTitle: (flightNo) => `پرواز جدید ${flightNo}`,
-    flightSummary: (route, date) => `${route} · ${date}`,
-    flightInstruction: 'این پرواز برای درخواست خرید صندلی آژانس باز است. پس از بررسی ظرفیت، تعداد صندلی موردنیاز را در بخش صندلی‌های تخصیصی استعلام و درخواست خود را ثبت کنید.',
-    flightNo: 'شماره پرواز', route: 'مسیر', departure: 'زمان پرواز', aircraft: 'نوع هواپیما', cabin: 'کابین',
-    fareClass: 'کلاس نرخی', available: 'ظرفیت قابل درخواست', seatUnit: 'صندلی', price: 'قیمت هر صندلی', toman: 'تومان',
-    openSeats: 'مشاهده و درخواست صندلی',
+    adminBadge: 'اطلاعیه ادمین', amendmentBadge: 'اصلاحیه ادمین',
+    previous: 'قبلی', next: 'بعدی',
   },
   en: {
     title: 'Notices & Amendments',
-    subtitle: 'Site-admin notices, new flights, and notifications relevant to your agency',
+    subtitle: 'Notices and amendments sent by the site admin to your agency',
     loading: 'Loading notices…',
-    all: 'All', flights: 'Flights', admin: 'Admin notices', notifications: 'Notifications',
+    all: 'All', notices: 'Notices', amendments: 'Amendments',
     unread: 'Unread', empty: 'There are no notices in this section.',
     partialError: 'Some sources are unavailable; the received items are still shown.',
     fullError: 'Notices could not be loaded. Please try again.', retry: 'Try again', close: 'Close',
-    flightBadge: 'New flight', adminBadge: 'Admin notice', amendmentBadge: 'Admin amendment', notificationBadge: 'System message',
-    flightTitle: (flightNo) => `New flight ${flightNo}`,
-    flightSummary: (route, date) => `${route} · ${date}`,
-    flightInstruction: 'This flight is open for agency seat requests. Check availability and submit the required seat count from Allocated Seats.',
-    flightNo: 'Flight number', route: 'Route', departure: 'Departure', aircraft: 'Aircraft', cabin: 'Cabin',
-    fareClass: 'Fare class', available: 'Available to request', seatUnit: 'seats', price: 'Price per seat', toman: 'Toman',
-    openSeats: 'View and request seats',
+    adminBadge: 'Admin notice', amendmentBadge: 'Admin amendment',
+    previous: 'Previous', next: 'Next',
   },
   ar: {
     title: 'الإشعارات والتعديلات',
-    subtitle: 'إشعارات إدارة الموقع والرحلات الجديدة والتنبيهات الخاصة بوكالتك',
+    subtitle: 'الإشعارات والتعديلات التي أرسلتها إدارة الموقع إلى وكالتك',
     loading: 'جارٍ تحميل الإشعارات…',
-    all: 'الكل', flights: 'الرحلات', admin: 'إشعارات الإدارة', notifications: 'التنبيهات',
+    all: 'الكل', notices: 'الإشعارات', amendments: 'التعديلات',
     unread: 'غير مقروء', empty: 'لا توجد إشعارات في هذا القسم.',
     partialError: 'بعض المصادر غير متاحة؛ تم عرض العناصر المستلمة.',
     fullError: 'تعذر تحميل الإشعارات. حاول مرة أخرى.', retry: 'إعادة المحاولة', close: 'إغلاق',
-    flightBadge: 'رحلة جديدة', adminBadge: 'إشعار الإدارة', amendmentBadge: 'تعديل الإدارة', notificationBadge: 'رسالة النظام',
-    flightTitle: (flightNo) => `رحلة جديدة ${flightNo}`,
-    flightSummary: (route, date) => `${route} · ${date}`,
-    flightInstruction: 'هذه الرحلة متاحة لطلبات مقاعد الوكالات. تحقق من السعة ثم أرسل عدد المقاعد المطلوب من قسم المقاعد المخصصة.',
-    flightNo: 'رقم الرحلة', route: 'المسار', departure: 'موعد الرحلة', aircraft: 'نوع الطائرة', cabin: 'المقصورة',
-    fareClass: 'فئة السعر', available: 'السعة المتاحة للطلب', seatUnit: 'مقاعد', price: 'سعر المقعد', toman: 'تومان',
-    openSeats: 'عرض وطلب المقاعد',
+    adminBadge: 'إشعار الإدارة', amendmentBadge: 'تعديل الإدارة',
+    previous: 'السابق', next: 'التالي',
   },
 };
 
 const KIND_STYLE: Record<NoticeKind, { dot: string; iconBg: string; icon: string }> = {
-  SITE: { dot: 'bg-[#e2ad39]', iconBg: 'bg-[#fff6dc] text-[#a26a00]', icon: '!' },
-  FLIGHT: { dot: 'bg-[#2e70d1]', iconBg: 'bg-[#eaf2ff] text-[#2767c4]', icon: '✈' },
-  NOTIFICATION: { dot: 'bg-[#2ca876]', iconBg: 'bg-[#e7f7ef] text-[#20815b]', icon: '●' },
+  NOTICE: { dot: 'bg-[#e2ad39]', iconBg: 'bg-[#fff6dc] text-[#a26a00]', icon: '!' },
+  AMENDMENT: { dot: 'bg-[#2e70d1]', iconBg: 'bg-[#eaf2ff] text-[#2767c4]', icon: '✎' },
 };
-
-function buildFlightBody(row: AgencySeatRequestOption, locale: StoredLocale): string {
-  const t = COPY[locale];
-  const route = `${row.originCode} → ${row.destCode}`;
-  const price = row.pricePerSeatIrr == null
-    ? '—'
-    : `${localeMoney(row.pricePerSeatIrr, locale)} ${t.toman}`;
-  return [
-    t.flightInstruction,
-    '',
-    `${t.flightNo}: ${row.flightNo}`,
-    `${t.route}: ${route}`,
-    `${t.departure}: ${formatLocaleDateTime(row.departureAt, locale)}`,
-    `${t.aircraft}: ${row.aircraftType}`,
-    `${t.cabin}: ${publicCabinLabel(row.cabin, locale)}`,
-    `${t.fareClass}: ${row.fareClassCode}`,
-    `${t.available}: ${localeDigits(row.availableToRequest, locale)} ${t.seatUnit}`,
-    `${t.price}: ${price}`,
-  ].join('\n');
-}
 
 export default function AgencyNoticesPage() {
   const { locale } = useLocale();
@@ -144,6 +88,7 @@ export default function AgencyNoticesPage() {
   const [loading, setLoading] = useState(true);
   const [failedSources, setFailedSources] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -151,88 +96,58 @@ export default function AgencyNoticesPage() {
     setFailedSources(0);
 
     Promise.allSettled([
-      fetchPublicHomeContent(locale),
-      fetchSeatRequestOptions(),
       fetchNotifications({ limit: 100, offset: 0 }),
-    ]).then(([contentResult, flightsResult, notificationsResult]) => {
+    ]).then(([notificationsResult]) => {
       if (!active) return;
       const next: NoticeItem[] = [];
       let failures = 0;
 
-      if (contentResult.status === 'fulfilled') {
-        const announcement = contentResult.value.blocks.find((block) => block.key === 'ANNOUNCEMENT_BAR');
-        if (announcement?.enabled && announcement.title.trim()) {
-          next.push({
-            id: 'site-announcement',
-            kind: 'SITE',
-            title: announcement.title,
-            summary: announcement.subtitle || announcement.buttonText || t.adminBadge,
-            body: announcement.subtitle || announcement.title,
-            badge: t.adminBadge,
-            createdAt: null,
-            unread: false,
-          });
-        }
-      } else failures += 1;
-
-      if (flightsResult.status === 'fulfilled') {
-        flightsResult.value
-          .filter((row) => row.definitionStatus === 'PUBLISHED' && row.availableToRequest > 0)
+      if (notificationsResult.status === 'fulfilled') {
+        notificationsResult.value
+          .filter((row) => row.entityType?.toUpperCase() === 'AGENCY_BULLETIN')
           .forEach((row) => {
-            const route = `${row.originCode} → ${row.destCode}`;
+            const isAmendment = row.action === 'AGENCY_AMENDMENT_PUBLISHED';
             next.push({
-              id: `flight-${row.flightInstanceId}-${row.cabin}-${row.fareClassCode}`,
-              kind: 'FLIGHT',
-              title: t.flightTitle(row.flightNo),
-              summary: t.flightSummary(route, formatLocaleDateTime(row.departureAt, locale)),
-              body: buildFlightBody(row, locale),
-              badge: t.flightBadge,
-              createdAt: row.departureAt,
-              unread: false,
-              flight: row,
+              id: `notification-${row.id}`,
+              kind: isAmendment ? 'AMENDMENT' : 'NOTICE',
+              title: row.title,
+              summary: row.body,
+              body: row.body,
+              badge: isAmendment ? t.amendmentBadge : t.adminBadge,
+              createdAt: row.createdAt,
+              unread: row.readAt == null,
+              notification: row,
             });
           });
       } else failures += 1;
 
-      if (notificationsResult.status === 'fulfilled') {
-        notificationsResult.value.forEach((row) => {
-          const isAdminBulletin = row.entityType?.toUpperCase() === 'AGENCY_BULLETIN';
-          const isAmendment = row.action === 'AGENCY_AMENDMENT_PUBLISHED';
-          next.push({
-            id: `notification-${row.id}`,
-            kind: isAdminBulletin ? 'SITE' : 'NOTIFICATION',
-            title: row.title,
-            summary: row.body,
-            body: row.body,
-            badge: isAdminBulletin
-              ? (isAmendment ? t.amendmentBadge : t.adminBadge)
-              : t.notificationBadge,
-            createdAt: row.createdAt,
-            unread: row.readAt == null,
-            notification: row,
-          });
-        });
-      } else failures += 1;
-
+      next.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
       setItems(next);
+      setPage(1);
       setFailedSources(failures);
       setLoading(false);
     });
 
     return () => { active = false; };
-  }, [locale, reloadKey, t.adminBadge, t.amendmentBadge, t.flightBadge, t.notificationBadge, t]);
+  }, [locale, reloadKey, t.adminBadge, t.amendmentBadge, t]);
 
   const counts = useMemo(() => ({
     ALL: items.length,
-    FLIGHT: items.filter((item) => item.kind === 'FLIGHT').length,
-    SITE: items.filter((item) => item.kind === 'SITE').length,
-    NOTIFICATION: items.filter((item) => item.kind === 'NOTIFICATION').length,
+    NOTICE: items.filter((item) => item.kind === 'NOTICE').length,
+    AMENDMENT: items.filter((item) => item.kind === 'AMENDMENT').length,
   }), [items]);
 
   const visible = useMemo(
     () => (filter === 'ALL' ? items : items.filter((item) => item.kind === filter)),
     [filter, items],
   );
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pageItems = useMemo(
+    () => visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [page, visible],
+  );
+
+  useEffect(() => setPage(1), [filter]);
 
   async function openNotice(item: NoticeItem) {
     setSelected(item);
@@ -250,9 +165,8 @@ export default function AgencyNoticesPage() {
 
   const filters: { key: NoticeFilter; label: string }[] = [
     { key: 'ALL', label: t.all },
-    { key: 'FLIGHT', label: t.flights },
-    { key: 'SITE', label: t.admin },
-    { key: 'NOTIFICATION', label: t.notifications },
+    { key: 'NOTICE', label: t.notices },
+    { key: 'AMENDMENT', label: t.amendments },
   ];
 
   return (
@@ -288,10 +202,10 @@ export default function AgencyNoticesPage() {
 
         {failedSources > 0 && !loading && (
           <div role="alert" className={`mx-4 mt-4 rounded-xl border px-4 py-3 text-xs sm:mx-7 ${
-            failedSources === 3 ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'
+            failedSources === 1 ? 'border-red-200 bg-red-50 text-red-700' : 'border-amber-200 bg-amber-50 text-amber-800'
           }`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span>{failedSources === 3 ? t.fullError : t.partialError}</span>
+              <span>{failedSources === 1 ? t.fullError : t.partialError}</span>
               <button type="button" className="font-black underline" onClick={() => setReloadKey((value) => value + 1)}>{t.retry}</button>
             </div>
           </div>
@@ -303,31 +217,42 @@ export default function AgencyNoticesPage() {
           ) : visible.length === 0 ? (
             <div className="grid min-h-[250px] place-items-center rounded-2xl border border-dashed border-[#d9e2ee] bg-[#fafcff] text-sm text-[#718198]">{t.empty}</div>
           ) : (
-            <div className="divide-y divide-[#edf1f6] rounded-2xl border border-[#e3eaf2]">
-              {visible.map((item) => {
-                const style = KIND_STYLE[item.kind];
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => void openNotice(item)}
-                    className="group flex w-full items-center gap-3 bg-white px-4 py-4 text-start first:rounded-t-2xl last:rounded-b-2xl hover:bg-[#f8fbff] sm:px-5"
-                  >
-                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-lg font-black ${style.iconBg}`} aria-hidden>{style.icon}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-black text-[#112b47]">{item.title}</span>
-                        <span className="rounded-full bg-[#f1f5fa] px-2.5 py-1 text-[9px] font-extrabold text-[#597087]">{item.badge}</span>
-                        {item.unread && <span className="rounded-full bg-[#fff0f0] px-2 py-1 text-[9px] font-black text-[#d64a4a]">{t.unread}</span>}
+            <>
+              <div data-testid="agency-notices-list" className="divide-y divide-[#edf1f6] rounded-2xl border border-[#e3eaf2]">
+                {pageItems.map((item) => {
+                  const style = KIND_STYLE[item.kind];
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => void openNotice(item)}
+                      className="group flex w-full items-center gap-3 bg-white px-4 py-4 text-start first:rounded-t-2xl last:rounded-b-2xl hover:bg-[#f8fbff] sm:px-5"
+                    >
+                      <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-lg font-black ${style.iconBg}`} aria-hidden>{style.icon}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-black text-[#112b47]">{item.title}</span>
+                          <span className="rounded-full bg-[#f1f5fa] px-2.5 py-1 text-[9px] font-extrabold text-[#597087]">{item.badge}</span>
+                          {item.unread && <span className="rounded-full bg-[#fff0f0] px-2 py-1 text-[9px] font-black text-[#d64a4a]">{t.unread}</span>}
+                        </span>
+                        <span className="mt-1 block truncate text-[11px] text-[#718198]">{item.summary}</span>
                       </span>
-                      <span className="mt-1 block truncate text-[11px] text-[#718198]">{item.summary}</span>
-                    </span>
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${style.dot}`} aria-hidden />
-                    <span className="shrink-0 text-[#8394a8] transition group-hover:translate-x-[-2px]" aria-hidden>‹</span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${style.dot}`} aria-hidden />
+                      <span className="shrink-0 text-[#8394a8] transition group-hover:translate-x-[-2px]" aria-hidden>‹</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={setPage}
+                variant="light"
+                previousLabel={t.previous}
+                nextLabel={t.next}
+                formatPage={(value) => localeDigits(value, locale)}
+              />
+            </>
           )}
         </div>
       </section>
@@ -349,11 +274,6 @@ export default function AgencyNoticesPage() {
             </header>
             <div className="max-h-[60vh] overflow-y-auto px-5 py-6 sm:px-6">
               <p className="m-0 whitespace-pre-line text-sm leading-8 text-[#324960]">{selected.body}</p>
-              {selected.flight && (
-                <Link to="/agency/seats" className="mt-6 inline-flex rounded-xl bg-[#326bc3] px-5 py-3 text-xs font-black text-white no-underline">
-                  {t.openSeats}
-                </Link>
-              )}
             </div>
           </section>
         </div>

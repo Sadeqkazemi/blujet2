@@ -42,6 +42,7 @@ const API_PROXY_PREFIXES = [
   'audit',
   'it',
   'support-tickets',
+  'notifications',
   'identity-verifications',
   'reconciliation',
   'webservice',
