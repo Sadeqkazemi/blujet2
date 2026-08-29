@@ -59,6 +59,7 @@ function isLegacyOtpShadowOwner(user: User, normalizedPhone: string): boolean {
 }
 
 async function main(): Promise<void> {
+  const preserveConflicts = process.argv.includes('--preserve-conflicts');
   const expectedAccounts = TEMPORARY_PHONE_LOGIN_ACCOUNTS.map((account) => ({
     ...account,
     normalizedPhone: normalizeIranPhone(account.phone),
@@ -140,11 +141,22 @@ async function main(): Promise<void> {
           !normalizedPhones.has(owner.phone) ||
           !isLegacyOtpShadowOwner(owner, owner.phone),
       );
-      if (ineligibleConflictingOwner) {
+      if (ineligibleConflictingOwner && !preserveConflicts) {
         throw new Error(
           'Phone-login reconciliation refused: a canonical reserved UAT phone is owned by an ineligible account.',
         );
       }
+      const preservedConflictPhones = new Set<string>();
+      if (preserveConflicts) {
+        for (const owner of conflictingOwners) {
+          if (owner.phone && !isLegacyOtpShadowOwner(owner, owner.phone)) {
+            preservedConflictPhones.add(owner.phone);
+          }
+        }
+      }
+      const releasableShadowOwners = conflictingOwners.filter(
+        (owner) => owner.phone && isLegacyOtpShadowOwner(owner, owner.phone),
+      );
 
       for (const account of expectedAccounts) {
         const user = usersByUsername.get(account.username);
@@ -180,14 +192,14 @@ async function main(): Promise<void> {
         username: string;
         role: string;
         normalizedPhone: string;
-        status: 'already_normalized' | 'reconciled';
+        status: 'already_normalized' | 'reconciled' | 'preserved_conflict';
       }>;
 
       // Release only the exact passwordless OTP shells validated above. The
       // rows and all of their business/history relations remain intact; only
       // the owner-approved reserved test phone is moved to its dedicated UAT
       // identity. Sessions are revoked below in the same transaction.
-      for (const shadowOwner of conflictingOwners) {
+      for (const shadowOwner of releasableShadowOwners) {
         const previousPhone = shadowOwner.phone!;
         shadowOwner.phone = null;
         shadowOwner.updatedAt = now;
@@ -213,14 +225,17 @@ async function main(): Promise<void> {
       }
       for (const account of expectedAccounts) {
         const user = usersByUsername.get(account.username)!;
-        const status =
-          user.phone === account.normalizedPhone
+        const status = preservedConflictPhones.has(account.normalizedPhone)
+          ? ('preserved_conflict' as const)
+          : user.phone === account.normalizedPhone
             ? ('already_normalized' as const)
             : ('reconciled' as const);
         const previousPhone = user.phone;
-        user.phone = account.normalizedPhone;
-        user.updatedAt = now;
-        await userRepository.save(user);
+        if (status !== 'preserved_conflict') {
+          user.phone = account.normalizedPhone;
+          user.updatedAt = now;
+          await userRepository.save(user);
+        }
         await manager.getRepository(AuditLog).save(
           manager.getRepository(AuditLog).create({
             actorId: user.id,
@@ -251,7 +266,7 @@ async function main(): Promise<void> {
         {
           userId: In([
             ...users.map(({ id }) => id),
-            ...conflictingOwners.map(({ id }) => id),
+            ...releasableShadowOwners.map(({ id }) => id),
           ]),
           revokedAt: IsNull(),
         },
@@ -261,7 +276,8 @@ async function main(): Promise<void> {
       return {
         version: 1,
         reconciledAt: now.toISOString(),
-        releasedLegacyOtpShadowCount: conflictingOwners.length,
+        releasedLegacyOtpShadowCount: releasableShadowOwners.length,
+        preservedConflictCount: preservedConflictPhones.size,
         accounts: reconciled,
       };
     });

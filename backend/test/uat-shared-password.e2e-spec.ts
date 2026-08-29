@@ -51,11 +51,12 @@ const TSX_CLI = path.join(
 function runScript(
   script: string,
   extraEnv: Record<string, string | undefined>,
+  extraArgs: string[] = [],
 ): { status: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync(
       process.execPath,
-      [TSX_CLI, script, '--execute'],
+      [TSX_CLI, script, '--execute', ...extraArgs],
       {
         cwd: backendRoot,
         env: { ...process.env, ...extraEnv },
@@ -104,13 +105,18 @@ function extendV3(extraEnv: Record<string, string | undefined> = {}) {
 
 function reconcilePhoneLogins(
   extraEnv: Record<string, string | undefined> = {},
+  preserveConflicts = false,
 ) {
-  return runScript('src/database/reconcile-temporary-phone-login-accounts.ts', {
-    NODE_ENV: 'production',
-    AUTH_SANDBOX_ENABLED: 'true',
-    TEMP_PHONE_LOGIN_RECONCILE_CONFIRM: 'RECONCILE_TEMPORARY_PHONE_LOGINS_V1',
-    ...extraEnv,
-  });
+  return runScript(
+    'src/database/reconcile-temporary-phone-login-accounts.ts',
+    {
+      NODE_ENV: 'production',
+      AUTH_SANDBOX_ENABLED: 'true',
+      TEMP_PHONE_LOGIN_RECONCILE_CONFIRM: 'RECONCILE_TEMPORARY_PHONE_LOGINS_V1',
+      ...extraEnv,
+    },
+    preserveConflicts ? ['--preserve-conflicts'] : [],
+  );
 }
 
 describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared-uat-panel-password)', () => {
@@ -430,6 +436,26 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
         expect(
           await userRepository.findOneByOrFail({ username: 'uat.customer' }),
         ).toMatchObject({ phone: '+989000000002' });
+
+        // Sandbox login resolves the immutable UAT identity directly, so a
+        // historical owner of the canonical phone can never block access.
+        const agencyLogin = await request(app.getHttpServer())
+          .post('/auth/agency/login')
+          .send({ phone: '09000000001', password: STRONG_PASSWORD });
+        expect(agencyLogin.status).toBe(200);
+        expect(agencyLogin.body.data.accessToken).toBeDefined();
+
+        const preserved = reconcilePhoneLogins({}, true);
+        expect(preserved.status).toBe(0);
+        expect(JSON.parse(preserved.stdout)).toMatchObject({
+          preservedConflictCount: 1,
+          accounts: expect.arrayContaining([
+            expect.objectContaining({
+              username: 'uat.agency',
+              status: 'preserved_conflict',
+            }),
+          ]),
+        });
       } finally {
         await userRepository.delete(conflict.id);
       }
