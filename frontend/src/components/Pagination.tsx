@@ -7,6 +7,8 @@ export interface PaginationProps {
   /** Dark staff panels vs light public/results chrome. */
   variant?: 'dark' | 'light';
   className?: string;
+  previousLabel?: string;
+  nextLabel?: string;
 }
 
 /**
@@ -19,6 +21,8 @@ export default function Pagination({
   onChange,
   variant = 'dark',
   className = '',
+  previousLabel = 'قبلی',
+  nextLabel = 'بعدی',
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
@@ -53,7 +57,7 @@ export default function Pagination({
         onClick={() => onChange(page - 1)}
         className={`${btnBase} px-[15px]`}
       >
-        قبلی
+        {previousLabel}
       </button>
       {start > 1 && (
         <>
@@ -88,7 +92,7 @@ export default function Pagination({
         onClick={() => onChange(page + 1)}
         className={`${btnBase} px-[15px]`}
       >
-        بعدی
+        {nextLabel}
       </button>
     </nav>
   );

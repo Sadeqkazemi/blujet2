@@ -223,7 +223,7 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-saved-chip-saved-1')).toHaveTextContent('سارا احمدی');
   });
 
-  it('shows passenger form for guests and opens OTP after confirm', async () => {
+  it('keeps checkout confirmation disabled for guests and opens OTP from the dedicated sign-in action', async () => {
     mockAuth('unauthenticated');
     const user = userEvent.setup();
     render(
@@ -245,7 +245,8 @@ describe('CheckoutPage', () => {
     expect(await screen.findByTestId('checkout-pax-step')).toBeInTheDocument();
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
     expect(screen.getByTestId('checkout-from-saved-0')).toBeDisabled();
-    expect(screen.getByTestId('checkout-next')).toBeEnabled();
+    expect(screen.getByTestId('checkout-next')).toBeDisabled();
+    expect(screen.getByTestId('checkout-sign-in-required')).toBeInTheDocument();
 
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'ALI');
     await user.type(screen.getByTestId('checkout-pax-last-0'), 'REZAEI');
@@ -256,11 +257,13 @@ describe('CheckoutPage', () => {
     await user.selectOptions(selects[2]!, '1');
     await user.selectOptions(selects[3]!, '1370');
 
-    expect(screen.getByTestId('checkout-next')).toBeEnabled();
-    await user.click(screen.getByTestId('checkout-next'));
+    expect(screen.getByTestId('checkout-next')).toBeDisabled();
+    await user.click(screen.getByTestId('checkout-sign-in-required'));
     expect(await screen.findByTestId('checkout-login-modal')).toBeInTheDocument();
     expect(screen.getByTestId('otp-phone')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-pax-step')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-pax-first-0')).toHaveValue('ALI');
+    expect(screen.getByTestId('checkout-pax-last-0')).toHaveValue('REZAEI');
 
     await user.click(screen.getByTestId('checkout-login-close'));
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
@@ -287,7 +290,7 @@ describe('CheckoutPage', () => {
     );
 
     await screen.findByTestId('checkout-pax-step');
-    expect(screen.getByTestId('checkout-next')).toBeEnabled();
+    expect(screen.getByTestId('checkout-next')).toBeDisabled();
     await user.type(screen.getByTestId('checkout-pax-first-0'), 'A');
 
     expect(screen.queryByTestId('checkout-login-modal')).not.toBeInTheDocument();
@@ -295,7 +298,7 @@ describe('CheckoutPage', () => {
     expect(screen.queryByText('کد ملی را وارد کنید.')).not.toBeInTheDocument();
     expect(screen.getByTestId('checkout-pax-last-0')).toHaveAttribute('aria-invalid', 'false');
 
-    await user.click(screen.getByTestId('checkout-next'));
+    await user.click(screen.getByTestId('checkout-sign-in-required'));
 
     expect(screen.getByText('نام خانوادگی را وارد کنید.')).toBeInTheDocument();
     expect(screen.getByText('کد ملی را وارد کنید.')).toBeInTheDocument();
@@ -368,6 +371,8 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('checkout-pricing-sidebar')).toBeInTheDocument();
     expect(screen.getByTestId('checkout-next')).toHaveTextContent('تأیید و ادامه');
     expect(screen.getByTestId('checkout-mobile-sticky')).toBeInTheDocument();
+    expect(screen.getByTestId('checkout-mobile-sticky')).toHaveClass('sticky');
+    expect(screen.getByTestId('checkout-mobile-sticky')).not.toHaveClass('fixed');
     expect(screen.getByTestId('checkout-next-mobile')).toHaveTextContent('تأیید و ادامه');
     expect(screen.getByTestId('checkout-pax-name-grid-0')).toHaveStyle({
       gridTemplateColumns: '1fr',

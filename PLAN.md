@@ -3954,3 +3954,14 @@ contracts and retires the production mock adapters.
 - [x] Make origin-to-destination direction explicit in flight details for RTL and LTR locales.
 - [x] Align persisted MD-80 cabin bands with the approved seat map and migrate existing seat/catalog rows.
 - [x] Prove first-class seat selection and the shared search/edit-search city filter with regression tests.
+
+## Guest checkout, account pagination, and internal cartable lifecycle (2026-08-29)
+
+- [x] Keep passenger entry available before authentication while disabling the primary checkout continuation and preserving the completed manifest through OTP login.
+- [x] Complete only missing profile identity fields from the first adult after login and save that passenger without duplicates.
+- [x] Paginate customer trips at ten records per page and keep the wallet top-up action aligned when amount-in-words appears.
+- [x] Replace the fixed mobile checkout action overlay with a footer-safe sticky action row.
+- [x] Separate internal-message reply from explicit conversation closure, retain searchable history, and auto-archive after four inactive days.
+- [x] Rename the pricing rejection submission to «ثبت درخواست» without changing its audited decision semantics.
+- [x] Pass 944 frontend tests, 341 backend unit tests, 36 cartable E2E tests, both production builds, lint checks, diff validation, and local responsive browser QA.
+- [ ] Commit/push, merge, and deploy only after explicit user approval.

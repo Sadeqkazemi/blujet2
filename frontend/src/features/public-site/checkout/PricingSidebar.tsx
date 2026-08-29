@@ -26,6 +26,8 @@ export default function PricingSidebar({
   error,
   disabled = false,
   disabledHint,
+  signInRequired = false,
+  onSignIn,
   /** When true, omit primary CTA (mobile sticky bar owns it). */
   hideActions = false,
 }: {
@@ -45,6 +47,8 @@ export default function PricingSidebar({
   error?: string | null;
   disabled?: boolean;
   disabledHint?: string | null;
+  signInRequired?: boolean;
+  onSignIn?: () => void;
   hideActions?: boolean;
 }) {
   const t = CHECKOUT_COPY[locale];
@@ -144,6 +148,21 @@ export default function PricingSidebar({
           >
             {busy ? t.loading : nextLabel}
           </button>
+
+          {signInRequired && onSignIn && (
+            <button
+              type="button"
+              onClick={onSignIn}
+              data-testid="checkout-sign-in-required"
+              className="mt-2.5 flex h-12 items-center justify-center rounded-[14px] border border-[#1668c4] bg-[#eef4fb] text-[13.5px] font-extrabold text-[#1668c4]"
+            >
+              {locale === 'en'
+                ? 'Sign in or register to continue'
+                : locale === 'ar'
+                  ? 'سجّل الدخول أو أنشئ حسابًا للمتابعة'
+                  : 'برای ادامه وارد شوید یا ثبت‌نام کنید'}
+            </button>
+          )}
 
           {disabledHint && (
             <div

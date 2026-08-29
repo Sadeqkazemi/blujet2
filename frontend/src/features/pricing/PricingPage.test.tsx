@@ -275,7 +275,7 @@ describe("PricingPage", () => {
       screen.getAllByRole("button", { name: "رد درخواست" })[0]!,
     );
     await userEvent.click(
-      await screen.findByRole("button", { name: "ثبت رد" }),
+      await screen.findByRole("button", { name: "ثبت درخواست" }),
     );
 
     expect(
@@ -287,7 +287,7 @@ describe("PricingPage", () => {
       screen.getByLabelText("دلیل رد درخواست (الزامی)"),
       "نرخ پیشنهادی بالاست",
     );
-    await userEvent.click(screen.getByRole("button", { name: "ثبت رد" }));
+    await userEvent.click(screen.getByRole("button", { name: "ثبت درخواست" }));
 
     expect(
       screen.queryByRole("dialog", { name: "تأیید مجدد هویت" }),

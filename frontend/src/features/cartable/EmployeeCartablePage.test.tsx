@@ -147,7 +147,7 @@ describe("EmployeeCartablePage", () => {
     expect(cartableApi.fetchSentManagerMessages).not.toHaveBeenCalled();
   });
 
-  it("replies to an internal message and closes the incoming item", async () => {
+  it("replies without closing and exposes a separate conversation close action", async () => {
     const internalTask = {
       ...LIST.tasks[0],
       sourceType: "MANAGER_MESSAGE" as const,
@@ -170,17 +170,23 @@ describe("EmployeeCartablePage", () => {
     vi.spyOn(cartableApi, "fetchCartableTask").mockResolvedValue(internalTask);
     const reply = vi
       .spyOn(cartableApi, "replyCartableMessage")
+      .mockResolvedValue({ ...internalTask, id: "reply-1", status: "OPEN" });
+    const close = vi
+      .spyOn(cartableApi, "closeCartableConversation")
       .mockResolvedValue({ ...internalTask, status: "APPROVED" });
 
     render(<EmployeeCartablePage />);
     await userEvent.click(await screen.findByRole("button", { name: "پاسخ" }));
     await userEvent.type(screen.getByLabelText("پاسخ شما *"), "پاسخ کارمند");
     await userEvent.click(
-      screen.getByRole("button", { name: "ارسال پاسخ و بستن" }),
+      screen.getByRole("button", { name: "ارسال پاسخ" }),
     );
 
     await waitFor(() => {
       expect(reply).toHaveBeenCalledWith("t1", "پاسخ کارمند", []);
     });
+    expect(screen.getByRole("button", { name: "بستن پیام" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "بستن پیام" }));
+    await waitFor(() => expect(close).toHaveBeenCalledWith("t1"));
   });
 });

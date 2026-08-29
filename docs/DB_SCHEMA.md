@@ -215,6 +215,9 @@ silently invented.
   receives one UUID; every recipient of a department broadcast receives a
   different UUID. Reply rows retain the same value while alternating sender
   and assignee. Resolved rows are retained as immutable conversation history.
+  Explicit `/close` and the four-day inactivity lifecycle reuse the existing
+  `status=APPROVED`, `resolutionNote`, and `resolvedAt` columns to archive every
+  OPEN row in a conversation without deleting messages or attachments.
 
 ### Current reporting and booking read models
 

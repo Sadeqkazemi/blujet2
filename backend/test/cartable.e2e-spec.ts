@@ -886,9 +886,9 @@ describe('Cartable + referrals + messages (e2e)', () => {
     );
 
     const closed = await request(app.getHttpServer())
-      .patch(`/cartable/${reply.body.data.id}/approve`)
+      .patch(`/cartable/${reply.body.data.id}/close`)
       .set('Authorization', `Bearer ${it.accessToken}`)
-      .send({ note: 'گفتگو بسته شد' });
+      .send();
     expect(closed.status).toBe(200);
 
     const historyAfterClose = await request(app.getHttpServer())
@@ -901,6 +901,44 @@ describe('Cartable + referrals + messages (e2e)', () => {
         expect.objectContaining({ detail: 'پیام مدیر فناوری اطلاعات' }),
         expect.objectContaining({
           detail: 'پاسخ مدیر مالی به مدیر فناوری اطلاعات',
+        }),
+      ]),
+    );
+  });
+
+  it('archives an internal conversation after four days without activity', async () => {
+    const it = await loginAs(app, 'itadmin');
+    const finance = await loginAs(app, 'finance');
+    const financeId = await userId('finance');
+
+    const message = await request(app.getHttpServer())
+      .post('/cartable/direct-message')
+      .set('Authorization', `Bearer ${it.accessToken}`)
+      .send({
+        toId: financeId,
+        subject: 'گفتگوی بدون فعالیت',
+        body: 'این گفتگو باید پس از چهار روز بایگانی شود',
+      });
+    expect(message.status).toBe(201);
+
+    const staleAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    await dataSource
+      .getRepository(CartableTask)
+      .update(
+        { conversationId: message.body.data.conversationId },
+        { createdAt: staleAt },
+      );
+
+    const list = await request(app.getHttpServer())
+      .get('/cartable?status=APPROVED')
+      .set('Authorization', `Bearer ${finance.accessToken}`);
+    expect(list.status).toBe(200);
+    expect(list.body.data.tasks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: message.body.data.id,
+          status: 'APPROVED',
+          resolutionNote: 'بسته‌شدن خودکار پس از ۴ روز عدم فعالیت',
         }),
       ]),
     );
