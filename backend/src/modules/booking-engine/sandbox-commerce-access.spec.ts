@@ -5,12 +5,15 @@ import { WalletPointsLockController } from './wallet-points-lock.controller';
 
 describe('sandbox customer and agency commerce access', () => {
   it('allows USER and AGENCY identities to use their own wallet', () => {
-    expect(
-      Reflect.getMetadata(
-        ROLES_KEY,
-        WalletPointsLockController.prototype.getWallet,
-      ),
-    ).toEqual(['USER', 'AGENCY']);
+    const getWalletHandler = Object.getOwnPropertyDescriptor(
+      WalletPointsLockController.prototype,
+      'getWallet',
+    )?.value as object;
+
+    expect(Reflect.getMetadata(ROLES_KEY, getWalletHandler)).toEqual([
+      'USER',
+      'AGENCY',
+    ]);
     expect(Reflect.getMetadata(ROLES_KEY, WalletPointsLockController)).toEqual([
       'USER',
     ]);
