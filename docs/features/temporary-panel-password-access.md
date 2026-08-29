@@ -195,6 +195,32 @@ Acceptance:
   any operational/business row for `uat.agency` —
   `uat-shared-password.e2e-spec.ts`.
 
+### UAT shared-password reconciliation after identity recovery
+
+The August 29 UAT login incident showed that a reserved identity could remain
+active and correctly normalized while its persisted Argon2 hash no longer
+matched the configured `UAT_PANEL_SHARED_PASSWORD`. The original shared
+password migration was protected by a consumed v1 sentinel, so later deploys
+could not repair this drift and `/auth/agency/login` returned the ordinary
+`401 UNAUTHORIZED` response before reaching the temporary-access check.
+
+The deploy now performs one additional, controlled reconciliation after the
+v3 identity/access recovery. It reuses the fail-closed rotation command, which:
+
+- accepts only the exact reserved, active, unexpired `uat.*` identities;
+- reads the current shared password from the protected deployment secret and
+  never prints it;
+- writes a fresh independently salted Argon2 hash for each identity while
+  preserving every access deadline;
+- revokes existing refresh sessions; and
+- writes only non-secret output to a root-only audit artifact.
+
+`/root/.blujet-uat-shared-password-reconciliation-v2-complete` makes the
+reconciliation one-time. Its audit output is stored at
+`/root/blujet-uat-shared-password-reconciliation-v2.json`. Ordinary agency,
+customer, employee and manager accounts are outside the reserved username set
+and cannot enter this operation.
+
 ## Acceptance checklist
 
 - [ ] A controlled production bootstrap creates exactly one temporary account

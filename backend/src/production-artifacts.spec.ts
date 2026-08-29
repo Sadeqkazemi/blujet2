@@ -150,4 +150,27 @@ describe('production backend artifacts', () => {
       'blujet-uat-temporary-access-extension-v3.json',
     );
   });
+
+  it('reconciles the reserved UAT account hashes with the configured shared password once after v3 recovery', () => {
+    const v3ExtensionIndex = deployWorkflow.indexOf(
+      'access_extension_v3_sentinel=',
+    );
+    const reconciliationIndex = deployWorkflow.indexOf(
+      'shared_password_reconciliation_v2_sentinel=',
+    );
+    expect(v3ExtensionIndex).toBeGreaterThanOrEqual(0);
+    expect(reconciliationIndex).toBeGreaterThan(v3ExtensionIndex);
+    expect(deployWorkflow).toContain(
+      '.blujet-uat-shared-password-reconciliation-v2-complete',
+    );
+    expect(deployWorkflow).toContain(
+      'blujet-uat-shared-password-reconciliation-v2.json',
+    );
+    expect(deployWorkflow).toContain(
+      'ROTATE_TEMPORARY_PANEL_PASSWORDS_SHARED_V1',
+    );
+    expect(deployWorkflow).toContain(
+      'backend node dist/database/rotate-temporary-panel-passwords.js --execute',
+    );
+  });
 });
