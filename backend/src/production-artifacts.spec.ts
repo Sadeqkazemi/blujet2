@@ -173,4 +173,27 @@ describe('production backend artifacts', () => {
       'backend node dist/database/rotate-temporary-panel-passwords.js --execute',
     );
   });
+
+  it('reconciles the reserved UAT hashes again after the protected shared secret is aligned', () => {
+    const reconciliationV2Index = deployWorkflow.indexOf(
+      'shared_password_reconciliation_v2_sentinel=',
+    );
+    const reconciliationV3Index = deployWorkflow.indexOf(
+      'shared_password_reconciliation_v3_sentinel=',
+    );
+    expect(reconciliationV2Index).toBeGreaterThanOrEqual(0);
+    expect(reconciliationV3Index).toBeGreaterThan(reconciliationV2Index);
+    expect(deployWorkflow).toContain(
+      '.blujet-uat-shared-password-reconciliation-v3-complete',
+    );
+    expect(deployWorkflow).toContain(
+      'blujet-uat-shared-password-reconciliation-v3.json',
+    );
+    expect(
+      deployWorkflow.indexOf(
+        'backend node dist/database/rotate-temporary-panel-passwords.js --execute',
+        reconciliationV3Index,
+      ),
+    ).toBeGreaterThan(reconciliationV3Index);
+  });
 });

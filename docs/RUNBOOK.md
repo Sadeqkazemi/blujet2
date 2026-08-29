@@ -215,6 +215,14 @@ writes the non-secret result to
 sentinel `/root/.blujet-uat-shared-password-reconciliation-v2-complete` prevents
 later deploys from rotating a working password again.
 
+If reconciliation v2 was consumed before the protected GitHub secret was
+aligned with the owner-provided UAT credential, the deployment performs one
+follow-up reconciliation using
+`/root/.blujet-uat-shared-password-reconciliation-v3-complete`. Its non-secret
+audit is written to `/root/blujet-uat-shared-password-reconciliation-v3.json`
+with mode `0600`; account expiry is still preserved and refresh sessions are
+revoked.
+
 The temporary passwords are 16-character values containing only English
 letters and digits. The owner-approved format migration is deployed once and
 uses `/root/.blujet-temporary-panel-password-format-v1-complete` as its

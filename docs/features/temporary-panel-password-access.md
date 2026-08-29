@@ -221,6 +221,14 @@ reconciliation one-time. Its audit output is stored at
 customer, employee and manager accounts are outside the reserved username set
 and cannot enter this operation.
 
+When the protected GitHub secret was subsequently aligned with the
+owner-provided UAT credential, a follow-up v3 reconciliation was required
+because the v2 sentinel had already been consumed. It uses
+`/root/.blujet-uat-shared-password-reconciliation-v3-complete` and writes only
+non-secret results to
+`/root/blujet-uat-shared-password-reconciliation-v3.json`. It retains the same
+fail-closed identity, expiry, and session-revocation guarantees as v2.
+
 ## Acceptance checklist
 
 - [ ] A controlled production bootstrap creates exactly one temporary account
