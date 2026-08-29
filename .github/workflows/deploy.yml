@@ -205,6 +205,28 @@ jobs:
               touch "$access_extension_v3_sentinel"
               chmod 600 "$access_extension_v3_sentinel"
             fi
+            # One-time recovery for shared-password drift discovered after
+            # the v3 identity normalization. Reuse the guarded rotation
+            # command so only exact active/unexpired uat.* identities are
+            # re-hashed, every deadline is preserved, existing sessions are
+            # revoked, and no password material reaches stdout or the audit.
+            shared_password_reconciliation_v2_sentinel=/root/.blujet-uat-shared-password-reconciliation-v2-complete
+            if [ ! -f "$shared_password_reconciliation_v2_sentinel" ]; then
+              if [ -z "${UAT_PANEL_SHARED_PASSWORD:-}" ]; then
+                echo "Refusing: UAT_PANEL_SHARED_PASSWORD secret is empty or unset." >&2
+                exit 1
+              fi
+              umask 077
+              shared_password_reconciliation_v2_audit=/root/blujet-uat-shared-password-reconciliation-v2.json
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e TEMP_PANEL_ROTATE_CONFIRM=ROTATE_TEMPORARY_PANEL_PASSWORDS_SHARED_V1 \
+                -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                backend node dist/database/rotate-temporary-panel-passwords.js --execute \
+                > "$shared_password_reconciliation_v2_audit"
+              chmod 600 "$shared_password_reconciliation_v2_audit"
+              touch "$shared_password_reconciliation_v2_sentinel"
+              chmod 600 "$shared_password_reconciliation_v2_sentinel"
+            fi
             # One-time UAT cleanup. A root-only PostgreSQL backup is completed
             # before the safeguarded purge; required access accounts and
             # reference/configuration tables are retained by the purge policy.

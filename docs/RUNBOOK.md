@@ -206,6 +206,15 @@ The extension deployments write their non-secret audit output to
 `.blujet-uat-temporary-access-extension-v3-complete` root sentinels make each
 grant one-time.
 
+After extension v3, the deployment also runs a one-time shared-password
+reconciliation for the exact reserved `uat.*` identities. This repairs a
+stored-hash/configured-secret mismatch without changing any access deadline.
+It revokes existing refresh sessions, never prints the shared password, and
+writes the non-secret result to
+`/root/blujet-uat-shared-password-reconciliation-v2.json` (mode `0600`). The
+sentinel `/root/.blujet-uat-shared-password-reconciliation-v2-complete` prevents
+later deploys from rotating a working password again.
+
 The temporary passwords are 16-character values containing only English
 letters and digits. The owner-approved format migration is deployed once and
 uses `/root/.blujet-temporary-panel-password-format-v1-complete` as its
