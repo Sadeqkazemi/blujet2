@@ -397,7 +397,7 @@ async function main() {
   // makes re-seeding idempotent and keeps checkout/refund flows usable without
   // inventing balances in the UI.
   const sandboxWalletGrantIrr = 1_000_000_000n;
-  for (const walletUser of [customerUser, agencyUserGold]) {
+  for (const walletUser of [customerUser, agencyUserGold, agencyUserSilver]) {
     const existingGrant = await walletEntryRepo.findOne({
       where: {
         userId: walletUser.id,

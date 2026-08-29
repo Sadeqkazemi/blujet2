@@ -152,6 +152,23 @@ jobs:
               touch "$operations_account_sentinel"
               chmod 600 "$operations_account_sentinel"
             fi
+            # One-time audited sandbox commerce setup: gives the reserved
+            # customer and agency wallets 100,000,000 toman each and creates
+            # the synthetic agency profile/credit line required for complete
+            # purchase and refund testing. Deterministic ledger ids and this
+            # sentinel prevent duplicate credit on later deploys.
+            commerce_sentinel=/root/.blujet-uat-sandbox-commerce-v1-complete
+            if [ ! -f "$commerce_sentinel" ]; then
+              umask 077
+              docker compose -f docker-compose.prod.yml exec -T \
+                -e NODE_ENV=production \
+                -e UAT_COMMERCE_CONFIRM=PROVISION_UAT_SANDBOX_COMMERCE_V1 \
+                backend node dist/database/provision-uat-sandbox-commerce.js --execute \
+                > /root/blujet-uat-sandbox-commerce-v1.json
+              chmod 600 /root/blujet-uat-sandbox-commerce-v1.json
+              touch "$commerce_sentinel"
+              chmod 600 "$commerce_sentinel"
+            fi
             # Owner-approved, one-time seven-day extension of the reserved UAT
             # identities. The command validates every reserved account, caps
             # access at 14 days from its original creation, writes security

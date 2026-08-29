@@ -94,7 +94,13 @@
     border-color: #cfe0f4 !important;
     background: #eef5ff !important;
     box-shadow: 0 4px 12px rgba(22, 104, 196, 0.13);
-    transform: rotate(90deg) !important;
+    transform: none !important;
+  }
+
+  .results-edit-search-swap-icon {
+    display: block;
+    line-height: 1;
+    transform: rotate(90deg);
   }
 
   .results-edit-search-airport-menu {

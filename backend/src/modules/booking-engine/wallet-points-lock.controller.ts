@@ -34,6 +34,9 @@ export class WalletPointsLockController {
   ) {}
 
   @Get('my/wallet')
+  // Both customer and agency identities have an independent wallet ledger.
+  // Club-points and price-lock methods below remain customer-only.
+  @Roles('USER', 'AGENCY')
   @ApiOperation({ summary: 'موجودی کیف پول' })
   async getWallet(@CurrentUser() user: AuthenticatedUser) {
     return {
@@ -43,6 +46,7 @@ export class WalletPointsLockController {
   }
 
   @Post('my/wallet/topup')
+  @Roles('USER', 'AGENCY')
   @ApiOperation({
     summary:
       'شارژ کیف پول (فقط غیرproduction تا اتصال درگاه واقعی؛ production غیرفعال)',
