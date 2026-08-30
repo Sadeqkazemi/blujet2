@@ -31,13 +31,13 @@ export default function Pagination({
 
   const dark = variant === 'dark';
   const btnBase = dark
-    ? 'h-[42px] rounded-[11px] border border-[#28344c] bg-[#18223a] text-[13px] font-bold text-[#9fb0c7] transition hover:border-[#3b4a6b] hover:text-white disabled:cursor-default disabled:opacity-40'
+    ? 'h-[42px] rounded-[11px] border border-panel-border bg-panel-surface-2 text-[13px] font-bold text-panel-muted transition hover:border-accent hover:text-panel-ink disabled:cursor-default disabled:opacity-40'
     : 'h-[42px] rounded-[11px] border border-[#e6eaf0] bg-white text-[13px] font-bold text-[#5a6678] transition hover:border-[#cfd6e0] disabled:cursor-default disabled:opacity-40';
   const pageActive = dark
     ? 'h-[42px] w-[42px] rounded-[11px] bg-[#3b82f6] text-[13px] font-extrabold text-white'
     : 'h-[42px] w-[42px] rounded-[11px] bg-[#1668c4] text-[13px] font-extrabold text-white';
   const pageIdle = dark
-    ? 'h-[42px] w-[42px] rounded-[11px] border border-[#28344c] bg-[#18223a] text-[13px] font-semibold text-[#9fb0c7] transition hover:text-white'
+    ? 'h-[42px] w-[42px] rounded-[11px] border border-panel-border bg-panel-surface-2 text-[13px] font-semibold text-panel-muted transition hover:border-accent hover:text-panel-ink'
     : 'h-[42px] w-[42px] rounded-[11px] border border-[#e6eaf0] bg-white text-[13px] font-semibold text-[#5a6678] transition hover:border-[#cfd6e0]';
 
   // Show a compact window of page numbers when there are many pages.

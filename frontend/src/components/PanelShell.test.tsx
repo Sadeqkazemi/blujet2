@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PanelShell from './PanelShell';
 import * as panelsApi from '../api/panels';
 import * as cartableApi from '../api/cartable';
@@ -16,6 +16,8 @@ function renderShell() {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => window.localStorage.clear());
 
 describe('PanelShell', () => {
   it('uses the shared light theme for every management role', async () => {
@@ -38,6 +40,23 @@ describe('PanelShell', () => {
       'data-theme',
       'light',
     );
+  });
+
+  it('switches the complete management shell to dark mode and persists the choice', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u-theme', fullName: 'مدیر بازرگانی', role: 'COMMERCIAL_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(), confirmTwoFactor: vi.fn(), agencyLogin: vi.fn(), signOut: vi.fn(),
+    });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([{ key: 'dashboard', labelFa: 'داشبورد', implemented: true }]);
+
+    renderShell();
+    const toggle = await screen.findByTestId('panel-theme-toggle');
+    await (await import('@testing-library/user-event')).default.click(toggle);
+
+    expect(screen.getByTestId('management-panel-shell')).toHaveAttribute('data-theme', 'dark');
+    expect(window.localStorage.getItem('blujet-panel-theme')).toBe('dark');
   });
 
   it('does not sign a staff user out until the confirmation dialog is accepted', async () => {

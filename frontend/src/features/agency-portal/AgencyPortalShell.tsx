@@ -10,6 +10,8 @@ import { AGENCY_PAGE_META, agencyNavKeyFromPath } from './agency-nav-config';
 import ConfirmActionDialog from '../../components/ConfirmActionDialog';
 import AgencyComposeMessageModal from './AgencyComposeMessageModal';
 import { usePanelInactivityLogout } from '../../hooks/usePanelInactivityLogout';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
+import PanelThemeToggle from '../../components/PanelThemeToggle';
 
 const STR: Record<StoredLocale, { newMessage: string; logoutTitle: string; logoutMessage: string; logoutConfirm: string; logoutCancel: string; logoutBusy: string }> = {
   fa: { newMessage: 'پیام جدید', logoutTitle: 'خروج از حساب', logoutMessage: 'آیا مطمئن هستید که می‌خواهید از پنل آژانس خارج شوید؟', logoutConfirm: 'بله، خارج شو', logoutCancel: 'انصراف', logoutBusy: 'در حال خروج…' },
@@ -27,6 +29,7 @@ export default function AgencyPortalShell() {
   const activeKey = agencyNavKeyFromPath(location.pathname);
   const pageMeta = AGENCY_PAGE_META[activeKey];
   const t = STR[locale];
+  const { theme, toggleTheme } = usePanelTheme();
 
   const [agencyName, setAgencyName] = useState(user?.fullName ?? '');
   const [licenseNo, setLicenseNo] = useState<string | null>(null);
@@ -81,10 +84,13 @@ export default function AgencyPortalShell() {
   return (
     <div
       dir={locale === 'en' ? 'ltr' : 'rtl'}
+      data-testid="agency-panel-shell"
+      data-theme={theme}
+      className={`portal-panel-theme portal-panel-theme--${theme}`}
       style={{
         fontFamily: locale === 'en' ? 'Inter, sans-serif' : 'var(--font-sans)',
-        background: '#f6f8fb',
-        color: '#16202e',
+        background: 'var(--portal-canvas)',
+        color: 'var(--portal-ink)',
         minHeight: '100vh',
         display: 'grid',
         gridTemplateColumns: isMobile ? '1fr' : '248px 1fr',
@@ -129,6 +135,13 @@ export default function AgencyPortalShell() {
             </div>
           ) : <span />}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <PanelThemeToggle
+              theme={theme}
+              onToggle={toggleTheme}
+              compact
+              lightLabel={locale === 'en' ? 'Light mode' : locale === 'ar' ? 'الوضع الفاتح' : 'حالت روشن'}
+              darkLabel={locale === 'en' ? 'Dark mode' : locale === 'ar' ? 'الوضع الداكن' : 'حالت تیره'}
+            />
             <button
               type="button"
               onClick={() => setComposeOpen(true)}
@@ -190,7 +203,7 @@ export default function AgencyPortalShell() {
         busyLabel={t.logoutBusy}
         onCancel={() => setLogoutConfirmOpen(false)}
         onConfirm={onSignOut}
-        variant="light"
+        variant={theme}
         testId="agency-logout-confirm"
       />
       {composeOpen && (

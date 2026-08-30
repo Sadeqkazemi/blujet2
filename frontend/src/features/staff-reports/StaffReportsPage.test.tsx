@@ -51,4 +51,29 @@ describe('StaffReportsPage', () => {
     await user.click(screen.getByRole('button', { name: 'علامت‌گذاری به‌عنوان خوانده‌شده' }));
     expect(screen.queryByText('کارمند جدید توسط مدیر IT اضافه شد')).not.toBeInTheDocument();
   });
+
+  it('shows exactly ten report records on each page', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUserWithRole('COMMERCIAL_MANAGER'),
+      requestLogin: vi.fn(), confirmTwoFactor: vi.fn(), agencyLogin: vi.fn(), signOut: vi.fn(),
+    });
+    vi.spyOn(reportingApi, 'fetchStaffReports').mockResolvedValue({
+      ...DATA,
+      reports: Array.from({ length: 12 }, (_, index) => ({
+        ...DATA.reports[0]!,
+        id: `r${index + 1}`,
+        action: `گزارش شماره ${index + 1}`,
+      })),
+      newEmployeeEvents: [],
+    });
+
+    render(<StaffReportsPage />);
+    expect(await screen.findByText('گزارش شماره 1')).toBeInTheDocument();
+    expect(screen.getByText('گزارش شماره 10')).toBeInTheDocument();
+    expect(screen.queryByText('گزارش شماره 11')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'بعدی' }));
+    expect(screen.getByText('گزارش شماره 11')).toBeInTheDocument();
+    expect(screen.queryByText('گزارش شماره 1')).not.toBeInTheDocument();
+  });
 });

@@ -42,7 +42,7 @@ export default function StaffReportsPage() {
     };
   }, [staffId]);
 
-  const reportsPager = usePagination(data?.reports ?? []);
+  const reportsPager = usePagination(data?.reports ?? [], 10);
 
   if (error) return <p className="px-[21px] py-8 text-sm text-[#f87171]">{error}</p>;
   if (!data) return <p className="px-[21px] py-8 text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
@@ -125,9 +125,9 @@ export default function StaffReportsPage() {
           </select>
         </label>
 
-        <div className="mb-3 border-b border-[#1f2a3d] pb-3 text-xs text-[#8fa1bb]">
+        <div className="mb-3 border-b border-panel-border pb-3 text-xs text-panel-muted">
           {selected ? `${selected.fullName}${selected.rank ? ` · ${selected.rank}` : ''}` : `همهٔ کارمندان ${deptLabel}`}{' '}
-          · <span className="font-num font-bold text-[#cdd9ec]">{faDigits(data.reports.length)}</span> گزارش
+          · <span className="font-num font-bold text-panel-ink">{faDigits(data.reports.length)}</span> گزارش
         </div>
 
         {data.reports.length === 0 ? (
@@ -139,7 +139,7 @@ export default function StaffReportsPage() {
                 key={r.id}
                 className="flex items-start gap-3 rounded-xl border border-panel-border bg-panel-canvas px-3.5 py-[13px]"
               >
-                <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-[rgba(59,130,246,.2)] text-[12.5px] font-extrabold text-white">
+                <span className="flex h-10 w-10 flex-none items-center justify-center rounded-[11px] bg-[rgba(59,130,246,.18)] text-[12.5px] font-extrabold text-accent">
                   {r.staffName.slice(0, 1)}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -149,10 +149,10 @@ export default function StaffReportsPage() {
                       {CATEGORY_LABEL[r.category] ?? r.category}
                     </span>
                   </div>
-                  <div className="text-[11.5px] leading-[1.8] text-[#9fb0c7]">{r.detail}</div>
+                  <div className="text-[11.5px] leading-[1.8] text-panel-muted">{r.detail}</div>
                   <div className="mt-[7px] flex items-center gap-2 text-[10.5px] text-[#6b7b94]">
                     <span>{r.staffName}</span>
-                    <span className="h-[3px] w-[3px] rounded-full bg-[#3a4a63]" />
+                    <span className="h-[3px] w-[3px] rounded-full bg-panel-muted" />
                     <span className="font-num">{formatJalaliDateTime(r.at)}</span>
                   </div>
                 </div>

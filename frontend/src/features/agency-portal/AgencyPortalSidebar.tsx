@@ -43,8 +43,9 @@ export default function AgencyPortalSidebar({
     <aside
       data-testid="agency-sidebar"
       style={{
-        background: '#fff',
-        borderLeft: '1px solid #e9eef4',
+        background: 'var(--portal-surface)',
+        color: 'var(--portal-ink)',
+        borderLeft: '1px solid var(--portal-border)',
         padding: '15px 11px',
         display: 'flex',
         flexDirection: 'column',
@@ -57,8 +58,8 @@ export default function AgencyPortalSidebar({
     >
       <div
         style={{
-          background: '#f0f5fb',
-          border: '1px solid #e1ebf6',
+          background: 'var(--portal-surface-2)',
+          border: '1px solid var(--portal-border)',
           borderRadius: 13,
           padding: '11px',
           marginBottom: 14,
@@ -87,7 +88,7 @@ export default function AgencyPortalSidebar({
               style={{
                 fontSize: 12,
                 fontWeight: 800,
-                color: '#0d2640',
+                color: 'var(--portal-ink)',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -119,8 +120,8 @@ export default function AgencyPortalSidebar({
                 cursor: 'pointer',
                 fontSize: 12.5,
                 fontWeight: active ? 800 : 600,
-                color: active ? '#1668c4' : '#5a6678',
-                background: active ? '#eef4fb' : 'transparent',
+                color: active ? 'var(--portal-accent)' : 'var(--portal-muted)',
+                background: active ? 'var(--portal-surface-2)' : 'transparent',
                 textDecoration: 'none',
               }}
             >
@@ -176,7 +177,7 @@ export default function AgencyPortalSidebar({
           border: 'none',
           borderTopWidth: 1,
           borderTopStyle: 'solid',
-          borderTopColor: '#eef2f7',
+          borderTopColor: 'var(--portal-border)',
           fontFamily: 'inherit',
           width: 'calc(100% + 22px)',
         }}

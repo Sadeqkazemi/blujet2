@@ -36,6 +36,8 @@ import ConfirmActionDialog from './ConfirmActionDialog';
 import { usePanelNotify } from '../hooks/usePanelNotify';
 import { usePanelInactivityLogout } from '../hooks/usePanelInactivityLogout';
 import { commercialNavWithServices } from './commercial-nav';
+import PanelThemeToggle from './PanelThemeToggle';
+import { usePanelTheme } from '../hooks/usePanelTheme';
 
 const ROLE_LABELS: Record<string, string> = {
   CEO: 'مدیر عامل',
@@ -86,6 +88,7 @@ export default function PanelShell() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const autoAiRequestedRef = useRef(false);
   const inactivityLogoutStartedRef = useRef(false);
+  const { theme, toggleTheme } = usePanelTheme();
 
   const onInactivityTimeout = useCallback(() => {
     if (inactivityLogoutStartedRef.current) return;
@@ -482,8 +485,8 @@ export default function PanelShell() {
     <div
       dir="rtl"
       data-testid="management-panel-shell"
-      data-theme="light"
-      className="management-panel-light flex min-h-screen bg-panel-canvas font-sans text-panel-ink"
+      data-theme={theme}
+      className={`management-panel-${theme} flex min-h-screen bg-panel-canvas font-sans text-panel-ink`}
     >
       <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink shadow-[-8px_0_30px_-24px_rgba(13,38,64,.35)]">
         <div className="flex items-center gap-[9px] px-2 pb-3.5 pt-[7px]">
@@ -507,6 +510,10 @@ export default function PanelShell() {
         )}
 
         <SuperAdminSandboxAccess />
+
+        <div className="px-[5px] pb-2">
+          <PanelThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
 
         <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
           {visibleNav === null && <div className="px-2 py-3 text-xs text-panel-muted-2">در حال بارگذاری…</div>}
@@ -603,7 +610,7 @@ export default function PanelShell() {
         busyLabel="در حال خروج…"
         onCancel={() => setLogoutConfirmOpen(false)}
         onConfirm={onSignOut}
-        variant="light"
+        variant={theme}
         testId="panel-logout-confirm"
       />
     </div>

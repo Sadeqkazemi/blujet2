@@ -68,6 +68,8 @@ import SupportConversationCenter from '../../components/SupportConversationCente
 import { joinPersonName, splitPersonName } from '../../lib/person-name';
 import Pagination from '../../components/Pagination';
 import { usePagination } from '../../hooks/usePagination';
+import { usePanelTheme } from '../../hooks/usePanelTheme';
+import PanelThemeToggle from '../../components/PanelThemeToggle';
 
 // پنل کاربر — real data from the existing bookings/wallet/club-points/refunds
 // endpoints (none of this is mock). Matches design-reference/پنل کاربر.dc.html's
@@ -557,6 +559,7 @@ export default function AccountPage() {
   const { status, user, signOut } = useAuth();
   const { locale } = useLocale();
   const t = STR[locale];
+  const { theme, toggleTheme } = usePanelTheme();
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1119,6 +1122,9 @@ export default function AccountPage() {
   return (
     <PublicPageShell>
       <div
+        data-testid="customer-panel-shell"
+        data-theme={theme}
+        className={`portal-panel-theme portal-panel-theme--${theme} account-panel-theme`}
         style={{
           maxWidth: 1320,
           margin: '0 auto',
@@ -1129,6 +1135,14 @@ export default function AccountPage() {
           alignItems: 'start',
         }}
       >
+        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: locale === 'en' ? 'flex-end' : 'flex-start' }}>
+          <PanelThemeToggle
+            theme={theme}
+            onToggle={toggleTheme}
+            lightLabel={locale === 'en' ? 'Light mode' : locale === 'ar' ? 'الوضع الفاتح' : 'حالت روشن'}
+            darkLabel={locale === 'en' ? 'Dark mode' : locale === 'ar' ? 'الوضع الداكن' : 'حالت تیره'}
+          />
+        </div>
         <AccountSidebar
           tab={tab}
           onTabChange={selectTab}

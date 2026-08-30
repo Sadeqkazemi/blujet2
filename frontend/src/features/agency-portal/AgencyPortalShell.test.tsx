@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AgencyPortalShell from './AgencyPortalShell';
 import * as useAuthModule from '../../hooks/useAuth';
 import * as useLocaleModule from '../../hooks/useLocale';
@@ -10,8 +10,23 @@ import * as agencyApi from '../../api/agency-portal';
 import * as notificationsApi from '../../api/notifications';
 
 afterEach(() => vi.restoreAllMocks());
+beforeEach(() => window.localStorage.clear());
 
 describe('AgencyPortalShell logout', () => {
+  it('offers the shared light/dark switch in the agency panel', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ status: 'authenticated', user: { id: 'a1', fullName: 'آژانس تست', role: 'AGENCY', preferredLocale: 'FA' }, requestLogin: vi.fn(), confirmTwoFactor: vi.fn(), agencyLogin: vi.fn(), signOut: vi.fn() });
+    vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });
+    vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
+    vi.spyOn(agencyApi, 'fetchProfile').mockResolvedValue({ fullName: 'آژانس تست', licenseNo: 'AG-4471', managerName: null, email: null, city: null, address: null, tier: null, isTemporaryReadOnly: false });
+    vi.spyOn(agencyApi, 'fetchInbox').mockResolvedValue([]);
+    vi.spyOn(agencyApi, 'fetchCredit').mockResolvedValue({ limitIrr: '50000000', usedIrr: '20000000', remainingIrr: '30000000' });
+    render(<MemoryRouter initialEntries={['/agency']}><Routes><Route path="/agency" element={<AgencyPortalShell />}><Route index element={<div />} /></Route></Routes></MemoryRouter>);
+
+    await userEvent.click(await screen.findByTestId('panel-theme-toggle'));
+    expect(screen.getByTestId('agency-panel-shell')).toHaveAttribute('data-theme', 'dark');
+    expect(screen.getByTestId('agency-nav-credit')).toBeInTheDocument();
+  });
+
   it('shows only the agency notifications returned by the scoped notification API', async () => {
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({ status: 'authenticated', user: { id: 'a1', fullName: 'آژانس تست', role: 'AGENCY', preferredLocale: 'FA' }, requestLogin: vi.fn(), confirmTwoFactor: vi.fn(), agencyLogin: vi.fn(), signOut: vi.fn() });
     vi.spyOn(useLocaleModule, 'useLocale').mockReturnValue({ locale: 'fa', setLocale: vi.fn() });

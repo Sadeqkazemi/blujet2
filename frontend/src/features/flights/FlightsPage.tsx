@@ -1008,16 +1008,16 @@ export default function FlightsPage() {
                 </div>
               )}
               <div className="overflow-x-auto">
-                <div className={isCommercial ? "min-w-[920px]" : "min-w-[760px]"}>
+                <div className={isCommercial ? "min-w-0" : "min-w-[760px]"}>
                   {isCommercial ? (
                     <>
-                      <div className="grid grid-cols-[1.6fr_1.4fr_1.5fr_1fr] gap-3 border-b border-panel-border px-5 py-2 text-[11px] font-bold text-panel-muted">
+                      <div className="sr-only">
                         <span>مسیر / پرواز</span>
                         <span>وضعیت ظرفیت</span>
                         <span>تفکیک کلاس</span>
                         <span>قیمت و نمایش سایت</span>
                       </div>
-                      <ul data-testid="commercial-active-flights">
+                      <ul data-testid="commercial-active-flights" className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
                         {activePager.pageItems.map((f) => {
                           const pct =
                             f.capacity > 0
@@ -1035,7 +1035,7 @@ export default function FlightsPage() {
                           const pubOn = f.publicSaleEnabled ?? f.siteVisible ?? false;
                           const expanded = expandedActiveId === f.id;
                           return (
-                            <li key={f.id}>
+                            <li key={f.id} className="min-w-0">
                               <div
                                 role="button"
                                 tabIndex={0}
@@ -1046,17 +1046,24 @@ export default function FlightsPage() {
                                     void openDetail(f.id);
                                   }
                                 }}
-                                className={`grid w-full grid-cols-[1.6fr_1.4fr_1.5fr_1fr] items-start gap-3 border-b border-panel-border px-5 py-3 text-right text-xs transition hover:bg-panel-surface-2/50 ${f.salesHealth?.isWeak ? "bg-[#f8717112]" : ""}`}
+                                data-testid={`commercial-flight-card-${f.id}`}
+                                className={`group grid min-h-full w-full grid-cols-1 gap-4 rounded-2xl border border-panel-border bg-panel-surface p-4 text-right text-xs shadow-[0_12px_32px_-26px_rgba(13,38,64,.55)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_38px_-24px_rgba(22,104,196,.38)] md:grid-cols-2 ${f.salesHealth?.isWeak ? "ring-1 ring-[#ef444433]" : ""}`}
                               >
-                                <span>
-                                  <span className="block font-bold text-panel-ink">
+                                <span className="min-w-0 border-b border-panel-border pb-3 md:col-span-2">
+                                  <span className="mb-2 flex items-center justify-between gap-3">
+                                    <span className="flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-accent/10 text-accent" aria-hidden>
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m2 16 20-8-6 8-5-2-4 4-1-6Z" /></svg>
+                                    </span>
+                                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${st.className}`}>
+                                      {st.label}
+                                    </span>
+                                  </span>
+                                  <span className="block text-[14px] font-black text-panel-ink">
                                     {routeLabel(f.originCode, f.destCode)}
                                   </span>
-                                  <span className="ltr font-num mt-1 block text-[10px] text-panel-muted">
-                                    {f.flightNo}
-                                  </span>
-                                  <span className="font-num mt-1 block text-[10px] text-panel-muted">
-                                    {formatJalaliDateTime(f.departureAt)}
+                                  <span className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-panel-muted">
+                                    <span className="ltr font-num rounded-md bg-panel-surface-2 px-2 py-1">{f.flightNo}</span>
+                                    <span className="font-num">{formatJalaliDateTime(f.departureAt)}</span>
                                   </span>
                                   {f.routeAgencyPriceIrr ? (
                                     <span className="mt-2 inline-block rounded-md bg-[#8b5cf624] px-2 py-0.5 text-[9px] font-bold text-[#a78bfa]">
@@ -1068,7 +1075,8 @@ export default function FlightsPage() {
                                     </span>
                                   )}
                                 </span>
-                                <span>
+                                <span className="rounded-xl bg-panel-canvas p-3">
+                                  <span className="mb-2 block text-[10px] font-extrabold text-panel-ink">وضعیت ظرفیت</span>
                                   <span className="font-num mb-1 block text-[10px] text-panel-muted">
                                     فروخته {faDigits(f.sold)} · آژانس {faDigits(relSeats)} · قفل {faDigits(locked)} · آزاد {faDigits(avail)}
                                   </span>
@@ -1077,11 +1085,10 @@ export default function FlightsPage() {
                                     <span className="h-full bg-[#a855f7]" style={{ width: `${pctOf(relSeats, f.capacity)}%` }} />
                                     <span className="h-full bg-[#f59e0b]" style={{ width: `${pctOf(locked, f.capacity)}%` }} />
                                   </span>
-                                  <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${st.className}`}>
-                                    {st.label}
-                                  </span>
+                                  <span className="font-num mt-2 block text-[10px] font-bold text-accent">ضریب اشغال {faDigits(pct)}٪</span>
                                 </span>
-                                <span>
+                                <span className="rounded-xl bg-panel-canvas p-3">
+                                  <span className="mb-2 block text-[10px] font-extrabold text-panel-ink">تفکیک کلاس‌های پروازی</span>
                                   {classes.length > 0 ? (
                                     <span className="flex flex-col gap-1">
                                       {(expanded ? classes : classes.slice(0, 2)).map((c) => (
@@ -1120,7 +1127,9 @@ export default function FlightsPage() {
                                     </span>
                                   )}
                                 </span>
-                                <span className="flex flex-col items-end gap-2">
+                                <span className="flex flex-col gap-2 rounded-xl border border-panel-border p-3 md:col-span-2">
+                                  <span className="text-[10px] font-extrabold text-panel-ink">نرخ و کانال فروش</span>
+                                  <span className="flex flex-wrap items-center justify-between gap-3">
                                   <span className="font-num font-bold text-panel-ink">
                                     {f.basePriceIrr != null ? `${faMoney(f.basePriceIrr)} تومان` : "—"}
                                   </span>
@@ -1142,6 +1151,8 @@ export default function FlightsPage() {
                                       </button>
                                     </span>
                                   )}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-accent opacity-0 transition group-hover:opacity-100">مشاهده و مدیریت جزئیات ←</span>
                                 </span>
                               </div>
                             </li>

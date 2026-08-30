@@ -35,15 +35,15 @@ function KpiCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[14px]">
+    <div className="rounded-[14px] border border-panel-border bg-panel-surface p-[14px] shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         {icon}
         {trend ? (
           <span className="text-[11px] font-bold text-[#34d399]">{trend}</span>
         ) : null}
       </div>
-      <div className="font-num text-[22.5px] font-black text-white">{value}</div>
-      <div className="mt-1 text-[11.5px] text-[#6b7b94]">{label}</div>
+      <div className="font-num text-[22.5px] font-black text-panel-ink">{value}</div>
+      <div className="mt-1 text-[11.5px] text-panel-muted">{label}</div>
     </div>
   );
 }
@@ -58,11 +58,11 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
   const agPct = ag?.pct ?? 0;
 
   return (
-    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+    <div className="rounded-[14px] border border-panel-border bg-panel-surface p-[15px] shadow-sm">
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
         <div>
-          <h2 className="m-0 text-[14.5px] font-extrabold text-white">گزارش مالی</h2>
-          <p className="mt-1 text-[11px] text-[#6b7b94]">
+          <h2 className="m-0 text-[14.5px] font-extrabold text-panel-ink">گزارش مالی</h2>
+          <p className="mt-1 text-[11px] text-panel-muted">
             خلاصه فروش سال جاری — جزئیات و فیلترها در صفحه مالی
           </p>
         </div>
@@ -74,12 +74,12 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
         </Link>
       </div>
 
-      <div className="mb-1.5 flex h-4 overflow-hidden rounded-lg bg-[#18223a]">
+      <div className="mb-1.5 flex h-4 overflow-hidden rounded-lg bg-panel-surface-2">
         <div style={{ width: `${sysPct}%`, background: MIX_COLORS.SYSTEM }} />
         <div style={{ width: `${chPct}%`, background: MIX_COLORS.CHARTER }} />
         <div style={{ width: `${agPct}%`, background: MIX_COLORS.AGENCY }} />
       </div>
-      <div className="mb-3.5 flex flex-wrap gap-3 text-[10px] text-[#9fb0c7]">
+      <div className="mb-3.5 flex flex-wrap gap-3 text-[10px] text-panel-muted">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
           سیستمی {faPercent(sysPct)}
@@ -95,12 +95,12 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2.5">
-        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
-          <div className="mb-1 text-[10.5px] text-[#6b7b94]">جمع فروش سال</div>
-          <div className="font-num text-base font-black text-white">{faMoney(total)}</div>
+        <div className="rounded-[12px] border border-panel-border bg-panel-surface-2 p-3">
+          <div className="mb-1 text-[10.5px] text-panel-muted">جمع فروش سال</div>
+          <div className="font-num text-base font-black text-panel-ink">{faMoney(total)}</div>
         </div>
-        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
-          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+        <div className="rounded-[12px] border border-panel-border bg-panel-surface-2 p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-panel-muted">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.SYSTEM }} />
             فروش سیستمی
           </div>
@@ -108,8 +108,8 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
             {faMoney(sys?.amountIrr ?? 0)}
           </div>
         </div>
-        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
-          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+        <div className="rounded-[12px] border border-panel-border bg-panel-surface-2 p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-panel-muted">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.CHARTER }} />
             فروش چارتری
           </div>
@@ -117,8 +117,8 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
             {faMoney(ch?.amountIrr ?? 0)}
           </div>
         </div>
-        <div className="rounded-[12px] border border-[#28344c] bg-[#18223a] p-3">
-          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-[#6b7b94]">
+        <div className="rounded-[12px] border border-panel-border bg-panel-surface-2 p-3">
+          <div className="mb-1 flex items-center gap-1.5 text-[10.5px] text-panel-muted">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ background: MIX_COLORS.AGENCY }} />
             فروش آژانس
           </div>
@@ -133,15 +133,15 @@ function FinancialSummaryCard({ mix }: { mix: RevenueMixResult }) {
 
 function CartableWidget({ cartable }: { cartable: CartableListResult }) {
   return (
-    <div className="overflow-hidden rounded-[14px] border border-[#2a3550] bg-[#141d2e]">
-      <div className="flex items-center gap-2 border-b border-[#1f2a3d] px-3.5 py-3">
+    <div className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-surface shadow-sm">
+      <div className="flex items-center gap-2 border-b border-panel-border px-3.5 py-3">
         <span className="relative flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-[rgba(248,113,113,.16)] text-[#f87171]">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
             <path d="M13.5 21a2 2 0 0 1-3 0" />
           </svg>
         </span>
-        <h3 className="m-0 flex-1 text-[13.5px] font-extrabold text-white">کارتابل</h3>
+        <h3 className="m-0 flex-1 text-[13.5px] font-extrabold text-panel-ink">کارتابل</h3>
         {cartable.totalOpen > 0 && (
           <span className="font-num flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] bg-[#f87171] px-1.5 text-[10px] font-extrabold text-white">
             {faDigits(cartable.totalOpen)}
@@ -156,7 +156,7 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
             <Link
               key={t.id}
               to="/panel/cartable"
-              className="flex items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 transition hover:bg-[#18223a]"
+              className="flex items-start gap-2.5 rounded-[10px] px-2.5 py-2.5 transition hover:bg-panel-surface-2"
             >
               <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-[9px] bg-[rgba(59,130,246,.16)] text-[#60a5fa]">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -165,8 +165,8 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
                 </svg>
               </span>
               <div className="min-w-0 leading-snug">
-                <div className="text-[11.5px] font-bold text-[#e7ecf3]">{t.title}</div>
-                <div className="mt-0.5 text-[10.5px] text-[#6b7b94]">
+                <div className="text-[11.5px] font-bold text-panel-ink">{t.title}</div>
+                <div className="mt-0.5 text-[10.5px] text-panel-muted">
                   {t.senderLabelFa ?? t.sender?.fullName ?? ''}
                 </div>
               </div>
@@ -176,7 +176,7 @@ function CartableWidget({ cartable }: { cartable: CartableListResult }) {
       </div>
       <Link
         to="/panel/cartable"
-        className="block border-t border-[#1f2a3d] py-2.5 text-center text-[11.5px] font-bold text-[#60a5fa]"
+        className="block border-t border-panel-border py-2.5 text-center text-[11.5px] font-bold text-accent"
       >
         مشاهده‌ی همه‌ی کارها ←
       </Link>
@@ -223,7 +223,7 @@ export default function CommercialDashboardPage() {
         </div>
         <div className="flex items-center gap-2.5">
           <PanelSearchBox nav={nav ?? []} />
-          <PanelNotifBell alerts={notifAlerts} variant="dark" />
+          <PanelNotifBell alerts={notifAlerts} variant="light" />
         </div>
       </div>
 
@@ -270,7 +270,7 @@ export default function CommercialDashboardPage() {
         />
       </div>
 
-      <LowSalesBanner alert={bannerAlert} variant="dark" />
+      <LowSalesBanner alert={bannerAlert} variant="light" />
 
       <div className="mt-[15px] grid grid-cols-1 items-start gap-[15px] lg:grid-cols-[1.7fr_1fr]">
         <FinancialSummaryCard mix={mix} />

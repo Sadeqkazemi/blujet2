@@ -166,6 +166,22 @@ body {
   color: var(--color-panel-muted) !important;
 }
 
+/* In light mode, legacy pages can still carry `text-white` from their former
+   dark layout. Convert only non-interactive copy and numeric values. Buttons,
+   links, badges and elements with their own coloured/gradient background keep
+   white text for accessible contrast. */
+.management-panel-light :is(
+  h1, h2, h3, h4, h5, h6, p, div, span, label, dt, dd, td, th, strong, b
+):is([class~="text-white"], [class*="text-white/"]):not([class*="bg-"]):not([class*="from-"]):not([class*="to-"]) {
+  color: var(--color-panel-ink) !important;
+}
+
+.management-panel-light :is(
+  h1, h2, h3, h4, h5, h6, p, div, span, label, dt, dd, td, th, strong, b
+)[style*="color: rgb(255, 255, 255)"]:not([style*="background"]) {
+  color: var(--color-panel-ink) !important;
+}
+
 .management-panel-light :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
   background-color: #fff !important;
   border-color: var(--color-panel-border-2) !important;
@@ -174,6 +190,164 @@ body {
 
 .management-panel-light :is(input, textarea)::placeholder {
   color: var(--color-panel-muted-2) !important;
+}
+
+/* Unified panel theming. The management shell owns all management/employee
+   routes, while agency and customer portals share the same persisted choice. */
+.management-panel-dark {
+  --color-panel-canvas: #0b1220;
+  --color-panel-bg: #0b1220;
+  --color-panel-surface: #131d2d;
+  --color-panel-card: #131d2d;
+  --color-panel-surface-2: #1c2940;
+  --color-panel-elevated: #22324d;
+  --color-panel-ink: #f1f5fb;
+  --color-panel-text: #f1f5fb;
+  --color-panel-muted: #a8b5c8;
+  --color-panel-muted-2: #8292aa;
+  --color-panel-border: #293852;
+  --color-panel-border-2: #354967;
+  --color-panel-accent: #60a5fa;
+  --color-panel-link: #60a5fa;
+  color-scheme: dark;
+}
+
+.management-panel-dark :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  background-color: var(--color-panel-surface-2);
+  border-color: var(--color-panel-border-2);
+  color: var(--color-panel-ink);
+}
+
+.panel-theme-toggle {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-panel-border, var(--portal-border, #dbe5f2));
+  border-radius: 10px;
+  background: var(--color-panel-surface-2, var(--portal-surface-2, #eef4fb));
+  color: var(--color-panel-ink, var(--portal-ink, #16233a));
+  padding: 0 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color .18s ease, background-color .18s ease, color .18s ease;
+}
+
+.panel-theme-toggle:hover {
+  border-color: var(--color-panel-accent, var(--portal-accent, #1668c4));
+  color: var(--color-panel-accent, var(--portal-accent, #1668c4));
+}
+
+.panel-theme-toggle--compact {
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+}
+
+.portal-panel-theme {
+  --portal-canvas: #f6f8fb;
+  --portal-surface: #ffffff;
+  --portal-surface-2: #eef4fb;
+  --portal-ink: #16202e;
+  --portal-muted: #66768b;
+  --portal-border: #dfe7f0;
+  --portal-accent: #1668c4;
+}
+
+.portal-panel-theme--dark {
+  --portal-canvas: #0b1220;
+  --portal-surface: #131d2d;
+  --portal-surface-2: #1c2940;
+  --portal-ink: #f1f5fb;
+  --portal-muted: #a8b5c8;
+  --portal-border: #2b3a54;
+  --portal-accent: #60a5fa;
+  color-scheme: dark;
+}
+
+.portal-panel-theme--dark :is(
+  [class*="bg-white"], [class*="bg-[#fff]"], [class*="bg-[#fafbfd]"],
+  [class*="bg-[#fbfcfe]"], [class*="bg-[#f8fafc]"], [class*="bg-[#f7faff]"]
+) {
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark :is(
+  [class*="text-[#0d2640]"], [class*="text-[#16202e]"],
+  [class*="text-[#163552]"], [class*="text-[#19334e]"], [class*="text-[#30465d]"]
+) {
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark :is(input, select, textarea) {
+  background-color: var(--portal-surface-2) !important;
+  border-color: var(--portal-border) !important;
+  color: var(--portal-ink) !important;
+}
+
+.account-panel-theme {
+  color: var(--portal-ink);
+}
+
+.account-panel-theme.portal-panel-theme--dark :is(main > div, main > form, main > section) {
+  color: var(--portal-ink);
+}
+
+.account-panel-theme.portal-panel-theme--dark :is(
+  [data-testid="account-trip"], [data-testid="account-price-lock"],
+  [data-testid="account-password-card"], [data-testid="wallet-history"] > div,
+  #wallet-topup-form
+) {
+  background: var(--portal-surface) !important;
+  border-color: var(--portal-border) !important;
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark [data-testid="agency-portal-header"] > div,
+.portal-panel-theme--dark [data-testid="account-sidebar"] {
+  background: var(--portal-surface) !important;
+  border-color: var(--portal-border) !important;
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark :is(h1, h2, h3, h4, strong, b) {
+  color: var(--portal-ink);
+}
+
+/* Several legacy agency/customer cards still use React inline light colours.
+   Normalized CSS-value selectors keep those pages on the shared dark palette
+   until each feature is incrementally migrated to portal tokens. */
+.portal-panel-theme--dark :is(
+  [style*="background: rgb(255, 255, 255)"],
+  [style*="background-color: rgb(255, 255, 255)"],
+  [style*="background: white"]
+) {
+  background: var(--portal-surface) !important;
+  border-color: var(--portal-border) !important;
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark :is(
+  [style*="background: rgb(246, 248, 251)"],
+  [style*="background: rgb(240, 245, 251)"],
+  [style*="background: rgb(238, 244, 251)"],
+  [style*="background: rgb(250, 251, 253)"]
+) {
+  background: var(--portal-surface-2) !important;
+  border-color: var(--portal-border) !important;
+}
+
+.portal-panel-theme--dark :is(
+  [style*="color: rgb(13, 38, 64)"],
+  [style*="color: rgb(22, 32, 46)"],
+  [style*="color: rgb(25, 51, 78)"]
+) {
+  color: var(--portal-ink) !important;
 }
 
 /* Isolated LTR spans for flight/airport codes, Latin names, emails. */

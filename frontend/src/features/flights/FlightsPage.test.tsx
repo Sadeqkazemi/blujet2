@@ -231,6 +231,8 @@ describe("FlightsPage", () => {
     const { default: userEvent } = await import("@testing-library/user-event");
     render(<FlightsPage />);
 
+    expect(await screen.findByTestId("commercial-flight-card-fi1")).toBeInTheDocument();
+
     expect(await screen.findByTestId("weak-sales-alert-fi1")).toBeInTheDocument();
     expect(screen.queryByTestId("weak-sales-alert-fi2")).not.toBeInTheDocument();
     await userEvent.click(screen.getByTestId("weak-sales-next"));

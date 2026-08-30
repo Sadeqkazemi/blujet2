@@ -17,6 +17,7 @@ import { formatNotificationTime, notificationCategoryIcon } from '../../componen
 import type { NotificationRow } from '../../types/notifications';
 import { AGENCY_NAV_ITEMS, agencyInitials } from './agency-nav-config';
 import type { AgencyNavKey } from './agency-nav-config';
+import AgencyNavIcon from './AgencyNavIcon';
 
 const LANG_OPTIONS: { value: StoredLocale; label: string }[] = [
   { value: 'fa', label: 'فارسی' },
@@ -220,7 +221,9 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             <div style={{ fontSize: 10.5, color: '#8a96a6' }}>{locale === 'fa' ? 'اعتبار قابل استفاده' : locale === 'ar' ? 'الرصيد المتاح' : 'Available credit'}</div>
             <b className="font-num" style={{ display: 'block', marginTop: 4, fontSize: 14, color: '#16202e' }}>{remainingIrr == null ? '—' : localeMoney(remainingIrr, locale)}</b>
           </div>
-          <span aria-hidden style={{ width: 34, height: 34, borderRadius: 9, background: '#fff', border: '1px solid #e6eaf0', display: 'grid', placeItems: 'center', color: '#5a6678' }}>▣</span>
+          <span aria-hidden style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--portal-surface)', border: '1px solid var(--portal-border)', display: 'grid', placeItems: 'center', color: 'var(--portal-accent)' }}>
+            <AgencyNavIcon name="credit" size={18} />
+          </span>
         </div>
         <div style={{ padding: 5 }}>
           <Link
