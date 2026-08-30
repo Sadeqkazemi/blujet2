@@ -20,12 +20,22 @@ export default function OperationsDashboardPage() {
   }, []);
 
   const cards = data
-    ? [
-        ["در انتظار بررسی من", data.counts.pendingOperations, "text-amber-300"],
-        ["ارسال‌شده به مدیر عامل", data.counts.pendingCeo, "text-blue-300"],
-        ["رد شده — نزد بازرگانی", data.counts.operationsRejected, "text-rose-300"],
-        ["تأیید نهایی شده", data.counts.published, "text-emerald-300"],
-      ] as const
+    ? (() => {
+        // Derive the KPI values from the same grouped rows rendered by this
+        // dashboard. This keeps the UI honest even while an older backend
+        // response is still cached and prevents a badge without a request.
+        const rows = data.rows ?? [];
+        const pendingOperations = data.pending?.length ?? rows.filter((row) => row.definitionStatus === "PENDING_OPERATIONS").length;
+        const pendingCeo = rows.filter((row) => row.definitionStatus === "PENDING_CEO").length;
+        const operationsRejected = rows.filter((row) => row.definitionStatus === "OPERATIONS_REJECTED" || row.definitionStatus === "REJECTED").length;
+        const published = rows.filter((row) => row.definitionStatus === "PUBLISHED").length;
+        return [
+          ["در انتظار بررسی من", pendingOperations, "text-amber-300"],
+          ["ارسال‌شده به مدیر عامل", pendingCeo, "text-blue-300"],
+          ["رد شده — نزد بازرگانی", operationsRejected, "text-rose-300"],
+          ["تأیید نهایی شده", published, "text-emerald-300"],
+        ] as const;
+      })()
     : [];
 
   return (

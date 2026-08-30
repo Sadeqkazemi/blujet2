@@ -14,7 +14,9 @@ import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 @ApiTags('refunds')
 @Controller('my/refunds')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('USER')
+// Customers and agencies can submit/refund only their own ticketed bookings;
+// ownership is enforced by RefundsService using the authenticated user id.
+@Roles('USER', 'AGENCY')
 export class RefundsCustomerController {
   constructor(private readonly refunds: RefundsService) {}
 

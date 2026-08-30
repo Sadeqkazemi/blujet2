@@ -541,7 +541,7 @@ export default function ResultsEditSearchModal({
                 cursor: 'pointer',
               }}
             >
-              ⇄
+              <span className="results-edit-search-swap-icon" aria-hidden="true">⇄</span>
             </button>
             <AirportPicker
               label={copy.toLabel}

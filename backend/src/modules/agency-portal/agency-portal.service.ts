@@ -204,7 +204,12 @@ export class AgencyPortalService {
   private async isUatSandboxAgencyActor(
     actor: AuthenticatedUser,
   ): Promise<boolean> {
-    return (await this.loadUatSandboxAgencyUser(actor)) !== null;
+    const sandboxUser = await this.loadUatSandboxAgencyUser(actor);
+    if (!sandboxUser) return false;
+    // A freshly bootstrapped identity remains an honest read-only empty
+    // shell. Once the audited UAT commerce provisioner creates its profile,
+    // it follows the normal agency purchase/finance rules.
+    return !(await this.profileRepo.exist({ where: { userId: actor.id } }));
   }
 
   private async assertAgencyPortalWritable(

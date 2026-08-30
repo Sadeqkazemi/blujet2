@@ -154,13 +154,10 @@ export interface UatSandboxAgencyCandidate extends TemporaryPanelAccessUser {
   role: Role;
 }
 
-/** Centralized detection for "active UAT sandbox AGENCY temporary account" —
- * the single place agency-portal read/write guards check before serving a
- * real empty state (reads) or refusing a mutation (writes) for `uat.agency`,
- * instead of creating an AgencyProfile/AgencyCreditLine just to satisfy the
- * panel. Never true outside `AUTH_SANDBOX_ENABLED`, and never true once the
- * account's temporary-access window has expired — both fall through to the
- * normal AgencyProfile-based behavior (a real 404). */
+/** Centralized detection for an active UAT sandbox AGENCY identity. The
+ * agency portal additionally checks whether the audited commerce provisioner
+ * has created its synthetic AgencyProfile; until then it stays read-only.
+ * Never true outside AUTH_SANDBOX_ENABLED or after temporary access expires. */
 export function isActiveUatSandboxAgency(
   user: UatSandboxAgencyCandidate,
   now = new Date(),

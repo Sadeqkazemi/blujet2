@@ -40,7 +40,8 @@
     "accounts:extend:temporary:v3:prod": "node dist/database/extend-temporary-panel-access-v3.js",
     "accounts:reconcile:temporary-phone-logins:prod": "node dist/database/reconcile-temporary-phone-login-accounts.js",
     "accounts:cleanup:temporary:prod": "node dist/database/cleanup-temporary-panel-accounts.js",
-    "accounts:bootstrap:super-admin:prod": "node dist/database/bootstrap-owner-super-admin.js"
+    "accounts:bootstrap:super-admin:prod": "node dist/database/bootstrap-owner-super-admin.js",
+    "uat:commerce:provision:prod": "node dist/database/provision-uat-sandbox-commerce.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

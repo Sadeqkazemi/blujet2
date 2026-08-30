@@ -54,6 +54,7 @@ import {
   RefundStatus,
   Role,
   SiteContentBlockKey,
+  WalletEntryType,
 } from './enums';
 import { AgencyApiKey } from './entities/agency-api-key.entity';
 import { AgencyCreditLine } from './entities/agency-credit-line.entity';
@@ -106,6 +107,7 @@ import { StoredFile } from './entities/stored-file.entity';
 import { SurveyQuestion } from './entities/survey-question.entity';
 import { SurveySettings } from './entities/survey-settings.entity';
 import { User } from './entities/user.entity';
+import { WalletEntry } from './entities/wallet-entry.entity';
 import type { JsonValue } from './json-types';
 import { ANCILLARY_BUILT_IN_SERVICES } from '../modules/ancillary-services/ancillary-services.catalog';
 
@@ -259,6 +261,7 @@ async function main() {
   const customerIdentityVerificationRepo = dataSource.getRepository(
     CustomerIdentityVerification,
   );
+  const walletEntryRepo = dataSource.getRepository(WalletEntry);
   const storedFileRepo = dataSource.getRepository(StoredFile);
   const surveySettingsRepo = dataSource.getRepository(SurveySettings);
   const surveyQuestionRepo = dataSource.getRepository(SurveyQuestion);
@@ -351,7 +354,7 @@ async function main() {
   const commercialManager = staffByUsername.get('comm')!;
   const financeManager = staffByUsername.get('finance')!;
 
-  await upsertBy(
+  const customerUser = await upsertBy(
     userRepo,
     { phone: '+989120000001' },
     {
@@ -388,6 +391,31 @@ async function main() {
       updatedAt: new Date(),
     },
   );
+
+  // Sandbox purchase accounts start with a real, ledger-backed wallet grant
+  // of 100,000,000 toman (1,000,000,000 rial). The deterministic ADJUST row
+  // makes re-seeding idempotent and keeps checkout/refund flows usable without
+  // inventing balances in the UI.
+  const sandboxWalletGrantIrr = 1_000_000_000n;
+  for (const walletUser of [customerUser, agencyUserGold, agencyUserSilver]) {
+    const existingGrant = await walletEntryRepo.findOne({
+      where: {
+        userId: walletUser.id,
+        type: WalletEntryType.ADJUST,
+        signedAmountIrr: sandboxWalletGrantIrr,
+      },
+    });
+    if (!existingGrant) {
+      await walletEntryRepo.save(
+        walletEntryRepo.create({
+          userId: walletUser.id,
+          type: WalletEntryType.ADJUST,
+          signedAmountIrr: sandboxWalletGrantIrr,
+          bookingId: null,
+        }),
+      );
+    }
+  }
 
   // ── Minimal flight/booking/ledger data so the reporting dashboards have
   // real, non-empty numbers to show across day/month/quarter granularities.

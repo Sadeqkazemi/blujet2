@@ -49,9 +49,12 @@
   }
 
   .results-edit-search-route {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) !important;
-    row-gap: 20px !important;
+    /* Keep the swap control in the layout between the two airport fields.
+       Absolute centering against the whole card placed it above the visual
+       midpoint because each field includes its label. */
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
     align-items: stretch !important;
     padding: 12px;
     border: 1px solid #e4eaf2;
@@ -64,6 +67,14 @@
     min-width: 0 !important;
   }
 
+  .results-edit-search-route > .results-edit-search-airport:first-child {
+    order: 1;
+  }
+
+  .results-edit-search-route > .results-edit-search-airport:last-child {
+    order: 3;
+  }
+
   .results-edit-search-airport-button {
     height: 54px !important;
     padding-inline: 14px !important;
@@ -73,17 +84,27 @@
   }
 
   .results-edit-search-swap {
-    position: absolute !important;
-    inset-inline-start: 50%;
-    top: 50%;
+    position: relative !important;
+    align-self: center !important;
+    order: 2;
     z-index: 3;
-    width: 40px !important;
-    height: 40px !important;
-    margin: 0 !important;
+    width: 36px !important;
+    height: 36px !important;
+    margin-block: -6px !important;
+    margin-inline: 0 !important;
     border-color: #cfe0f4 !important;
     background: #eef5ff !important;
     box-shadow: 0 4px 12px rgba(22, 104, 196, 0.13);
-    transform: translate(-50%, -50%) rotate(90deg) !important;
+    /* The destination label occupies the upper part of the visual gap.
+       Shift the control by half that label height so it is centered between
+       the two input boxes themselves, not between their wrapper elements. */
+    transform: translateY(13px) !important;
+  }
+
+  .results-edit-search-swap-icon {
+    display: block;
+    line-height: 1;
+    transform: rotate(90deg);
   }
 
   .results-edit-search-airport-menu {

@@ -141,15 +141,7 @@ export class FlightWorkflowService {
       FlightDefinitionStatus.PENDING_CEO,
       FlightDefinitionStatus.PUBLISHED,
     ];
-    const [
-      pendingRows,
-      recentRows,
-      pendingOperations,
-      pendingCeo,
-      opsRejected,
-      ceoRejected,
-      published,
-    ] = await Promise.all([
+    const [pendingRows, recentRows] = await Promise.all([
       this.instanceRepo.find({
         where: {
           definitionStatus: FlightDefinitionStatus.PENDING_OPERATIONS,
@@ -170,22 +162,44 @@ export class FlightWorkflowService {
         order: { departureAt: 'DESC' },
         take: 100,
       }),
-      this.countByDefinitionStatus(FlightDefinitionStatus.PENDING_OPERATIONS),
-      this.countByDefinitionStatus(FlightDefinitionStatus.PENDING_CEO),
-      this.countByDefinitionStatus(FlightDefinitionStatus.OPERATIONS_REJECTED),
-      this.countByDefinitionStatus(FlightDefinitionStatus.REJECTED),
-      this.countByDefinitionStatus(FlightDefinitionStatus.PUBLISHED),
     ]);
     const rows = [...pendingRows, ...recentRows];
     const shaped = await this.shapeOperationsRows(rows);
 
-    return {
-      counts: {
-        pendingOperations,
-        pendingCeo,
-        operationsRejected: opsRejected + ceoRejected,
-        published,
+    // Counts must describe the same workflow items rendered below. A
+    // schedule template materializes several occurrences, but the operations
+    // queue is one actionable item per template. Counting raw instances made
+    // the dashboard show a non-zero badge while the queue was empty (or show
+    // a larger number than the visible requests).
+    const groupedCounts = shaped.reduce(
+      (counts, row) => {
+        switch (row.definitionStatus) {
+          case FlightDefinitionStatus.PENDING_OPERATIONS:
+            counts.pendingOperations += 1;
+            break;
+          case FlightDefinitionStatus.PENDING_CEO:
+            counts.pendingCeo += 1;
+            break;
+          case FlightDefinitionStatus.OPERATIONS_REJECTED:
+          case FlightDefinitionStatus.REJECTED:
+            counts.operationsRejected += 1;
+            break;
+          case FlightDefinitionStatus.PUBLISHED:
+            counts.published += 1;
+            break;
+        }
+        return counts;
       },
+      {
+        pendingOperations: 0,
+        pendingCeo: 0,
+        operationsRejected: 0,
+        published: 0,
+      },
+    );
+
+    return {
+      counts: groupedCounts,
       pending: shaped.filter(
         (row) =>
           row.definitionStatus === FlightDefinitionStatus.PENDING_OPERATIONS,
@@ -204,7 +218,8 @@ export class FlightWorkflowService {
     }
     const groups = [...grouped.values()].map((items) =>
       [...items].sort(
-        (left, right) => left.departureAt.getTime() - right.departureAt.getTime(),
+        (left, right) =>
+          left.departureAt.getTime() - right.departureAt.getTime(),
       ),
     );
     const representatives = groups.map((items) => items[0]!);
@@ -278,13 +293,6 @@ export class FlightWorkflowService {
         },
       };
     });
-  }
-
-  private countByDefinitionStatus(status: FlightDefinitionStatus) {
-    return this.instanceRepo
-      .createQueryBuilder('instance')
-      .where('instance.definitionStatus = :status', { status })
-      .getCount();
   }
 
   async operationsDecision(

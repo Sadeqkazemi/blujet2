@@ -66,6 +66,13 @@ function isUniqueViolation(err: unknown, constraintName: string): boolean {
   return driverErr.code === '23505' && driverErr.constraint === constraintName;
 }
 
+export function bookingBelongsToActor(
+  booking: Pick<Booking, 'userId' | 'agencyId'>,
+  actorId: string,
+): boolean {
+  return booking.userId === actorId || booking.agencyId === actorId;
+}
+
 @Injectable()
 export class RefundsService {
   constructor(
@@ -296,6 +303,7 @@ export class RefundsService {
       await tx.save(
         tx.create(LedgerEntry, {
           bookingId: request.bookingId,
+          agencyId: request.booking?.agencyId ?? null,
           type: 'REFUND',
           signedAmountIrr: negateIrr(request.refundableIrr),
           createdById: actor.id,
@@ -329,10 +337,12 @@ export class RefundsService {
       },
     });
 
-    if (request.booking?.userId) {
+    const refundRecipientId =
+      request.booking?.userId ?? request.booking?.agencyId ?? null;
+    if (refundRecipientId) {
       await this.notifications.notify(
         refundPaidNotificationInput({
-          recipientId: request.booking.userId,
+          recipientId: refundRecipientId,
           refundId: id,
           pnr: request.booking.pnr,
         }),
@@ -407,7 +417,7 @@ export class RefundsService {
   async listEligibleBookings(userId: string) {
     const [bookings, rules] = await Promise.all([
       this.bookingWithFlightQuery()
-        .where('b.userId = :userId', { userId })
+        .where('(b.userId = :userId OR b.agencyId = :userId)', { userId })
         .andWhere('b.status IN (:...statuses)', {
           statuses: ['TICKETED', 'PAID'],
         })
@@ -455,7 +465,7 @@ export class RefundsService {
         .getOne(),
       this.ruleRepo.find(),
     ]);
-    if (!booking || booking.userId !== userId) {
+    if (!booking || !bookingBelongsToActor(booking, userId)) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'رزرو یافت نشد.',
@@ -480,7 +490,7 @@ export class RefundsService {
             .leftJoinAndSelect('flight.route', 'route')
             .where('b.id = :id', { id: dto.bookingId })
             .getOne();
-          if (!booking || booking.userId !== actor.id) {
+          if (!booking || !bookingBelongsToActor(booking, actor.id)) {
             throw new NotFoundException({
               code: ErrorCode.NOT_FOUND,
               message: 'رزرو یافت نشد.',
@@ -655,7 +665,9 @@ export class RefundsService {
       .leftJoinAndSelect('booking.flightInstance', 'flightInstance')
       .leftJoinAndSelect('flightInstance.flight', 'flight')
       .leftJoinAndSelect('flight.route', 'route')
-      .where('booking.userId = :userId', { userId })
+      .where('(booking.userId = :userId OR booking.agencyId = :userId)', {
+        userId,
+      })
       .orderBy('r.createdAt', 'DESC')
       .getMany();
     return requests.map(toCustomerRow);
@@ -670,7 +682,7 @@ export class RefundsService {
       .leftJoinAndSelect('flight.route', 'route')
       .where('r.id = :id', { id })
       .getOne();
-    if (!request || request.booking.userId !== userId) {
+    if (!request || !bookingBelongsToActor(request.booking, userId)) {
       throw new NotFoundException({
         code: ErrorCode.NOT_FOUND,
         message: 'درخواست استرداد یافت نشد.',
