@@ -149,7 +149,7 @@ export function submitAnonymousRefund(
 
 export function fetchWallet() {
   // Decimal STRING on the wire (BigInt.prototype.toJSON on the backend).
-  return apiGet<{ balanceIrr: string }>('/my/wallet');
+  return apiGet<import('../types/public-site').WalletView>('/my/wallet');
 }
 
 export function topupWallet(amountIrr: number) {

@@ -282,6 +282,38 @@ describe('PublicHeader — logged-in user', () => {
     expect(screen.getByText('استرداد بلیط')).toHaveAttribute('href', '/account?tab=refunds');
   });
 
+  it('replaces a stale persistent wallet balance after a successful payment event', async () => {
+    mockLocale();
+    mockCustomerNotifications();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: mockAuthUser({ id: 'u1', fullName: 'نگار رضایی', role: 'USER' }),
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(publicSiteApi, 'fetchClubPoints').mockResolvedValue({ isMember: false, level: null, balance: 0 });
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '100000000' });
+    vi.spyOn(publicSiteApi, 'fetchMyProfile').mockResolvedValue({
+      fullName: 'نگار رضایی', nationalId: null, birthDate: null, passportNo: null,
+      email: null, emailVerifiedAt: null, completionPct: 100, profileIncomplete: false,
+      missingProfileFields: [],
+    });
+    renderHeader();
+    await userEvent.click(screen.getByTestId('public-user-menu-toggle'));
+    expect(await screen.findByTestId('public-user-wallet-balance')).toHaveTextContent('۱۰٬۰۰۰٬۰۰۰');
+
+    window.dispatchEvent(
+      new CustomEvent('blujet:wallet-balance', {
+        detail: { balanceIrr: '84000000' },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('public-user-wallet-balance')).toHaveTextContent('۸٬۴۰۰٬۰۰۰'),
+    );
+  });
+
   it('shows English notifications and wallet balance when locale is en', async () => {
     mockLocale('en');
     mockCustomerNotifications([{ id: 'n-en', title: 'Trip reminder', body: 'Check-in is open.' }]);

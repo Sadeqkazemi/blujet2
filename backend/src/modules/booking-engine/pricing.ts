@@ -18,10 +18,7 @@ const BUSINESS_MULTIPLIER_PCT = 180;
 const COMFORT_MULTIPLIER_PCT = 125;
 const FIRST_MULTIPLIER_PCT = 250;
 
-export function fallbackCabinPrice(
-  economyPrice: Irr,
-  cabin: CabinClass,
-): Irr {
+export function fallbackCabinPrice(economyPrice: Irr, cabin: CabinClass): Irr {
   const multiplier =
     cabin === 'FIRST'
       ? FIRST_MULTIPLIER_PCT
@@ -100,12 +97,21 @@ export async function resolveFareClass(
     where: { flightInstanceId, cabin },
   });
   const priceForChannel = (rule: FareRule): Irr =>
-    channel === 'SYSTEM' && rule.sitePriceIrr != null
-      ? rule.sitePriceIrr
-      : rule.priceIrr;
+    channel === 'SYSTEM'
+      ? (rule.sitePriceIrr ?? rule.priceIrr)
+      : channel === 'AGENCY'
+        ? (rule.agencyReleasePriceIrr ?? rule.priceIrr)
+        : rule.priceIrr;
+  const releasedForChannel = (rule: FareRule): number =>
+    channel === 'SYSTEM'
+      ? Math.max(0, rule.siteSeatsReleased)
+      : channel === 'AGENCY'
+        ? Math.max(0, rule.agencySeatsReleased)
+        : Math.max(0, rule.seatsAllocated);
   const rules = allRules
     .filter(
       (r) =>
+        releasedForChannel(r) > 0 &&
         (!r.validFrom || r.validFrom <= now) &&
         (!r.validUntil || r.validUntil >= now) &&
         ((r.allowedChannels ?? []).length === 0 ||
@@ -123,6 +129,7 @@ export async function resolveFareClass(
   const usageRows = await manager
     .createQueryBuilder(Booking, 'b')
     .select('b.fareClassCode', 'fareClassCode')
+    .addSelect('b.channel', 'channel')
     .addSelect(
       'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
       'count',
@@ -138,14 +145,36 @@ export async function resolveFareClass(
     .andWhere('b.status IN (:...statuses)', {
       statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
     })
+    .andWhere('(b.status != :held OR b."holdExpiresAt" > :now)', {
+      held: 'HELD',
+      now,
+    })
+    .andWhere('b."deletedAt" IS NULL')
+    .andWhere('p."deletedAt" IS NULL')
     .groupBy('b.fareClassCode')
-    .getRawMany<{ fareClassCode: string; count: string }>();
+    .addGroupBy('b.channel')
+    .getRawMany<{
+      fareClassCode: string;
+      channel: BookingChannel;
+      count: string;
+    }>();
   const used = new Map(
-    usageRows.map((u) => [u.fareClassCode, Number(u.count)]),
+    usageRows.map((u) => [`${u.channel}:${u.fareClassCode}`, Number(u.count)]),
   );
+  const sharedUsed = new Map<string, number>();
+  for (const row of usageRows) {
+    sharedUsed.set(
+      row.fareClassCode,
+      (sharedUsed.get(row.fareClassCode) ?? 0) + Number(row.count),
+    );
+  }
 
   for (const rule of rules) {
-    if ((used.get(rule.classCode) ?? 0) < rule.seatsAllocated) {
+    if (
+      (used.get(`${channel}:${rule.classCode}`) ?? 0) <
+        releasedForChannel(rule) &&
+      (sharedUsed.get(rule.classCode) ?? 0) < rule.seatsAllocated
+    ) {
       return {
         classCode: rule.classCode,
         priceIrr: priceForChannel(rule),
@@ -153,13 +182,8 @@ export async function resolveFareClass(
       };
     }
   }
-  // every bucket exhausted → most expensive (still-valid/eligible) class
-  // keeps selling while physical seats remain (availability itself is the
-  // seat map's job).
-  const last = rules[rules.length - 1];
-  return {
-    classCode: last.classCode,
-    priceIrr: priceForChannel(last),
-    taxIrr: last.taxIrr,
-  };
+  // A programmed bucket is a hard channel quota. Once every bucket for the
+  // requesting channel is consumed, pricing must not spill into the other
+  // channel or silently keep selling at the final rate.
+  return null;
 }

@@ -92,10 +92,10 @@ describe('agency seat request class offer', () => {
     priceIrr: 30_000_000n,
   };
 
-  it('keeps an active class requestable before a dedicated agency release', () => {
+  it('keeps an active class closed until a dedicated agency release exists', () => {
     expect(agencySeatRequestClassOffer(baseRule, 20)).toEqual({
       hasDedicatedAgencyRelease: false,
-      availableToRequest: 100,
+      availableToRequest: 0,
       pricePerSeatIrr: 32_000_000n,
     });
   });

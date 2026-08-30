@@ -18,6 +18,28 @@ function renderShell() {
 }
 
 describe('PanelShell', () => {
+  it('uses the shared light theme for every management role', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      status: 'authenticated',
+      user: { id: 'u-light', fullName: 'مدیر بازرگانی', role: 'COMMERCIAL_MANAGER', preferredLocale: 'FA' },
+      requestLogin: vi.fn(),
+      confirmTwoFactor: vi.fn(),
+      agencyLogin: vi.fn(),
+      signOut: vi.fn(),
+    });
+    vi.spyOn(reportingApi, 'fetchLowSalesAlerts').mockResolvedValue([]);
+    vi.spyOn(panelsApi, 'fetchNav').mockResolvedValue([
+      { key: 'dashboard', labelFa: 'داشبورد', implemented: true },
+    ]);
+
+    renderShell();
+
+    expect(await screen.findByTestId('management-panel-shell')).toHaveAttribute(
+      'data-theme',
+      'light',
+    );
+  });
+
   it('does not sign a staff user out until the confirmation dialog is accepted', async () => {
     const signOut = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({

@@ -45,9 +45,9 @@ export default function FlightCancellationsPage() {
   }
 
   return (
-    <div dir="rtl" className="space-y-5 p-6 text-white">
+    <div dir="rtl" className="space-y-5 p-6 text-panel-ink">
       <header>
-        <h1 className="text-2xl font-black">کنسلی پرواز</h1>
+        <h1 className="text-2xl font-black text-panel-ink">کنسلی پرواز</h1>
         <p className="mt-1 text-sm text-[#91a0bd]">
           {isFinance
             ? 'فهرست مسافران پروازهای کنسل‌شده و بازگشت وجه به حساب'
@@ -61,14 +61,14 @@ export default function FlightCancellationsPage() {
       ) : rows.length === 0 ? (
         <div className="rounded-2xl border border-[#29354d] bg-[#151e31] p-8 text-center text-[#91a0bd]">پرواز کنسل‌شده‌ای وجود ندارد.</div>
       ) : rows.map((row) => (
-        <section key={row.id} className="rounded-2xl border border-[#29354d] bg-[#151e31] p-5 shadow-xl">
+        <section key={row.id} className="rounded-2xl border border-panel-border bg-panel-surface p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-black">{row.flightNo} · {row.originCode} ← {row.destCode}</h2>
               <p className="mt-1 text-xs text-[#91a0bd]">زمان پرواز: {formatJalaliDateTime(row.departureAt)}</p>
               <p className="mt-1 text-xs text-red-300">علت: {row.cancellationReason ?? '—'}</p>
             </div>
-            <div className="rounded-xl bg-[#202b43] px-4 py-2 text-xs">
+            <div className="rounded-xl border border-panel-border bg-panel-canvas px-4 py-2 text-xs text-panel-ink">
               در انتظار استرداد: <b className="text-amber-300">{faDigits(row.refundSummary.pending)}</b>
               {' · '}پرداخت‌شده: <b className="text-emerald-300">{faDigits(row.refundSummary.refunded)}</b>
             </div>
@@ -76,7 +76,7 @@ export default function FlightCancellationsPage() {
           <div className="mt-4 space-y-2">
             {row.bookings.length === 0 && <p className="text-sm text-[#91a0bd]">بلیط فروخته‌شده‌ای برای این پرواز ثبت نشده است.</p>}
             {row.bookings.map((booking) => (
-              <div key={booking.id} className="grid gap-3 rounded-xl border border-[#2b3852] bg-[#101829] p-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-center">
+              <div key={booking.id} className="grid gap-3 rounded-xl border border-panel-border bg-panel-canvas p-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-center">
                 <div><span className="text-xs text-[#91a0bd]">مسافر</span><p className="font-bold">{booking.passengerNames.join('، ') || '—'}</p></div>
                 <div><span className="text-xs text-[#91a0bd]">PNR</span><p className="font-bold">{booking.pnr}</p></div>
                 <div className="font-black text-blue-300">{faMoney(booking.priceIrr)} تومان</div>

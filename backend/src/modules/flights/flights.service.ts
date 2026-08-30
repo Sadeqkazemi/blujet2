@@ -45,6 +45,7 @@ import {
   addIrr,
   divRoundBigInt,
   maxIrr,
+  roundIrrTo,
   subIrr,
 } from '../../common/money';
 import type { Irr } from '../../common/money';
@@ -70,7 +71,6 @@ import {
   resolveSiteVisible,
   type CommercialPanelSettings,
 } from './commercial-panel-settings';
-import { maximumChannelRelease } from '../booking-engine/commercial-cabin-capacity';
 
 /** Long-range published inventory is repeated in the planning tab, but it
  * must never be removed from the complete active-flight list. */
@@ -1433,6 +1433,87 @@ export class FlightsService {
     });
   }
 
+  /**
+   * Older flight occurrences already contain the approved cabin capacities
+   * and base fare, but pre-date persisted FareRule rows.  Commercial users
+   * must not recreate those cabins manually merely to release inventory.
+   * Materialise one standard base rule per approved cabin once, preserving
+   * the existing public-sale state, and use the same rules thereafter.
+   */
+  private async ensureCommercialFareRules(instance: FlightInstance) {
+    const current = await this.listFareRules(instance.id);
+    if (current.length > 0) return current;
+
+    let cabins = serializeCabinCapacities(instance.cabinCapacities).filter(
+      (row) => row.seats > 0,
+    );
+    if (cabins.length === 0) {
+      const seatMap = await this.seatMapRepo.findOneBy({
+        aircraftType: resolveAircraftType(instance),
+      });
+      if (seatMap) {
+        const counts = new Map<CabinClass, number>();
+        for (const seat of enumerateSeats(seatMap)) {
+          counts.set(seat.cabin, (counts.get(seat.cabin) ?? 0) + 1);
+        }
+        cabins = [...counts.entries()].map(([cabin, seats]) => ({
+          cabin,
+          seats,
+          capacity: seats,
+        }));
+      }
+    }
+    if (cabins.length === 0 || instance.basePriceIrr == null) return [];
+
+    const classCode = (cabin: CabinClass) => {
+      switch (cabin) {
+        case 'FIRST':
+          return 'F';
+        case 'BUSINESS':
+          return 'C';
+        case 'COMFORT':
+          return 'W';
+        default:
+          return 'Y';
+      }
+    };
+
+    return this.dataSource.transaction(async (manager) => {
+      await manager
+        .createQueryBuilder(FlightInstance, 'instance')
+        .setLock('pessimistic_write')
+        .where('instance.id = :instanceId', { instanceId: instance.id })
+        .getOneOrFail();
+      const existing = await manager.find(FareRule, {
+        where: { flightInstanceId: instance.id },
+        order: { cabin: 'ASC', priceIrr: 'ASC' },
+      });
+      if (existing.length > 0) return existing;
+
+      return manager.save(
+        FareRule,
+        cabins.map((row) =>
+          manager.create(FareRule, {
+            flightInstanceId: instance.id,
+            cabin: row.cabin,
+            classCode: classCode(row.cabin),
+            priceIrr: instance.basePriceIrr!,
+            sitePriceIrr: null,
+            seatsAllocated: row.seats,
+            siteSeatsReleased: instance.publicSaleEnabled ? row.seats : 0,
+            agencySeatsReleased: 0,
+            agencyReleasePriceIrr: null,
+            agencySpecialOffer: false,
+            refundable: true,
+            changeable: true,
+            taxIrr: 0n,
+            allowedChannels: [BookingChannel.SYSTEM, BookingChannel.AGENCY],
+          }),
+        ),
+      );
+    });
+  }
+
   private async loadCommercialInstance(instanceId: string) {
     const instance = await this.instanceRepo
       .createQueryBuilder('fi')
@@ -1549,7 +1630,7 @@ export class FlightsService {
 
   async commercialControl(instanceId: string) {
     const instance = await this.loadCommercialInstance(instanceId);
-    const rules = await this.listFareRules(instanceId);
+    const rules = await this.ensureCommercialFareRules(instance);
     const soldRows = await this.passengerRepo
       .createQueryBuilder('p')
       .innerJoin('p.booking', 'b')
@@ -1570,6 +1651,56 @@ export class FlightsService {
         channel: BookingChannel;
         soldSeats: string;
       }>();
+    const inventoryRows = await this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select('b.cabin', 'cabin')
+      .addSelect('b.fareClassCode', 'classCode')
+      .addSelect('b.channel', 'channel')
+      .addSelect(
+        'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
+        'reservedSeats',
+      )
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.status IN (:...statuses)', {
+        statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+      })
+      .andWhere('(b.status != :held OR b."holdExpiresAt" > :inventoryNow)', {
+        held: 'HELD',
+        inventoryNow: new Date(),
+      })
+      .andWhere('p.occupiesSeat = true')
+      .andWhere('p.deletedAt IS NULL')
+      .andWhere('b.deletedAt IS NULL')
+      .groupBy('b.cabin')
+      .addGroupBy('b.fareClassCode')
+      .addGroupBy('b.channel')
+      .getRawMany<{
+        cabin: CabinClass;
+        classCode: string | null;
+        channel: BookingChannel;
+        reservedSeats: string;
+      }>();
+    const agencyAllocationRows = await this.dataSource
+      .getRepository(AgencyAllotment)
+      .createQueryBuilder('allotment')
+      .select('allotment.cabin', 'cabin')
+      .addSelect('allotment.fareClassCode', 'classCode')
+      .addSelect('COALESCE(SUM(allotment.seatsAllocated), 0)', 'allocatedSeats')
+      .where('allotment.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('allotment.cabin IS NOT NULL')
+      .andWhere('allotment.fareClassCode IS NOT NULL')
+      .andWhere(
+        '(allotment.type = :hard OR allotment.releaseAt IS NULL OR allotment.releaseAt > :allocationNow)',
+        { hard: 'HARD', allocationNow: new Date() },
+      )
+      .groupBy('allotment.cabin')
+      .addGroupBy('allotment.fareClassCode')
+      .getRawMany<{
+        cabin: CabinClass;
+        classCode: string;
+        allocatedSeats: string;
+      }>();
     const revenueRows = await this.bookingRepo
       .createQueryBuilder('b')
       .select('b.cabin', 'cabin')
@@ -1584,6 +1715,34 @@ export class FlightsService {
         classCode: string | null;
         revenueIrr: string | null;
       }>();
+    const soldRateRows = await this.passengerRepo
+      .createQueryBuilder('p')
+      .innerJoin('p.booking', 'b')
+      .select('b.cabin', 'cabin')
+      .addSelect('b.fareClassCode', 'classCode')
+      .addSelect('b.channel', 'channel')
+      .addSelect('p.fareIrr', 'priceIrr')
+      .addSelect('COUNT(p.id)', 'seats')
+      .addSelect('SUM(p.fareIrr)', 'revenueIrr')
+      .addSelect('MAX(b.createdAt)', 'lastSoldAt')
+      .where('b.flightInstanceId = :instanceId', { instanceId })
+      .andWhere('b.status IN (:...statuses)', { statuses: [...SOLD_STATUSES] })
+      .andWhere('p.occupiesSeat = true')
+      .andWhere('p.deletedAt IS NULL')
+      .groupBy('b.cabin')
+      .addGroupBy('b.fareClassCode')
+      .addGroupBy('b.channel')
+      .addGroupBy('p.fareIrr')
+      .orderBy('MAX(b.createdAt)', 'DESC')
+      .getRawMany<{
+        cabin: CabinClass;
+        classCode: string | null;
+        channel: BookingChannel;
+        priceIrr: string;
+        seats: string;
+        revenueIrr: string | null;
+        lastSoldAt: Date | string;
+      }>();
 
     const ruleIds = rules.map((rule) => rule.id);
     const history =
@@ -1593,8 +1752,11 @@ export class FlightsService {
             .createQueryBuilder('a')
             .where('a.entityType = :entityType', { entityType: 'FareRule' })
             .andWhere('a.entityId IN (:...ruleIds)', { ruleIds })
-            .andWhere('a.action = :action', {
-              action: 'تغییر قیمت فروش سایت کلاس نرخی',
+            .andWhere('a.action IN (:...actions)', {
+              actions: [
+                'تغییر قیمت فروش سایت کلاس نرخی',
+                'آزادسازی آژانسی کلاس نرخی',
+              ],
             })
             .orderBy('a.createdAt', 'DESC')
             .getMany()
@@ -1602,6 +1764,8 @@ export class FlightsService {
 
     return {
       flightInstanceId: instance.id,
+      departureAt: instance.departureAt.toISOString(),
+      competitorPriceIrr: instance.competitorPriceIrr?.toString() ?? null,
       publicSaleEnabled: instance.publicSaleEnabled,
       agencySaleEnabled: instance.agencySaleEnabled,
       fareClasses: rules.map((rule) => {
@@ -1621,6 +1785,10 @@ export class FlightsService {
                 ? entry.metadata
                 : {};
             return {
+              channel:
+                entry.action === 'آزادسازی آژانسی کلاس نرخی'
+                  ? ('AGENCY' as const)
+                  : ('SYSTEM' as const),
               previousPriceIrr:
                 typeof metadata.previousPriceIrr === 'string'
                   ? metadata.previousPriceIrr
@@ -1628,7 +1796,9 @@ export class FlightsService {
               newPriceIrr:
                 typeof metadata.newPriceIrr === 'string'
                   ? metadata.newPriceIrr
-                  : '0',
+                  : typeof metadata.priceIrr === 'string'
+                    ? metadata.priceIrr
+                    : '0',
               reason:
                 typeof metadata.reason === 'string' ? metadata.reason : '',
               changedAt: entry.createdAt.toISOString(),
@@ -1644,6 +1814,46 @@ export class FlightsService {
         const agencySoldSeats = classSoldRows
           .filter((row) => row.channel === BookingChannel.AGENCY)
           .reduce((total, row) => total + Number(row.soldSeats), 0);
+        const classInventoryRows = inventoryRows.filter(
+          (row) => row.cabin === rule.cabin && row.classCode === rule.classCode,
+        );
+        const siteReservedSeats = classInventoryRows
+          .filter((row) => row.channel === BookingChannel.SYSTEM)
+          .reduce((total, row) => total + Number(row.reservedSeats), 0);
+        const agencyBookedSeats = classInventoryRows
+          .filter((row) => row.channel === BookingChannel.AGENCY)
+          .reduce((total, row) => total + Number(row.reservedSeats), 0);
+        const nonAgencyReservedSeats = classInventoryRows
+          .filter((row) => row.channel !== BookingChannel.AGENCY)
+          .reduce((total, row) => total + Number(row.reservedSeats), 0);
+        const agencyAllocatedSeats = Number(
+          agencyAllocationRows.find(
+            (row) =>
+              row.cabin === rule.cabin && row.classCode === rule.classCode,
+          )?.allocatedSeats ?? 0,
+        );
+        const agencyCommittedSeats = Math.max(
+          agencyAllocatedSeats,
+          agencyBookedSeats,
+        );
+        const sharedSeatsRemaining = Math.max(
+          0,
+          rule.seatsAllocated - nonAgencyReservedSeats - agencyCommittedSeats,
+        );
+        const siteSeatsAvailable = Math.max(
+          0,
+          Math.min(
+            sharedSeatsRemaining,
+            rule.siteSeatsReleased - siteReservedSeats,
+          ),
+        );
+        const agencySeatsAvailable = Math.max(
+          0,
+          Math.min(
+            sharedSeatsRemaining,
+            rule.agencySeatsReleased - agencyCommittedSeats,
+          ),
+        );
         return {
           ruleId: rule.id,
           cabin: rule.cabin,
@@ -1653,6 +1863,10 @@ export class FlightsService {
           siteSoldSeats,
           agencySoldSeats,
           remainingSeats: Math.max(0, rule.seatsAllocated - soldSeats),
+          sharedSeatsRemaining,
+          siteSeatsAvailable,
+          agencySeatsAvailable,
+          agencySeatsCommitted: agencyCommittedSeats,
           revenueIrr: String(revenue?.revenueIrr ?? '0'),
           basePriceIrr: rule.priceIrr.toString(),
           sitePriceIrr: rule.sitePriceIrr?.toString() ?? null,
@@ -1660,9 +1874,171 @@ export class FlightsService {
           agencySeatsReleased: rule.agencySeatsReleased,
           agencyReleasePriceIrr: rule.agencyReleasePriceIrr?.toString() ?? null,
           agencySpecialOffer: rule.agencySpecialOffer,
+          salesByRate: soldRateRows
+            .filter(
+              (row) =>
+                row.cabin === rule.cabin && row.classCode === rule.classCode,
+            )
+            .map((row) => ({
+              channel: row.channel,
+              priceIrr: row.priceIrr,
+              seats: Number(row.seats),
+              revenueIrr: String(row.revenueIrr ?? '0'),
+              lastSoldAt: new Date(row.lastSoldAt).toISOString(),
+            })),
           priceHistory,
         };
       }),
+    };
+  }
+
+  /**
+   * Advisory-only fare-class pricing.  The ML service is preferred when it
+   * is configured; the deterministic fallback keeps the commercial workflow
+   * usable and is labelled as such.  This method never mutates or publishes a
+   * FareRule — a commercial user must explicitly save the proposed amount.
+   */
+  async suggestFareClassPrice(
+    instanceId: string,
+    ruleId: string,
+    channel: 'SYSTEM' | 'AGENCY',
+    competitorPriceOverride?: Irr,
+    requestId?: string,
+  ) {
+    const instance = await this.loadCommercialInstance(instanceId);
+    const control = await this.commercialControl(instanceId);
+    const row = control.fareClasses.find((item) => item.ruleId === ruleId);
+    if (!row) {
+      throw new NotFoundException({
+        code: ErrorCode.NOT_FOUND,
+        message: 'کلاس نرخی یافت نشد.',
+      });
+    }
+
+    const basePriceIrr = BigInt(row.basePriceIrr);
+    const currentPriceIrr =
+      channel === 'AGENCY'
+        ? BigInt(
+            row.agencyReleasePriceIrr ?? row.sitePriceIrr ?? row.basePriceIrr,
+          )
+        : BigInt(row.sitePriceIrr ?? row.basePriceIrr);
+    const competitorPriceIrr =
+      competitorPriceOverride ?? instance.competitorPriceIrr ?? currentPriceIrr;
+    const soldSeats =
+      channel === 'AGENCY' ? row.agencySoldSeats : row.siteSoldSeats;
+    const releasedSeats =
+      channel === 'AGENCY' ? row.agencySeatsReleased : row.siteSeatsReleased;
+    const availableSeats =
+      channel === 'AGENCY' ? row.agencySeatsAvailable : row.siteSeatsAvailable;
+    const occupancyPct =
+      row.seatsAllocated > 0
+        ? Math.round((row.soldSeats / row.seatsAllocated) * 100)
+        : 0;
+    const hoursToDeparture = Math.max(
+      0,
+      Math.round(
+        ((instance.departureAt.getTime() - Date.now()) / 3_600_000) * 10,
+      ) / 10,
+    );
+
+    const factorsFa: string[] = [
+      `فروش کل کلاس ${occupancyPct}٪ ظرفیت است.`,
+      `${hoursToDeparture} ساعت تا پرواز باقی مانده است.`,
+      `نرخ رقیب ${competitorPriceIrr.toString()} ریال در تحلیل لحاظ شد.`,
+    ];
+    let demandAdjustmentPct = 0;
+    if (occupancyPct >= 85) {
+      demandAdjustmentPct += 12;
+      factorsFa.push(
+        'تقاضای بسیار بالا، امکان افزایش کنترل‌شده نرخ را نشان می‌دهد.',
+      );
+    } else if (occupancyPct >= 65) {
+      demandAdjustmentPct += 7;
+      factorsFa.push('ضریب اشغال مناسب است.');
+    } else if (occupancyPct <= 25) {
+      demandAdjustmentPct -= hoursToDeparture <= 168 ? 10 : 5;
+      factorsFa.push(
+        'فروش پایین کلاس، کاهش نرخ برای تحریک تقاضا را توجیه می‌کند.',
+      );
+    } else if (occupancyPct <= 45 && hoursToDeparture <= 72) {
+      demandAdjustmentPct -= 5;
+      factorsFa.push('تا پرواز زمان کمی مانده و فروش کلاس پایین است.');
+    }
+    if (hoursToDeparture <= 24) {
+      demandAdjustmentPct += occupancyPct >= 65 ? 5 : -8;
+      factorsFa.push(
+        occupancyPct >= 65
+          ? 'نزدیکی پرواز همراه با تقاضای بالا، فشار افزایشی نرخ دارد.'
+          : 'نزدیکی پرواز همراه با ظرفیت خالی، فشار کاهشی نرخ دارد.',
+      );
+    }
+
+    const marketAnchor = divRoundBigInt(
+      currentPriceIrr * 6n + competitorPriceIrr * 4n,
+      10n,
+    );
+    let fallbackPriceIrr = divRoundBigInt(
+      marketAnchor * BigInt(100 + demandAdjustmentPct),
+      100n,
+    );
+    const lowerBound = divRoundBigInt(basePriceIrr * 70n, 100n);
+    const upperBound = divRoundBigInt(basePriceIrr * 150n, 100n);
+    fallbackPriceIrr =
+      fallbackPriceIrr < lowerBound
+        ? lowerBound
+        : fallbackPriceIrr > upperBound
+          ? upperBound
+          : fallbackPriceIrr;
+    fallbackPriceIrr = maxIrr(100_000n, roundIrrTo(fallbackPriceIrr, 100_000n));
+
+    const mlResult = await this.priceSuggestions.suggest(
+      [
+        {
+          proposal_id: ruleId,
+          origin_code: instance.flight.route.originCode,
+          dest_code: instance.flight.route.destCode,
+          departure_at: instance.departureAt.toISOString(),
+          base_price_irr: Number(basePriceIrr),
+          competitor_price_irr: Number(competitorPriceIrr),
+          proposed_price_irr: Number(fallbackPriceIrr),
+          capacity: row.seatsAllocated,
+          charter_seats: instance.charterSeats,
+        },
+      ],
+      requestId,
+    );
+    const mlSuggestion = mlResult?.suggestions.find(
+      (item) => item.proposal_id === ruleId && item.price_irr > 0,
+    );
+    const suggestedPriceIrr = mlSuggestion
+      ? roundIrrTo(BigInt(Math.round(mlSuggestion.price_irr)), 100_000n)
+      : fallbackPriceIrr;
+
+    return {
+      ruleId,
+      cabin: row.cabin,
+      classCode: row.classCode,
+      channel,
+      capacity: row.seatsAllocated,
+      releasedSeats,
+      soldSeats,
+      totalSoldSeats: row.soldSeats,
+      availableSeats,
+      sharedSeatsRemaining: row.sharedSeatsRemaining,
+      occupancyPct,
+      hoursToDeparture,
+      basePriceIrr: basePriceIrr.toString(),
+      currentPriceIrr: currentPriceIrr.toString(),
+      competitorPriceIrr: competitorPriceIrr.toString(),
+      suggestedPriceIrr: suggestedPriceIrr.toString(),
+      source: mlSuggestion ? ('ML' as const) : ('HEURISTIC' as const),
+      modelVersion: mlSuggestion && mlResult ? mlResult.model_version : null,
+      confidence: mlSuggestion?.confidence ?? null,
+      reasonFa:
+        mlSuggestion?.reason_fa ??
+        'پیشنهاد پشتیبان با ترکیب فروش کلاس، زمان باقی‌مانده و فاصله نرخ بازار محاسبه شد.',
+      factorsFa: mlSuggestion?.factors_fa ?? factorsFa,
+      advisoryOnly: true,
     };
   }
 
@@ -1675,12 +2051,6 @@ export class FlightsService {
     seats?: number,
   ) {
     const trimmedReason = reason.trim();
-    if (trimmedReason.length < 2) {
-      throw new BadRequestException({
-        code: ErrorCode.VALIDATION_FAILED,
-        message: 'دلیل تغییر قیمت را وارد کنید.',
-      });
-    }
     const { saved, previousPriceIrr } = await this.dataSource.transaction(
       async (tx) => {
         const rule = await tx
@@ -1698,20 +2068,19 @@ export class FlightsService {
           });
         }
         const nextSeats = seats ?? rule.siteSeatsReleased;
-        if (
-          nextSeats < 0 ||
-          nextSeats + rule.agencySeatsReleased > rule.seatsAllocated
-        ) {
-          const maximum = maximumChannelRelease(
-            rule.seatsAllocated,
-            rule.agencySeatsReleased,
-          );
+        if (nextSeats < 0 || nextSeats > rule.seatsAllocated) {
           throw new BadRequestException({
             code: ErrorCode.VALIDATION_FAILED,
-            message: `حداکثر ${maximum} صندلی از این کلاس برای سایت قابل آزادسازی است.`,
+            message: `حداکثر ${rule.seatsAllocated} صندلی از این کلاس برای سایت قابل آزادسازی است.`,
           });
         }
         const previousPriceIrr = rule.sitePriceIrr ?? rule.priceIrr;
+        if (previousPriceIrr !== priceIrr && trimmedReason.length < 2) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: 'دلیل تغییر قیمت را وارد کنید.',
+          });
+        }
         rule.sitePriceIrr = priceIrr;
         rule.siteSeatsReleased = nextSeats;
         return { saved: await tx.save(rule), previousPriceIrr };
@@ -1742,7 +2111,92 @@ export class FlightsService {
     ruleId: string,
     dto: { seats: number; priceIrr: Irr; specialOffer?: boolean },
   ) {
-    const saved = await this.dataSource.transaction(async (tx) => {
+    const { saved, previousPriceIrr } = await this.dataSource.transaction(
+      async (tx) => {
+        const rule = await tx
+          .createQueryBuilder(FareRule, 'r')
+          .leftJoinAndSelect('r.flightInstance', 'flightInstance')
+          .leftJoinAndSelect('flightInstance.flight', 'flight')
+          .setLock('pessimistic_write', undefined, ['r'])
+          .where('r.id = :ruleId', { ruleId })
+          .getOne();
+        if (!rule || rule.flightInstanceId !== instanceId) {
+          throw new NotFoundException({
+            code: ErrorCode.NOT_FOUND,
+            message: 'کلاس نرخی یافت نشد.',
+          });
+        }
+
+        // Keep this query on the transaction connection and serialize it after
+        // the FareRule lock. The activation path takes the same locks, so a
+        // release cannot race an agency payment/allotment activation.
+        const allocatedRow = await tx
+          .createQueryBuilder(AgencyAllotment, 'allotment')
+          .select('COALESCE(SUM(allotment.seatsAllocated), 0)', 'allocated')
+          .where('allotment.flightInstanceId = :instanceId', { instanceId })
+          .andWhere('allotment.cabin = :cabin', { cabin: rule.cabin })
+          .andWhere('allotment.fareClassCode = :classCode', {
+            classCode: rule.classCode,
+          })
+          .andWhere(
+            '(allotment.type = :hard OR allotment.releaseAt IS NULL OR allotment.releaseAt > :now)',
+            { hard: 'HARD', now: new Date() },
+          )
+          .getRawOne<{ allocated: string }>();
+        const activated = Number(allocatedRow?.allocated ?? 0);
+        if (dto.seats < activated) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `سهمیه آژانسی نمی‌تواند از ${activated} صندلی فعال‌شده کمتر باشد.`,
+          });
+        }
+        if (dto.seats > rule.seatsAllocated) {
+          throw new BadRequestException({
+            code: ErrorCode.VALIDATION_FAILED,
+            message: `حداکثر ${rule.seatsAllocated} صندلی از این کلاس برای آژانس‌ها قابل آزادسازی است.`,
+          });
+        }
+        const previousPriceIrr = rule.agencyReleasePriceIrr ?? rule.priceIrr;
+        rule.agencySeatsReleased = dto.seats;
+        rule.agencyReleasePriceIrr = dto.seats > 0 ? dto.priceIrr : null;
+        rule.agencySpecialOffer = dto.seats > 0 && (dto.specialOffer ?? false);
+        return { saved: await tx.save(rule), previousPriceIrr };
+      },
+    );
+    await this.audit.record({
+      actorId: actor.id,
+      actorRole: actor.role,
+      category: 'PRICING',
+      action: 'آزادسازی آژانسی کلاس نرخی',
+      detail: `${dto.seats} صندلی از کلاس ${saved.classCode} پرواز ${saved.flightInstance.flight.flightNo} برای فروش آژانسی تنظیم شد.`,
+      entityType: 'FareRule',
+      entityId: saved.id,
+      metadata: {
+        seats: dto.seats,
+        previousPriceIrr: previousPriceIrr.toString(),
+        newPriceIrr: dto.priceIrr.toString(),
+        priceIrr: dto.priceIrr.toString(),
+        specialOffer: dto.specialOffer ?? false,
+      },
+    });
+    return saved;
+  }
+
+  async updateFareClassChannelRelease(
+    actor: AuthenticatedUser,
+    instanceId: string,
+    ruleId: string,
+    dto: {
+      siteSeats: number;
+      sitePriceIrr: Irr;
+      agencySeats: number;
+      agencyPriceIrr: Irr;
+      specialOffer?: boolean;
+      reason?: string;
+    },
+  ) {
+    const trimmedReason = dto.reason?.trim() ?? '';
+    const result = await this.dataSource.transaction(async (tx) => {
       const rule = await tx
         .createQueryBuilder(FareRule, 'r')
         .leftJoinAndSelect('r.flightInstance', 'flightInstance')
@@ -1757,9 +2211,56 @@ export class FlightsService {
         });
       }
 
-      // Keep this query on the transaction connection and serialize it after
-      // the FareRule lock. The activation path takes the same locks, so a
-      // release cannot race an agency payment/allotment activation.
+      if (
+        dto.siteSeats > rule.seatsAllocated ||
+        dto.agencySeats > rule.seatsAllocated
+      ) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `سقف فروش هر کانال نمی‌تواند از ${rule.seatsAllocated} صندلی بیشتر باشد.`,
+        });
+      }
+      if (dto.agencySeats > 0 && dto.agencyPriceIrr <= ZERO_IRR) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: 'برای ظرفیت آژانسی، قیمت فروش معتبر وارد کنید.',
+        });
+      }
+
+      const soldRows = await tx
+        .createQueryBuilder(Passenger, 'p')
+        .innerJoin('p.booking', 'b')
+        .select('b.channel', 'channel')
+        .addSelect('COUNT(p.id)', 'soldSeats')
+        .where('b.flightInstanceId = :instanceId', { instanceId })
+        .andWhere('b.cabin = :cabin', { cabin: rule.cabin })
+        .andWhere('b.fareClassCode = :classCode', {
+          classCode: rule.classCode,
+        })
+        .andWhere('b.status IN (:...statuses)', {
+          statuses: [...SOLD_STATUSES],
+        })
+        .andWhere('p.occupiesSeat = true')
+        .andWhere('p.deletedAt IS NULL')
+        .groupBy('b.channel')
+        .getRawMany<{ channel: BookingChannel; soldSeats: string }>();
+      const soldFor = (channel: BookingChannel) =>
+        Number(soldRows.find((row) => row.channel === channel)?.soldSeats ?? 0);
+      const siteSold = soldFor(BookingChannel.SYSTEM);
+      const agencySold = soldFor(BookingChannel.AGENCY);
+      if (dto.siteSeats < siteSold) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `ظرفیت سایت نمی‌تواند از ${siteSold} صندلی فروخته‌شده کمتر باشد.`,
+        });
+      }
+      if (dto.agencySeats < agencySold) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `ظرفیت آژانسی نمی‌تواند از ${agencySold} صندلی فروخته‌شده کمتر باشد.`,
+        });
+      }
+
       const allocatedRow = await tx
         .createQueryBuilder(AgencyAllotment, 'allotment')
         .select('COALESCE(SUM(allotment.seatsAllocated), 0)', 'allocated')
@@ -1773,43 +2274,59 @@ export class FlightsService {
           { hard: 'HARD', now: new Date() },
         )
         .getRawOne<{ allocated: string }>();
-      const activated = Number(allocatedRow?.allocated ?? 0);
-      if (dto.seats < activated) {
+      const activeAgencySeats = Number(allocatedRow?.allocated ?? 0);
+      if (dto.agencySeats < activeAgencySeats) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `سهمیه آژانسی نمی‌تواند از ${activated} صندلی فعال‌شده کمتر باشد.`,
+          message: `ظرفیت آژانسی نمی‌تواند از ${activeAgencySeats} صندلی فعال‌شده کمتر باشد.`,
         });
       }
-      if (dto.seats + rule.siteSeatsReleased > rule.seatsAllocated) {
-        const maximum = maximumChannelRelease(
-          rule.seatsAllocated,
-          rule.siteSeatsReleased,
-        );
+
+      const previousSitePriceIrr = rule.sitePriceIrr ?? rule.priceIrr;
+      const sitePriceChanged = previousSitePriceIrr !== dto.sitePriceIrr;
+      if (sitePriceChanged && trimmedReason.length < 2) {
         throw new BadRequestException({
           code: ErrorCode.VALIDATION_FAILED,
-          message: `حداکثر ${maximum} صندلی از این کلاس برای آژانس‌ها قابل آزادسازی است.`,
+          message: 'برای تغییر قیمت فروش سایت، دلیل تغییر را وارد کنید.',
         });
       }
-      rule.agencySeatsReleased = dto.seats;
-      rule.agencyReleasePriceIrr = dto.seats > 0 ? dto.priceIrr : null;
-      rule.agencySpecialOffer = dto.seats > 0 && (dto.specialOffer ?? false);
-      return tx.save(rule);
+
+      rule.siteSeatsReleased = dto.siteSeats;
+      rule.sitePriceIrr = dto.sitePriceIrr;
+      rule.agencySeatsReleased = dto.agencySeats;
+      rule.agencyReleasePriceIrr =
+        dto.agencySeats > 0 ? dto.agencyPriceIrr : null;
+      rule.agencySpecialOffer =
+        dto.agencySeats > 0 && (dto.specialOffer ?? false);
+      return {
+        saved: await tx.save(rule),
+        previousSitePriceIrr,
+        sitePriceChanged,
+      };
     });
+
     await this.audit.record({
       actorId: actor.id,
       actorRole: actor.role,
       category: 'PRICING',
-      action: 'آزادسازی آژانسی کلاس نرخی',
-      detail: `${dto.seats} صندلی از کلاس ${saved.classCode} پرواز ${saved.flightInstance.flight.flightNo} برای فروش آژانسی تنظیم شد.`,
+      action: result.sitePriceChanged
+        ? 'تغییر قیمت فروش سایت کلاس نرخی'
+        : 'تنظیم ظرفیت فروش سایت و آژانس',
+      detail: `نرخ و ظرفیت فروش سایت و آژانس کلاس ${result.saved.classCode} پرواز ${result.saved.flightInstance.flight.flightNo} توسط ${actor.fullName} ثبت شد.`,
       entityType: 'FareRule',
-      entityId: saved.id,
+      entityId: result.saved.id,
       metadata: {
-        seats: dto.seats,
-        priceIrr: dto.priceIrr.toString(),
+        previousPriceIrr: result.previousSitePriceIrr.toString(),
+        newPriceIrr: dto.sitePriceIrr.toString(),
+        reason: trimmedReason,
+        siteSeats: dto.siteSeats,
+        agencySeats: dto.agencySeats,
+        agencyPriceIrr: dto.agencyPriceIrr.toString(),
         specialOffer: dto.specialOffer ?? false,
       },
     });
-    return saved;
+    await this.invalidateFlightSearch(result.saved.flightInstance);
+    return result.saved;
   }
 
   /** Physical seat count for one cabin — prefers flight-definition
@@ -1872,6 +2389,11 @@ export class FlightsService {
       classCode: string;
       priceIrr: Irr;
       seatsAllocated: number;
+      siteSeats?: number;
+      sitePriceIrr?: Irr;
+      agencySeats?: number;
+      agencyPriceIrr?: Irr;
+      agencySpecialOffer?: boolean;
       taxIrr?: Irr;
       refundable?: boolean;
       changeable?: boolean;
@@ -1894,6 +2416,21 @@ export class FlightsService {
     }
     this.validateFareRuleWindow(dto);
 
+    const siteSeats = dto.siteSeats ?? dto.seatsAllocated;
+    const agencySeats = dto.agencySeats ?? 0;
+    if (siteSeats > dto.seatsAllocated || agencySeats > dto.seatsAllocated) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'سقف فروش هر کانال از ظرفیت برنامه نرخ بیشتر است.',
+      });
+    }
+    if (agencySeats > 0 && !dto.agencyPriceIrr) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'برای سهم آژانسی، نرخ فروش آژانس را وارد کنید.',
+      });
+    }
+
     const cabinSeats = await this.cabinSeatCount(instance, dto.cabin);
     const existing = await this.fareRuleRepo.find({
       where: { flightInstanceId: instanceId, cabin: dto.cabin },
@@ -1913,7 +2450,13 @@ export class FlightsService {
         classCode: dto.classCode,
         priceIrr: dto.priceIrr,
         seatsAllocated: dto.seatsAllocated,
-        siteSeatsReleased: dto.seatsAllocated,
+        sitePriceIrr: dto.sitePriceIrr ?? dto.priceIrr,
+        siteSeatsReleased: siteSeats,
+        agencySeatsReleased: agencySeats,
+        agencyReleasePriceIrr:
+          agencySeats > 0 ? (dto.agencyPriceIrr ?? null) : null,
+        agencySpecialOffer:
+          agencySeats > 0 && (dto.agencySpecialOffer ?? false),
         taxIrr: dto.taxIrr ?? ZERO_IRR,
         refundable: dto.refundable ?? true,
         changeable: dto.changeable ?? true,

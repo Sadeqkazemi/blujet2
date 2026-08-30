@@ -323,6 +323,28 @@ describe('AccountPage', () => {
     expect(await screen.findByTestId('wallet-balance')).toHaveTextContent('۲۵۰٬۰۰۰');
   });
 
+  it('renders the immutable wallet purchase history with PNR and debit amount', async () => {
+    mockAuth('authenticated');
+    vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({
+      balanceIrr: '84000000',
+      entries: [
+        {
+          id: 'we-1',
+          type: 'PURCHASE',
+          signedAmountIrr: '-16000000',
+          bookingId: 'b1',
+          pnr: 'BJ4X2K',
+          createdAt: '2026-08-30T06:00:00.000Z',
+        },
+      ],
+    });
+    renderPage('/account?tab=wallet');
+
+    expect(await screen.findByTestId('wallet-history')).toHaveTextContent('خرید بلیط');
+    expect(screen.getByTestId('wallet-history')).toHaveTextContent('BJ4X2K');
+    expect(screen.getByTestId('wallet-history')).toHaveTextContent('۱٬۶۰۰٬۰۰۰');
+  });
+
   it('switches to the club tab and shows tier banner + issued card', async () => {
     mockAuth('authenticated');
     renderPage('/account?tab=club');

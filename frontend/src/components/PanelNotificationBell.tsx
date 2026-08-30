@@ -41,7 +41,7 @@ export default function PanelNotificationBell({ items }: { items: PanelNotificat
         onClick={() => setOpen((v) => !v)}
         aria-label="اعلان‌ها"
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-panel-ink transition hover:bg-white/10"
+        className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-panel-border bg-panel-surface text-panel-ink shadow-sm transition hover:bg-panel-surface-2"
       >
         <span aria-hidden>🔔</span>
         {items.length > 0 && (
@@ -55,7 +55,7 @@ export default function PanelNotificationBell({ items }: { items: PanelNotificat
       </button>
 
       {open && (
-        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-white/10 bg-panel-surface p-2 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-80 rounded-xl border border-panel-border bg-panel-surface p-2 shadow-lg">
           <div className="px-2 py-1.5 text-xs font-bold text-panel-ink">اعلان‌ها</div>
           {items.length === 0 ? (
             <p className="px-2 py-4 text-center text-xs text-panel-muted">اعلان جدیدی ندارید.</p>
@@ -77,7 +77,7 @@ export default function PanelNotificationBell({ items }: { items: PanelNotificat
                         setOpeningKey(null);
                       }
                     }}
-                    className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-start text-xs transition hover:bg-white/5 disabled:cursor-wait disabled:opacity-60"
+                    className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-start text-xs transition hover:bg-panel-surface-2 disabled:cursor-wait disabled:opacity-60"
                   >
                     <span className={`mt-1 h-2 w-2 flex-none rounded-full ${TONE_DOT[item.tone]}`} />
                     <span className="min-w-0 flex-1">

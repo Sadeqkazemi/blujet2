@@ -1976,20 +1976,21 @@ export default function FlightsPage() {
         <Modal
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
-          maxWidthClass="max-w-[660px]"
+          variant="light"
+          maxWidthClass="max-w-[840px]"
         >
-          <div className="mb-4 flex items-center justify-between border-b border-[#27334a] pb-3 text-[10px] text-[#9fb0c7]">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-panel-border bg-panel-canvas px-3 py-2.5 text-[10px] text-panel-muted">
             <span className="flex items-center gap-2">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#1b355a] text-sm text-[#80b7ff]" aria-hidden="true">✈</span>
-              <span>{detail.flightNo} · {detail.aircraftType}</span>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-sm text-accent" aria-hidden="true">✈</span>
+              <span className="font-bold text-panel-ink">{detail.flightNo} · {detail.aircraftType}</span>
             </span>
             <span className="font-num">{formatJalaliDateTime(detail.departureAt)}</span>
           </div>
-          <div className="mb-4 flex gap-1 border-b border-[#27334a]">
-            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-t-lg px-4 py-2 text-xs font-extrabold ${detailTab === "details" ? "border-b-2 border-[#4f8cff] text-white" : "text-panel-muted"}`}>
+          <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-panel-border bg-panel-canvas p-1">
+            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "details" ? "bg-white text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
               جزئیات پرواز
             </button>
-            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-t-lg px-4 py-2 text-xs font-extrabold ${detailTab === "seats" ? "border-b-2 border-[#4f8cff] text-white" : "text-panel-muted"}`}>
+            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "seats" ? "bg-white text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
               نقشه صندلی
             </button>
           </div>
@@ -2099,7 +2100,7 @@ export default function FlightsPage() {
               </div>
 
               {(detail.classBreakdown ?? []).length > 0 && (
-                <div className="order-2 rounded-xl border border-panel-border p-3" data-commercial-section="public-fare-classes">
+                <div className="hidden" data-commercial-section="legacy-public-fare-classes">
                   <h3 className="mb-2 text-xs font-bold text-panel-ink">قیمت سایت به ازای کلاس</h3>
                   <div className="flex flex-col gap-2">
                     {(detail.classBreakdown ?? []).map((row) => {
@@ -2143,7 +2144,7 @@ export default function FlightsPage() {
               )}
 
               {(detail.classBreakdown ?? []).length > 0 && (
-                <div className="order-1 rounded-xl border border-panel-border p-3" data-commercial-section="agency-fare-release">
+                <div className="hidden" data-commercial-section="legacy-agency-fare-release">
                   <h3 className="mb-2 text-xs font-bold text-panel-ink">آزادسازی صندلی برای آژانس</h3>
                   <div className="flex flex-col gap-2">
                     {(detail.classBreakdown ?? []).map((row) => {

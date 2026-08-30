@@ -511,6 +511,14 @@ competitorPriceIrr? }`. Cabin capacities must fit the aircraft seat-map
 - POST `/flights/ai-analysis` — «تحلیل قیمت‌گذاری با هوش مصنوعی» over the
   future list, reusing Phase 6's ml-service client verbatim (2s timeout,
   graceful degradation, advisory only, persisted with modelVersion).
+- POST `/flights/:instanceId/fare-rules/:ruleId/price-suggestion` — Commercial
+  Manager / permitted commercial employee; body
+  `{ channel: SYSTEM|AGENCY, competitorPriceIrr? }`. Returns a per-class
+  advisory projection containing real capacity/released/sold/available seats,
+  occupancy, hours to departure, base/current/competitor/suggested IRR values,
+  rationale/factors and `source: ML|HEURISTIC`. It never mutates or publishes
+  the fare rule; the existing site-price or agency-release command remains the
+  mandatory human confirmation boundary.
 - Deferred (explicit): خروجی Excel buttons (same deferral as Phase 3's,
   toast-only in mocks); RRULE schedules (no design UI — see DB_SCHEMA).
 
@@ -2138,7 +2146,7 @@ the frontend UI closure, and the found-and-fixed bugs are in
 
 | Method | Path               | Notes                                                                                                                                                                                                                                  |
 | ------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/my/wallet`       | `{ balanceIrr }` — always `SUM(WalletEntry.signedAmountIrr)`, never a mutable column.                                                                                                                                                  |
+| GET    | `/my/wallet`       | `{ balanceIrr, entries }` — `balanceIrr` is always `SUM(WalletEntry.signedAmountIrr)`, never a mutable column. `entries` is the newest-first immutable wallet history with booking/PNR context when present.                           |
 | POST   | `/my/wallet/topup` | `{ amountIrr (min 10,000) }` — a sandbox "always succeeds" gateway (no redirect/callback, unlike `POST /bookings/:id/pay`'s `GATEWAY` method): inserts a `WalletEntry(type=TOPUP)` and returns the new `{ balanceIrr }` synchronously. |
 
 ### `backend/src/modules/booking-engine/` — price lock ("قفل قیمت هوشمند") — `@Roles('USER')`
@@ -4064,12 +4072,20 @@ only when the active agency credit line covers the server-computed total.
 
 - `PATCH /flights/:instanceId/fare-rules/:ruleId/site-price`
   accepts `priceIrr`, `reason`, and optional `seats`. `seats` is the public-site
-  release for that fare class. Together with the agency release it cannot
-  exceed `FareRule.seatsAllocated`.
+  ceiling for that fare class. Site and agency ceilings are independent and
+  each may be as high as `FareRule.seatsAllocated`.
+- `PUT /flights/:instanceId/fare-rules/:ruleId/channel-release` remains a
+  compatibility operation. The Commercial UI uses the independent site-price
+  and agency-release endpoints so either channel may be opened or closed alone.
 - Public search, price-calendar results, and `POST /bookings` use the remaining
   site release (`siteSeatsReleased - active SYSTEM passengers`) and still obey
   the smaller physical/commercial cabin ceiling. A cabin with no site release
   is omitted from public search.
+- Both channels consume the same live reservation inventory. Active public
+  holds/sales reduce agency request capacity; active agency allotments reserve
+  only their unconsumed remainder from public availability. Flight and fare
+  rows are transactionally locked again at booking/allotment activation, so
+  simultaneous public and agency attempts cannot oversell the aircraft.
 - `POST /agency-portal/seat-inquiry` returns `suggestedSeats` and
   `canFulfillRequested`. If the request exceeds the live agency release,
   `suggestedSeats` is the largest currently orderable quantity. The subsequent
@@ -4083,8 +4099,10 @@ only when the active agency credit line covers the server-computed total.
 
 - `GET /flights/:instanceId/commercial-control` returns `publicSaleEnabled`,
   `agencySaleEnabled`, and per fare class `soldSeats`, `siteSoldSeats`, and
-  `agencySoldSeats`. Sold counts are derived from paid/ticketed passenger seats;
-  they are not editable counters.
+  `agencySoldSeats`, plus `sharedSeatsRemaining`, `siteSeatsAvailable`,
+  `agencySeatsAvailable`, and `agencySeatsCommitted`. Sold counts are derived
+  from paid/ticketed passenger seats; live availability additionally includes
+  current holds and active allotments and is never an editable counter.
 - `PATCH /flights/:instanceId/sales-visibility` controls public search/sale only.
 - `PATCH /flights/:instanceId/agency-sales-visibility` independently controls
   whether an otherwise active and sellable flight is listed in the agency seat
@@ -4092,6 +4110,17 @@ only when the active agency credit line covers the server-computed total.
 - `GET /agency-portal/seat-request-options` and
   `POST /agency-portal/seat-inquiry` apply the agency visibility gate in
   addition to schedule, approval, departure, and sale-window checks.
+
+## Wallet purchase accounting (2026-08-30)
+
+- `POST /bookings/:id/pay` with `paymentMethod=WALLET` debits the immutable
+  wallet ledger, transitions the booking to `TICKETED`, and writes the
+  booking-linked `SALE` ledger entry inside one database transaction. A
+  successful wallet response additionally returns `walletBalanceIrr` so
+  persistent clients can replace stale cached balances immediately.
+- `GET /my/wallet` returns `{ balanceIrr, entries }`. Each entry contains
+  `id`, `type`, `signedAmountIrr`, `bookingId`, optional `pnr`, and `createdAt`.
+  Both balance and history are derived from immutable `wallet_entries` rows.
 
 ## Internal cartable support assignment and agency bulletins (2026-08-28)
 

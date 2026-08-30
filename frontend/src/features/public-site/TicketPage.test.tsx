@@ -78,7 +78,8 @@ describe('TicketPage', () => {
     vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
     const view = renderPage('fa');
     expect(await screen.findByTestId('ticket-route')).toHaveAttribute('dir', 'rtl');
-    expect(screen.getByText('THR')).toBeInTheDocument();
+    expect(screen.getByTestId('ticket-origin')).toHaveClass('order-3');
+    expect(screen.getByTestId('ticket-destination')).toHaveClass('order-1');
 
     view.unmount();
     vi.restoreAllMocks();
@@ -86,6 +87,17 @@ describe('TicketPage', () => {
     renderPage('en');
     expect(await screen.findAllByTestId('ticket-route')).toHaveLength(1);
     expect(screen.getByTestId('ticket-route')).toHaveAttribute('dir', 'ltr');
+    expect(screen.getByTestId('ticket-origin')).toHaveClass('order-1');
+    expect(screen.getByTestId('ticket-destination')).toHaveClass('order-3');
+  });
+
+  it('uses the Persian route placement for Arabic tickets', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue(TICKETED);
+    renderPage('ar');
+
+    expect(await screen.findByTestId('ticket-route')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByTestId('ticket-origin')).toHaveClass('order-3');
+    expect(screen.getByTestId('ticket-destination')).toHaveClass('order-1');
   });
 
   it('blocks the boarding-pass view for unpaid HELD bookings', async () => {

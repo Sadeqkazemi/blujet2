@@ -412,7 +412,18 @@ export default function DestinationsPage() {
                     </span>
                   </span>
                 </span>
-                <span style={{ color: '#1668c4', fontSize: 15 }}>✈</span>
+                <span
+                  aria-hidden="true"
+                  data-testid="popular-route-plane"
+                  style={{
+                    color: '#1668c4',
+                    display: 'inline-block',
+                    fontSize: 15,
+                    transform: locale === 'en' ? 'none' : 'scaleX(-1)',
+                  }}
+                >
+                  ✈
+                </span>
                 <span style={{ lineHeight: 1.6, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: '#0d2640' }}>
                     {r.toName}{' '}

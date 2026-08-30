@@ -5,8 +5,6 @@ import {
   fetchAllotmentsSummary,
   fetchCommercialFlightControl,
   updateFareClassSitePrice,
-  updateAgencySalesVisibility,
-  updateFlightSalesVisibility,
   upsertAgencyFareRelease,
 } from "../../../api/flights";
 import { fetchAgencies } from "../../../api/agencies";
@@ -27,6 +25,7 @@ import type {
 import type { AgencyListRow } from "../../../types/agencies";
 import { cancelFlight } from "../../../api/flight-cancellations";
 import AgencyAllotmentsSummaryCard from "./AgencyAllotmentsSummaryCard";
+import CommercialFareClassControls from "./CommercialFareClassControls";
 
 interface Props {
   detail: FlightDetail;
@@ -48,7 +47,7 @@ const cabinLabel = {
 const channelMeta = {
   SYSTEM: { label: "فروش سیستمی", color: "bg-[#4f8cff]" },
   CHARTER: { label: "فروش چارتری", color: "bg-[#a855f7]" },
-  AGENCY: { label: "فروش آژانس همکار", color: "bg-[#34d399]" },
+  AGENCY: { label: "فروش آژانس همکار", color: "bg-[#7c3aed]" },
 } as const;
 
 function classTitle(row: CommercialFareClassControl) {
@@ -154,40 +153,6 @@ export default function CommercialFlightDetailContent({
         .sort((a, b) => b.changedAt.localeCompare(a.changedAt)),
     [control],
   );
-
-  async function toggleVisibility() {
-    if (!control || !canManage) return;
-    const enabled = !control.publicSaleEnabled;
-    setBusyKey("visibility");
-    try {
-      await updateFlightSalesVisibility(detail.id, enabled);
-      await Promise.all([load(), Promise.resolve(onChanged())]);
-      onNotice(enabled ? "فروش این پرواز در سایت فعال شد." : "فروش این پرواز در سایت متوقف شد.");
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "تغییر وضعیت فروش ناموفق بود.");
-    } finally {
-      setBusyKey(null);
-    }
-  }
-
-  async function toggleAgencyVisibility() {
-    if (!control || !canManage) return;
-    const enabled = !control.agencySaleEnabled;
-    setBusyKey("agency-visibility");
-    try {
-      await updateAgencySalesVisibility(detail.id, enabled);
-      await Promise.all([load(), Promise.resolve(onChanged())]);
-      onNotice(
-        enabled
-          ? "نمایش و درخواست این پرواز برای آژانس‌ها فعال شد."
-          : "نمایش و درخواست این پرواز برای آژانس‌ها متوقف شد.",
-      );
-    } catch (error) {
-      onError(error instanceof Error ? error.message : "تغییر وضعیت فروش آژانسی ناموفق بود.");
-    } finally {
-      setBusyKey(null);
-    }
-  }
 
   async function saveRelease(row: CommercialFareClassControl) {
     const seats = Number(latinDigits(releaseSeats[row.ruleId] ?? ""));
@@ -327,7 +292,7 @@ export default function CommercialFlightDetailContent({
   if (!control) return null;
 
   return (
-    <div className="-m-5 min-h-full space-y-2.5 bg-[#0d1729] p-3 text-[#e7ecf3] sm:p-4" data-testid="commercial-flight-detail" dir="rtl">
+    <div className="space-y-3 text-panel-ink" data-testid="commercial-flight-detail" dir="rtl">
       <nav className="grid grid-cols-2 gap-1 rounded-lg border border-[#2a3550] bg-[#101a2c] p-1" aria-label="تب‌های جزئیات پرواز">
         <button
           type="button"
@@ -346,90 +311,10 @@ export default function CommercialFlightDetailContent({
           آژانس
         </button>
       </nav>
-      <section
-        className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border p-2.5 ${
-          control.publicSaleEnabled
-            ? "border-[#20c99766] bg-[#0d332f66]"
-            : "border-[#f59e0b55] bg-[#3b2c1566]"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className={`text-[11px] font-black ${control.publicSaleEnabled ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
-              {control.publicSaleEnabled
-                ? "مجوز نمایش و فروش در سایت"
-                : "نمایش و فروش در سایت غیرفعال است"}
-            </h3>
-            <p className="mt-0.5 text-[9px] leading-4 text-[#91a1b8]">
-              {control.publicSaleEnabled
-                ? "این پرواز هم‌اکنون در جست‌وجوی سایت قابل مشاهده و فروش است."
-                : "تا زمان فعال‌سازی، این پرواز در نتایج عمومی نمایش داده نمی‌شود."}
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={control.publicSaleEnabled}
-            aria-label="مجوز نمایش و فروش در سایت"
-            disabled={!canManage || busyKey === "visibility"}
-            onClick={() => void toggleVisibility()}
-            className={`relative h-6 w-10 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              control.publicSaleEnabled ? "bg-[#19b66b]" : "bg-[#465168]"
-            }`}
-          >
-            <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
-                control.publicSaleEnabled ? "left-1" : "right-1"
-              }`}
-            />
-          </button>
-        </div>
-      </section>
-
-      <section
-        className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border p-2.5 ${
-          control.agencySaleEnabled
-            ? "border-[#20c99766] bg-[#0d332f66]"
-            : "border-[#f59e0b55] bg-[#3b2c1566]"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className={`text-[11px] font-black ${control.agencySaleEnabled ? "text-[#34d399]" : "text-[#fbbf24]"}`}>
-              {control.agencySaleEnabled
-                ? "مجوز نمایش و درخواست برای آژانس‌ها"
-                : "نمایش و درخواست برای آژانس‌ها غیرفعال است"}
-            </h3>
-            <p className="mt-0.5 text-[9px] leading-4 text-[#91a1b8]">
-              {control.agencySaleEnabled
-                ? "این پرواز در فهرست صندلی‌های تخصیصی آژانس‌ها قابل مشاهده و درخواست است."
-                : "تا زمان فعال‌سازی، آژانس‌ها این پرواز را مشاهده و درخواست نمی‌کنند."}
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={control.agencySaleEnabled}
-            aria-label="مجوز نمایش و درخواست برای آژانس‌ها"
-            disabled={!canManage || busyKey === "agency-visibility"}
-            onClick={() => void toggleAgencyVisibility()}
-            className={`relative h-6 w-10 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
-              control.agencySaleEnabled ? "bg-[#19b66b]" : "bg-[#465168]"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${
-                control.agencySaleEnabled ? "left-1" : "right-1"
-              }`}
-            />
-          </button>
-        </div>
-      </section>
-
       <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} grid grid-cols-3 gap-1.5`}>
         <div className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5">
           <div className="text-[10px] text-[#8c9bb2]">صندلی فروخته‌شده</div>
-          <div className="mt-1 font-num text-sm font-black text-white">
+          <div className="mt-1 font-num text-sm font-black text-panel-ink">
             {faDigits(detail.sold)} / {faDigits(detail.capacity)}
           </div>
         </div>
@@ -447,9 +332,11 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#24324b] bg-[#101a2c] p-2.5`}>
-        <h3 className="mb-2 text-[11px] font-black text-white">تفکیک کانال فروش صندلی</h3>
-        <div className="space-y-2">
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-panel-border bg-white p-2.5`}>
+        <h3 className="mb-2 text-[11px] font-black text-panel-ink">تفکیک کانال فروش صندلی</h3>
+        {detail.sold === 0 ? (
+          <div className="rounded-lg bg-panel-canvas px-3 py-2 text-[10px] text-panel-muted">هنوز فروشی برای این پرواز ثبت نشده است.</div>
+        ) : <div className="space-y-2">
           {detail.channels.map((channel) => {
             const meta = channelMeta[channel.channel];
             const pct = detail.sold > 0 ? Math.round((channel.seats / detail.sold) * 100) : 0;
@@ -460,7 +347,7 @@ export default function CommercialFlightDetailContent({
                     <span className={`h-2 w-2 rounded-sm ${meta.color}`} />
                     {meta.label}
                   </span>
-                  <span className="font-num text-[9px] font-bold text-white">
+                  <span className="font-num text-[9px] font-bold text-panel-ink">
                     {faDigits(channel.seats)} صندلی · {faMoney(channel.revenueIrr)} تومان
                   </span>
                 </div>
@@ -470,11 +357,11 @@ export default function CommercialFlightDetailContent({
               </div>
             );
           })}
-        </div>
+        </div>}
       </section>
 
       <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} flex items-center justify-between rounded-lg border border-[#2a3550] bg-[#18243b] px-3 py-2`}>
-        <span className="text-[10px] font-black text-white">درآمد پرواز <span className="font-normal text-[#71829d]">(با فروش هر صندلی افزایش می‌یابد)</span></span>
+        <span className="text-[10px] font-black text-panel-ink">درآمد پرواز <span className="font-normal text-[#71829d]">(با فروش هر صندلی افزایش می‌یابد)</span></span>
         <span className="font-num text-sm font-black text-[#6ea8ff]">
           {faMoney(detail.totalRevenueIrr)} تومان
         </span>
@@ -485,7 +372,7 @@ export default function CommercialFlightDetailContent({
           <AgencyAllotmentsSummaryCard summary={allotmentSummary} />
           {canManage && (
             <div className="rounded-lg border border-[#2a3550] bg-[#121d31] p-3">
-              <h3 className="text-[11px] font-black text-white">افزودن دستی آژانس و قفل صندلی</h3>
+              <h3 className="text-[11px] font-black text-panel-ink">افزودن دستی آژانس و قفل صندلی</h3>
               <p className="mt-1 text-[9px] leading-4 text-[#78879d]">
                 ظرفیت مجاز از موجودی واقعی پرواز محاسبه می‌شود؛ مجموع فروش آنلاین و قفل‌های آژانسی هرگز نمی‌تواند از ظرفیت پرواز بیشتر شود.
               </p>
@@ -536,7 +423,7 @@ export default function CommercialFlightDetailContent({
                 <div className="mt-3 space-y-1.5">
                   {allotmentSummary?.agencies.map((agency) => (
                     <div key={agency.id} className="flex items-center justify-between gap-3 rounded-md border border-[#2b3852] bg-[#0f192a] px-3 py-2 text-[10px]">
-                      <span><strong className="text-white">{agency.agencyName}</strong> · {faDigits(agency.seatsAllocated)} صندلی</span>
+                      <span><strong className="text-panel-ink">{agency.agencyName}</strong> · {faDigits(agency.seatsAllocated)} صندلی</span>
                       <button
                         type="button"
                         disabled={busyKey === `allotment-delete-${agency.id}`}
@@ -554,7 +441,7 @@ export default function CommercialFlightDetailContent({
         </section>
       )}
 
-      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#121d31] p-2.5`} data-commercial-section="agency-fare-release">
+      <section className="hidden" data-commercial-section="legacy-agency-fare-release">
         <h3 className="text-[11px] font-black text-white">آزادسازی صندلی برای فروش آژانسی — به تفکیک کلاس پروازی</h3>
         <p className="mt-1 text-[9px] leading-4 text-[#78879d]">
           برای هر کلاس تعداد و قیمت صندلی را مشخص کنید؛ پیشنهاد ویژه پس از ثبت در پنل آژانس نمایش داده می‌شود.
@@ -650,7 +537,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5`} data-commercial-section="public-fare-classes">
+      <section className="hidden" data-commercial-section="legacy-public-fare-classes">
         <h3 className="text-[11px] font-black text-[#80b7ff]">قیمت فروش در سایت به تفکیک کلاس پروازی</h3>
         <div className="mt-2 space-y-1.5">
           {control.fareClasses.map((row) => {
@@ -739,8 +626,17 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
+      {activeTab === "OVERVIEW" && (
+        <CommercialFareClassControls
+          instanceId={detail.id}
+          canManage={canManage}
+          onNotice={onNotice}
+          onError={onError}
+        />
+      )}
+
       <section className={activeTab !== "OVERVIEW" ? "hidden" : ""} data-commercial-section="price-history">
-        <h3 className="mb-1.5 text-[10px] font-black text-white">تاریخچه تغییر قیمت</h3>
+        <h3 className="mb-1.5 text-[10px] font-black text-panel-ink">تاریخچه تغییر قیمت</h3>
         {combinedHistory.length === 0 ? (
           <div className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5 text-[9px] text-[#8c9bb2]">
             هنوز تغییری در قیمت کلاس‌های این پرواز ثبت نشده است.
@@ -750,7 +646,7 @@ export default function CommercialFlightDetailContent({
             {combinedHistory.map((entry, index) => (
               <div key={`${entry.changedAt}-${entry.className}-${index}`} className="rounded-lg border border-[#2a3550] bg-[#18243b] p-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]">
-                  <span className="text-[9px] font-bold text-white">
+                  <span className="text-[9px] font-bold text-panel-ink">
                     {entry.className}: {faMoney(entry.previousPriceIrr)} ← {faMoney(entry.newPriceIrr)} تومان
                   </span>
                   <span className="font-num text-[#78879d]">{formatJalaliDateTime(entry.changedAt)}</span>
@@ -795,13 +691,6 @@ export default function CommercialFlightDetailContent({
         </section>
       )}
 
-      <button
-        type="button"
-        onClick={onConfirm}
-        className="w-full rounded-md bg-[#3b82f6] px-4 py-2.5 text-[11px] font-black text-white"
-      >
-        تأیید
-      </button>
     </div>
   );
 }

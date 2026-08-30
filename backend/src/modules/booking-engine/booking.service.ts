@@ -601,6 +601,26 @@ export class BookingService {
         .where('fi.id = :id', { id: instance.id })
         .getOne();
 
+      if (fareClass) {
+        const liveFareClass = await resolveFareClass(
+          tx,
+          instance.id,
+          dto.cabin,
+          'SYSTEM',
+        );
+        if (
+          !liveFareClass ||
+          liveFareClass.classCode !== fareClass.classCode ||
+          liveFareClass.priceIrr !== unitPriceIrr
+        ) {
+          throw new ConflictException({
+            code: ErrorCode.CONFLICT,
+            message:
+              'ظرفیت این برنامه نرخ تکمیل یا نرخ آن تغییر کرده است؛ نتایج پرواز را دوباره بررسی کنید.',
+          });
+        }
+      }
+
       await assertNationalIdSeatLimitForFlight(tx, instance.id, dto.passengers);
 
       const taken = await this.search.takenSeatCodes(instance.id);
@@ -1031,10 +1051,16 @@ export class BookingService {
           this.bookingRepo.manager,
           instance.id,
           dto.cabin,
+          'AGENCY',
         );
     const unitPriceIrr =
       allotment.contractPriceIrr ??
-      (await getCabinPrice(this.bookingRepo.manager, instance.id, dto.cabin));
+      (await getCabinPrice(
+        this.bookingRepo.manager,
+        instance.id,
+        dto.cabin,
+        'AGENCY',
+      ));
     const unitCharges = await calculateActiveCharges(
       this.bookingRepo.manager,
       instance.id,
@@ -1283,6 +1309,7 @@ export class BookingService {
         return {
           priceChanged: false as const,
           booking: this.toDetail(await this.materializeExpiry(priorBooking!)),
+          walletBalanceIrr: await this.wallet.getBalance(user.id),
         };
       }
     }
@@ -1300,6 +1327,7 @@ export class BookingService {
         return {
           priceChanged: false as const,
           booking: this.toDetail(await this.materializeExpiry(booking)),
+          walletBalanceIrr: await this.wallet.getBalance(user.id),
         };
       }
       throw new ConflictException({
@@ -1421,6 +1449,7 @@ export class BookingService {
     const paid = await this.bookingRepo.manager.transaction(async (tx) => {
       let finalPriceIrr = currentPriceIrr;
       let discountIrr: Irr = 0n;
+      let walletEntryId: string | null = null;
       if (options.promoCode) {
         const result = await applyPromoCode(tx, {
           code: options.promoCode,
@@ -1436,7 +1465,13 @@ export class BookingService {
       }
 
       if (paymentMethod === 'WALLET') {
-        await this.wallet.charge(tx, user.id, finalPriceIrr, id);
+        const walletEntry = await this.wallet.charge(
+          tx,
+          user.id,
+          finalPriceIrr,
+          id,
+        );
+        walletEntryId = walletEntry.id;
       } else if (paymentMethod === 'POINTS') {
         if (!member) {
           throw new BadRequestException({
@@ -1481,7 +1516,12 @@ export class BookingService {
           .getOneOrFail();
         const latest = await this.loadBookingRelations(latestRaw, tx);
         if (latest.status === 'TICKETED' || latest.status === 'PAID') {
-          return { booking: latest, discountIrr: 0n };
+          return {
+            booking: latest,
+            discountIrr: 0n,
+            walletEntryId: null,
+            ledgerEntryId: null,
+          };
         }
         throw new ConflictException({
           code: ErrorCode.CONFLICT,
@@ -1516,7 +1556,7 @@ export class BookingService {
         );
       }
 
-      await tx.save(
+      const ledgerEntry = await tx.save(
         tx.create(LedgerEntry, {
           bookingId: id,
           type: 'SALE',
@@ -1545,6 +1585,8 @@ export class BookingService {
       return {
         booking: await this.loadBookingRelations(finalRaw, tx),
         discountIrr,
+        walletEntryId,
+        ledgerEntryId: ledgerEntry.id,
       };
     });
 
@@ -1573,6 +1615,8 @@ export class BookingService {
         paymentMethod,
         discountIrr: paid.discountIrr,
         gatewayRefId,
+        walletEntryId: paid.walletEntryId,
+        ledgerEntryId: paid.ledgerEntryId,
       },
     });
 
@@ -1597,6 +1641,7 @@ export class BookingService {
     return {
       priceChanged: false as const,
       booking: this.toDetail(paid.booking),
+      walletBalanceIrr: await this.wallet.getBalance(user.id),
     };
   }
 }

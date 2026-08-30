@@ -65,10 +65,10 @@ export function agencySeatSuggestion(
 }
 
 /**
- * A published flight must stay requestable even before the commercial manager
- * reserves a dedicated agency pool.  A configured agency release remains the
- * hard request ceiling; otherwise the class inventory is only a provisional
- * ceiling and the live reservation inquiry below applies the real seat limit.
+ * Agency sale is independent from public sale: a class is requestable only
+ * after Commercial Management explicitly opens an agency ceiling and price.
+ * The live reservation inventory is applied separately by the option/inquiry
+ * flows, so this ceiling never promises seats already consumed by the site.
  */
 export function agencySeatRequestClassOffer(
   rule: Pick<
@@ -88,9 +88,7 @@ export function agencySeatRequestClassOffer(
   );
   const hasDedicatedAgencyRelease =
     releasedSeats > 0 && rule.agencyReleasePriceIrr != null;
-  const requestCeiling = hasDedicatedAgencyRelease
-    ? releasedSeats
-    : classCapacity;
+  const requestCeiling = hasDedicatedAgencyRelease ? releasedSeats : 0;
   return {
     hasDedicatedAgencyRelease,
     availableToRequest: Math.max(
@@ -864,37 +862,49 @@ export class AgencyPortalService {
       ]),
     );
 
-    return fareRules.flatMap((rule) => {
-      const instance = instanceById.get(rule.flightInstanceId);
-      if (!instance || rule.seatsAllocated < 1) return [];
-      const key = `${instance.id}:${rule.cabin}:${rule.classCode}`;
-      const allotment = allotmentByClass.get(key);
-      const allocated = Number(allotment?.total ?? 0);
-      const ownAllocated = Number(allotment?.own ?? 0);
-      const offer = agencySeatRequestClassOffer(rule, allocated);
-      return {
-        flightInstanceId: instance.id,
-        flightNo: instance.flight.flightNo,
-        originCode: instance.flight.route.originCode,
-        destCode: instance.flight.route.destCode,
-        departureAt: instance.departureAt,
-        aircraftType:
-          instance.aircraftTypeOverride ?? instance.flight.aircraftType,
-        cabin: rule.cabin,
-        fareClassCode: rule.classCode,
-        capacity: rule.seatsAllocated,
-        agencySeatsReleased: rule.agencySeatsReleased,
-        agencyAllocated: allocated,
-        ownAllocated,
-        availableToRequest: offer.availableToRequest,
-        pricePerSeatIrr: offer.pricePerSeatIrr,
-        specialOffer: rule.agencySpecialOffer,
-        // Every returned row has already passed the same CEO-approved active
-        // inventory gate used above; the portal does not expose revision
-        // workflow internals to an agency.
-        definitionStatus: 'PUBLISHED' as const,
-      };
-    });
+    const offers = await Promise.all(
+      fareRules.map(async (rule) => {
+        const instance = instanceById.get(rule.flightInstanceId);
+        if (!instance || rule.seatsAllocated < 1) return null;
+        const key = `${instance.id}:${rule.cabin}:${rule.classCode}`;
+        const allotment = allotmentByClass.get(key);
+        const allocated = Number(allotment?.total ?? 0);
+        const ownAllocated = Number(allotment?.own ?? 0);
+        const offer = agencySeatRequestClassOffer(rule, allocated);
+        if (!offer.hasDedicatedAgencyRelease) return null;
+        const liveInventory = await this.search.cabinAvailability(
+          instance,
+          rule.cabin,
+        );
+        const availableToRequest = Math.max(
+          0,
+          Math.min(offer.availableToRequest, liveInventory?.seatsLeft ?? 0),
+        );
+        return {
+          flightInstanceId: instance.id,
+          flightNo: instance.flight.flightNo,
+          originCode: instance.flight.route.originCode,
+          destCode: instance.flight.route.destCode,
+          departureAt: instance.departureAt,
+          aircraftType:
+            instance.aircraftTypeOverride ?? instance.flight.aircraftType,
+          cabin: rule.cabin,
+          fareClassCode: rule.classCode,
+          capacity: rule.seatsAllocated,
+          agencySeatsReleased: rule.agencySeatsReleased,
+          agencyAllocated: allocated,
+          ownAllocated,
+          availableToRequest,
+          pricePerSeatIrr: offer.pricePerSeatIrr,
+          specialOffer: rule.agencySpecialOffer,
+          // Every returned row has already passed the same CEO-approved active
+          // inventory gate used above; the portal does not expose revision
+          // workflow internals to an agency.
+          definitionStatus: 'PUBLISHED' as const,
+        };
+      }),
+    );
+    return offers.filter((row) => row !== null);
   }
 
   /**

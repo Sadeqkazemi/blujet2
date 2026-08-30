@@ -467,7 +467,7 @@ export default function PanelShell() {
   const roleLabel = user?.isSuperAdmin ? 'سوپر ادمین' : user ? (ROLE_LABELS[user.role] ?? user.role) : '';
   const brandSub = (user?.role ? ROLE_BRAND_SUB[user.role] : undefined) ?? 'پنل مدیریت';
 
-  /** Dark executive chrome: CEO / Board / Senior / Commercial / Operations. */
+  /** Executive roles retain their compact header layout on the shared light palette. */
   const executiveShell =
     user?.role === 'CEO' ||
     user?.role === 'BOARD_CHAIR' ||
@@ -479,22 +479,27 @@ export default function PanelShell() {
   const notifAlerts = lowSalesAlerts.slice(1);
 
   return (
-    <div dir="rtl" className="flex min-h-screen bg-panel-canvas font-sans text-panel-ink">
-      <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink">
+    <div
+      dir="rtl"
+      data-testid="management-panel-shell"
+      data-theme="light"
+      className="management-panel-light flex min-h-screen bg-panel-canvas font-sans text-panel-ink"
+    >
+      <aside className="sticky top-0 flex h-screen w-[248px] flex-none flex-col gap-1.5 border-l border-panel-border bg-panel-surface px-[11px] py-[15px] text-panel-ink shadow-[-8px_0_30px_-24px_rgba(13,38,64,.35)]">
         <div className="flex items-center gap-[9px] px-2 pb-3.5 pt-[7px]">
           <div className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#3b82f6] text-white">
             {PANEL_BRAND_PLANE_ICON}
           </div>
           <div className="leading-[1.3]">
-            <div className="text-[15.5px] font-black text-white">blujet</div>
-            <div className="text-[10px] text-[#6b7b94]">{brandSub}</div>
+            <div className="text-[15.5px] font-black text-panel-ink">blujet</div>
+            <div className="text-[10px] text-panel-muted">{brandSub}</div>
           </div>
         </div>
 
         {user?.role !== 'EMPLOYEE' && (
           <div className="px-[5px] pb-[11px]">
-            <label className="mb-1.5 block pr-[3px] text-[10px] text-[#6b7b94]">نقش این پنل</label>
-            <div className="flex items-center gap-[7px] rounded-[10px] border border-[#2a3a55] bg-[#18223a] px-[11px] py-[9px]">
+            <label className="mb-1.5 block pr-[3px] text-[10px] text-panel-muted">نقش این پنل</label>
+            <div className="flex items-center gap-[7px] rounded-[10px] border border-panel-border bg-panel-surface-2 px-[11px] py-[9px]">
               <span className="h-2 w-2 flex-none rounded-full bg-[#3b82f6]" />
               <span className="text-xs font-extrabold text-panel-ink">{roleLabel}</span>
             </div>
@@ -518,8 +523,8 @@ export default function PanelShell() {
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 rounded-[11px] px-[11px] py-2.5 text-[12.5px] transition ${
                     isActive
-                      ? 'bg-[rgba(59,130,246,.16)] font-bold text-white'
-                      : 'font-medium text-panel-muted hover:bg-white/5'
+                      ? 'bg-[rgba(22,104,196,.12)] font-bold text-accent'
+                      : 'font-medium text-panel-muted hover:bg-panel-surface-2 hover:text-panel-ink'
                   }`
                 }
               >
@@ -544,7 +549,7 @@ export default function PanelShell() {
             type="button"
             data-testid="panel-logout"
             onClick={() => setLogoutConfirmOpen(true)}
-            className="flex min-h-[72px] w-full items-center gap-2 px-[22px] text-right text-xs font-bold text-[#f87171] transition hover:bg-red-400/5 hover:text-[#fca5a5]"
+            className="flex min-h-[72px] w-full items-center gap-2 px-[22px] text-right text-xs font-bold text-[#dc4545] transition hover:bg-red-50 hover:text-[#b91c1c]"
           >
             <svg
               width="19"
@@ -570,14 +575,14 @@ export default function PanelShell() {
         {executiveShell ? (
           showExecNotifChrome ? (
             <div className="flex items-center justify-end gap-2.5 px-[21px] pt-[18px]">
-              <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-[#28344c] bg-[#18223a] px-3 text-[12px] text-[#6b7b94]">
+              <div className="flex h-[42px] w-[230px] items-center gap-2 rounded-[10px] border border-panel-border bg-panel-surface px-3 text-[12px] text-panel-muted shadow-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="7" />
                   <path d="M21 21l-4.3-4.3" />
                 </svg>
                 <span>جستجو…</span>
               </div>
-              <PanelNotifBell alerts={notifAlerts} variant="dark" />
+              <PanelNotifBell alerts={notifAlerts} variant="light" />
             </div>
           ) : null
         ) : (
@@ -598,7 +603,7 @@ export default function PanelShell() {
         busyLabel="در حال خروج…"
         onCancel={() => setLogoutConfirmOpen(false)}
         onConfirm={onSignOut}
-        variant="dark"
+        variant="light"
         testId="panel-logout-confirm"
       />
     </div>

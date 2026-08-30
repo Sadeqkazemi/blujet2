@@ -3062,6 +3062,15 @@ existing bookings. Existing rows default to enabled so active sellable flights
 remain requestable unless a commercial manager explicitly disables the agency
 channel.
 
+## Fare-class advisory pricing projection (2026-08-30)
+
+No schema migration is required. The per-class pricing assistant is a
+read-only projection over `FlightInstance`, `FareRule`, confirmed `Booking` /
+`Passenger` inventory and the existing `competitorPriceIrr`. Suggestions are
+not persisted as an authoritative fare and cannot change channel visibility or
+inventory. Only the existing audited site-price and agency-release commands may
+publish a manager-confirmed rate.
+
 ## Finance report detail and paging correction (2026-08-27)
 
 No schema migration is required. The finance customer-flight detail is a

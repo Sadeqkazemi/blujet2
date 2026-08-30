@@ -248,6 +248,7 @@ describe('Flight engine completion', () => {
         classCode: 'Y',
         priceIrr: 30_000_000n,
         seatsAllocated: 1,
+        siteSeatsReleased: 1,
         taxIrr: 0n,
       },
       {
@@ -256,6 +257,7 @@ describe('Flight engine completion', () => {
         classCode: 'B',
         priceIrr: 40_000_000n,
         seatsAllocated: 2,
+        siteSeatsReleased: 2,
         taxIrr: 0n,
       },
     ]) {

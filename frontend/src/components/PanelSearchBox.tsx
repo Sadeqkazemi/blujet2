@@ -51,12 +51,12 @@ export default function PanelSearchBox({ nav }: { nav: PanelNavItem[] }) {
           }}
           placeholder="جستجو…"
           aria-label="جستجو در صفحات این پنل"
-          className="h-9 w-full rounded-lg border border-white/10 bg-white/5 py-2 pe-3 ps-8 text-xs text-panel-ink outline-none transition placeholder:text-panel-muted-2 focus:border-accent"
+          className="h-9 w-full rounded-lg border border-panel-border bg-panel-surface py-2 pe-3 ps-8 text-xs text-panel-ink shadow-sm outline-none transition placeholder:text-panel-muted-2 focus:border-accent"
         />
       </div>
 
       {open && query.trim() && (
-        <div className="absolute right-0 z-20 mt-2 w-full rounded-xl border border-white/10 bg-panel-surface p-2 shadow-lg">
+        <div className="absolute right-0 z-20 mt-2 w-full rounded-xl border border-panel-border bg-panel-surface p-2 shadow-lg">
           {results.length === 0 ? (
             <p className="px-2 py-3 text-center text-xs text-panel-muted">صفحه‌ای یافت نشد.</p>
           ) : (
@@ -66,7 +66,7 @@ export default function PanelSearchBox({ nav }: { nav: PanelNavItem[] }) {
                   <button
                     type="button"
                     onClick={() => goTo(item)}
-                    className="block w-full rounded-lg px-2 py-2 text-start text-xs text-panel-ink transition hover:bg-white/5"
+                    className="block w-full rounded-lg px-2 py-2 text-start text-xs text-panel-ink transition hover:bg-panel-surface-2"
                   >
                     {item.labelFa}
                   </button>

@@ -218,7 +218,7 @@ export default function CommercialDashboardPage() {
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="m-0 text-[20.5px] font-black text-white">داشبورد</h1>
+          <h1 className="m-0 text-[20.5px] font-black text-panel-ink">داشبورد</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">نمای کلی فروش و کارهای در انتظار اقدام</p>
         </div>
         <div className="flex items-center gap-2.5">

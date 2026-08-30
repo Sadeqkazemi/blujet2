@@ -136,8 +136,8 @@ describe('AgenciesListPage', () => {
 
     expect(await screen.findByText('آژانس blujet')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'مدیریت آژانس‌ها' })).toBeInTheDocument();
-    expect(screen.getByLabelText('جستجو در صفحات این پنل')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'اعلان‌ها' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('جستجو در صفحات این پنل')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'اعلان‌ها' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'آژانس‌های همکار' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'درخواست همکاری' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'آژانس‌های دارای بدهی' })).toBeInTheDocument();

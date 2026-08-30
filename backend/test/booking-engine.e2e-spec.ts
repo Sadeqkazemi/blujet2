@@ -13,6 +13,7 @@ import { PaymentReconciliation } from '../src/database/entities/payment-reconcil
 import { Route } from '../src/database/entities/route.entity';
 import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
 import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
+import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -248,6 +249,64 @@ describe('Booking engine (e2e)', () => {
     expect(ledger!.signedAmountIrr).toBe(
       BigInt(String(payRes.body.data.booking.priceIrr)),
     );
+  });
+
+  it('pays from the wallet, debits the exact fare, records the SALE document, and issues the ticket', async () => {
+    const instance = await freshInstance();
+    const { accessToken, userId } = await loginAsCustomer(app, '09130000982');
+    expect(userId).toBeDefined();
+
+    const walletRepo = dataSource.getRepository(WalletEntry);
+    const openingBalance = 1_000_000_000n;
+    await walletRepo.save(
+      walletRepo.create({
+        userId: userId!,
+        type: 'TOPUP',
+        signedAmountIrr: openingBalance,
+        bookingId: null,
+      }),
+    );
+    const balanceBeforePayRow = await walletRepo
+      .createQueryBuilder('wallet')
+      .select('COALESCE(SUM(wallet."signedAmountIrr"), 0)', 'balance')
+      .where('wallet."userId" = :userId', { userId })
+      .getRawOne<{ balance: string }>();
+    const balanceBeforePay = BigInt(balanceBeforePayRow?.balance ?? '0');
+
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'خریدار کیف پول', seatCode: '2A' }],
+      });
+    expect(createRes.status).toBe(201);
+    const bookingId = createRes.body.data.id as string;
+
+    const payRes = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ paymentMethod: 'WALLET' });
+
+    expect(payRes.status).toBe(201);
+    expect(payRes.body.data.booking.status).toBe('TICKETED');
+    const paidFare = BigInt(String(payRes.body.data.booking.priceIrr));
+    expect(BigInt(String(payRes.body.data.walletBalanceIrr))).toBe(
+      balanceBeforePay - paidFare,
+    );
+
+    const purchase = await walletRepo.findOneBy({
+      userId: userId!,
+      bookingId,
+      type: 'PURCHASE',
+    });
+    expect(purchase?.signedAmountIrr).toBe(-paidFare);
+
+    const ledger = await dataSource
+      .getRepository(LedgerEntry)
+      .findOneBy({ bookingId, type: 'SALE' });
+    expect(ledger?.signedAmountIrr).toBe(paidFare);
   });
 
   it('prices selected travel costs from server configuration and stores an immutable snapshot', async () => {

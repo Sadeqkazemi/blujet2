@@ -312,6 +312,18 @@ export default function PublicHeader() {
   }, [loggedIn]);
 
   useEffect(() => {
+    const onWalletBalance = (event: Event) => {
+      const detail = (event as CustomEvent<{ balanceIrr?: string }>).detail;
+      if (typeof detail?.balanceIrr === 'string') {
+        setWalletBalanceIrr(detail.balanceIrr);
+      }
+    };
+    window.addEventListener('blujet:wallet-balance', onWalletBalance);
+    return () =>
+      window.removeEventListener('blujet:wallet-balance', onWalletBalance);
+  }, []);
+
+  useEffect(() => {
     if (!agencyLoggedIn) {
       setAgencyProfileName(null);
       setAgencyLicenseNo(null);

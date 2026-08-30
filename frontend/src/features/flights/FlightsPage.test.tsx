@@ -126,7 +126,10 @@ const DETAIL: FlightDetail = {
 
 const COMMERCIAL_CONTROL: CommercialFlightControl = {
   flightInstanceId: "fi1",
+  departureAt: "2026-08-31T08:00:00.000Z",
+  competitorPriceIrr: null,
   publicSaleEnabled: true,
+  agencySaleEnabled: true,
   fareClasses: [
     {
       ruleId: "rule-y",
@@ -134,7 +137,13 @@ const COMMERCIAL_CONTROL: CommercialFlightControl = {
       classCode: "Y",
       seatsAllocated: 180,
       soldSeats: 152,
+      siteSoldSeats: 140,
+      agencySoldSeats: 12,
       remainingSeats: 28,
+      sharedSeatsRemaining: 28,
+      siteSeatsAvailable: 0,
+      agencySeatsAvailable: 0,
+      agencySeatsCommitted: 12,
       revenueIrr: "5776000000",
       basePriceIrr: "38000000",
       sitePriceIrr: "38000000",
@@ -415,7 +424,7 @@ describe("FlightsPage", () => {
     expect(
       within(dialog).getByText('قیمت فروش در سایت به تفکیک کلاس پروازی'),
     ).toBeInTheDocument();
-    expect(within(dialog).getByRole('switch', { name: 'مجوز نمایش و فروش در سایت' })).toBeInTheDocument();
+    expect(await within(dialog).findByRole('switch', { name: /فروش در سایت/ })).toBeInTheDocument();
   });
 
   it("does not expose published-fare or seat-lock controls to an employee", async () => {

@@ -221,7 +221,7 @@ describe('Commercial manager overhaul (e2e)', () => {
   });
 
   describe('seat requests', () => {
-    it('lists an active sellable flight and accepts a request before a dedicated agency pool is released', async () => {
+    it('keeps agency inventory closed until its independent release is saved', async () => {
       const agency = await createFreshAgency();
       const instance = await futureInstance();
       await dataSource.getRepository(FareRule).update(
@@ -238,8 +238,50 @@ describe('Commercial manager overhaul (e2e)', () => {
         .get('/agency-portal/seat-request-options')
         .set('Authorization', auth(agencyToken))
         .expect(200);
-      const option = (
+      const closedOption = (
         catalogue.body.data as Array<{
+          flightInstanceId: string;
+          fareClassCode: string;
+          agencySeatsReleased: number;
+          availableToRequest: number;
+          pricePerSeatIrr: string;
+        }>
+      ).find(
+        (row) =>
+          row.flightInstanceId === instance.id && row.fareClassCode === 'Y',
+      );
+      expect(closedOption).toBeUndefined();
+
+      await request(app.getHttpServer())
+        .post('/agency-portal/seat-requests')
+        .set('Authorization', auth(agencyToken))
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          fareClassCode: 'Y',
+          seats: 4,
+          payMethod: 'INVOICE',
+        })
+        .expect(404);
+
+      const rule = await dataSource.getRepository(FareRule).findOneByOrFail({
+        flightInstanceId: instance.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: 'Y',
+      });
+      const commercial = await loginAs(app, 'comm');
+      await request(app.getHttpServer())
+        .put(`/flights/${instance.id}/fare-rules/${rule.id}/agency-release`)
+        .set('Authorization', auth(commercial.accessToken))
+        .send({ seats: 8, priceIrr: '4500000', specialOffer: false })
+        .expect(200);
+
+      const reopenedCatalogue = await request(app.getHttpServer())
+        .get('/agency-portal/seat-request-options')
+        .set('Authorization', auth(agencyToken))
+        .expect(200);
+      const option = (
+        reopenedCatalogue.body.data as Array<{
           flightInstanceId: string;
           fareClassCode: string;
           agencySeatsReleased: number;
@@ -252,9 +294,9 @@ describe('Commercial manager overhaul (e2e)', () => {
       );
       expect(option).toMatchObject({
         flightInstanceId: instance.id,
-        agencySeatsReleased: 0,
-        availableToRequest: 80,
-        pricePerSeatIrr: '5000000',
+        agencySeatsReleased: 8,
+        availableToRequest: 8,
+        pricePerSeatIrr: '4500000',
       });
 
       const submitted = await request(app.getHttpServer())

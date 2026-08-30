@@ -28,6 +28,8 @@ const detail: FlightDetail = {
 
 const control: CommercialFlightControl = {
   flightInstanceId: "fi-1",
+  departureAt: "2026-08-31T08:00:00.000Z",
+  competitorPriceIrr: null,
   publicSaleEnabled: true,
   agencySaleEnabled: true,
   fareClasses: [
@@ -40,6 +42,10 @@ const control: CommercialFlightControl = {
       siteSoldSeats: 25,
       agencySoldSeats: 5,
       remainingSeats: 120,
+      sharedSeatsRemaining: 120,
+      siteSeatsAvailable: 0,
+      agencySeatsAvailable: 3,
+      agencySeatsCommitted: 5,
       revenueIrr: "1520000000",
       basePriceIrr: "38000000",
       sitePriceIrr: "38000000",
@@ -142,7 +148,7 @@ describe("CommercialFlightDetailContent", () => {
     expect(await screen.findByText("تفکیک کانال فروش صندلی")).toBeInTheDocument();
     expect(screen.getAllByText("اکونومی · Y")).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole("switch", { name: "مجوز نمایش و فروش در سایت" }));
+    fireEvent.click(await screen.findByRole("switch", { name: /فروش در سایت/ }));
     await waitFor(() => expect(visibilitySpy).toHaveBeenCalledWith("fi-1", false));
   });
 
@@ -154,7 +160,7 @@ describe("CommercialFlightDetailContent", () => {
 
     expect(await screen.findByText("۲۵ صندلی فروخته‌شده در سایت")).toBeInTheDocument();
     expect(screen.getByText("۵ صندلی فروخته‌شده به آژانس‌ها")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("switch", { name: "مجوز نمایش و درخواست برای آژانس‌ها" }));
+    fireEvent.click(await screen.findByRole("switch", { name: /فروش آژانسی/ }));
 
     await waitFor(() =>
       expect(agencyVisibilitySpy).toHaveBeenCalledWith("fi-1", false),

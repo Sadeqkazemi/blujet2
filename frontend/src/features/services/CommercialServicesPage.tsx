@@ -309,7 +309,7 @@ export default function CommercialServicesPage() {
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="m-0 text-[20.5px] font-black text-white">خدمات</h1>
+          <h1 className="m-0 text-[20.5px] font-black text-panel-ink">خدمات</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">قیمت‌گذاری و فعال‌سازی خدمات قابل خرید همراه بلیت</p>
         </div>
         <button
@@ -394,7 +394,7 @@ export default function CommercialServicesPage() {
         </section>
       )}
 
-      <section className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
+      <section className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-surface shadow-sm">
         {loading ? (
           <p className="p-10 text-center text-xs text-[#6b7b94]">در حال بارگذاری خدمات…</p>
         ) : rows.length === 0 ? (
@@ -404,23 +404,23 @@ export default function CommercialServicesPage() {
             const meta = getServiceMeta(row.code);
             const disabled = busyId === row.id;
             return (
-              <article key={row.id} className="grid grid-cols-1 gap-4 border-b border-[#1f2a3d] px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1fr)_minmax(300px,420px)] lg:items-center">
+              <article key={row.id} className="grid grid-cols-1 gap-4 border-b border-panel-border px-4 py-5 last:border-b-0 lg:grid-cols-[minmax(260px,1fr)_auto] lg:items-center">
                 <div className="flex items-center gap-3">
                   <ServiceIcon code={row.code} />
                   <div>
-                    <h2 className="m-0 text-[13px] font-extrabold text-white">{row.titleFa || meta.label}</h2>
+                    <h2 className="m-0 text-[13px] font-extrabold text-panel-ink">{row.titleFa || meta.label}</h2>
                     <p className="mt-1 text-[10.5px] text-[#6b7b94]">{row.descriptionFa || meta.description}</p>
                     <p className="mt-1 text-[10px] text-[#8494ac]">{unitLabels[row.billingUnit]} · قیمت فعلی {faMoney(row.priceIrr)} تومان</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 lg:justify-end">
+                <div className="grid grid-cols-[minmax(150px,190px)_auto_auto_auto] items-center gap-2.5 max-sm:grid-cols-2">
                   <input
                     aria-label={`قیمت ${row.titleFa}`}
                     inputMode="numeric"
                     value={drafts[row.id] ?? ''}
                     onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: latinDigits(event.target.value).replace(/\D/g, '') }))}
                     placeholder="قیمت (تومان)"
-                    className="font-num h-10 min-w-[150px] flex-1 rounded-[9px] border border-[#2a3550] bg-[#0f1726] px-3 text-xs text-white outline-none focus:border-[#3b82f6] lg:flex-none"
+                    className="font-num h-10 w-full rounded-[9px] border border-panel-border-2 bg-white px-3 text-xs text-panel-ink outline-none focus:border-[#3b82f6]"
                   />
                   <button type="button" disabled={disabled} onClick={() => void savePrice(row)} className="h-10 rounded-[9px] bg-[linear-gradient(135deg,#7c3aed,#8b5cf6)] px-4 text-xs font-extrabold text-white disabled:opacity-50">ثبت قیمت</button>
                   <span className={`min-w-[48px] text-[11px] font-bold ${row.active ? 'text-[#34d399]' : 'text-[#6b7b94]'}`}>{row.active ? 'فعال' : 'غیرفعال'}</span>

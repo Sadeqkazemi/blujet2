@@ -63,7 +63,7 @@ function EyeIcon({ hidden }: { hidden: boolean }) {
 }
 
 export default function LoginPage() {
-  const { requestLogin } = useAuth();
+  const { requestLogin, status, user } = useAuth();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<LoginPhase>('username');
   const [username, setUsername] = useState('');
@@ -80,6 +80,25 @@ export default function LoginPage() {
     const timer = window.setTimeout(() => setToast(null), 2800);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !user) return;
+    if (user.mustChangePassword) {
+      navigate('/required-password-change', { replace: true });
+      return;
+    }
+    if (user.role === 'AGENCY') {
+      navigate('/agency', { replace: true });
+      return;
+    }
+    if (user.role === 'USER') {
+      navigate('/account', { replace: true });
+      return;
+    }
+    navigate('/panel', { replace: true });
+  }, [navigate, status, user]);
+
+  if (status === 'authenticated' && user) return null;
 
   async function onUsernameSubmit(e: FormEvent) {
     e.preventDefault();

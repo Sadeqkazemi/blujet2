@@ -45,7 +45,7 @@ describe('StaffReportsPage', () => {
     expect(screen.getByText('کارمند جدید توسط مدیر IT اضافه شد')).toBeInTheDocument();
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'مریم حسینی' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'انتخاب کارمند' }), 's1');
     await waitFor(() => expect(fetchSpy).toHaveBeenLastCalledWith('s1'));
 
     await user.click(screen.getByRole('button', { name: 'علامت‌گذاری به‌عنوان خوانده‌شده' }));
