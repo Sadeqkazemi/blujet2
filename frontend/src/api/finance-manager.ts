@@ -70,11 +70,12 @@ export function downloadFinanceReport(filters: FinanceReportFilters, format: 'cs
   return apiGetBlob(`/reporting/finance-reports/export?${params}`);
 }
 
-export function searchFinanceFlights(query: { q?: string; from?: string; to?: string }) {
+export function searchFinanceFlights(query: { q?: string; from?: string; to?: string; limit?: number }) {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.from) params.set('from', query.from);
   if (query.to) params.set('to', query.to);
+  if (query.limit) params.set('limit', String(query.limit));
   return apiGet<{ rows: FinanceFlightRow[] }>(`/reporting/finance-flight-search?${params}`);
 }
 

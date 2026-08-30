@@ -601,7 +601,7 @@ export class FinanceReportsService {
     }
     const rows = await qb
       .orderBy('fi."departureAt"', 'DESC')
-      .limit(60)
+      .limit(query.limit ?? 12)
       .getRawMany<RawFlight>();
     return { rows: rows.map((row) => this.toFlight(row)) };
   }

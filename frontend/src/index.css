@@ -218,6 +218,14 @@ body {
   color: var(--color-panel-ink);
 }
 
+.management-panel-light .finance-partial-alert {
+  color: #92400e;
+}
+
+.management-panel-dark .finance-partial-alert {
+  color: #fde68a;
+}
+
 .panel-theme-toggle {
   display: inline-flex;
   min-height: 38px;
@@ -345,8 +353,25 @@ body {
 .portal-panel-theme--dark :is(
   [style*="color: rgb(13, 38, 64)"],
   [style*="color: rgb(22, 32, 46)"],
-  [style*="color: rgb(25, 51, 78)"]
+  [style*="color: rgb(25, 51, 78)"],
+  [style*="color: rgb(59, 69, 84)"],
+  [style*="color: rgb(90, 102, 120)"],
+  [style*="color: rgb(102, 117, 138)"]
 ) {
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme--dark [data-testid="agency-portal-header"] :is(
+  [style*="background: rgb(243, 245, 248)"],
+  [style*="background: rgb(244, 248, 255)"],
+  [style*="background: rgb(242, 244, 247)"],
+  [data-testid="agency-user-menu-toggle"]
+) {
+  background: var(--portal-surface-2) !important;
+  border-color: var(--portal-border) !important;
+}
+
+.portal-panel-theme--dark [data-testid="agency-portal-header"] [style*="color: rgb(22, 32, 46)"] {
   color: var(--portal-ink) !important;
 }
 

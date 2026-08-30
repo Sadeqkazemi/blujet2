@@ -277,6 +277,9 @@ describe("FlightsPage", () => {
     await userEvent.click(await screen.findByText("تهران ← دبی"));
     const dialog = await screen.findByRole("dialog", { name: /EP-821/ });
 
+    expect(dialog).toHaveClass("bg-[#141d2e]");
+    expect(dialog).not.toHaveClass("bg-white");
+
     expect(
       within(dialog).getByText("تفکیک کانال فروش صندلی"),
     ).toBeInTheDocument();

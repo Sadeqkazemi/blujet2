@@ -332,7 +332,7 @@ export default function CommercialFlightDetailContent({
         </div>
       </section>
 
-      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-panel-border bg-white p-2.5`}>
+      <section className={`${activeTab !== "OVERVIEW" ? "hidden" : ""} rounded-lg border border-panel-border bg-panel-surface p-2.5`}>
         <h3 className="mb-2 text-[11px] font-black text-panel-ink">تفکیک کانال فروش صندلی</h3>
         {detail.sold === 0 ? (
           <div className="rounded-lg bg-panel-canvas px-3 py-2 text-[10px] text-panel-muted">هنوز فروشی برای این پرواز ثبت نشده است.</div>
@@ -351,7 +351,7 @@ export default function CommercialFlightDetailContent({
                     {faDigits(channel.seats)} صندلی · {faMoney(channel.revenueIrr)} تومان
                   </span>
                 </div>
-                <div className="h-1 overflow-hidden rounded-full bg-[#0b1220]">
+                <div className="h-1 overflow-hidden rounded-full bg-panel-surface-2">
                   <div className={`h-full rounded-full ${meta.color}`} style={{ width: `${pct}%` }} />
                 </div>
               </div>

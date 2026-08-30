@@ -274,6 +274,21 @@ describe('FinancePage', () => {
     expect(screen.queryByText('تراکنش‌های مالی اخیر')).not.toBeInTheDocument();
   });
 
+  it('keeps the analytic finance page visible when one report endpoint fails', async () => {
+    mockRole('COMMERCIAL_MANAGER');
+    vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);
+    vi.spyOn(reportingApi, 'fetchKpis').mockResolvedValue(KPIS);
+    vi.spyOn(reportingApi, 'fetchCompletedFlightsSummary').mockResolvedValue(FLIGHTS);
+    vi.spyOn(reportingApi, 'fetchRevenueMix').mockRejectedValue(new Error('temporary failure'));
+
+    renderFinancePage();
+
+    expect(await screen.findByText('نمودار فروش')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('بخشی از اطلاعات مالی در دسترس نیست');
+    expect(screen.getByText('مطالبات معوق آژانس‌ها')).toBeInTheDocument();
+    expect(screen.getByText('تفکیک کانال‌های درآمد در حال حاضر در دسترس نیست.')).toBeInTheDocument();
+  });
+
   it('CEO شماره پرواز mode shows searchable flight cards and selected-flight summary', async () => {
     mockRole('CEO');
     vi.spyOn(reportingApi, 'fetchSalesChart').mockResolvedValue([]);

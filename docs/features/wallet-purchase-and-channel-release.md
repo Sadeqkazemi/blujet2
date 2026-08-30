@@ -31,6 +31,10 @@ This change closes two operational gaps:
       no fabricated row is introduced.
 - [x] An end-to-end database test proves the balance delta, wallet entry,
       finance ledger entry, ticket status and idempotent replay.
+- [x] The owner-approved UAT deployment performs a one-time, backed-up,
+      audited reconciliation of the exact `uat.customer` and `uat.agency`
+      ledger-derived wallet balances to 100,000,000 toman without adding a
+      mutable balance column.
 
 ### Site/agency channel release
 

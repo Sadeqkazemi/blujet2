@@ -1017,7 +1017,7 @@ export default function FlightsPage() {
                         <span>تفکیک کلاس</span>
                         <span>قیمت و نمایش سایت</span>
                       </div>
-                      <ul data-testid="commercial-active-flights" className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+                      <ul data-testid="commercial-active-flights" className="grid grid-cols-1 gap-3 p-3">
                         {activePager.pageItems.map((f) => {
                           const pct =
                             f.capacity > 0
@@ -1047,7 +1047,7 @@ export default function FlightsPage() {
                                   }
                                 }}
                                 data-testid={`commercial-flight-card-${f.id}`}
-                                className={`group grid min-h-full w-full grid-cols-1 gap-4 rounded-2xl border border-panel-border bg-panel-surface p-4 text-right text-xs shadow-[0_12px_32px_-26px_rgba(13,38,64,.55)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_38px_-24px_rgba(22,104,196,.38)] md:grid-cols-2 ${f.salesHealth?.isWeak ? "ring-1 ring-[#ef444433]" : ""}`}
+                                className={`group grid w-full grid-cols-1 gap-3 rounded-2xl border border-panel-border bg-panel-surface p-3 text-right text-xs shadow-[0_12px_32px_-26px_rgba(13,38,64,.55)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_38px_-24px_rgba(22,104,196,.38)] md:grid-cols-2 ${f.salesHealth?.isWeak ? "ring-1 ring-[#ef444433]" : ""}`}
                               >
                                 <span className="min-w-0 border-b border-panel-border pb-3 md:col-span-2">
                                   <span className="mb-2 flex items-center justify-between gap-3">
@@ -1987,7 +1987,6 @@ export default function FlightsPage() {
         <Modal
           title={`${routeLabel(detail.originCode, detail.destCode)} · ${detail.flightNo}`}
           onClose={() => setDetail(null)}
-          variant="light"
           maxWidthClass="max-w-[840px]"
         >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-panel-border bg-panel-canvas px-3 py-2.5 text-[10px] text-panel-muted">
@@ -1998,10 +1997,10 @@ export default function FlightsPage() {
             <span className="font-num">{formatJalaliDateTime(detail.departureAt)}</span>
           </div>
           <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-panel-border bg-panel-canvas p-1">
-            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "details" ? "bg-white text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
+            <button type="button" onClick={() => setDetailTab("details")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "details" ? "bg-panel-surface text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
               جزئیات پرواز
             </button>
-            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "seats" ? "bg-white text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
+            <button type="button" onClick={() => setDetailTab("seats")} className={`rounded-lg px-4 py-2.5 text-xs font-extrabold transition ${detailTab === "seats" ? "bg-panel-surface text-accent shadow-sm" : "text-panel-muted hover:text-panel-ink"}`}>
               نقشه صندلی
             </button>
           </div>

@@ -32,23 +32,28 @@ const PERIODS: { key: FinanceReportPeriod; label: string }[] = [
 
 type TopTab = FinanceReportScope | 'FLIGHT_SEARCH' | 'SALES_ENGINE';
 const PAGE_SIZE = 10;
+const SEARCH_PAGE_SIZE = 6;
 
-function useTenRowPage<T>(rows: T[]) {
+function useRowsPage<T>(rows: T[], pageSize = PAGE_SIZE) {
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   useEffect(() => setPage(1), [rows]);
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
-  const start = (page - 1) * PAGE_SIZE;
-  return { page, setPage, totalPages, start, pageRows: rows.slice(start, start + PAGE_SIZE) };
+  const start = (page - 1) * pageSize;
+  return { page, setPage, totalPages, start, pageRows: rows.slice(start, start + pageSize) };
 }
 
-function TablePagination({ page, totalPages, start, total, onPage }: { page: number; totalPages: number; start: number; total: number; onPage: (page: number) => void }) {
+function useTenRowPage<T>(rows: T[]) {
+  return useRowsPage(rows, PAGE_SIZE);
+}
+
+function TablePagination({ page, totalPages, start, total, onPage, pageSize = PAGE_SIZE }: { page: number; totalPages: number; start: number; total: number; onPage: (page: number) => void; pageSize?: number }) {
   if (!total) return null;
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#222e43] px-4 py-3 text-[10px] text-[#9fb0c7]">
-      <span>نمایش {faDigits(start + 1)} تا {faDigits(Math.min(start + PAGE_SIZE, total))} از {faDigits(total)} رکورد</span>
+      <span>نمایش {faDigits(start + 1)} تا {faDigits(Math.min(start + pageSize, total))} از {faDigits(total)} رکورد</span>
       <div className="flex items-center gap-2">
         <button type="button" aria-label="صفحه قبل" disabled={page === 1} onClick={() => onPage(page - 1)} className="rounded-lg border border-[#2b3852] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40">قبلی</button>
         <span className="font-num">{faDigits(page)} / {faDigits(totalPages)}</span>
@@ -91,6 +96,20 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+function saveDownload(blob: Blob, filename: string) {
+  if (blob.size === 0) throw new Error('فایل خروجی خالی است.');
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoking synchronously can truncate the download in Chromium/Excel flows.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
 function ExportButtons({ onExport, busy }: { onExport: (format: 'csv' | 'excel' | 'pdf') => void; busy: string | null }) {
   return (
     <div className="flex gap-2" dir="ltr">
@@ -108,7 +127,10 @@ function ExportButtons({ onExport, busy }: { onExport: (format: 'csv' | 'excel' 
 }
 
 function CalendarPicker({ month, day, onMonth, onDay }: { month: number; day: number; onMonth: (value: number) => void; onDay: (value: number) => void }) {
-  const days = jalaliMonth(month).daysInMonth();
+  const firstDay = jalaliMonth(month);
+  const days = firstDay.daysInMonth();
+  // Day.js numbers Sunday as zero; Persian calendars start on Saturday.
+  const leadingEmptyCells = (firstDay.day() + 1) % 7;
   return (
     <div className="rounded-[14px] border border-[#28344c] bg-[#18223a] p-3">
       <div className="mb-3 grid grid-cols-[1fr_72px] gap-2">
@@ -119,6 +141,9 @@ function CalendarPicker({ month, day, onMonth, onDay }: { month: number; day: nu
       </div>
       <div className="mb-2 grid grid-cols-7 gap-1 text-center text-[9px] text-[#6b7b94]">{['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map((name) => <span key={name}>{name}</span>)}</div>
       <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: leadingEmptyCells }, (_, index) => (
+          <span key={`empty-${index}`} aria-hidden="true" className="h-7" />
+        ))}
         {Array.from({ length: days }, (_, index) => index + 1).map((value) => (
           <button key={value} type="button" onClick={() => onDay(value)} className={`h-7 rounded-md text-[10px] ${day === value ? 'border border-[#5b8cff] bg-[#263f70] text-white' : 'border border-[#28344c] text-[#9fb0c7] hover:bg-white/5'}`}>
             {faDigits(value)}
@@ -392,6 +417,7 @@ export default function FinanceReportsPage() {
   const [reload, setReload] = useState(0);
   const [exportBusy, setExportBusy] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [searchRows, setSearchRows] = useState<FinanceFlightRow[] | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<FinanceFlightDetail | null>(null);
   const [detailTarget, setDetailTarget] = useState<FinanceFlightRow | null>(null);
@@ -419,13 +445,18 @@ export default function FinanceReportsPage() {
 
   useEffect(() => {
     if (tab !== 'FLIGHT_SEARCH') return;
+    if (appliedQuery.length < 2) {
+      setSearchRows(null);
+      setSelectedFlight(null);
+      return;
+    }
     let active = true;
     setSearchRows(null);
-    searchFinanceFlights({ q: query.trim() || undefined, ...rangeFor('month', month, day) })
+    searchFinanceFlights({ q: appliedQuery, limit: 18, ...rangeFor('month', month, day) })
       .then((data) => active && setSearchRows(data.rows))
       .catch(() => active && setSearchRows([]));
     return () => { active = false; };
-  }, [tab, query, month, day]);
+  }, [tab, appliedQuery, month, day]);
 
   useEffect(() => {
     if (tab !== 'SALES_ENGINE') return;
@@ -444,12 +475,7 @@ export default function FinanceReportsPage() {
     setExportBusy(format);
     try {
       const blob = await downloadFinanceReport(filters, format);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `finance-report.${format === 'excel' ? 'xlsx' : format}`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveDownload(blob, `finance-report.${format === 'excel' ? 'xlsx' : format}`);
     } finally {
       setExportBusy(null);
     }
@@ -486,12 +512,7 @@ export default function FinanceReportsPage() {
         },
         format,
       );
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `flight-${selectedFlight.summary.flightNo}.${format === 'excel' ? 'xlsx' : format}`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveDownload(blob, `flight-${selectedFlight.summary.flightNo}.${format === 'excel' ? 'xlsx' : format}`);
     } finally {
       setExportBusy(null);
     }
@@ -501,24 +522,20 @@ export default function FinanceReportsPage() {
     setExportBusy(format);
     try {
       const blob = await downloadFinanceSales(appliedSalesFilters, format);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `finance-sales.${format === 'excel' ? 'xlsx' : format}`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveDownload(blob, `finance-sales.${format === 'excel' ? 'xlsx' : format}`);
     } finally {
       setExportBusy(null);
     }
   }
 
+  const searchPaging = useRowsPage(searchRows ?? [], SEARCH_PAGE_SIZE);
   const title = tab === 'AGENCIES' ? 'گزارش فروش و پرداخت آژانس‌ها' : tab === 'CHARTERS' ? 'گزارش فروش و پرداخت چارترکنندگان' : tab === 'CUSTOMERS' ? 'گزارش فروش مشتریان' : tab === 'SALES_ENGINE' ? 'موتور گزارش فروش' : 'جستجوی گزارش پرواز';
 
   return (
-    <div dir="rtl" className="min-h-full bg-[#0f1623] px-6 py-5 text-[#e7ecf3] lg:px-8" data-testid="finance-reports-page">
+    <div dir="rtl" className="min-h-full bg-panel-canvas px-6 py-5 text-panel-ink lg:px-8" data-testid="finance-reports-page">
       <header className="mb-7 text-right">
-        <h1 className="text-2xl font-black text-white">گزارشات و خروجی</h1>
-        <p className="mt-1 text-[11px] text-[#6b7b94]">خروجی Excel و CSV از فروش آژانس‌ها، چارترها و مشتریان</p>
+        <h1 className="text-2xl font-black text-panel-ink">گزارشات و خروجی</h1>
+        <p className="mt-1 text-[11px] text-panel-muted">خروجی Excel و CSV از فروش آژانس‌ها، چارترها و مشتریان</p>
       </header>
 
       <div className="mb-4 flex justify-end">
@@ -617,8 +634,26 @@ export default function FinanceReportsPage() {
           <section className="grid gap-4 rounded-[15px] border border-[#222e43] bg-[#141d2e] p-4 lg:grid-cols-[260px_1fr]">
             <CalendarPicker month={month} day={day} onMonth={setMonth} onDay={setDay} />
             <div>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="جستجوی شماره پرواز یا مسیر…" className="mb-3 w-full rounded-[11px] border border-[#2b3852] bg-[#18223a] px-4 py-3 text-xs text-white outline-none focus:border-[#4f7ff0]" />
-              {!searchRows ? <EmptyState text="در حال جستجو…" /> : searchRows.length === 0 ? <EmptyState text="پرواز منطبق پیدا نشد." /> : <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{searchRows.map((row) => <button key={row.flightInstanceId} type="button" onClick={() => void selectFlight(row)} className={`rounded-[12px] border p-4 text-right ${selectedFlight?.summary.flightInstanceId === row.flightInstanceId ? 'border-[#4f7ff0] bg-[#4f7ff0] text-white' : 'border-[#2b3852] bg-[#111a2b]'}`}><strong className="font-num block text-sm">{row.flightNo}</strong><span className="mt-1 block text-[11px]">{row.originCityFa} ← {row.destCityFa}</span><span className="font-num mt-1 block text-[9px] opacity-70">{formatJalaliDate(row.departureAt)} · {faDigits(row.soldSeats)} صندلی</span></button>)}</div>}
+              <form
+                className="mb-3 flex gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const normalized = query.trim();
+                  if (normalized.length >= 2) setAppliedQuery(normalized);
+                }}
+              >
+                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="حداقل ۲ حرف از شماره پرواز یا مسیر…" className="min-w-0 flex-1 rounded-[11px] border border-[#2b3852] bg-[#18223a] px-4 py-3 text-xs text-white outline-none focus:border-[#4f7ff0]" />
+                <button type="submit" disabled={query.trim().length < 2} className="rounded-[11px] bg-[#4f7ff0] px-5 text-xs font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40">جستجو</button>
+                {appliedQuery && <button type="button" onClick={() => { setQuery(''); setAppliedQuery(''); }} className="rounded-[11px] border border-[#2b3852] px-4 text-[11px] text-[#9fb0c7]">پاک‌کردن</button>}
+              </form>
+              {!appliedQuery ? <EmptyState text="برای نمایش محدود نتایج، شماره پرواز یا مسیر را جستجو کنید." /> : !searchRows ? <EmptyState text="در حال جستجو…" /> : searchRows.length === 0 ? <EmptyState text="پرواز منطبق پیدا نشد." /> : (
+                <div className="overflow-hidden rounded-xl border border-[#2b3852]">
+                  <div className="divide-y divide-[#222e43]">
+                    {searchPaging.pageRows.map((row) => <button key={row.flightInstanceId} type="button" onClick={() => void selectFlight(row)} className={`grid w-full grid-cols-[100px_1fr_auto] items-center gap-3 px-4 py-3 text-right ${selectedFlight?.summary.flightInstanceId === row.flightInstanceId ? 'bg-[#4f7ff0] text-white' : 'bg-[#111a2b] hover:bg-[#18223a]'}`}><strong className="font-num text-sm">{row.flightNo}</strong><span className="text-[11px]">{row.originCityFa} ← {row.destCityFa}</span><span className="font-num text-[9px] opacity-70">{formatJalaliDate(row.departureAt)} · {faDigits(row.soldSeats)} صندلی</span></button>)}
+                  </div>
+                  <TablePagination page={searchPaging.page} totalPages={searchPaging.totalPages} start={searchPaging.start} total={searchRows.length} pageSize={SEARCH_PAGE_SIZE} onPage={searchPaging.setPage} />
+                </div>
+              )}
             </div>
           </section>
           {selectedFlight && (

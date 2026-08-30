@@ -37,7 +37,7 @@ describe('FinanceReportsPage', () => {
     );
   });
 
-  it('shows the flight-search empty state from a real empty response', async () => {
+  it('does not eagerly load flights and shows the empty state after a bounded search', async () => {
     vi.spyOn(api, 'fetchFinanceReport').mockResolvedValue({
       kind: 'partners',
       scope: 'AGENCIES',
@@ -45,10 +45,14 @@ describe('FinanceReportsPage', () => {
       rows: [],
       summary: { totalIrr: '0', paidIrr: '0' },
     });
-    vi.spyOn(api, 'searchFinanceFlights').mockResolvedValue({ rows: [] });
+    const search = vi.spyOn(api, 'searchFinanceFlights').mockResolvedValue({ rows: [] });
     render(<FinanceReportsPage />);
     await userEvent.click(screen.getByRole('button', { name: 'جستجوی پرواز' }));
+    expect(search).not.toHaveBeenCalled();
+    await userEvent.type(screen.getByPlaceholderText('حداقل ۲ حرف از شماره پرواز یا مسیر…'), 'KL');
+    await userEvent.click(screen.getByRole('button', { name: 'جستجو' }));
     expect(await screen.findByText('پرواز منطبق پیدا نشد.')).toBeInTheDocument();
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({ q: 'KL', limit: 18 }));
   });
 
   it('shows customer report seat split columns from real flight rows', async () => {
