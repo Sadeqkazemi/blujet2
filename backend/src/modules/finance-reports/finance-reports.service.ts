@@ -439,10 +439,7 @@ export class FinanceReportsService {
       .createQueryBuilder()
       .select('COALESCE(ap."userId", :fallbackId)', 'id')
       .addSelect('COALESCE(u."fullName", :fallbackName)', 'name')
-      .addSelect(
-        'COALESCE(SUM(b."priceIrr" + b."taxIrr" + b."extrasIrr"), 0)',
-        'totalIrr',
-      )
+      .addSelect('COALESCE(SUM(b."priceIrr"), 0)', 'totalIrr')
       .addSelect(
         `COALESCE((SELECT GREATEST(SUM(le."signedAmountIrr"), 0) FROM ledger_entries le WHERE le."agencyId" = ap."userId" AND le.type IN ('SALE','SETTLEMENT')), 0)`,
         'agencyOutstandingIrr',
@@ -545,7 +542,7 @@ export class FinanceReportsService {
         'soldSeats',
       )
       .addSelect(
-        `(SELECT COALESCE(SUM(b."priceIrr" + b."taxIrr" + b."extrasIrr"), 0) FROM bookings b WHERE b."flightInstanceId" = fi.id AND b.status IN ('PAID','TICKETED') AND b."deletedAt" IS NULL)`,
+        `(SELECT COALESCE(SUM(b."priceIrr"), 0) FROM bookings b WHERE b."flightInstanceId" = fi.id AND b.status IN ('PAID','TICKETED') AND b."deletedAt" IS NULL)`,
         'totalIrr',
       )
       .addSelect(
@@ -627,10 +624,7 @@ export class FinanceReportsService {
         'COALESCE(SUM((SELECT COUNT(*) FROM passengers p WHERE p."bookingId" = b.id AND p."deletedAt" IS NULL AND p."occupiesSeat" = true)), 0)',
         'soldSeats',
       )
-      .addSelect(
-        'COALESCE(SUM(b."priceIrr" + b."taxIrr" + b."extrasIrr"), 0)',
-        'salesIrr',
-      )
+      .addSelect('COALESCE(SUM(b."priceIrr"), 0)', 'salesIrr')
       .addSelect(
         `COALESCE((SELECT GREATEST(SUM(le."signedAmountIrr"), 0) FROM ledger_entries le WHERE le."agencyId" = ap."userId" AND le.type IN ('SALE','SETTLEMENT')), 0)`,
         'agencyOutstandingIrr',
@@ -728,10 +722,15 @@ export class FinanceReportsService {
         '(SELECT COUNT(*) FROM passengers p WHERE p."bookingId" = b.id AND p."deletedAt" IS NULL)',
         'passengerCount',
       )
-      .addSelect('b."priceIrr"', 'baseFareIrr')
+      // Booking.priceIrr is the immutable all-in amount captured by checkout;
+      // taxIrr/extrasIrr are disclosure components, not amounts to add again.
+      .addSelect(
+        'GREATEST(b."priceIrr" - b."taxIrr" - b."extrasIrr", 0)',
+        'baseFareIrr',
+      )
       .addSelect('b."taxIrr"', 'taxIrr')
       .addSelect('b."extrasIrr"', 'extrasIrr')
-      .addSelect('(b."priceIrr" + b."taxIrr" + b."extrasIrr")', 'totalIrr')
+      .addSelect('b."priceIrr"', 'totalIrr')
       .addSelect('b."agencyId"', 'agencyId')
       .addSelect('u."fullName"', 'agencyName')
       .from('bookings', 'b')

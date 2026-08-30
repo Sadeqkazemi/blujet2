@@ -169,6 +169,70 @@ describe('FinanceReportsService', () => {
     );
   });
 
+  it('treats priceIrr as the all-in booking total without adding tax and extras twice', async () => {
+    const qb: Record<string, jest.Mock> = {};
+    for (const method of [
+      'select',
+      'addSelect',
+      'from',
+      'innerJoin',
+      'leftJoin',
+      'where',
+      'andWhere',
+      'orderBy',
+      'limit',
+    ]) {
+      qb[method] = jest.fn().mockReturnValue(qb);
+    }
+    qb.getRawMany = jest.fn().mockResolvedValue([
+      {
+        bookingId: 'booking-1',
+        pnr: 'BJTOTAL',
+        bookedAt: '2026-08-30T10:00:00.000Z',
+        bookingStatus: 'TICKETED',
+        channel: 'SYSTEM',
+        flightInstanceId: 'flight-1',
+        flightNo: 'KL2550',
+        originCode: 'IKA',
+        destCode: 'FRA',
+        departureAt: '2026-09-01T04:30:00.000Z',
+        arrivalAt: '2026-09-01T07:30:00.000Z',
+        cabin: 'FIRST',
+        fareClassCode: 'F',
+        passengerCount: '1',
+        baseFareIrr: '100',
+        taxIrr: '10',
+        extrasIrr: '5',
+        totalIrr: '115',
+        agencyId: null,
+        agencyName: null,
+      },
+    ]);
+    const service = new FinanceReportsService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+    } as unknown as DataSource);
+
+    const result = await service.salesReport({
+      flightInstanceId: 'flight-1',
+    });
+
+    expect(qb.addSelect).toHaveBeenCalledWith(
+      'GREATEST(b."priceIrr" - b."taxIrr" - b."extrasIrr", 0)',
+      'baseFareIrr',
+    );
+    expect(qb.addSelect).toHaveBeenCalledWith('b."priceIrr"', 'totalIrr');
+    expect(result.rows[0]).toMatchObject({
+      baseFareIrr: '100',
+      taxIrr: '10',
+      extrasIrr: '5',
+      totalIrr: '115',
+    });
+    expect(result.summary).toMatchObject({
+      grossIrr: '115',
+      netRevenueIrr: '115',
+    });
+  });
+
   it('exports the same detailed result as CSV and Excel', async () => {
     const service = new FinanceReportsService({} as DataSource);
     jest.spyOn(service, 'salesReport').mockResolvedValue({

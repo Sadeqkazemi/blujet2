@@ -42,12 +42,14 @@ export async function getCabinPrice(
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
+  excludeBookingId?: string,
 ): Promise<Irr> {
   const byClass = await resolveFareClass(
     manager,
     flightInstanceId,
     cabin,
     channel,
+    excludeBookingId,
   );
   if (byClass) return byClass.priceIrr;
 
@@ -91,6 +93,7 @@ export async function resolveFareClass(
   flightInstanceId: string,
   cabin: CabinClass,
   channel: BookingChannel = 'SYSTEM',
+  excludeBookingId?: string,
 ): Promise<{ classCode: string; priceIrr: Irr; taxIrr: Irr } | null> {
   const now = new Date();
   const allRules = await manager.find(FareRule, {
@@ -126,7 +129,7 @@ export async function resolveFareClass(
     );
   if (rules.length === 0) return null;
 
-  const usageRows = await manager
+  const usageQuery = manager
     .createQueryBuilder(Booking, 'b')
     .select('b.fareClassCode', 'fareClassCode')
     .addSelect('b.channel', 'channel')
@@ -150,7 +153,14 @@ export async function resolveFareClass(
       now,
     })
     .andWhere('b."deletedAt" IS NULL')
-    .andWhere('p."deletedAt" IS NULL')
+    .andWhere('p."deletedAt" IS NULL');
+  // The current HELD booking already owns its seat. Counting it during
+  // pre-payment re-pricing makes the final seat in a fare bucket appear
+  // exhausted and incorrectly jumps that booking to the next rate.
+  if (excludeBookingId) {
+    usageQuery.andWhere('b.id != :excludeBookingId', { excludeBookingId });
+  }
+  const usageRows = await usageQuery
     .groupBy('b.fareClassCode')
     .addGroupBy('b.channel')
     .getRawMany<{

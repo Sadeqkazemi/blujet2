@@ -1353,6 +1353,8 @@ export class BookingService {
           this.bookingRepo.manager,
           booking.flightInstanceId,
           booking.cabin,
+          'SYSTEM',
+          booking.id,
         );
     let currentTaxIrr: Irr = 0n;
     let currentPriceIrr: Irr = booking.priceIrr;
@@ -1362,6 +1364,8 @@ export class BookingService {
         this.bookingRepo.manager,
         booking.flightInstanceId,
         booking.cabin,
+        'SYSTEM',
+        booking.id,
       );
       const unitCharges = await calculateActiveCharges(
         this.bookingRepo.manager,
