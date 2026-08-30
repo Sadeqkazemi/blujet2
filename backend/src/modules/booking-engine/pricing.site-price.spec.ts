@@ -154,4 +154,37 @@ describe('fare-class channel pricing', () => {
       resolveFareClass(manager, 'flight-1', 'ECONOMY', 'AGENCY'),
     ).resolves.toBeNull();
   });
+
+  it('excludes only the current HELD booking while re-pricing the last bucket seat', async () => {
+    const manager = managerFor(
+      [
+        {
+          ...common,
+          classCode: 'Y',
+          priceIrr: 5_000_000n,
+          sitePriceIrr: 5_000_000n,
+          siteSeatsReleased: 20,
+        },
+      ],
+      // The database result after applying b.id != current-booking.
+      [{ fareClassCode: 'Y', channel: 'SYSTEM', count: '19' }],
+    );
+
+    await expect(
+      resolveFareClass(
+        manager,
+        'flight-1',
+        'ECONOMY',
+        'SYSTEM',
+        'current-booking',
+      ),
+    ).resolves.toMatchObject({ classCode: 'Y', priceIrr: 5_000_000n });
+
+    const usageQuery = (manager.createQueryBuilder as jest.Mock).mock.results[0]
+      .value as { andWhere: jest.Mock };
+    expect(usageQuery.andWhere).toHaveBeenCalledWith(
+      'b.id != :excludeBookingId',
+      { excludeBookingId: 'current-booking' },
+    );
+  });
 });

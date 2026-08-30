@@ -27,6 +27,7 @@ import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
 import { LedgerEntry } from '../../database/entities/ledger-entry.entity';
 import type { JsonValue } from '../../database/json-types';
+import { SearchService } from '../booking-engine/search.service';
 
 /** List-row shape: no PII at all (the design's cards show none). */
 function toListRow(r: RefundRequest) {
@@ -91,6 +92,7 @@ export class RefundsService {
     private readonly audit: AuditService,
     private readonly stepUp: StepUpService,
     private readonly notifications: NotificationsService,
+    private readonly search: SearchService,
   ) {}
 
   /** RefundRequest has a recursive JsonValue `history` column, which makes
@@ -315,6 +317,7 @@ export class RefundsService {
         { status: 'REFUNDED' },
       );
     });
+    await this.search.invalidateForInstance(request.booking.flightInstanceId);
 
     const updated = await this.refundRepo
       .createQueryBuilder('r')

@@ -358,4 +358,39 @@ jobs:
                 touch "$flight_reset_sentinel"
                 chmod 600 "$flight_reset_sentinel"
               fi
+              # Owner-approved one-time financial scenario for the exact
+              # synthetic KL2550 occurrence. A fresh backup is completed
+              # first. The runner validates flight number/route/date/capacity,
+              # all three cabins, reserved uat.* actors and sandbox mode;
+              # deterministic booking/payment keys make interrupted retries
+              # safe. Root-only JSON/CSV evidence is retained on the host.
+              kl2550_scenario_sentinel=/root/.blujet-uat-kl2550-financial-scenario-v1-complete
+              if [ ! -f "$kl2550_scenario_sentinel" ]; then
+                if [ -z "${UAT_PANEL_SHARED_PASSWORD:-}" ]; then
+                  echo "Refusing: UAT_PANEL_SHARED_PASSWORD secret is empty or unset." >&2
+                  exit 1
+                fi
+                umask 077
+                kl2550_backup="/root/blujet-uat-before-kl2550-$(date -u +%Y%m%dT%H%M%SZ).dump"
+                kl2550_audit=/root/blujet-uat-kl2550-financial-scenario-v1.json
+                kl2550_csv=/root/blujet-uat-kl2550-sales-v1.csv
+                docker compose -f docker-compose.prod.yml exec -T db \
+                  pg_dump -U blujet -d blujet --format=custom > "$kl2550_backup"
+                chmod 600 "$kl2550_backup"
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e NODE_ENV=production \
+                  -e AUTH_SANDBOX_ENABLED=true \
+                  -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                  -e UAT_KL2550_FINANCIAL_CONFIRM=SELL_OUT_KL2550_AND_REFUND_10_V1 \
+                  -e UAT_KL2550_INSTANCE_ID=ef2d652c-47b2-4167-bb7c-ba09be3d18dc \
+                  -e UAT_KL2550_BACKUP_REF="$kl2550_backup" \
+                  -e UAT_KL2550_EXPORT_PATH=/app/backups/uat-kl2550-sales-v1.csv \
+                  backend node dist/database/run-uat-kl2550-financial-scenario.js --execute \
+                  > "$kl2550_audit"
+                docker compose -f docker-compose.prod.yml cp \
+                  backend:/app/backups/uat-kl2550-sales-v1.csv "$kl2550_csv"
+                chmod 600 "$kl2550_audit" "$kl2550_csv"
+                touch "$kl2550_scenario_sentinel"
+                chmod 600 "$kl2550_scenario_sentinel"
+              fi
               docker image prune -f

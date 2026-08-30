@@ -335,18 +335,24 @@ async function main() {
 
   const staffByUsername = new Map<string, User>();
   for (const s of staff) {
+    const seededStaff = {
+      role: s.role,
+      username: s.username,
+      passwordHash,
+      fullName: s.fullName,
+      twoFactorEnabled: true,
+      // Re-seeding the deterministic dev/test identities must also undo a
+      // previous first-login test mutation; otherwise later finance suites
+      // receive a token that PanelAccessGuard correctly refuses.
+      mustChangePassword: false,
+      isActive: true,
+      updatedAt: new Date(),
+    };
     const user = await upsertBy(
       userRepo,
       { username: s.username },
-      {
-        role: s.role,
-        username: s.username,
-        passwordHash,
-        fullName: s.fullName,
-        twoFactorEnabled: true,
-        isActive: true,
-        updatedAt: new Date(),
-      },
+      seededStaff,
+      process.env.NODE_ENV === 'production' ? undefined : seededStaff,
     );
     staffByUsername.set(s.username, user);
   }
