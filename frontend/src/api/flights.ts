@@ -15,6 +15,7 @@ import type {
   OperationsFlightRow,
   OperationsOverview,
   FlightWorkflowHistory,
+  FareClassPriceSuggestion,
   UpdateFareRulePayload,
   UpdateFlightDefinitionPayload,
 } from "../types/flights";
@@ -166,6 +167,38 @@ export function upsertAgencyFareRelease(
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export function suggestFareClassPrice(
+  instanceId: string,
+  ruleId: string,
+  payload: {
+    channel: "SYSTEM" | "AGENCY";
+    competitorPriceIrr?: string;
+  },
+) {
+  return apiPost<FareClassPriceSuggestion>(
+    `/flights/${instanceId}/fare-rules/${ruleId}/price-suggestion`,
+    payload,
+  );
+}
+
+export function updateFareClassChannelRelease(
+  instanceId: string,
+  ruleId: string,
+  payload: {
+    siteSeats: number;
+    sitePriceIrr: string;
+    agencySeats: number;
+    agencyPriceIrr: string;
+    specialOffer?: boolean;
+    reason?: string;
+  },
+) {
+  return apiRequest<FareRuleRow>(
+    `/flights/${instanceId}/fare-rules/${ruleId}/channel-release`,
+    { method: "PUT", body: JSON.stringify(payload) },
+  );
 }
 
 export function planFlight(

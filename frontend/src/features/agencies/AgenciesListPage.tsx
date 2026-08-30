@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useOutletContext } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import {
   fetchAgencies,
@@ -17,8 +17,6 @@ import { usePagination } from '../../hooks/usePagination';
 import { TIER_LABELS, seatRequestTermLabel, statusBadge } from './agency-labels';
 import WebserviceRequestDetailModal from './WebserviceRequestDetailModal';
 import SeatRequestDetailModal from './SeatRequestDetailModal';
-import PanelNotifBell from '../../components/PanelNotifBell';
-import PanelSearchBox from '../../components/PanelSearchBox';
 import type {
   AgencyAggregateInvoiceRow,
   AgencyListResult,
@@ -28,7 +26,6 @@ import type {
   AggregateInvoiceStatus,
 } from '../../types/agencies';
 import type { AgencyWebserviceQueueRow } from '../../types/agency-portal';
-import type { PanelShellContext } from '../../types/panel-shell';
 
 type SubTab = 'list' | 'credit';
 
@@ -94,7 +91,6 @@ function SeatRequestRowCard({ rq, onOpen }: { rq: AgencySeatRequestRow; onOpen: 
 }
 
 export default function AgenciesListPage() {
-  const shell = useOutletContext<PanelShellContext | null>();
   const { user } = useAuth();
   const navigate = useNavigate();
   const role = user?.role;
@@ -281,12 +277,6 @@ export default function AgenciesListPage() {
               : 'مدیریت آژانس‌های همکار، اعتبار و تسویه'}
           </p>
         </div>
-        {isCommercial && (
-          <div className="flex items-center gap-2.5">
-            <PanelSearchBox nav={shell?.nav ?? []} />
-            <PanelNotifBell alerts={shell?.lowSalesAlerts?.slice(1) ?? []} variant="dark" />
-          </div>
-        )}
       </div>
 
       {error && <p className="mb-4 rounded-lg bg-danger/10 p-3 text-sm text-danger">{error}</p>}
@@ -568,7 +558,7 @@ export default function AgenciesListPage() {
 
           {drilldown === null && commercialTab === 'list' && (
             <>
-              <h3 className="m-0 mt-1 text-[14.5px] font-extrabold text-white">آژانس‌های همکار</h3>
+              <h3 className="m-0 mt-1 text-[14.5px] font-extrabold text-panel-ink">آژانس‌های همکار</h3>
 
               <div className="relative mb-0.5">
                 <span className="pointer-events-none absolute right-[14px] top-1/2 flex -translate-y-1/2 text-[#6b7b94]">

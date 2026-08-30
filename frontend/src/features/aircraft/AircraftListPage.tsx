@@ -40,14 +40,14 @@ export default function AircraftListPage() {
 
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]" data-testid="aircraft-list-page">
-      <div className="mb-5 overflow-hidden rounded-[18px] border border-[#24324a] bg-gradient-to-l from-[#152742] to-[#111b2d] p-5">
+      <div className="mb-5 overflow-hidden rounded-[18px] border border-panel-border bg-panel-surface p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#3b82f626] text-[#60a5fa]">
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-accent">
               <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M2 16l20-8-2-3-7 2-4-5-2 1 3 6-5 2-2-2-1 1 2 3-2 2Z" /></svg>
             </span>
             <div>
-          <h1 className="text-[20.5px] font-black text-white">تعریف هواپیما</h1>
+          <h1 className="text-[20.5px] font-black text-panel-ink">تعریف هواپیما</h1>
           <p className="mt-1 text-[11.5px] text-[#6b7b94]">
             ناوگان، ظرفیت کابین و نقشه صندلی‌ها را یک‌جا مدیریت کنید
           </p>
@@ -69,7 +69,7 @@ export default function AircraftListPage() {
             ['aircraft-kpi-active', 'مدل فعال', activeAircraft, '#34d399'],
             ['aircraft-kpi-capacity', 'مجموع ظرفیت', totalCapacity, '#fbbf24'],
           ].map(([testId, label, value, color]) => (
-            <div key={String(testId)} data-testid={String(testId)} className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-4">
+            <div key={String(testId)} data-testid={String(testId)} className="rounded-[14px] border border-panel-border bg-panel-surface p-4 shadow-sm">
               <div className="text-[11px] text-[#7d8ba3]">{label}</div>
               <div className="font-num mt-2 text-2xl font-black" style={{ color: String(color) }}>{faDigits(Number(value))}</div>
             </div>
@@ -108,30 +108,30 @@ export default function AircraftListPage() {
           <div
             key={row.id}
             data-testid="aircraft-card"
-            className="group rounded-[16px] border border-[#1f2a3d] bg-[#141d2e] p-5 transition hover:-translate-y-0.5 hover:border-[#35527b]"
+            className="group rounded-[16px] border border-panel-border bg-panel-surface p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/40"
           >
             <div className="mb-5 flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#233453] text-[#70a7f5]">✈</span>
-                <div><div className="text-sm font-black text-white">{row.title || row.model}</div><div className="ltr font-num mt-1 text-[11px] text-[#7d8ba3]">{row.code} · {row.model}</div></div>
+                <div><div className="text-sm font-black text-panel-ink">{row.title || row.model}</div><div className="ltr font-num mt-1 text-[11px] text-panel-muted">{row.code} · {row.model}</div></div>
               </div>
               <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${row.status === 'ACTIVE' ? 'bg-[#10b98122] text-[#34d399]' : 'bg-[#f8717122] text-[#f87171]'}`}>{row.status === 'ACTIVE' ? 'فعال' : 'غیرفعال'}</span>
             </div>
-            <div className="mb-4 rounded-xl bg-[#101827] p-3">
-              <div className="mb-2 flex items-center justify-between text-[11px]"><span className="text-[#7d8ba3]">ظرفیت کل</span><strong className="font-num text-base text-white">{faDigits(row.totalCapacity)} صندلی</strong></div>
+            <div className="mb-4 rounded-xl bg-panel-canvas p-3">
+              <div className="mb-2 flex items-center justify-between text-[11px]"><span className="text-panel-muted">ظرفیت کل</span><strong className="font-num text-base text-panel-ink">{faDigits(row.totalCapacity)} صندلی</strong></div>
               <div className="h-1.5 overflow-hidden rounded-full bg-[#243047]"><div className="h-full rounded-full bg-gradient-to-l from-[#3b82f6] to-[#60a5fa]" style={{ width: `${Math.min(100, Math.max(12, row.totalCapacity / 2))}%` }} /></div>
               <div className="mt-3 text-[10.5px] leading-6 text-[#9fb0c7]">{cabinSummary(row)}</div>
             </div>
             <div className="flex gap-2 border-t border-[#1f2a3d] pt-4">
               <Link
                 to={`/panel/aircraft/${row.id}`}
-                className="flex-1 rounded-lg bg-[#21324f] px-3 py-2.5 text-center text-[11px] font-bold text-[#7db1fb]"
+                className="flex-1 rounded-lg bg-blue-50 px-3 py-2.5 text-center text-[11px] font-bold text-accent"
               >
                 مشاهده
               </Link>
               <Link
                 to={`/panel/aircraft/${row.id}/edit`}
-                className="flex-1 rounded-lg border border-[#2d3a51] px-3 py-2.5 text-center text-[11px] font-bold text-[#c7d2e3]"
+                className="flex-1 rounded-lg border border-panel-border px-3 py-2.5 text-center text-[11px] font-bold text-panel-ink"
               >
                 ویرایش
               </Link>

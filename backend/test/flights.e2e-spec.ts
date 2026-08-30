@@ -164,6 +164,8 @@ describe('Flights (e2e)', () => {
         dataSource.getRepository(Passenger).create({
           bookingId: booking.id,
           fullName: `مسافر ${channel}`,
+          occupiesSeat: true,
+          fareIrr: channel === 'SYSTEM' ? 30_000_000n : 27_000_000n,
         }),
       );
     }
@@ -203,10 +205,68 @@ describe('Flights (e2e)', () => {
           siteSoldSeats: 1,
           agencySoldSeats: 1,
           remainingSeats: 18,
+          salesByRate: expect.arrayContaining([
+            expect.objectContaining({
+              channel: 'SYSTEM',
+              priceIrr: '30000000',
+              seats: 1,
+            }),
+            expect.objectContaining({
+              channel: 'AGENCY',
+              priceIrr: '27000000',
+              seats: 1,
+            }),
+          ]),
         }),
       ]),
     );
     expect(detail.body.data.agencySaleEnabled).toBe(true);
+
+    const programCode = `B${Date.now()}`;
+    const createdProgram = await request(app.getHttpServer())
+      .post(`/flights/${instance.id}/fare-rules`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        cabin: 'ECONOMY',
+        classCode: programCode,
+        priceIrr: '39000000',
+        seatsAllocated: 20,
+        siteSeats: 0,
+        sitePriceIrr: '39000000',
+        agencySeats: 8,
+        agencyPriceIrr: '39000000',
+        agencySpecialOffer: true,
+        allowedChannels: ['SYSTEM', 'AGENCY'],
+      });
+    expect(createdProgram.status).toBe(201);
+    expect(createdProgram.body.data).toEqual(
+      expect.objectContaining({
+        classCode: programCode,
+        siteSeatsReleased: 0,
+        sitePriceIrr: '39000000',
+        agencySeatsReleased: 8,
+        agencyReleasePriceIrr: '39000000',
+        agencySpecialOffer: true,
+      }),
+    );
+
+    const stagedSiteRelease = await request(app.getHttpServer())
+      .patch(
+        `/flights/${instance.id}/fare-rules/${createdProgram.body.data.id}/site-price`,
+      )
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        priceIrr: '42000000',
+        seats: 12,
+        reason: 'مرحله دوم فروش عمومی',
+      });
+    expect(stagedSiteRelease.status).toBe(200);
+    expect(stagedSiteRelease.body.data).toEqual(
+      expect.objectContaining({
+        siteSeatsReleased: 12,
+        sitePriceIrr: '42000000',
+      }),
+    );
 
     const visibility = await request(app.getHttpServer())
       .patch(`/flights/${instance.id}/sales-visibility`)
@@ -235,6 +295,13 @@ describe('Flights (e2e)', () => {
     expect(updatedPrice.status).toBe(200);
     expect(updatedPrice.body.data.sitePriceIrr).toBe('38000000');
 
+    const independentSiteRelease = await request(app.getHttpServer())
+      .patch(`/flights/${instance.id}/fare-rules/${rule.id}/site-price`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ priceIrr: '38000000', seats: 1, reason: '' });
+    expect(independentSiteRelease.status).toBe(200);
+    expect(independentSiteRelease.body.data.siteSeatsReleased).toBe(1);
+
     const excessiveRelease = await request(app.getHttpServer())
       .put(`/flights/${instance.id}/fare-rules/${rule.id}/agency-release`)
       .set('Authorization', `Bearer ${accessToken}`)
@@ -253,6 +320,213 @@ describe('Flights (e2e)', () => {
         agencySpecialOffer: true,
       }),
     );
+
+    const controlWithRateHistory = await request(app.getHttpServer())
+      .get(`/flights/${instance.id}/commercial-control`)
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(controlWithRateHistory.status).toBe(200);
+    const controlledRule = controlWithRateHistory.body.data.fareClasses.find(
+      (item: { ruleId: string }) => item.ruleId === rule.id,
+    );
+    expect(controlledRule).toEqual(
+      expect.objectContaining({
+        seatsAllocated: 20,
+        basePriceIrr: '30000000',
+        priceHistory: expect.arrayContaining([
+          expect.objectContaining({
+            channel: 'SYSTEM',
+            previousPriceIrr: '30000000',
+            newPriceIrr: '38000000',
+          }),
+          expect.objectContaining({
+            channel: 'AGENCY',
+            previousPriceIrr: '30000000',
+            newPriceIrr: '32000000',
+          }),
+        ]),
+      }),
+    );
+
+    const atomicRelease = await request(app.getHttpServer())
+      .put(`/flights/${instance.id}/fare-rules/${rule.id}/channel-release`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        siteSeats: 12,
+        sitePriceIrr: '40000000',
+        agencySeats: 8,
+        agencyPriceIrr: '33000000',
+        specialOffer: true,
+        reason: 'تنظیم یکپارچه کانال‌های فروش',
+      });
+    expect(atomicRelease.status).toBe(200);
+    expect(atomicRelease.body.data).toEqual(
+      expect.objectContaining({
+        siteSeatsReleased: 12,
+        sitePriceIrr: '40000000',
+        agencySeatsReleased: 8,
+        agencyReleasePriceIrr: '33000000',
+        agencySpecialOffer: true,
+      }),
+    );
+
+    const belowSold = await request(app.getHttpServer())
+      .put(`/flights/${instance.id}/fare-rules/${rule.id}/channel-release`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        siteSeats: 0,
+        sitePriceIrr: '40000000',
+        agencySeats: 8,
+        agencyPriceIrr: '33000000',
+      });
+    expect(belowSold.status).toBe(400);
+  });
+
+  it('materialises approved cabin definitions for legacy flights without asking the commercial user to create classes', async () => {
+    const instance = await createInstance({
+      capacity: 100,
+      basePriceIrr: 38_000_000,
+    });
+    instance.cabinCapacities = [
+      { cabin: CabinClass.BUSINESS, seats: 20, capacity: 20 },
+      { cabin: CabinClass.ECONOMY, seats: 80, capacity: 80 },
+    ];
+    instance.publicSaleEnabled = false;
+    await dataSource.getRepository(FlightInstance).save(instance);
+
+    expect(
+      await dataSource.getRepository(FareRule).countBy({
+        flightInstanceId: instance.id,
+      }),
+    ).toBe(0);
+
+    const { accessToken } = await loginAs(app, 'comm');
+    const control = await request(app.getHttpServer())
+      .get(`/flights/${instance.id}/commercial-control`)
+      .set('Authorization', `Bearer ${accessToken}`);
+
+    expect(control.status).toBe(200);
+    expect(control.body.data.fareClasses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          cabin: CabinClass.BUSINESS,
+          classCode: 'C',
+          seatsAllocated: 20,
+          basePriceIrr: '38000000',
+          siteSeatsReleased: 0,
+        }),
+        expect.objectContaining({
+          cabin: CabinClass.ECONOMY,
+          classCode: 'Y',
+          seatsAllocated: 80,
+          basePriceIrr: '38000000',
+          siteSeatsReleased: 0,
+        }),
+      ]),
+    );
+    expect(
+      await dataSource.getRepository(FareRule).countBy({
+        flightInstanceId: instance.id,
+      }),
+    ).toBe(2);
+  });
+
+  it('returns per-class advisory pricing without mutating or publishing the fare', async () => {
+    const instance = await createInstance({
+      departureAt: new Date(Date.now() + 48 * 3_600_000),
+      capacity: 30,
+      basePriceIrr: 36_000_000,
+    });
+    instance.competitorPriceIrr = 40_000_000n;
+    await dataSource.getRepository(FlightInstance).save(instance);
+    const fareRuleRepo = dataSource.getRepository(FareRule);
+    const rule = await fareRuleRepo.save(
+      fareRuleRepo.create({
+        flightInstanceId: instance.id,
+        cabin: CabinClass.ECONOMY,
+        classCode: `AI${Date.now()}`,
+        priceIrr: 36_000_000n,
+        sitePriceIrr: 38_000_000n,
+        taxIrr: 0n,
+        seatsAllocated: 30,
+        siteSeatsReleased: 10,
+        agencySeatsReleased: 5,
+        agencyReleasePriceIrr: 32_000_000n,
+      }),
+    );
+    const path = `/flights/${instance.id}/fare-rules/${rule.id}/price-suggestion`;
+
+    expect(
+      (
+        await request(app.getHttpServer())
+          .post(path)
+          .send({ channel: 'SYSTEM' })
+      ).status,
+    ).toBe(401);
+    const finance = await loginAs(app, 'finance');
+    expect(
+      (
+        await request(app.getHttpServer())
+          .post(path)
+          .set('Authorization', `Bearer ${finance.accessToken}`)
+          .send({ channel: 'SYSTEM' })
+      ).status,
+    ).toBe(403);
+
+    const { accessToken } = await loginAs(app, 'comm');
+    const fallback = await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ channel: 'SYSTEM', competitorPriceIrr: '41000000' });
+    expect(fallback.status).toBe(201);
+    expect(fallback.body.data).toEqual(
+      expect.objectContaining({
+        ruleId: rule.id,
+        channel: 'SYSTEM',
+        capacity: 30,
+        releasedSeats: 10,
+        soldSeats: 0,
+        competitorPriceIrr: '41000000',
+        source: 'HEURISTIC',
+        advisoryOnly: true,
+      }),
+    );
+    expect(BigInt(fallback.body.data.suggestedPriceIrr)).toBeGreaterThan(0n);
+
+    const afterFallback = await fareRuleRepo.findOneByOrFail({ id: rule.id });
+    expect(afterFallback.sitePriceIrr).toBe(38_000_000n);
+    expect(afterFallback.siteSeatsReleased).toBe(10);
+    expect(afterFallback.agencyReleasePriceIrr).toBe(32_000_000n);
+
+    fakeMl.nextResult = {
+      model_version: 'pricing-test-v1',
+      suggestions: [
+        {
+          proposal_id: rule.id,
+          price_irr: 39_500_000,
+          reason_fa: 'پیشنهاد مدل تست',
+          factors_fa: ['ظرفیت', 'زمان', 'رقبا'],
+          season_fa: 'عادی',
+          occasion_fa: 'بدون مناسبت',
+          confidence: 0.81,
+        },
+      ],
+    };
+    const ml = await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ channel: 'AGENCY', competitorPriceIrr: '40000000' });
+    expect(ml.status).toBe(201);
+    expect(ml.body.data).toEqual(
+      expect.objectContaining({
+        channel: 'AGENCY',
+        suggestedPriceIrr: '39500000',
+        source: 'ML',
+        modelVersion: 'pricing-test-v1',
+        advisoryOnly: true,
+      }),
+    );
+    const afterMl = await fareRuleRepo.findOneByOrFail({ id: rule.id });
+    expect(afterMl.agencyReleasePriceIrr).toBe(32_000_000n);
   });
 
   it('overview: KPI figures reconcile while every published future flight remains active', async () => {

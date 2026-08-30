@@ -41,7 +41,7 @@ export class WalletPointsLockController {
   async getWallet(@CurrentUser() user: AuthenticatedUser) {
     return {
       success: true,
-      data: { balanceIrr: await this.wallet.getBalance(user.id) },
+      data: await this.wallet.getWallet(user.id),
     };
   }
 

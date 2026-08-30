@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { WalletEntry } from '../../database/entities/wallet-entry.entity';
+import { User } from '../../database/entities/user.entity';
 import { ErrorCode } from '../../common/errors';
 import { type Irr, ZERO_IRR, negateIrr } from '../../common/money';
 
@@ -33,6 +34,39 @@ export class WalletService {
 
   async getBalance(userId: string): Promise<Irr> {
     return this.sumBalance(this.walletRepo.manager, userId);
+  }
+
+  async getWallet(userId: string) {
+    const [balanceIrr, entries] = await Promise.all([
+      this.getBalance(userId),
+      this.walletRepo
+        .createQueryBuilder('w')
+        .leftJoin('w.booking', 'booking')
+        .select([
+          'w.id',
+          'w.type',
+          'w.signedAmountIrr',
+          'w.bookingId',
+          'w.createdAt',
+          'booking.id',
+          'booking.pnr',
+        ])
+        .where('w.userId = :userId', { userId })
+        .orderBy('w.createdAt', 'DESC')
+        .take(50)
+        .getMany(),
+    ]);
+    return {
+      balanceIrr,
+      entries: entries.map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        signedAmountIrr: entry.signedAmountIrr,
+        bookingId: entry.bookingId,
+        pnr: entry.booking?.pnr ?? null,
+        createdAt: entry.createdAt,
+      })),
+    };
   }
 
   async topup(userId: string, amountIrr: Irr) {
@@ -64,6 +98,14 @@ export class WalletService {
     amountIrr: Irr,
     bookingId: string | null,
   ) {
+    // Wallet balances are ledger-derived, so serialize all debits on the
+    // owning user row before reading SUM(entries). This prevents two bookings
+    // from both spending the same committed balance concurrently.
+    await manager
+      .createQueryBuilder(User, 'user')
+      .setLock('pessimistic_write')
+      .where('user.id = :userId', { userId })
+      .getOneOrFail();
     const balance = await this.sumBalance(manager, userId);
     if (balance < amountIrr) {
       throw new ConflictException({
@@ -71,7 +113,7 @@ export class WalletService {
         message: 'موجودی کیف پول کافی نیست.',
       });
     }
-    await manager.save(
+    return manager.save(
       manager.create(WalletEntry, {
         userId,
         type: 'PURCHASE',

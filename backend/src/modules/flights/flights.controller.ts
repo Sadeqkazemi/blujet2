@@ -235,6 +235,47 @@ class CreateFareRuleDto {
   @Max(1000)
   seatsAllocated: number;
 
+  @ApiProperty({ required: false, description: 'سهم این برنامه برای سایت' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  siteSeats?: number;
+
+  @ApiProperty({
+    required: false,
+    type: String,
+    description: 'نرخ فروش سایت (ریال)',
+  })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  sitePriceIrr?: Irr;
+
+  @ApiProperty({ required: false, description: 'سهم این برنامه برای آژانس‌ها' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  agencySeats?: number;
+
+  @ApiProperty({
+    required: false,
+    type: String,
+    description: 'نرخ فروش آژانس (ریال)',
+  })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  agencyPriceIrr?: Irr;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  agencySpecialOffer?: boolean;
+
   @ApiProperty({
     description: 'مالیات/عوارض (ریال)',
     required: false,
@@ -391,6 +432,60 @@ class UpsertAgencyFareReleaseDto {
   @IsOptional()
   @IsBoolean()
   specialOffer?: boolean;
+}
+
+class FareClassPriceSuggestionDto {
+  @ApiProperty({ enum: ['SYSTEM', 'AGENCY'] })
+  @IsIn(['SYSTEM', 'AGENCY'])
+  channel: 'SYSTEM' | 'AGENCY';
+
+  @ApiProperty({
+    required: false,
+    type: String,
+    description:
+      'نرخ مشاهده‌شده رقبا (ریال)؛ در صورت خالی بودن از نرخ رقیب ثبت‌شده پرواز استفاده می‌شود',
+  })
+  @IsOptional()
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  competitorPriceIrr?: Irr;
+}
+
+class UpdateFareClassChannelReleaseDto {
+  @ApiProperty({ description: 'ظرفیت فروش عمومی سایت' })
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  siteSeats: number;
+
+  @ApiProperty({ type: String, example: '38000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(1n)
+  @TransformToIrr()
+  sitePriceIrr: Irr;
+
+  @ApiProperty({ description: 'ظرفیت فروش آژانسی' })
+  @IsInt()
+  @Min(0)
+  @Max(1000)
+  agencySeats: number;
+
+  @ApiProperty({ type: String, example: '32000000' })
+  @IsIrrAmount()
+  @MinIrrAmount(0n)
+  @TransformToIrr()
+  agencyPriceIrr: Irr;
+
+  @ApiProperty({ required: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  specialOffer?: boolean;
+
+  @ApiProperty({ required: false, description: 'الزامی هنگام تغییر قیمت سایت' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 class CreateAllotmentDto {
@@ -1124,6 +1219,60 @@ export class FlightsController {
     @Body() dto: UpsertAgencyFareReleaseDto,
   ) {
     const data = await this.flights.upsertAgencyFareRelease(
+      actor,
+      instanceId,
+      ruleId,
+      dto,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':instanceId/fare-rules/:ruleId/price-suggestion')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission(
+    'fl_site_sales',
+    'fl_agency_sales',
+    'fl_manage',
+    'fl_assign',
+  )
+  @ApiOperation({
+    summary:
+      'پیشنهاد مشورتی نرخ هر کلاس بر پایه ظرفیت، فروش، زمان پرواز و نرخ رقبا؛ بدون ثبت یا انتشار خودکار',
+  })
+  async suggestFareClassPrice(
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() dto: FareClassPriceSuggestionDto,
+    @Req() req: Request,
+  ) {
+    const data = await this.flights.suggestFareClassPrice(
+      instanceId,
+      ruleId,
+      dto.channel,
+      dto.competitorPriceIrr,
+      req.headers['x-request-id'] as string | undefined,
+    );
+    return { success: true, data };
+  }
+
+  @Put(':instanceId/fare-rules/:ruleId/channel-release')
+  @Roles('COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission(
+    'fl_site_sales',
+    'fl_agency_sales',
+    'fl_manage',
+    'fl_assign',
+  )
+  @ApiOperation({
+    summary: 'ثبت اتمیک نرخ و ظرفیت فروش سایت و آژانس برای یک کلاس نرخی',
+  })
+  async updateFareClassChannelRelease(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('instanceId', ParseUUIDPipe) instanceId: string,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+    @Body() dto: UpdateFareClassChannelReleaseDto,
+  ) {
+    const data = await this.flights.updateFareClassChannelRelease(
       actor,
       instanceId,
       ruleId,

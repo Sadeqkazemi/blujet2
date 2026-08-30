@@ -100,6 +100,7 @@ describe('DestinationsPage', () => {
     expect(screen.getAllByText(/Toman/).length).toBeGreaterThan(0);
     expect(screen.getByText('Popular routes')).toBeInTheDocument();
     expect(screen.getAllByText(/1,480,000/).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('popular-route-plane')).toHaveStyle({ transform: 'none' });
   });
 
   it('renders translated catalog with Eastern Arabic-Indic digits in Arabic', async () => {
@@ -109,6 +110,14 @@ describe('DestinationsPage', () => {
     expect((await screen.findAllByText('كيش')).length).toBeGreaterThan(0);
     expect(screen.getByText('المسارات الأكثر طلبًا')).toBeInTheDocument();
     expect(screen.getAllByText(/١٬٤٨٠٬٠٠٠/).length).toBeGreaterThan(0);
+    expect(await screen.findByTestId('popular-route-plane')).toHaveStyle({ transform: 'scaleX(-1)' });
+  });
+
+  it('points popular-route planes right-to-left in Persian', async () => {
+    mockLocale('fa');
+    renderWithRouter(<DestinationsPage />);
+
+    expect(await screen.findByTestId('popular-route-plane')).toHaveStyle({ transform: 'scaleX(-1)' });
   });
 });
 

@@ -3,6 +3,7 @@ import type { App } from 'supertest/types';
 import request from 'supertest';
 import { DataSource, In } from 'typeorm';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AuditLog } from '../src/database/entities/audit-log.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { ClubPointsEntry } from '../src/database/entities/club-points-entry.entity';
 import { Flight } from '../src/database/entities/flight.entity';
@@ -10,6 +11,7 @@ import { FlightInstance } from '../src/database/entities/flight-instance.entity'
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { Passenger } from '../src/database/entities/passenger.entity';
 import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
+import { PayIdempotencyRecord } from '../src/database/entities/pay-idempotency-record.entity';
 import { Route } from '../src/database/entities/route.entity';
 import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
 import { FlightInstanceStatus } from '../src/database/enums';
@@ -30,7 +32,9 @@ describe('Phase 13 — reservation engine completion', () => {
   // depend on which customer places it, so there's no reason to burn a
   // fresh OTP login per test.
   let customerToken: string;
+  let customerUserId: string;
   let staffToken: string;
+  const createdWalletEntryIds: string[] = [];
 
   async function upsertSeatMap(
     aircraftType: string,
@@ -48,7 +52,9 @@ describe('Phase 13 — reservation engine completion', () => {
   beforeAll(async () => {
     app = await createTestApp();
     dataSource = app.get(DataSource);
-    customerToken = (await loginAsCustomer(app, '09901119901')).accessToken!;
+    const customer = await loginAsCustomer(app, '09901119901');
+    customerToken = customer.accessToken!;
+    customerUserId = customer.userId!;
     staffToken = (await loginAs(app, 'senior')).accessToken!;
 
     await upsertSeatMap(AIRCRAFT_SMALL, {
@@ -103,6 +109,11 @@ describe('Phase 13 — reservation engine completion', () => {
   });
 
   afterAll(async () => {
+    if (createdWalletEntryIds.length > 0) {
+      await dataSource
+        .getRepository(WalletEntry)
+        .delete({ id: In(createdWalletEntryIds) });
+    }
     const instances = await dataSource
       .getRepository(FlightInstance)
       .createQueryBuilder('fi')
@@ -123,6 +134,9 @@ describe('Phase 13 — reservation engine completion', () => {
     // aggregates (which sum LedgerEntry directly) even after the Booking
     // row itself is gone.
     if (bids.length > 0) {
+      await dataSource
+        .getRepository(PayIdempotencyRecord)
+        .delete({ bookingId: In(bids) });
       await dataSource
         .getRepository(PaymentReconciliation)
         .delete({ bookingId: In(bids) });
@@ -219,6 +233,184 @@ describe('Phase 13 — reservation engine completion', () => {
       });
     expect(res.status).toBe(201);
   });
+
+  it('wallet payment atomically debits the wallet, tickets the booking, records the finance sale, and replays idempotently', async () => {
+    const instance = await freshInstance({ capacity: 4, daysAhead: 61 });
+    const walletRepo = dataSource.getRepository(WalletEntry);
+    const credit = await walletRepo.save(
+      walletRepo.create({
+        userId: customerUserId,
+        type: 'TOPUP',
+        signedAmountIrr: 1_000_000_000n,
+        bookingId: null,
+      }),
+    );
+    createdWalletEntryIds.push(credit.id);
+
+    const created = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'مسافر کیف پول', seatCode: '2A' }],
+      })
+      .expect(201);
+    const bookingId = created.body.data.id as string;
+    const chargedIrr = BigInt(String(created.body.data.priceIrr));
+
+    const paid = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .set('idempotency-key', `wallet-${bookingId}`)
+      .send({ paymentMethod: 'WALLET' })
+      .expect(201);
+    expect(paid.body.data.booking.status).toBe('TICKETED');
+    expect(paid.body.data.walletBalanceIrr).toBe(
+      String(1_000_000_000n - chargedIrr),
+    );
+
+    const wallet = await request(app.getHttpServer())
+      .get('/my/wallet')
+      .set('Authorization', `Bearer ${customerToken}`)
+      .expect(200);
+    expect(wallet.body.data.balanceIrr).toBe(
+      String(1_000_000_000n - chargedIrr),
+    );
+    expect(wallet.body.data.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'PURCHASE',
+          bookingId,
+          signedAmountIrr: String(-chargedIrr),
+        }),
+      ]),
+    );
+
+    const walletPurchases = await walletRepo.findBy({
+      bookingId,
+      type: 'PURCHASE',
+    });
+    expect(walletPurchases).toHaveLength(1);
+    const sales = await dataSource.getRepository(LedgerEntry).findBy({
+      bookingId,
+      type: 'SALE',
+    });
+    expect(sales).toHaveLength(1);
+    expect(sales[0].signedAmountIrr).toBe(chargedIrr);
+    const paymentAudit = await dataSource.getRepository(AuditLog).findOneBy({
+      entityType: 'Booking',
+      entityId: bookingId,
+      action: 'پرداخت و صدور بلیط',
+    });
+    expect(paymentAudit?.metadata).toEqual(
+      expect.objectContaining({
+        paymentMethod: 'WALLET',
+        walletEntryId: walletPurchases[0].id,
+        ledgerEntryId: sales[0].id,
+      }),
+    );
+
+    const finance = await loginAs(app, 'finance');
+    const financeRows = await request(app.getHttpServer())
+      .get('/reporting/recent-transactions')
+      .set('Authorization', `Bearer ${finance.accessToken}`)
+      .expect(200);
+    expect(financeRows.body.data.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: sales[0].id,
+          type: 'SALE',
+          signedAmountIrr: String(chargedIrr),
+        }),
+      ]),
+    );
+
+    const replay = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${customerToken}`)
+      .set('idempotency-key', `wallet-${bookingId}`)
+      .send({ paymentMethod: 'WALLET' })
+      .expect(201);
+    expect(replay.body.data.booking.status).toBe('TICKETED');
+    expect(await walletRepo.countBy({ bookingId, type: 'PURCHASE' })).toBe(1);
+  }, 15000);
+
+  it('serializes concurrent wallet purchases so the same balance cannot be spent twice', async () => {
+    const instance = await freshInstance({ capacity: 4, daysAhead: 62 });
+    const create = (seatCode: string) =>
+      request(app.getHttpServer())
+        .post('/bookings')
+        .set('Authorization', `Bearer ${customerToken}`)
+        .send({
+          flightInstanceId: instance.id,
+          cabin: 'ECONOMY',
+          passengers: [{ fullName: 'مسافر همزمان', seatCode }],
+        });
+    const [first, second] = await Promise.all([create('1A'), create('1C')]);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    const bookingIds = [first.body.data.id, second.body.data.id] as string[];
+    const oneTicketPriceIrr = BigInt(String(first.body.data.priceIrr));
+    expect(second.body.data.priceIrr).toBe(String(oneTicketPriceIrr));
+
+    const walletRepo = dataSource.getRepository(WalletEntry);
+    const balanceRow = await walletRepo
+      .createQueryBuilder('w')
+      .select('COALESCE(SUM(w.signedAmountIrr), 0)', 'balance')
+      .where('w.userId = :userId', { userId: customerUserId })
+      .getRawOne<{ balance: string }>();
+    const currentBalance = BigInt(balanceRow?.balance ?? '0');
+    if (currentBalance !== 0n) {
+      const adjustment = await walletRepo.save(
+        walletRepo.create({
+          userId: customerUserId,
+          type: 'ADJUST',
+          signedAmountIrr: -currentBalance,
+          bookingId: null,
+        }),
+      );
+      createdWalletEntryIds.push(adjustment.id);
+    }
+    const credit = await walletRepo.save(
+      walletRepo.create({
+        userId: customerUserId,
+        type: 'TOPUP',
+        signedAmountIrr: oneTicketPriceIrr,
+        bookingId: null,
+      }),
+    );
+    createdWalletEntryIds.push(credit.id);
+
+    const pay = (bookingId: string) =>
+      request(app.getHttpServer())
+        .post(`/bookings/${bookingId}/pay`)
+        .set('Authorization', `Bearer ${customerToken}`)
+        .set('idempotency-key', `concurrent-${bookingId}`)
+        .send({ paymentMethod: 'WALLET' });
+    const results = await Promise.all(bookingIds.map(pay));
+    expect(results.map((result) => result.status).sort()).toEqual([201, 409]);
+
+    expect(
+      await walletRepo.count({
+        where: { bookingId: In(bookingIds), type: 'PURCHASE' },
+      }),
+    ).toBe(1);
+    expect(
+      await dataSource.getRepository(LedgerEntry).count({
+        where: { bookingId: In(bookingIds), type: 'SALE' },
+      }),
+    ).toBe(1);
+    const refreshed = await dataSource
+      .getRepository(Booking)
+      .findBy({ id: In(bookingIds) });
+    expect(
+      refreshed.filter((booking) => booking.status === 'TICKETED'),
+    ).toHaveLength(1);
+    expect(
+      refreshed.filter((booking) => booking.status === 'HELD'),
+    ).toHaveLength(1);
+  }, 15000);
 
   it('rejects a public booking once the public pool (capacity minus agency/charter quotas) is exhausted, even with physical seats free', async () => {
     // capacity 4, agency 2, charter 1 → public pool = 1

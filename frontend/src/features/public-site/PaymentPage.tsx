@@ -475,6 +475,13 @@ export default function PaymentPage() {
         setPriceChange(result);
         return;
       }
+      if (result.walletBalanceIrr !== undefined) {
+        window.dispatchEvent(
+          new CustomEvent('blujet:wallet-balance', {
+            detail: { balanceIrr: result.walletBalanceIrr },
+          }),
+        );
+      }
       const pendingReturn = sessionStorage.getItem('blujet_pending_return_payment');
       if (pendingReturn) {
         sessionStorage.removeItem('blujet_pending_return_payment');

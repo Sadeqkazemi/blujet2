@@ -1681,6 +1681,46 @@ export class AgenciesService {
         });
       }
 
+      const publicUsage = await tx
+        .createQueryBuilder(Passenger, 'passenger')
+        .innerJoin(Booking, 'booking', 'booking.id = passenger.bookingId')
+        .select(
+          `COALESCE(SUM(CASE
+            WHEN passenger."occupiesSeat" = FALSE THEN 0
+            WHEN passenger."extraSeatCode" IS NULL THEN 1
+            ELSE 2
+          END), 0)`,
+          'used',
+        )
+        .where('booking.flightInstanceId = :flightInstanceId', {
+          flightInstanceId: instance.id,
+        })
+        .andWhere('booking.cabin = :cabin', { cabin: request.cabin })
+        .andWhere('booking.fareClassCode = :classCode', {
+          classCode: request.fareClassCode,
+        })
+        .andWhere('booking.channel != :agencyChannel', {
+          agencyChannel: 'AGENCY',
+        })
+        .andWhere('booking.status IN (:...statuses)', {
+          statuses: ['DRAFT', 'HELD', 'PAID', 'TICKETED'],
+        })
+        .andWhere('(booking.status != :held OR booking.holdExpiresAt > :now)', {
+          held: 'HELD',
+          now: new Date(),
+        })
+        .andWhere('passenger.deletedAt IS NULL')
+        .andWhere('booking.deletedAt IS NULL')
+        .getRawOne<{ used: string }>();
+      const publicSeatsUsed = Number(publicUsage?.used ?? 0);
+      if (publicSeatsUsed + used + request.seats > rule.seatsAllocated) {
+        throw new ConflictException({
+          code: ErrorCode.POOL_EXHAUSTED,
+          message:
+            'موجودی لحظه‌ای موتور رزرو پس از فروش سایت برای فعال‌سازی این سهمیه کافی نیست.',
+        });
+      }
+
       await tx.save(
         tx.create(AgencyAllotment, {
           agencyId: request.agencyId,

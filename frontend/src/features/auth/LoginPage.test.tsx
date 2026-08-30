@@ -25,6 +25,9 @@ function renderLoginJourney() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/panel" element={<div>temporary panel reached</div>} />
+        <Route path="/agency" element={<div>agency panel reached</div>} />
+        <Route path="/account" element={<div>customer account reached</div>} />
+        <Route path="/required-password-change" element={<div>password change reached</div>} />
         <Route path="/two-factor" element={<div>two factor reached</div>} />
       </Routes>
     </MemoryRouter>,
@@ -52,6 +55,41 @@ const baseAuth = {
 };
 
 describe('LoginPage', () => {
+  it('redirects an already authenticated staff session from login to its panel', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      ...baseAuth,
+      status: 'authenticated',
+      user: {
+        id: 'commercial-1',
+        fullName: 'Commercial Manager',
+        role: 'COMMERCIAL_MANAGER',
+        preferredLocale: 'FA',
+        mustChangePassword: false,
+      },
+    });
+    renderLoginJourney();
+
+    expect(await screen.findByText('temporary panel reached')).toBeInTheDocument();
+    expect(screen.queryByText('ورود به سامانه')).not.toBeInTheDocument();
+  });
+
+  it('redirects an authenticated session to its role-specific surface', async () => {
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      ...baseAuth,
+      status: 'authenticated',
+      user: {
+        id: 'agency-1',
+        fullName: 'Agency',
+        role: 'AGENCY',
+        preferredLocale: 'FA',
+        mustChangePassword: false,
+      },
+    });
+    renderLoginJourney();
+
+    expect(await screen.findByText('agency panel reached')).toBeInTheDocument();
+  });
+
   it('runs the sandbox first-login setup before the OTP screen', async () => {
     vi.spyOn(authApi, 'resolveStaffLoginMode').mockResolvedValue({ mode: 'FIRST_LOGIN_SETUP' });
     const firstLogin = vi

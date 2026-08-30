@@ -13,6 +13,12 @@
 - [x] Public checkout holds inventory for exactly 15 minutes. Payment confirms/tickets the order; timeout or unsuccessful completion expires it and releases inventory.
 - [x] Successful sales/payments remain represented by immutable `LedgerEntry` rows and therefore appear in finance reports and accounting integrations.
 - [x] On desktop the trust badges are placed in a distinct left-side footer row with a small inward offset and no separator above the badges; mobile stacking stays unchanged. WhatsApp uses the canonical logo path.
+- [x] Every site/agency fare-class card shows real class capacity, released seats, channel sold seats, sellable seats, and publication status from `commercial-control`.
+- [x] Fare classes are collapsible per channel; a successful explicit confirmation saves/publishes through the real endpoint and collapses only that class card.
+- [x] Per-class price assistance considers capacity/occupancy, time to departure, current/base price and competitor price; ML output is preferred and a clearly labelled analytical fallback is used when ML is unavailable.
+- [x] Applying a suggestion only fills the new-rate input. A manager/authorized commercial employee must separately confirm before any fare or inventory is persisted.
+- [x] Site and agency master activation switches call their independent backend commands and accurately show active/inactive status.
+- [x] The shared staff management shell uses the light management-panel token palette; panel data and RBAC behavior remain unchanged.
 
 ## Safety rules
 
@@ -20,3 +26,10 @@
 - Seat-map geometry comes only from `AircraftSeatMap` in PostgreSQL.
 - Passenger identity fields remain encrypted/hashed; agency locks store only the agency account foreign key.
 - A managerial lock is not a sale. It creates no booking, ticket, or ledger entry until finalized through the existing governed flow.
+- AI/analytical suggestions are never published automatically and never bypass re-pricing before payment.
+
+## Verification map (2026-08-30 extension)
+
+- Frontend behavior: `CommercialFareClassControls.test.tsx`.
+- Backend contract/auth/advisory-only behavior: `backend/test/flights.e2e-spec.ts`.
+- Runtime visual/interaction check: local `/panel/flights` with the Commercial Manager sandbox account.

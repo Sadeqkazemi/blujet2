@@ -29,25 +29,23 @@
   --color-surface-2: #eef4fb;
   --color-danger: #e5484d;
 
-  /* Management-panel dark theme (staff panels only — sampled from the
-     design reference bundle, not reused from the light public-site tokens
-     above). Canvas < surface < surface-2 is a 3-tier depth ladder: page
-     background, card/sidebar fill, and nested highlight boxes inside a
-     card. */
-  --color-panel-canvas: #0f1623;
-  --color-panel-bg: #0f1623;
-  --color-panel-surface: #141d2e;
-  --color-panel-card: #141d2e;
-  --color-panel-surface-2: #182236;
-  --color-panel-elevated: #18223a;
-  --color-panel-ink: #e7ecf3;
-  --color-panel-text: #e7ecf3;
-  --color-panel-muted: #9fb0c7;
-  --color-panel-muted-2: #8fa1bb;
-  --color-panel-border: #1f2a3d;
-  --color-panel-border-2: #28344c;
-  --color-panel-accent: #3b82f6;
-  --color-panel-link: #60a5fa;
+  /* Shared light management-panel palette.  All staff roles consume the
+     same tokens so the shell, cards, dialogs and nested controls switch as
+     one coherent surface instead of mixing dark and light fragments. */
+  --color-panel-canvas: #f4f7fb;
+  --color-panel-bg: #f4f7fb;
+  --color-panel-surface: #ffffff;
+  --color-panel-card: #ffffff;
+  --color-panel-surface-2: #eef4fb;
+  --color-panel-elevated: #e9f1fb;
+  --color-panel-ink: #16233a;
+  --color-panel-text: #16233a;
+  --color-panel-muted: #65758b;
+  --color-panel-muted-2: #7e8da3;
+  --color-panel-border: #dbe5f2;
+  --color-panel-border-2: #c7d5e6;
+  --color-panel-accent: #1668c4;
+  --color-panel-link: #1668c4;
 }
 
 html,
@@ -66,6 +64,116 @@ body {
   font-family: var(--font-sans);
   background: var(--color-body);
   color: var(--color-ink);
+}
+
+/* Management pages historically mixed central panel tokens with many local
+   dark utility colours.  Scope the compatibility layer to PanelShell so the
+   public site and agency/customer portals keep their own approved themes. */
+.management-panel-light :is(
+  [class*="bg-[#070b14]"], [class*="bg-[#07111a]"],
+  [class*="bg-[#07182c]"], [class*="bg-[#0a1220]"],
+  [class*="bg-[#0b111d]"], [class*="bg-[#0b1220]"],
+  [class*="bg-[#0b1526]"], [class*="bg-[#0b1f35]"],
+  [class*="bg-[#0d1625]"], [class*="bg-[#0d1729]"],
+  [class*="bg-[#0d1b33]"], [class*="bg-[#0d2640]"],
+  [class*="bg-[#0e1624]"], [class*="bg-[#0e1625]"],
+  [class*="bg-[#0f1623]"], [class*="bg-[#0f1626]"],
+  [class*="bg-[#0f1725]"], [class*="bg-[#0f1726]"],
+  [class*="bg-[#0f172a]"], [class*="bg-[#0f192a]"],
+  [class*="bg-[#101827]"], [class*="bg-[#101829]"],
+  [class*="bg-[#101a2b]"], [class*="bg-[#101a2c]"],
+  [class*="bg-[#111a2a]"], [class*="bg-[#111a2b]"],
+  [class*="bg-[#111b30]"], [class*="bg-[#121c2e]"],
+  [class*="bg-[#121d31]"], [class*="bg-[#122033]"],
+  [class*="bg-[#131d2d]"], [class*="bg-[#132033]"],
+  [class*="bg-[#13233d]"], [class*="bg-[#141d2e]"],
+  [class*="bg-[#142743]"], [class*="bg-[#151e2d]"],
+  [class*="bg-[#151e31]"], [class*="bg-[#152033]"],
+  [class*="bg-[#152136]"], [class*="bg-[#152848]"],
+  [class*="bg-[#161f31]"], [class*="bg-[#171d29]"],
+  [class*="bg-[#172238]"], [class*="bg-[#18223a]"],
+  [class*="bg-[#18243b]"], [class*="bg-[#1a2435]"],
+  [class*="bg-[#1a2438]"], [class*="bg-[#1a2944]"],
+  [class*="bg-[#1a2a42]"], [class*="bg-[#1a2a46]"],
+  [class*="bg-[#1b2740]"], [class*="bg-[#1b2945]"],
+  [class*="bg-[#1b355a]"], [class*="bg-[#1c2740]"],
+  [class*="bg-[#1d2a40]"], [class*="bg-[#1d2a43]"],
+  [class*="bg-[#1d2b45]"], [class*="bg-[#1f2a3d]"],
+  [class*="bg-[#202b43]"], [class*="bg-[#21324f]"],
+  [class*="bg-[#22304a]"], [class*="bg-[#233453]"],
+  [class*="bg-[#23395f]"], [class*="bg-[#243047]"],
+  [class*="bg-[#24344c]"], [class*="bg-[#28344c]"],
+  [class*="bg-[#29313f]"], [class*="bg-[#334155]"],
+  [class*="bg-[#344158]"], [class*="bg-[#3a4459]"],
+  [class*="bg-[#3a4a63]"], [class*="bg-[#465168]"]
+) {
+  background-color: var(--color-panel-surface) !important;
+  color: var(--color-panel-ink) !important;
+}
+
+.management-panel-light :is(
+  [class*="border-[#1a2436]"], [class*="border-[#1b2536]"],
+  [class*="border-[#1c2740]"], [class*="border-[#1c293b]"],
+  [class*="border-[#1d2738]"], [class*="border-[#1d283b]"],
+  [class*="border-[#1e293b]"], [class*="border-[#1f2a3d]"],
+  [class*="border-[#202a3c]"], [class*="border-[#202b40]"],
+  [class*="border-[#222e43]"], [class*="border-[#22304a]"],
+  [class*="border-[#24304a]"], [class*="border-[#243149]"],
+  [class*="border-[#24324a]"], [class*="border-[#24324b]"],
+  [class*="border-[#24344c]"], [class*="border-[#253149]"],
+  [class*="border-[#26324a]"], [class*="border-[#26334b]"],
+  [class*="border-[#27334a]"], [class*="border-[#27344a]"],
+  [class*="border-[#27344c]"], [class*="border-[#273755]"],
+  [class*="border-[#274166]"], [class*="border-[#27416c]"],
+  [class*="border-[#28344c]"], [class*="border-[#29354d]"],
+  [class*="border-[#2a3550]"], [class*="border-[#2a3953]"],
+  [class*="border-[#2a3a55]"], [class*="border-[#2a4060]"],
+  [class*="border-[#2b3850]"], [class*="border-[#2b3852]"],
+  [class*="border-[#2d3a51]"], [class*="border-[#2f3f5c]"],
+  [class*="border-[#30405f]"], [class*="border-[#31405d]"],
+  [class*="border-[#33415b]"], [class*="border-[#33415c]"],
+  [class*="border-[#33435e]"], [class*="border-[#34415a]"],
+  [class*="border-[#34435d]"], [class*="border-[#34435f]"],
+  [class*="border-[#364052]"], [class*="border-[#3a4963]"],
+  [class*="border-[#3a4a63]"], [class*="border-[#3a4a68]"]
+) {
+  border-color: var(--color-panel-border) !important;
+}
+
+.management-panel-light :is(
+  [class*="text-[#e7ecf3]"], [class*="text-[#dbe7fb]"],
+  [class*="text-[#dce8f8]"], [class*="text-[#dce5f2]"],
+  [class*="text-[#dbe6f5]"], [class*="text-[#dbe6f7]"],
+  [class*="text-[#d7dfeb]"], [class*="text-[#cdd6e3]"],
+  [class*="text-[#cdd7e5]"], [class*="text-[#cdd9ec]"],
+  [class*="text-[#c7d2e2]"], [class*="text-[#c7d2e3]"],
+  [class*="text-[#c7d4e8]"], [class*="text-[#c3cfe3]"],
+  [class*="text-[#b7c3d6]"], [class*="text-[#aebbd0]"]
+) {
+  color: var(--color-panel-ink) !important;
+}
+
+.management-panel-light :is(
+  [class*="text-[#9fb0c7]"], [class*="text-[#94a3b8]"],
+  [class*="text-[#93a5c2]"], [class*="text-[#91a1bb]"],
+  [class*="text-[#8fa1bb]"], [class*="text-[#8c9bb2]"],
+  [class*="text-[#8796aa]"], [class*="text-[#8494ac]"],
+  [class*="text-[#8494ad]"], [class*="text-[#8291a8]"],
+  [class*="text-[#7c8aa2]"], [class*="text-[#7b8b9d]"],
+  [class*="text-[#7b8b9e]"], [class*="text-[#718198]"],
+  [class*="text-[#6b7b94]"], [class*="text-[#63738b]"]
+) {
+  color: var(--color-panel-muted) !important;
+}
+
+.management-panel-light :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  background-color: #fff !important;
+  border-color: var(--color-panel-border-2) !important;
+  color: var(--color-panel-ink) !important;
+}
+
+.management-panel-light :is(input, textarea)::placeholder {
+  color: var(--color-panel-muted-2) !important;
 }
 
 /* Isolated LTR spans for flight/airport codes, Latin names, emails. */

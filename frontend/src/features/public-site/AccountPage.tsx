@@ -45,7 +45,7 @@ import { tomanAmountInWords } from '../../lib/amount-in-words';
 import { localeDigits } from '../../lib/locale-format';
 import { formatLocaleDate, formatLocaleDateTime, parseLocaleDateToIso } from '../../lib/locale-format';
 import { useLocale, type StoredLocale } from '../../hooks/useLocale';
-import type { BookingDetail, PriceLock, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile } from '../../types/public-site';
+import type { BookingDetail, PriceLock, SavedPassenger, SavedBankAccount, CustomerReferralDashboard, CustomerIdentityView, ActiveSession, UserProfile, WalletView } from '../../types/public-site';
 import AccountSecuritySessions from './AccountSecuritySessions';
 import type { ClubMembershipView } from '../../types/club-membership';
 import type { MySupportTicketRow } from '../../types/support-tickets';
@@ -564,7 +564,7 @@ export default function AccountPage() {
   const [tab, setTab] = useState<TabKey>(() => (isAccountTabKey(urlTab) ? urlTab : 'trips'));
   const [bookings, setBookings] = useState<BookingDetail[] | null>(null);
   const [, setHoldTick] = useState(0);
-  const [wallet, setWallet] = useState<{ balanceIrr: string } | null>(null);
+  const [wallet, setWallet] = useState<WalletView | null>(null);
   const [club, setClub] = useState<{ isMember: boolean; level: string | null; balance: number } | null>(null);
   const [clubMembership, setClubMembership] = useState<ClubMembershipView | null>(null);
   const [topupAmount, setTopupAmount] = useState('');
@@ -809,8 +809,8 @@ export default function AccountPage() {
     }
     setTopupBusy(true);
     try {
-      const result = await topupWallet(amountRial);
-      setWallet(result);
+      await topupWallet(amountRial);
+      setWallet(await fetchWallet());
       setTopupAmount('');
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.topupErrorFallback);
@@ -1320,9 +1320,36 @@ export default function AccountPage() {
                 <Link to="/account?tab=club" style={{ alignSelf: 'flex-start', color: '#fff', fontSize: 11.5, fontWeight: 800, textDecoration: 'underline' }}>{t.viewClubLink}</Link>
               </div>
             </div>
-            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '28px 20px', textAlign: 'center' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 800, color: '#0d2640' }}>{locale === 'fa' ? 'گردش امتیاز' : locale === 'ar' ? 'سجل النقاط' : 'Points history'}</h3>
-              <div style={{ color: '#8a96a6', fontSize: 13 }}>{locale === 'fa' ? 'تراکنشی برای نمایش ثبت نشده است.' : locale === 'ar' ? 'لا توجد معاملات لعرضها.' : 'No point transactions to display.'}</div>
+            <div style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '20px' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 800, color: '#0d2640' }}>{locale === 'fa' ? 'گردش کیف پول' : locale === 'ar' ? 'سجل المحفظة' : 'Wallet history'}</h3>
+              {(wallet?.entries ?? []).length === 0 ? (
+                <div style={{ color: '#8a96a6', fontSize: 13, textAlign: 'center', padding: 8 }}>{locale === 'fa' ? 'تراکنشی برای نمایش ثبت نشده است.' : locale === 'ar' ? 'لا توجد معاملات لعرضها.' : 'No wallet transactions to display.'}</div>
+              ) : (
+                <div data-testid="wallet-history" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(wallet?.entries ?? []).map((entry) => {
+                    const positive = !entry.signedAmountIrr.startsWith('-');
+                    const absoluteIrr = entry.signedAmountIrr.replace(/^-/, '');
+                    const labels = {
+                      TOPUP: locale === 'fa' ? 'شارژ کیف پول' : locale === 'ar' ? 'شحن المحفظة' : 'Wallet top-up',
+                      PURCHASE: locale === 'fa' ? 'خرید بلیط' : locale === 'ar' ? 'شراء تذكرة' : 'Ticket purchase',
+                      REFUND: locale === 'fa' ? 'بازگشت وجه' : locale === 'ar' ? 'استرداد' : 'Refund',
+                      ADJUST: locale === 'fa' ? 'اصلاح مالی' : locale === 'ar' ? 'تسوية مالية' : 'Adjustment',
+                    };
+                    return (
+                      <div key={entry.id} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr auto' : '1fr auto auto', alignItems: 'center', gap: 12, border: '1px solid #edf1f6', borderRadius: 12, padding: '11px 13px' }}>
+                        <div>
+                          <div style={{ color: '#0d2640', fontSize: 12.5, fontWeight: 800 }}>{labels[entry.type]}</div>
+                          {entry.pnr && <div dir="ltr" style={{ marginTop: 3, color: '#7b8798', fontSize: 10.5 }}>PNR {entry.pnr}</div>}
+                        </div>
+                        {!isMobile && <div style={{ color: '#8a96a6', fontSize: 10.5 }}>{formatLocaleDateTime(entry.createdAt, locale)}</div>}
+                        <div dir="ltr" style={{ color: positive ? '#18875f' : '#c43d45', fontSize: 12.5, fontWeight: 900 }}>
+                          {positive ? '+' : '−'} {localeMoney(absoluteIrr, locale)} {t.toman}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <form id="wallet-topup-form" onSubmit={onTopup} style={{ background: '#fff', border: '1px solid #e8eef6', borderRadius: 16, padding: '18px 20px', display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div style={{ flex: '1 1 200px' }}>

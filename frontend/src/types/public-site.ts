@@ -251,6 +251,21 @@ export interface CustomerIdentityView {
 export interface PayResultOk {
   priceChanged: false;
   booking: BookingDetail;
+  walletBalanceIrr?: string;
+}
+
+export interface WalletEntryView {
+  id: string;
+  type: 'TOPUP' | 'PURCHASE' | 'REFUND' | 'ADJUST';
+  signedAmountIrr: string;
+  bookingId: string | null;
+  pnr: string | null;
+  createdAt: string;
+}
+
+export interface WalletView {
+  balanceIrr: string;
+  entries?: WalletEntryView[];
 }
 
 export interface PayResultPriceChanged {

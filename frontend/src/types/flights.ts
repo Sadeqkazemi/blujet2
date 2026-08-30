@@ -95,6 +95,7 @@ export interface FlightCommercialFields {
 }
 
 export interface FareClassPriceHistory {
+  channel: "SYSTEM" | "AGENCY";
   previousPriceIrr: string;
   newPriceIrr: string;
   reason: string;
@@ -110,6 +111,10 @@ export interface CommercialFareClassControl {
   siteSoldSeats: number;
   agencySoldSeats: number;
   remainingSeats: number;
+  sharedSeatsRemaining: number;
+  siteSeatsAvailable: number;
+  agencySeatsAvailable: number;
+  agencySeatsCommitted: number;
   revenueIrr: string;
   basePriceIrr: string;
   sitePriceIrr: string | null;
@@ -117,14 +122,48 @@ export interface CommercialFareClassControl {
   agencySeatsReleased: number;
   agencyReleasePriceIrr: string | null;
   agencySpecialOffer: boolean;
+  salesByRate?: {
+    channel: "SYSTEM" | "AGENCY" | "CHARTER" | "MANAGERIAL";
+    priceIrr: string;
+    seats: number;
+    revenueIrr: string;
+    lastSoldAt: string;
+  }[];
   priceHistory: FareClassPriceHistory[];
 }
 
 export interface CommercialFlightControl {
   flightInstanceId: string;
+  departureAt: string;
+  competitorPriceIrr: string | null;
   publicSaleEnabled: boolean;
   agencySaleEnabled: boolean;
   fareClasses: CommercialFareClassControl[];
+}
+
+export interface FareClassPriceSuggestion {
+  ruleId: string;
+  cabin: CabinKind;
+  classCode: string;
+  channel: "SYSTEM" | "AGENCY";
+  capacity: number;
+  releasedSeats: number;
+  soldSeats: number;
+  totalSoldSeats: number;
+  availableSeats: number;
+  sharedSeatsRemaining: number;
+  occupancyPct: number;
+  hoursToDeparture: number;
+  basePriceIrr: string;
+  currentPriceIrr: string;
+  competitorPriceIrr: string;
+  suggestedPriceIrr: string;
+  source: "ML" | "HEURISTIC";
+  modelVersion: string | null;
+  confidence: number | null;
+  reasonFa: string;
+  factorsFa: string[];
+  advisoryOnly: true;
 }
 
 export interface FlightRow {
@@ -176,7 +215,7 @@ export interface FlightAiSuggestion {
   // Advisory-only ML output, persisted as a plain JSON blob (not a native
   // bigint column, never routed through BigInt.prototype.toJSON) — stays a
   // real JS number, unlike the other Irr fields on this page.
-  priceIrr: number;
+  priceIrr: string | number;
   reason: string;
   factors: string[];
   season: string;
@@ -300,8 +339,13 @@ export interface FareRuleRow {
 export interface CreateFareRulePayload {
   cabin: CabinKind;
   classCode: string;
-  priceIrr: number;
+  priceIrr: string | number;
   seatsAllocated: number;
+  siteSeats?: number;
+  sitePriceIrr?: string;
+  agencySeats?: number;
+  agencyPriceIrr?: string;
+  agencySpecialOffer?: boolean;
   taxIrr?: number;
   refundable?: boolean;
   changeable?: boolean;
@@ -452,7 +496,7 @@ export interface FlightWorkflowHistory {
 }
 
 export interface UpdateFareRulePayload {
-  priceIrr?: number;
+  priceIrr?: string | number;
   seatsAllocated?: number;
   taxIrr?: number;
   refundable?: boolean;

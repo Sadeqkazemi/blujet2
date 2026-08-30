@@ -190,8 +190,12 @@ export default function TicketPage() {
           </header>
 
           <section className="px-5 py-6 sm:px-7" dir={isRtl ? 'rtl' : 'ltr'} data-testid="ticket-route">
-            <div className={`grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6 ${isRtl ? 'direction-rtl' : ''}`}>
-              <div className={`${isRtl ? 'order-3 text-right' : 'order-1 text-left'} min-w-0`}>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6" dir="ltr">
+              <div
+                className={`${isRtl ? 'order-3 text-right' : 'order-1 text-left'} min-w-0`}
+                data-testid="ticket-origin"
+                dir={isRtl ? 'rtl' : 'ltr'}
+              >
                 <div className="font-num text-[30px] font-black leading-none text-[#0d2640]" dir="ltr">{booking.originCode}</div>
                 <div className="mt-2 text-xs font-bold text-[#6b7787]">{t.origin}</div>
                 <div className="mt-1 font-num text-[11px] text-[#8a96a6]" dir="ltr">{formatDeparture(booking.departureAt, locale)}</div>
@@ -209,7 +213,11 @@ export default function TicketPage() {
                 <div className="text-[10px] font-bold text-[#6b7787]">{routeArrow}</div>
               </div>
 
-              <div className={`${isRtl ? 'order-1 text-left' : 'order-3 text-right'} min-w-0`}>
+              <div
+                className={`${isRtl ? 'order-1 text-left' : 'order-3 text-right'} min-w-0`}
+                data-testid="ticket-destination"
+                dir={isRtl ? 'rtl' : 'ltr'}
+              >
                 <div className="font-num text-[30px] font-black leading-none text-[#0d2640]" dir="ltr">{booking.destCode}</div>
                 <div className="mt-2 text-xs font-bold text-[#6b7787]">{t.dest}</div>
                 <div className="mt-1 font-num text-[11px] text-[#8a96a6]" dir="ltr">{formatDeparture(booking.arrivalAt, locale)}</div>
