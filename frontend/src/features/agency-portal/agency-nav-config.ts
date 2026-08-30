@@ -67,7 +67,7 @@ export const AGENCY_NAV_ITEMS: AgencyNavItem[] = [
     key: 'credit',
     path: '/agency/credit',
     icon: 'credit',
-    label: { fa: 'اعتبار و موجودی', en: 'Credit & Balance', ar: 'الرصيد والائتمان' },
+    label: { fa: 'کیف پول و اعتبار', en: 'Wallet & Credit', ar: 'المحفظة والائتمان' },
   },
   {
     key: 'report',
@@ -141,7 +141,7 @@ export const AGENCY_PAGE_META: Record<
     },
   },
   credit: {
-    title: { fa: 'اعتبار و موجودی', en: 'Credit & Balance', ar: 'الرصيد والائتمان' },
+    title: { fa: 'کیف پول و اعتبار', en: 'Wallet & Credit', ar: 'المحفظة والائتمان' },
     subtitle: {
       fa: 'سقف اعتبار، فاکتورهای شرکت هواپیمایی و فعالیت حساب',
       en: 'Credit limit, airline invoices, and account activity',

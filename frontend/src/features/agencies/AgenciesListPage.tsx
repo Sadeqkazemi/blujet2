@@ -70,13 +70,13 @@ function SeatRequestRowCard({ rq, onOpen }: { rq: AgencySeatRequestRow; onOpen: 
   return (
     <div
       onClick={onOpen}
-      className="flex cursor-pointer flex-wrap items-center justify-between gap-2.5 rounded-[11px] border border-[#28344c] bg-[#18223a] px-[13px] py-[11px] transition hover:border-[#3a4a68]"
+      className="flex cursor-pointer flex-wrap items-center justify-between gap-2.5 rounded-[11px] border border-panel-border bg-panel-surface-2 px-[13px] py-[11px] transition hover:border-accent/50"
     >
       <div>
-        <div className="text-[13px] font-extrabold text-[#e7ecf3]">
+        <div className="text-[13px] font-extrabold text-panel-ink">
           {rq.agencyName} · {rq.routeFa}
         </div>
-        <div className="mt-[3px] text-[11px] text-[#8494ac]">
+        <div className="mt-[3px] text-[11px] text-panel-muted">
           {faDigits(rq.seats)} صندلی · {seatRequestTermLabel(rq.months)} · {faMoney(rq.totalIrr)} تومان
         </div>
       </div>
@@ -196,15 +196,15 @@ export default function AgenciesListPage() {
   const seatRequestsPreview = (
     <div
       className="overflow-hidden rounded-[14px] border"
-      style={{ borderColor: 'rgba(245,158,11,.35)', background: '#141d2e' }}
+      style={{ borderColor: 'rgba(245,158,11,.35)', background: 'var(--color-panel-surface)' }}
     >
-      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-[15px] py-3">
+      <div className="flex flex-wrap items-center gap-[9px] border-b border-panel-border px-[15px] py-3">
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(245,158,11,.16)] text-[#f59e0b]">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" />
           </svg>
         </span>
-        <h3 className="m-0 text-sm font-extrabold text-white">درخواست‌های خرید صندلی آژانس‌ها</h3>
+        <h3 className="m-0 text-sm font-extrabold text-panel-ink">درخواست‌های خرید صندلی آژانس‌ها</h3>
         <span className="rounded-[18px] bg-[rgba(245,158,11,.14)] px-[9px] py-0.5 text-[11px] font-bold text-[#f59e0b]">
           {faDigits(pendingSeatRequests.length)}
         </span>
@@ -228,8 +228,8 @@ export default function AgenciesListPage() {
   );
 
   const webserviceRequestsPreview = wsRequests.length > 0 && (
-    <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
-      <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-[15px] py-3">
+    <div className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-surface">
+      <div className="flex flex-wrap items-center gap-[9px] border-b border-panel-border px-[15px] py-3">
         <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(59,130,246,.16)] text-[#60a5fa]">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -237,7 +237,7 @@ export default function AgenciesListPage() {
             <path d="M6 14h4" />
           </svg>
         </span>
-        <h3 className="m-0 text-sm font-extrabold text-white">درخواست‌های خرید وب‌سرویس آژانس‌ها</h3>
+        <h3 className="m-0 text-sm font-extrabold text-panel-ink">درخواست‌های خرید وب‌سرویس آژانس‌ها</h3>
         <span className="rounded-[18px] bg-[rgba(59,130,246,.14)] px-[9px] py-0.5 text-[11px] font-bold text-[#60a5fa]">
           {faDigits(wsRequests.length)}
         </span>
@@ -247,11 +247,11 @@ export default function AgenciesListPage() {
           <div
             key={r.id}
             onClick={() => setOpenWsRequest(r)}
-            className="flex cursor-pointer flex-wrap items-center justify-between gap-2.5 rounded-[11px] border border-[#28344c] bg-[#18223a] px-[13px] py-[11px] transition hover:border-[#3a4a68]"
+            className="flex cursor-pointer flex-wrap items-center justify-between gap-2.5 rounded-[11px] border border-panel-border bg-panel-surface-2 px-[13px] py-[11px] transition hover:border-accent/50"
           >
             <div>
-              <div className="text-[13px] font-extrabold text-[#e7ecf3]">{r.agencyName}</div>
-              <div className="mt-[3px] text-[11px] text-[#8494ac]">
+              <div className="text-[13px] font-extrabold text-panel-ink">{r.agencyName}</div>
+              <div className="mt-[3px] text-[11px] text-panel-muted">
                 {faDigits(r.months)} ماهه · {faMoney(r.priceIrr)} تومان
               </div>
             </div>
@@ -285,7 +285,7 @@ export default function AgenciesListPage() {
       {isCommercial ? (
         <div className="flex flex-col gap-[15px]">
           {drilldown === null && (
-            <div className="flex gap-[7px] rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-1">
+            <div className="flex gap-[7px] rounded-xl border border-panel-border bg-panel-surface p-1">
               {(
                 [
                   { key: 'list', label: 'آژانس‌های همکار' },
@@ -297,7 +297,7 @@ export default function AgenciesListPage() {
                   key={t.key}
                   onClick={() => setCommercialTab(t.key)}
                   className={`flex-1 rounded-[9px] py-[9px] text-center text-xs font-bold transition ${
-                    commercialTab === t.key ? 'bg-accent text-white' : 'text-[#9fb0c7] hover:bg-white/5'
+                    commercialTab === t.key ? 'bg-accent text-white' : 'text-panel-muted hover:bg-panel-surface-2'
                   }`}
                 >
                   {t.label}
@@ -310,7 +310,7 @@ export default function AgenciesListPage() {
             <div className="flex flex-col gap-[15px]">
               <button
                 onClick={() => setDrilldown(null)}
-                className="flex w-max items-center gap-1.5 text-xs text-[#9fb0c7] transition hover:text-white"
+                className="flex w-max items-center gap-1.5 text-xs text-panel-muted transition hover:text-panel-ink"
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M15 6l-6 6 6 6" />
@@ -319,10 +319,10 @@ export default function AgenciesListPage() {
               </button>
               <div
                 className="overflow-hidden rounded-[14px] border"
-                style={{ borderColor: 'rgba(245,158,11,.35)', background: '#141d2e' }}
+                style={{ borderColor: 'rgba(245,158,11,.35)', background: 'var(--color-panel-surface)' }}
               >
-                <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-[15px] py-3">
-                  <h3 className="m-0 text-sm font-extrabold text-white">همهٔ درخواست‌های خرید صندلی آژانس‌ها</h3>
+                <div className="flex flex-wrap items-center gap-[9px] border-b border-panel-border px-[15px] py-3">
+                  <h3 className="m-0 text-sm font-extrabold text-panel-ink">همهٔ درخواست‌های خرید صندلی آژانس‌ها</h3>
                   <span className="rounded-[18px] bg-[rgba(245,158,11,.14)] px-[9px] py-0.5 text-[11px] font-bold text-[#f59e0b]">
                     {faDigits(seatRequests.length)}
                   </span>
@@ -345,30 +345,30 @@ export default function AgenciesListPage() {
             <div className="flex flex-col gap-[15px]">
               <button
                 onClick={() => setDrilldown(null)}
-                className="flex w-max items-center gap-1.5 text-xs text-[#9fb0c7] transition hover:text-white"
+                className="flex w-max items-center gap-1.5 text-xs text-panel-muted transition hover:text-panel-ink"
               >
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M15 6l-6 6 6 6" />
                 </svg>
                 بازگشت به فهرست آژانس‌ها
               </button>
-              <div className="flex gap-[7px] rounded-xl border border-[#1f2a3d] bg-[#141d2e] p-1">
+              <div className="flex gap-[7px] rounded-xl border border-panel-border bg-panel-surface p-1">
                 {(Object.keys(INVOICE_TAB_LABEL) as AggregateInvoiceStatus[]).map((st) => (
                   <button
                     key={st}
                     onClick={() => setInvoiceTab(st)}
                     className={`flex-1 rounded-[9px] py-[9px] text-center text-xs font-bold transition ${
-                      invoiceTab === st ? 'bg-accent text-white' : 'text-[#9fb0c7] hover:bg-white/5'
+                      invoiceTab === st ? 'bg-accent text-white' : 'text-panel-muted hover:bg-panel-surface-2'
                     }`}
                   >
                     {INVOICE_TAB_LABEL[st]} ({faDigits(invoices.filter((v) => v.status === st).length)})
                   </button>
                 ))}
               </div>
-              <div className="overflow-hidden rounded-[14px] border border-[#1f2a3d] bg-[#141d2e]">
-                <div className="flex items-center gap-2 border-b border-[#1f2a3d] px-[15px] py-[13px]">
-                  <h3 className="m-0 text-sm font-extrabold text-white">همهٔ فاکتورهای صادرشده برای آژانس‌ها</h3>
-                  <span className="rounded-xl bg-[#18223a] px-2 py-0.5 text-[10.5px] font-bold text-[#9fb0c7]">
+              <div className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-surface">
+                <div className="flex items-center gap-2 border-b border-panel-border px-[15px] py-[13px]">
+                  <h3 className="m-0 text-sm font-extrabold text-panel-ink">همهٔ فاکتورهای صادرشده برای آژانس‌ها</h3>
+                  <span className="rounded-xl bg-panel-surface-2 px-2 py-0.5 text-[10.5px] font-bold text-panel-muted">
                     {faDigits(invoicesInTab.length)}
                   </span>
                 </div>
@@ -379,7 +379,7 @@ export default function AgenciesListPage() {
                     allInvPager.pageItems.map((v) => (
                       <div
                         key={v.id}
-                        className="flex flex-wrap items-center gap-3.5 rounded-xl border border-[#28344c] bg-[#18223a] px-[15px] py-[13px]"
+                        className="flex flex-wrap items-center gap-3.5 rounded-xl border border-panel-border bg-panel-surface-2 px-[15px] py-[13px]"
                       >
                         <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[rgba(59,130,246,.14)] text-[#60a5fa]">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -389,9 +389,9 @@ export default function AgenciesListPage() {
                         </span>
                         <div className="min-w-[220px] flex-1">
                           <div className="mb-[3px] flex flex-wrap items-center gap-2">
-                            <span className="ltr font-num text-[12.5px] font-extrabold text-[#e7ecf3]">{v.invoiceNo}</span>
+                            <span className="ltr font-num text-[12.5px] font-extrabold text-panel-ink">{v.invoiceNo}</span>
                             <span className="h-[3px] w-[3px] rounded-full bg-[#3a4a63]" />
-                            <span className="text-[12.5px] font-bold text-[#9fb0c7]">{v.agencyName}</span>
+                            <span className="text-[12.5px] font-bold text-panel-muted">{v.agencyName}</span>
                           </div>
                           <div className="text-[11px] text-[#6b7b94]">{v.descriptionFa}</div>
                         </div>
@@ -401,7 +401,7 @@ export default function AgenciesListPage() {
                         </div>
                         <div className="min-w-[110px] flex-none text-left">
                           <div className="mb-[3px] text-[9.5px] text-[#6b7b94]">مبلغ</div>
-                          <div className="font-num text-[13px] font-extrabold text-[#e7ecf3]">{faMoney(v.amountIrr)} تومان</div>
+                          <div className="font-num text-[13px] font-extrabold text-panel-ink">{faMoney(v.amountIrr)} تومان</div>
                         </div>
                         <span
                           className="flex-none rounded-2xl px-3 py-1.5 text-[10.5px] font-bold"
@@ -425,8 +425,8 @@ export default function AgenciesListPage() {
           )}
 
           {drilldown === null && commercialTab === 'coop' && (
-            <section className="overflow-hidden rounded-[14px] border border-[#2a3550] bg-[#141d2e]">
-              <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-[15px] py-3">
+            <section className="overflow-hidden rounded-[14px] border border-panel-border bg-panel-surface">
+              <div className="flex flex-wrap items-center gap-[9px] border-b border-panel-border px-[15px] py-3">
                 <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(245,158,11,.16)] text-[#f59e0b]">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 3v4a1 1 0 0 0 1 1h4" />
@@ -434,7 +434,7 @@ export default function AgenciesListPage() {
                     <path d="M9 13h6M9 17h4" />
                   </svg>
                 </span>
-                <h2 className="m-0 text-sm font-extrabold text-white">درخواست‌های همکاری آژانس‌ها</h2>
+                <h2 className="m-0 text-sm font-extrabold text-panel-ink">درخواست‌های همکاری آژانس‌ها</h2>
                 <span className="rounded-full bg-[rgba(245,158,11,.14)] px-3 py-1 text-[11px] font-bold text-[#f59e0b]">
                   {faDigits(pendingRequests.length)} درخواست
                 </span>
@@ -448,14 +448,14 @@ export default function AgenciesListPage() {
                     {pendingPager.pageItems.map((r) => (
                       <li
                         key={r.id}
-                        className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1a2436] px-2.5 py-[11px] last:border-b-0"
+                        className="flex flex-wrap items-center justify-between gap-3 border-b border-panel-border px-2.5 py-[11px] last:border-b-0"
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-2.5">
                           <span className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#241d12] text-sm font-black text-[#f59e0b]">
                             {r.applicantName.slice(0, 1)}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <div className="text-[12.5px] font-extrabold text-[#e7ecf3]">{r.applicantName}</div>
+                            <div className="text-[12.5px] font-extrabold text-panel-ink">{r.applicantName}</div>
                             <div className="mt-0.5 text-[11px] text-panel-muted">
                               مدیر: {r.managerName} · مجوز <span className="ltr font-num">{r.licenseNo}</span> · {r.city}
                             </div>
@@ -484,16 +484,16 @@ export default function AgenciesListPage() {
           {drilldown === null && commercialTab === 'debtors' && (
             <section
               className="overflow-hidden rounded-[14px] border"
-              style={{ borderColor: 'rgba(248,113,113,.35)', background: '#141d2e' }}
+              style={{ borderColor: 'rgba(248,113,113,.35)', background: 'var(--color-panel-surface)' }}
             >
-              <div className="flex flex-wrap items-center gap-[9px] border-b border-[#1f2a3d] px-3.5 py-[11px]">
+              <div className="flex flex-wrap items-center gap-[9px] border-b border-panel-border px-3.5 py-[11px]">
                 <span className="flex h-8 w-8 flex-none items-center justify-center rounded-[9px] bg-[rgba(248,113,113,.16)] text-[#f87171]">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10.3 3.9l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z" />
                     <path d="M12 9v4M12 17h.01" />
                   </svg>
                 </span>
-                <h2 className="m-0 text-sm font-extrabold text-white">آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده</h2>
+                <h2 className="m-0 text-sm font-extrabold text-panel-ink">آژانس‌های دارای بدهی یا فاکتور پرداخت‌نشده</h2>
                 <span className="rounded-[18px] bg-[rgba(248,113,113,.14)] px-[9px] py-0.5 text-[11px] font-bold text-[#f87171]">
                   {faDigits(debtors.length)} آژانس
                 </span>
@@ -509,7 +509,7 @@ export default function AgenciesListPage() {
                 </button>
                 <button
                   onClick={() => setDrilldown('all-invoices')}
-                  className="flex items-center gap-1.5 rounded-[9px] border border-[#28344c] bg-[#18223a] px-[11px] py-[7px] text-[11.5px] font-bold text-[#9fb0c7] transition hover:text-white"
+                  className="flex items-center gap-1.5 rounded-[9px] border border-panel-border bg-panel-surface-2 px-[11px] py-[7px] text-[11.5px] font-bold text-panel-muted transition hover:text-panel-ink"
                 >
                   فاکتورهای همه آژانس‌ها
                 </button>
@@ -526,14 +526,14 @@ export default function AgenciesListPage() {
                     return (
                       <li
                         key={d.id}
-                        className="flex items-center justify-between gap-2.5 border-b border-[#1a2436] px-2.5 py-[11px] last:border-b-0"
+                        className="flex items-center justify-between gap-2.5 border-b border-panel-border px-2.5 py-[11px] last:border-b-0"
                       >
                         <div className="flex min-w-0 items-center gap-[9px]">
-                          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-[#1d2a40] text-[11.5px] font-extrabold text-[#9fb0c7]">
+                          <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[10px] bg-panel-surface-2 text-[11.5px] font-extrabold text-panel-muted">
                             {d.fullName.slice(0, 1)}
                           </span>
                           <div className="min-w-0 leading-[1.6]">
-                            <div className="text-[12.5px] font-bold text-[#e7ecf3]">{d.fullName}</div>
+                            <div className="text-[12.5px] font-bold text-panel-ink">{d.fullName}</div>
                             <span
                               className={`rounded-xl px-[7px] py-0.5 text-[10px] font-bold ${
                                 unpaid ? 'bg-[rgba(245,158,11,.14)] text-[#f59e0b]' : 'bg-[rgba(248,113,113,.14)] text-[#f87171]'
@@ -571,14 +571,14 @@ export default function AgenciesListPage() {
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder="جستجوی آژانس بر اساس نام، مجوز، مدیر یا شهر…"
-                  className="h-[46px] w-full rounded-xl border border-[#28344c] bg-[#141d2e] py-0 pl-[11px] pr-[34px] text-xs text-[#e7ecf3] outline-none transition focus:border-accent"
+                  className="h-[46px] w-full rounded-xl border border-panel-border bg-panel-surface py-0 pl-[11px] pr-[34px] text-xs text-panel-ink outline-none transition focus:border-accent"
                 />
               </div>
 
               {loading ? (
                 <p className="py-10 text-center text-sm text-panel-muted">در حال بارگذاری…</p>
               ) : (result?.agencies.length ?? 0) === 0 ? (
-                <p className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] py-[21px] text-center text-xs text-[#6b7b94]">
+                <p className="rounded-[14px] border border-panel-border bg-panel-surface py-[21px] text-center text-xs text-panel-muted">
                   آژانسی با این عبارت یافت نشد.
                 </p>
               ) : (

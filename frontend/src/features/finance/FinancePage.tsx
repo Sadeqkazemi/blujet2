@@ -761,22 +761,22 @@ function AnalyticKpiCard({
         ? 'bg-[rgba(245,158,11,.12)] text-[#f59e0b]'
         : 'bg-[rgba(248,113,113,.12)] text-[#f87171]';
   return (
-    <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-3">
+    <div className="rounded-[14px] border border-panel-border bg-panel-surface p-3 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <span className={`flex h-10 w-10 items-center justify-center rounded-[11px] ${iconClass}`}>
           {icon}
         </span>
         <span className={`rounded-full px-[7px] py-0.5 text-[10.5px] font-bold ${badgeClass}`}>{badge}</span>
       </div>
-      <div className="font-num text-[21.5px] font-black leading-tight text-white">{value}</div>
-      <div className="mt-1 text-[11px] text-[#6b7b94]">{label}</div>
+      <div className="font-num text-[21.5px] font-black leading-tight text-panel-ink">{value}</div>
+      <div className="mt-1 text-[11px] text-panel-muted">{label}</div>
     </div>
   );
 }
 
 function FlightsStrip({ flights }: { flights: CompletedFlightsSummary }) {
   return (
-    <div className="flex flex-wrap items-center gap-5 rounded-[14px] border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-4 py-[13px]">
+    <div className="flex flex-wrap items-center gap-5 rounded-[14px] border border-panel-border bg-panel-surface px-4 py-[13px] shadow-sm">
       <div className="flex min-w-[200px] items-center gap-[11px]">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[rgba(59,130,246,.14)] text-[#60a5fa]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
@@ -785,26 +785,26 @@ function FlightsStrip({ flights }: { flights: CompletedFlightsSummary }) {
         </span>
         <div>
           <div className="text-[11px] text-[#6b7b94]">پروازهای انجام‌شده</div>
-          <div className="font-num mt-0.5 text-[19px] font-black text-white">
+          <div className="font-num mt-0.5 text-[19px] font-black text-panel-ink">
             {faDigits(flights.flightCount)}{' '}
             <span className="text-[10px] font-normal text-[#7c8aa2]">پرواز</span>
           </div>
         </div>
       </div>
       <div className="grid min-w-[300px] flex-1 grid-cols-3 gap-2.5">
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[13px] py-[9px]">
           <div className="text-[9.5px] text-[#6b7b94]">مجموع صندلی پروازها</div>
-          <div className="font-num mt-[3px] text-sm font-extrabold text-[#e7ecf3]">
+          <div className="font-num mt-[3px] text-sm font-extrabold text-panel-ink">
             {faDigits(flights.totalSeats)}
           </div>
         </div>
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[13px] py-[9px]">
           <div className="text-[9.5px] text-[#6b7b94]">صندلی فروخته‌شده</div>
           <div className="font-num mt-[3px] text-sm font-extrabold text-[#34d399]">
             {faDigits(flights.soldSeats)}
           </div>
         </div>
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[13px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[13px] py-[9px]">
           <div className="text-[9.5px] text-[#6b7b94]">صندلی فروش‌نرفته</div>
           <div className="font-num mt-[3px] text-sm font-extrabold text-[#f87171]">
             {faDigits(flights.unsoldSeats)}
@@ -839,14 +839,14 @@ function ChannelSummaryTiles({
 
   return (
     <div className="mb-3.5 flex flex-wrap gap-2.5">
-      <div className="min-w-[150px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+      <div className="min-w-[150px] rounded-xl border border-panel-border bg-panel-surface px-3.5 py-2.5 shadow-sm">
         <div className="text-[9.5px] text-[#6b7b94]">{viewLabel}</div>
-        <div className="font-num mt-[3px] text-[19px] font-black text-white">
+        <div className="font-num mt-[3px] text-[19px] font-black text-panel-ink">
           {totalDisplay} <span className="text-[9.5px] font-normal text-[#7c8aa2]">{viewUnit}</span>
         </div>
       </div>
       <div className="grid min-w-[230px] flex-1 grid-cols-3 gap-2">
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[11px] py-[9px]">
           <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
             <span className="h-2 w-2 rounded-sm bg-[#3b82f6]" />
             سیستمی
@@ -855,7 +855,7 @@ function ChannelSummaryTiles({
             {channelDisplay(systemIrr)}
           </div>
         </div>
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[11px] py-[9px]">
           <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
             <span className="h-2 w-2 rounded-sm bg-[#a855f7]" />
             چارتر
@@ -864,7 +864,7 @@ function ChannelSummaryTiles({
             {channelDisplay(charterIrr)}
           </div>
         </div>
-        <div className="rounded-xl border border-[#28344c] bg-[#18223a] px-[11px] py-[9px]">
+        <div className="rounded-xl border border-panel-border bg-panel-surface-2 px-[11px] py-[9px]">
           <div className="mb-1 flex items-center gap-1.5 text-[9.5px] text-[#6b7b94]">
             <span className="h-2 w-2 rounded-sm bg-[#34d399]" />
             آژانس
@@ -874,10 +874,10 @@ function ChannelSummaryTiles({
           </div>
         </div>
       </div>
-      <div className="min-w-[280px] rounded-xl border border-[#28344c] bg-gradient-to-br from-[#1a2740] to-[#141d2e] px-3.5 py-2.5">
+      <div className="min-w-[280px] rounded-xl border border-panel-border bg-panel-surface px-3.5 py-2.5 shadow-sm">
         <div className="flex items-baseline justify-between gap-2.5">
           <div className="text-[9.5px] text-[#6b7b94]">پروازهای انجام‌شده</div>
-          <div className="font-num text-base font-black text-white">
+          <div className="font-num text-base font-black text-panel-ink">
             {faDigits(flights.flightCount)}{' '}
             <span className="text-[9px] font-normal text-[#7c8aa2]">پرواز</span>
           </div>
@@ -885,7 +885,7 @@ function ChannelSummaryTiles({
         <div className="mt-[7px] grid grid-cols-3 gap-2">
           <div>
             <div className="text-[9px] text-[#6b7b94]">مجموع صندلی</div>
-            <div className="font-num mt-0.5 text-xs font-extrabold text-[#e7ecf3]">
+            <div className="font-num mt-0.5 text-xs font-extrabold text-panel-ink">
               {faDigits(flights.totalSeats)}
             </div>
           </div>
@@ -1043,7 +1043,7 @@ function FinanceCompetitorAnalysis({
   onAnalyze: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#2a3550] bg-gradient-to-l from-[#172339] to-[#1d2a44] px-4 py-3.5">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-panel-border bg-panel-surface px-4 py-3.5 shadow-sm">
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[rgba(168,85,247,.2)] text-[#c084fc]">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
@@ -1051,8 +1051,8 @@ function FinanceCompetitorAnalysis({
           </svg>
         </span>
         <div>
-          <div className="text-[14.5px] font-extrabold text-white">تحلیل هوشمند قیمت رقبا</div>
-          <div className="mt-0.5 text-[11.5px] text-[#9fb0c7]">
+          <div className="text-[14.5px] font-extrabold text-panel-ink">تحلیل هوشمند قیمت رقبا</div>
+          <div className="mt-0.5 text-[11.5px] text-panel-muted">
             هوش مصنوعی با بررسی قیمت رقبا برای هر پرواز قیمت بهینه پیشنهاد می‌دهد
             {state === 'done' && Object.keys(suggestions).length > 0
               ? ` — ${faDigits(Object.keys(suggestions).length)} پرواز`
@@ -1061,7 +1061,7 @@ function FinanceCompetitorAnalysis({
         </div>
       </div>
       {state === 'loading' ? (
-        <span className="flex items-center gap-2 text-[12.5px] font-semibold text-white">
+        <span className="flex items-center gap-2 text-[12.5px] font-semibold text-panel-ink">
           <span className="inline-block h-[18px] w-[18px] animate-spin rounded-full border-2 border-white/30 border-t-white" />
           در حال تحلیل رقبا…
         </span>
@@ -1069,7 +1069,7 @@ function FinanceCompetitorAnalysis({
         <button
           type="button"
           onClick={onAnalyze}
-          className="rounded-[10px] border border-white/30 px-4 py-2 text-xs font-bold text-white"
+          className="rounded-[10px] border border-panel-border px-4 py-2 text-xs font-bold text-panel-ink"
         >
           تحلیل دوباره
         </button>
@@ -1354,11 +1354,11 @@ function FinanceAnalyticView() {
 
   return (
     <div className="flex flex-col gap-[15px]">
-      <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]">
+      <div className="rounded-[14px] border border-panel-border bg-panel-surface p-[15px] shadow-sm">
         <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2.5">
           <div>
-            <h2 className="m-0 text-[14.5px] font-extrabold text-white">نمودار فروش</h2>
-            <p className="mt-[3px] text-[11px] text-[#6b7b94]">
+            <h2 className="m-0 text-[14.5px] font-extrabold text-panel-ink">نمودار فروش</h2>
+            <p className="mt-[3px] text-[11px] text-panel-muted">
               {chartCaption(chart.granularity)} · میلیارد تومان
             </p>
           </div>
@@ -1529,8 +1529,8 @@ export default function FinancePage() {
   return (
     <div className="px-[21px] pb-[34px] pt-[18px]">
       <div className="mb-6">
-        <h1 className="text-[20.5px] font-black text-white">مالی</h1>
-        <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+        <h1 className="text-[20.5px] font-black text-panel-ink">مالی</h1>
+        <p className="mt-1 text-[11.5px] text-panel-muted">
           فروش هر پرواز بر اساس کانال و پیشنهاد قیمت هوش مصنوعی
         </p>
       </div>

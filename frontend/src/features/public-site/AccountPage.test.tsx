@@ -252,6 +252,7 @@ function renderPage(initialEntry = '/account') {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   vi.spyOn(useIsMobileModule, 'useIsMobile').mockReturnValue(false);
   vi.spyOn(publicSiteApi, 'fetchMyBookings').mockResolvedValue([BOOKING]);
   vi.spyOn(publicSiteApi, 'fetchWallet').mockResolvedValue({ balanceIrr: '2500000' });
@@ -272,6 +273,16 @@ beforeEach(() => {
 });
 
 describe('AccountPage', () => {
+  it('offers the shared theme control and keeps the wallet icon in customer navigation', async () => {
+    mockAuth('authenticated');
+    mockLocale('fa');
+    renderPage();
+
+    await userEvent.click(await screen.findByTestId('panel-theme-toggle'));
+    expect(screen.getByTestId('customer-panel-shell')).toHaveAttribute('data-theme', 'dark');
+    expect(screen.getByRole('button', { name: 'کیف پول' })).toBeInTheDocument();
+  });
+
   it('shows the trips tab by default with real booking data', async () => {
     mockAuth('authenticated');
     renderPage();
