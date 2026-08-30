@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository, SelectQueryBuilder } from 'typeorm';
 import { AuditLog } from '../../database/entities/audit-log.entity';
 import type { AuditCategory, Role } from '../../database/enums';
-import type { JsonValue } from '../../database/json-types';
+import { toJsonValue } from '../../database/json-types';
 
 export interface RecordAuditEntryInput {
   actorId: string;
@@ -76,7 +76,8 @@ export class AuditService {
         ...input,
         entityType: input.entityType ?? null,
         entityId: input.entityId ?? null,
-        metadata: (input.metadata as JsonValue | undefined) ?? null,
+        metadata:
+          input.metadata === undefined ? null : toJsonValue(input.metadata),
         requestId: input.requestId ?? null,
       }),
     );

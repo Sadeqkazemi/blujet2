@@ -33,6 +33,7 @@ import {
   type SeatCell,
 } from '../modules/reservation/seat-layout';
 import { StepUpService } from '../modules/auth/step-up.service';
+import { AuditService } from '../modules/audit/audit.service';
 import {
   selectRefundSeatCodes,
   UAT_KL2550_BOOKING_KEY_PREFIX as BOOKING_KEY_PREFIX,
@@ -403,6 +404,7 @@ async function main(): Promise<void> {
     const refunds = app.get(RefundsService);
     const stepUp = app.get(StepUpService);
     const financeReports = app.get(FinanceReportsService);
+    const audit = app.get(AuditService);
 
     const instance = await dataSource
       .getRepository(FlightInstance)
@@ -674,20 +676,17 @@ async function main(): Promise<void> {
       })),
       financeReport: report.summary,
     };
-    await dataSource.getRepository(AuditLog).save(
-      dataSource.getRepository(AuditLog).create({
-        actorId: actors.finance.id,
-        actorRole: actors.finance.role,
-        category: 'FINANCE',
-        action: 'UAT KL2550 financial scenario completed',
-        detail:
-          'All 140 KL2550 seats were wallet-paid, lock-verified, and ten synthetic tickets were refunded.',
-        entityType: 'FlightInstance',
-        entityId: flightInstanceId,
-        metadata: result,
-        requestId: null,
-      }),
-    );
+    await audit.record({
+      actorId: actors.finance.id,
+      actorRole: actors.finance.role,
+      category: 'FINANCE',
+      action: 'UAT KL2550 financial scenario completed',
+      detail:
+        'All 140 KL2550 seats were wallet-paid, lock-verified, and ten synthetic tickets were refunded.',
+      entityType: 'FlightInstance',
+      entityId: flightInstanceId,
+      metadata: result,
+    });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } finally {
     await app.close();
