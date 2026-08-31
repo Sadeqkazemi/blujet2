@@ -12,6 +12,7 @@ import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
+import { Passenger } from '../src/database/entities/passenger.entity';
 import { StoredFile } from '../src/database/entities/stored-file.entity';
 import { User } from '../src/database/entities/user.entity';
 import { AgencyAllotment } from '../src/database/entities/agency-allotment.entity';
@@ -19,6 +20,11 @@ import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
 const AGENCY_PASSWORD = 'AgencyTest@123';
+
+type FreeSeat = {
+  seatCode: string;
+  cabin: 'ECONOMY' | 'COMFORT' | 'BUSINESS' | 'FIRST';
+};
 
 describe('Agency Portal (e2e)', () => {
   let app: INestApplication<App>;
@@ -91,6 +97,44 @@ describe('Agency Portal (e2e)', () => {
     };
   }
 
+  async function findSellableInstanceWithFreeSeats(minimum: number) {
+    const instances = await dataSource
+      .getRepository(FlightInstance)
+      .createQueryBuilder('instance')
+      .where('instance.status = :status', { status: 'SCHEDULED' })
+      .andWhere(
+        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
+      )
+      .getMany();
+
+    for (const instance of instances) {
+      await dataSource
+        .createQueryBuilder()
+        .update(FlightInstance)
+        .set({
+          saleStartsAt: null,
+          saleEndsAt: null,
+          publicSaleEnabled: true,
+          agencySaleEnabled: true,
+          commercialPanelSettings: () =>
+            `jsonb_set(COALESCE("commercialPanelSettings", '{}'::jsonb), '{siteVisible}', 'true'::jsonb, true)`,
+        })
+        .where('id = :id', { id: instance.id })
+        .execute();
+      const seatMap = await request(app.getHttpServer()).get(
+        `/search/flights/${instance.id}/seatmap`,
+      );
+      const freeSeats = (seatMap.body?.data?.seats ?? []).filter(
+        (candidate: { status: string }) => candidate.status === 'FREE',
+      ) as FreeSeat[];
+      if (freeSeats.length >= minimum) return { instance, freeSeats };
+    }
+
+    throw new Error(
+      `No public sellable flight has ${minimum} free test seat(s).`,
+    );
+  }
+
   async function addAgencySale(agencyId: string, amountIrr: number) {
     const instance = await dataSource
       .getRepository(FlightInstance)
@@ -115,6 +159,23 @@ describe('Agency Portal (e2e)', () => {
         agencyId,
         type: 'SALE',
         signedAmountIrr: BigInt(amountIrr),
+      }),
+    );
+    await dataSource.getRepository(Passenger).save(
+      dataSource.getRepository(Passenger).create({
+        bookingId: booking.id,
+        fullName: 'مسافر گزارش آژانس',
+        passengerType: 'ADULT',
+        gender: null,
+        seatCode: null,
+        extraSeatCode: null,
+        extraSeatRequested: false,
+        occupiesSeat: true,
+        fareIrr: BigInt(amountIrr),
+        taxIrr: 0n,
+        extraSeatFareIrr: 0n,
+        ticketNo: `780${crypto.randomInt(1_000_000_000, 10_000_000_000)}`,
+        ticketIssuedAt: new Date(),
       }),
     );
     return booking;
@@ -765,21 +826,8 @@ describe('Agency Portal (e2e)', () => {
     const commercial = await dataSource
       .getRepository(User)
       .findOneByOrFail({ username: 'comm' });
-    const instance = await dataSource
-      .getRepository(FlightInstance)
-      .createQueryBuilder('instance')
-      .leftJoinAndSelect('instance.flight', 'flight')
-      .where('instance.status = :status', { status: 'SCHEDULED' })
-      .andWhere(
-        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
-      )
-      .getOneOrFail();
-    await dataSource
-      .createQueryBuilder()
-      .update(FlightInstance)
-      .set({ saleStartsAt: null, saleEndsAt: null })
-      .where('id = :id', { id: instance.id })
-      .execute();
+    const { instance, freeSeats } =
+      await findSellableInstanceWithFreeSeats(1);
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -792,13 +840,7 @@ describe('Agency Portal (e2e)', () => {
         createdById: commercial.id,
       }),
     );
-    const seatMap = await request(app.getHttpServer()).get(
-      `/search/flights/${instance.id}/seatmap`,
-    );
-    const seat = seatMap.body.data.seats.find(
-      (candidate: { status: string }) => candidate.status === 'FREE',
-    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' };
-    expect(seat).toBeTruthy();
+    const [seat] = freeSeats;
 
     const key = crypto.randomUUID();
     const body = {
@@ -837,20 +879,8 @@ describe('Agency Portal (e2e)', () => {
     const commercial = await dataSource
       .getRepository(User)
       .findOneByOrFail({ username: 'comm' });
-    const instance = await dataSource
-      .getRepository(FlightInstance)
-      .createQueryBuilder('instance')
-      .where('instance.status = :status', { status: 'SCHEDULED' })
-      .andWhere(
-        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
-      )
-      .getOneOrFail();
-    await dataSource
-      .createQueryBuilder()
-      .update(FlightInstance)
-      .set({ saleStartsAt: null, saleEndsAt: null })
-      .where('id = :id', { id: instance.id })
-      .execute();
+    const { instance, freeSeats } =
+      await findSellableInstanceWithFreeSeats(1);
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -863,12 +893,7 @@ describe('Agency Portal (e2e)', () => {
         createdById: commercial.id,
       }),
     );
-    const seatMap = await request(app.getHttpServer()).get(
-      `/search/flights/${instance.id}/seatmap`,
-    );
-    const seat = seatMap.body.data.seats.find(
-      (candidate: { status: string }) => candidate.status === 'FREE',
-    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' };
+    const [seat] = freeSeats;
     const body = {
       cabin: seat.cabin,
       passengers: [{ fullName: 'مسافر کنترل دسترسی', seatCode: seat.seatCode }],
@@ -923,20 +948,9 @@ describe('Agency Portal (e2e)', () => {
     const commercial = await dataSource
       .getRepository(User)
       .findOneByOrFail({ username: 'comm' });
-    const instance = await dataSource
-      .getRepository(FlightInstance)
-      .createQueryBuilder('instance')
-      .where('instance.status = :status', { status: 'SCHEDULED' })
-      .andWhere(
-        `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
-      )
-      .getOneOrFail();
-    await dataSource
-      .createQueryBuilder()
-      .update(FlightInstance)
-      .set({ saleStartsAt: null, saleEndsAt: null })
-      .where('id = :id', { id: instance.id })
-      .execute();
+    const { instance, freeSeats } =
+      await findSellableInstanceWithFreeSeats(2);
+
     const allotmentRepo = dataSource.getRepository(AgencyAllotment);
     const allotment = await allotmentRepo.save(
       allotmentRepo.create({
@@ -949,14 +963,6 @@ describe('Agency Portal (e2e)', () => {
         createdById: commercial.id,
       }),
     );
-    const seatMap = await request(app.getHttpServer()).get(
-      `/search/flights/${instance.id}/seatmap`,
-    );
-    const freeSeats = seatMap.body.data.seats.filter(
-      (candidate: { status: string }) => candidate.status === 'FREE',
-    ) as { seatCode: string; cabin: 'ECONOMY' | 'BUSINESS' }[];
-    expect(freeSeats.length).toBeGreaterThanOrEqual(2);
-
     const responses = await Promise.all(
       freeSeats.slice(0, 2).map((seat, index) =>
         request(app.getHttpServer())

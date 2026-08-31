@@ -15,6 +15,7 @@ import { bigintTransformer } from '../transformers/bigint.transformer';
 export type PassengerType = 'ADULT' | 'CHILD' | 'INFANT';
 
 @Index('passengers_nationalIdHash_idx', ['nationalIdHash'])
+@Index('passengers_ticketNo_key', ['ticketNo'], { unique: true })
 @Check(
   'passengers_passengerType_check',
   `"passengerType" IN ('ADULT','CHILD','INFANT')`,
@@ -68,6 +69,13 @@ export class Passenger {
   /** Adjacent EXST seat occupied by this same passenger. No baggage entitlement. */
   @Column({ type: 'text', nullable: true })
   extraSeatCode!: string | null;
+
+  /** Passenger-level immutable e-ticket number, assigned on issuance. */
+  @Column({ type: 'text', nullable: true })
+  ticketNo!: string | null;
+
+  @Column({ type: 'timestamp', precision: 3, nullable: true })
+  ticketIssuedAt!: Date | null;
 
   @Column({ type: 'bigint', default: 0, transformer: bigintTransformer })
   extraSeatFareIrr = 0n;

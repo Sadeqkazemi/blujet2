@@ -10,13 +10,13 @@ describe('nationalIdsExceedingSeatLimit', () => {
     extraSeatRequested,
   });
 
-  it('counts an additional seat as a second occupied seat', () => {
+  it('keeps an adjacent EXST attached to its passenger identity', () => {
     expect(nationalIdsExceedingSeatLimit([passenger(true)])).toEqual([]);
     expect(nationalIdsExceedingSeatLimit([passenger(true), passenger(false)])).toEqual([
       '0012345679',
     ]);
   });
-  it('allows two seats with the same national ID', () => {
+  it('rejects two passenger rows with the same national ID', () => {
     const a = {
       ...emptyPassenger(''),
       nationalId: '0012345679',
@@ -27,10 +27,10 @@ describe('nationalIdsExceedingSeatLimit', () => {
       nationalId: '0012345679',
       docType: 'NATIONAL_ID' as const,
     };
-    expect(nationalIdsExceedingSeatLimit([a, b])).toEqual([]);
+    expect(nationalIdsExceedingSeatLimit([a, b])).toEqual(['0012345679']);
   });
 
-  it('rejects a third seat with the same national ID', () => {
+  it('rejects any additional passenger with the same national ID', () => {
     const rows = [1, 2, 3].map(() => ({
       ...emptyPassenger(''),
       nationalId: '0012345679',
@@ -39,7 +39,7 @@ describe('nationalIdsExceedingSeatLimit', () => {
     expect(nationalIdsExceedingSeatLimit(rows)).toEqual(['0012345679']);
   });
 
-  it('ignores infants and passport-only rows', () => {
+  it('counts infant identities but ignores passport-only rows', () => {
     const adult = {
       ...emptyPassenger(''),
       nationalId: '0012345679',
@@ -57,6 +57,8 @@ describe('nationalIdsExceedingSeatLimit', () => {
       passportNo: 'A1234567',
       docType: 'PASSPORT' as const,
     };
-    expect(nationalIdsExceedingSeatLimit([adult, adult, infant, passport])).toEqual([]);
+    expect(nationalIdsExceedingSeatLimit([adult, infant, passport])).toEqual([
+      '0012345679',
+    ]);
   });
 });

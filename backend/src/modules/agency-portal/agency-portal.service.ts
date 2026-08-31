@@ -529,32 +529,51 @@ export class AgencyPortalService {
       order: { createdAt: 'DESC' },
     });
 
-    const passengerCounts = bookings.length
+    const passengerRows = bookings.length
       ? await this.passengerRepo
           .createQueryBuilder('p')
-          .select('p."bookingId"', 'bookingId')
-          .addSelect('COUNT(*)', 'count')
+          .select([
+            'p.id',
+            'p.bookingId',
+            'p.ticketNo',
+            'p.ticketIssuedAt',
+            'p.fareIrr',
+            'p.taxIrr',
+            'p.extraSeatFareIrr',
+          ])
           .where('p."bookingId" IN (:...ids)', {
             ids: bookings.map((b) => b.id),
           })
-          .groupBy('p."bookingId"')
-          .getRawMany<{ bookingId: string; count: string }>()
+          .andWhere('p."deletedAt" IS NULL')
+          .andWhere('p."ticketNo" IS NOT NULL')
+          .orderBy('p."ticketIssuedAt"', 'ASC')
+          .addOrderBy('p.id', 'ASC')
+          .getMany()
       : [];
-    const passengerCountByBooking = new Map<string, number>(
-      passengerCounts.map((row) => [row.bookingId, Number(row.count)]),
-    );
+    const passengersByBooking = new Map<string, Passenger[]>();
+    for (const passenger of passengerRows) {
+      const rows = passengersByBooking.get(passenger.bookingId) ?? [];
+      rows.push(passenger);
+      passengersByBooking.set(passenger.bookingId, rows);
+    }
 
-    const tickets = bookings.map((b) => ({
-      pnr: b.pnr,
-      status: b.status,
-      cabin: b.cabin,
-      fareClassCode: b.fareClassCode,
-      flightNo: b.flightInstance.flight.flightNo,
-      route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
-      departureAt: b.flightInstance.departureAt,
-      priceIrr: b.priceIrr,
-      passengerCount: passengerCountByBooking.get(b.id) ?? 0,
-    }));
+    const tickets = bookings.flatMap((b) =>
+      (passengersByBooking.get(b.id) ?? []).map((passenger) => ({
+        passengerId: passenger.id,
+        ticketNo: passenger.ticketNo,
+        ticketIssuedAt: passenger.ticketIssuedAt,
+        pnr: b.pnr,
+        status: b.status,
+        cabin: b.cabin,
+        fareClassCode: b.fareClassCode,
+        flightNo: b.flightInstance.flight.flightNo,
+        route: `${b.flightInstance.flight.route.originCode} → ${b.flightInstance.flight.route.destCode}`,
+        departureAt: b.flightInstance.departureAt,
+        priceIrr:
+          passenger.fareIrr + passenger.taxIrr + passenger.extraSeatFareIrr,
+        passengerCount: 1,
+      })),
+    );
 
     const perFlightMap = new Map<
       string,
@@ -576,7 +595,7 @@ export class AgencyPortalService {
         ticketsCount: 0,
         salesIrr: ZERO_IRR,
       };
-      existing.ticketsCount += 1;
+      existing.ticketsCount += (passengersByBooking.get(b.id) ?? []).length;
       existing.salesIrr = addIrr(existing.salesIrr, b.priceIrr);
       perFlightMap.set(key, existing);
     }
@@ -585,7 +604,11 @@ export class AgencyPortalService {
       (s, b) => addIrr(s, b.priceIrr),
       ZERO_IRR,
     );
-    const ticketsIssued = soldBookings.length;
+    const ticketsIssued = soldBookings.reduce(
+      (count, booking) =>
+        count + (passengersByBooking.get(booking.id) ?? []).length,
+      0,
+    );
     const refundedCount = bookings.filter(
       (b) => b.status === 'REFUNDED',
     ).length;
@@ -609,9 +632,10 @@ export class AgencyPortalService {
   async salesCsv(actor: AuthenticatedUser): Promise<string> {
     const report = await this.sales(actor);
     const header =
-      'PNR,Flight,Route,Departure,Cabin,FareClass,Status,Passengers,AmountIRR';
+      'TicketNo,PNR,Flight,Route,Departure,Cabin,FareClass,Status,Passengers,AmountIRR';
     const rows = report.tickets.map((t) =>
       [
+        t.ticketNo ?? '',
         t.pnr,
         t.flightNo,
         `"${t.route}"`,
@@ -871,7 +895,6 @@ export class AgencyPortalService {
         const allocated = Number(allotment?.total ?? 0);
         const ownAllocated = Number(allotment?.own ?? 0);
         const offer = agencySeatRequestClassOffer(rule, allocated);
-        if (!offer.hasDedicatedAgencyRelease) return null;
         const liveInventory = await this.search.cabinAvailability(
           instance,
           rule.cabin,
@@ -894,6 +917,7 @@ export class AgencyPortalService {
           agencySeatsReleased: rule.agencySeatsReleased,
           agencyAllocated: allocated,
           ownAllocated,
+          sellableSeats: liveInventory?.seatsLeft ?? 0,
           availableToRequest,
           pricePerSeatIrr: offer.pricePerSeatIrr,
           specialOffer: rule.agencySpecialOffer,

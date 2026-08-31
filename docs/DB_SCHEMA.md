@@ -2863,6 +2863,15 @@ capacity. Definition, fare rules, proposal and transition to
 
 `passengers` stores the immutable purchase-time classification and fare inputs:
 
+### Persisted passenger e-tickets (2026-08-31)
+
+Each `passengers` row is the passenger-level ticket record and gains nullable
+`ticketNo` (unique) and `ticketIssuedAt` columns. Payment assigns both fields
+to every passenger inside the same database transaction as the wallet debit,
+booking status transition, SALE ledger entry, and payment idempotency claim.
+EXST remains columns on its owning passenger and never creates a second ticket.
+Existing ticketed passengers are backfilled by migration.
+
 - `passengerType text NOT NULL` (`ADULT|CHILD|INFANT`)
 - `birthDate date NOT NULL`
 - `occupiesSeat boolean NOT NULL`

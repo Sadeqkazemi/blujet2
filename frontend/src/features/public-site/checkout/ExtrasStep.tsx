@@ -166,7 +166,7 @@ function GenericSeatMap({
             const taken = st.status === 'TAKEN';
             const biz = st.cabin === 'BUSINESS';
             const locked =
-              (biz && businessLocked) ||
+              (biz && businessLocked && bookedCabin !== 'BUSINESS') ||
               st.cabin !== bookedCabin ||
               (selectionLimitReached && !selected);
             let bg = biz ? '#fff6e3' : '#eaf4ff';

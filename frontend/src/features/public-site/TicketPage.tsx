@@ -174,7 +174,12 @@ export default function TicketPage() {
           </span>
         </div>
 
-        <article className="overflow-hidden rounded-[22px] border border-[#dce6f2] bg-white shadow-[0_24px_54px_-28px_rgba(13,38,102,.35)]">
+        {booking.passengers.map((passenger, passengerIndex) => (
+        <article
+          key={passenger.id ?? passenger.ticketNo ?? `${passenger.seatCode ?? 'no-seat'}-${passengerIndex}`}
+          data-testid="passenger-ticket"
+          className="mb-5 overflow-hidden rounded-[22px] border border-[#dce6f2] bg-white shadow-[0_24px_54px_-28px_rgba(13,38,102,.35)]"
+        >
           <header className="flex items-center justify-between gap-3 bg-[linear-gradient(120deg,#1668c4,#0d3b66)] px-5 py-4 text-white sm:px-7">
             <div className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 text-lg">✈</span>
@@ -186,6 +191,10 @@ export default function TicketPage() {
             <div className="text-right" dir="ltr">
               <div className="text-[10px] text-white/70">{t.pnrLabel}</div>
               <div className="font-num text-base font-black tracking-[.18em]">{booking.pnr}</div>
+              <div className="mt-1 text-[9px] text-white/70">E-ticket No.</div>
+              <div className="font-num text-xs font-black tracking-[.08em]">
+                {passenger.ticketNo ?? '—'}
+              </div>
             </div>
           </header>
 
@@ -206,7 +215,13 @@ export default function TicketPage() {
                 <div className="flex w-full items-center gap-1.5 text-[#1668c4]" aria-hidden="true">
                   <span className="h-2 w-2 rounded-full bg-[#1668c4]" />
                   <span className="h-px flex-1 bg-[#c7d9ed]" />
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#eef5ff] text-base shadow-sm">✈</span>
+                  <span
+                    data-testid="ticket-route-airplane"
+                    data-direction={isRtl ? 'left' : 'right'}
+                    className={`${isRtl ? 'rotate-180' : ''} flex h-9 w-9 items-center justify-center rounded-full bg-[#eef5ff] text-base shadow-sm`}
+                  >
+                    ✈
+                  </span>
                   <span className="h-px flex-1 bg-[#c7d9ed]" />
                   <span className="h-2 w-2 rounded-full border-2 border-[#9bb9dc] bg-white" />
                 </div>
@@ -256,20 +271,19 @@ export default function TicketPage() {
           <section className="border-t border-[#f2f4f7] px-5 py-5 sm:px-7" dir={isRtl ? 'rtl' : 'ltr'}>
             <div className="mb-3 text-sm font-black text-[#0d2640]">{t.passengers}</div>
             <div className="flex flex-col gap-2">
-              {booking.passengers.map((p, index) => (
-                <div key={`${p.seatCode ?? 'no-seat'}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-[#f7fafd] px-3.5 py-3 text-xs">
-                  <span className="font-bold text-[#16202e]">{p.fullName}</span>
-                  <span className="font-num rounded-lg bg-[#e8f1fc] px-2.5 py-1 font-extrabold text-[#1668c4]" dir="ltr">{p.seatCode || '—'}</span>
-                </div>
-              ))}
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#f7fafd] px-3.5 py-3 text-xs">
+                <span className="font-bold text-[#16202e]">{passenger.fullName}</span>
+                <span className="font-num rounded-lg bg-[#e8f1fc] px-2.5 py-1 font-extrabold text-[#1668c4]" dir="ltr">{passenger.seatCode || '—'}</span>
+              </div>
             </div>
           </section>
 
           <footer className="flex flex-col items-center gap-4 border-t border-[#f2f4f7] bg-[#fafbfd] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-            <TicketBarcode value={booking.pnr} />
+            <TicketBarcode value={passenger.ticketNo ?? booking.pnr} />
             <div className="text-center text-[10px] leading-relaxed text-[#8a96a6] sm:text-right" dir={isRtl ? 'rtl' : 'ltr'}>{t.showAtCheckin}</div>
           </footer>
         </article>
+        ))}
 
         <button type="button" onClick={() => window.print()} className="mt-4 w-full rounded-xl border border-[#d5e1f0] bg-white py-3 text-xs font-bold text-[#1668c4]">{t.downloadPrint}</button>
       </div>

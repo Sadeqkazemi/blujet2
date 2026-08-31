@@ -1,7 +1,6 @@
 import {
   assertInRequestNationalIdSeatLimit,
   countOccupyingNationalIdHashes,
-  MAX_SEATS_PER_NATIONAL_ID,
 } from './national-id-seat-limit';
 import { hashPii, normalizeNationalId } from '../../common/pii-crypto';
 
@@ -21,16 +20,16 @@ describe('national-id-seat-limit', () => {
     else process.env.PII_ENCRYPTION_KEY = originalKey;
   });
 
-  it(`allows up to ${MAX_SEATS_PER_NATIONAL_ID} seats for the same national ID`, () => {
+  it('rejects a second passenger row with the same national ID', () => {
     expect(() =>
       assertInRequestNationalIdSeatLimit([
         { nationalId: VALID_NID, passengerType: 'ADULT' },
         { nationalId: VALID_NID, passengerType: 'ADULT' },
       ]),
-    ).not.toThrow();
+    ).toThrow(/یک مسافر/);
   });
 
-  it('counts one passenger with EXST as two occupied seats', () => {
+  it('allows one passenger to own one adjacent EXST without another ticket', () => {
     expect(() =>
       assertInRequestNationalIdSeatLimit([
         {
@@ -40,45 +39,23 @@ describe('national-id-seat-limit', () => {
         },
       ]),
     ).not.toThrow();
-    expect(() =>
-      assertInRequestNationalIdSeatLimit([
-        {
-          nationalId: VALID_NID,
-          passengerType: 'ADULT',
-          extraSeatRequested: true,
-        },
-        { nationalId: VALID_NID, passengerType: 'ADULT' },
-      ]),
-    ).toThrow(/حداکثر/);
   });
 
-  it(`rejects more than ${MAX_SEATS_PER_NATIONAL_ID} seats for the same national ID`, () => {
+  it('also rejects duplicate identity when one row is an infant', () => {
     expect(() =>
       assertInRequestNationalIdSeatLimit([
-        { nationalId: VALID_NID, passengerType: 'ADULT' },
-        { nationalId: VALID_NID, passengerType: 'CHILD' },
-        { nationalId: VALID_NID, passengerType: 'ADULT' },
-      ]),
-    ).toThrow(/حداکثر/);
-  });
-
-  it('ignores infants (no seat) when counting', () => {
-    expect(() =>
-      assertInRequestNationalIdSeatLimit([
-        { nationalId: VALID_NID, passengerType: 'ADULT' },
         { nationalId: VALID_NID, passengerType: 'ADULT' },
         { nationalId: VALID_NID, passengerType: 'INFANT' },
       ]),
-    ).not.toThrow();
+    ).toThrow(/یک مسافر/);
   });
 
   it('counts distinct national IDs independently', () => {
     const counts = countOccupyingNationalIdHashes([
       { nationalId: VALID_NID, passengerType: 'ADULT' },
-      { nationalId: VALID_NID, passengerType: 'ADULT' },
       { nationalId: VALID_NID_B, passengerType: 'ADULT' },
     ]);
-    expect(counts.get(hashPii(normalizeNationalId(VALID_NID)))).toBe(2);
+    expect(counts.get(hashPii(normalizeNationalId(VALID_NID)))).toBe(1);
     expect(counts.get(hashPii(normalizeNationalId(VALID_NID_B)))).toBe(1);
   });
 });

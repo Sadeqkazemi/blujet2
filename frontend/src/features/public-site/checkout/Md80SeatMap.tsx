@@ -269,10 +269,11 @@ export default function Md80SeatMap({
     if (MD80_EXCLUDED.has(s.seatCode)) continue;
     if (s.cabin === 'COMFORT') continue;
     if (byCode.has(s.seatCode)) {
+      const layoutSeat = byCode.get(s.seatCode)!;
       byCode.set(s.seatCode, {
         seatCode: s.seatCode,
         row: s.row,
-        cabin: s.cabin,
+        cabin: layoutSeat.cabin,
         status: s.status,
       });
     }
@@ -289,7 +290,12 @@ export default function Md80SeatMap({
   function isLocked(cabin: CabinClass, status: 'FREE' | 'TAKEN', code: string) {
     if (status === 'TAKEN') return true;
     if (cabin !== bookedCabin) return true;
-    if (cabin === 'BUSINESS' && businessLocked) return true;
+    if (
+      cabin === 'BUSINESS' &&
+      businessLocked &&
+      bookedCabin !== 'BUSINESS'
+    )
+      return true;
     if (selectionLimitReached && !selectedSeats.includes(code)) return true;
     return false;
   }

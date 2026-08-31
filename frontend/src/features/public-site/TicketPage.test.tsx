@@ -21,7 +21,15 @@ const TICKETED: BookingDetail = {
   departureAt: '2026-08-01T05:00:00.000Z',
   arrivalAt: '2026-08-01T06:30:00.000Z',
   isPriceLocked: false,
-  passengers: [{ fullName: 'علی رضایی', seatCode: '2A' }],
+  passengers: [
+    {
+      id: 'p1',
+      fullName: 'علی رضایی',
+      seatCode: '2A',
+      ticketNo: '7800000000001',
+      ticketIssuedAt: '2026-08-01T04:58:00.000Z',
+    },
+  ],
 };
 
 function renderPage(locale: 'fa' | 'en' | 'ar' = 'fa') {
@@ -50,6 +58,7 @@ describe('TicketPage', () => {
 
     expect(await screen.findByText('BJABC123')).toBeInTheDocument();
     expect(screen.getByTestId('ticket-barcode')).toBeInTheDocument();
+    expect(screen.getByText('7800000000001')).toBeInTheDocument();
     expect(screen.getByText('علی رضایی')).toBeInTheDocument();
     expect(screen.queryByTestId('open-refund-form')).not.toBeInTheDocument();
   });
@@ -80,6 +89,7 @@ describe('TicketPage', () => {
     expect(await screen.findByTestId('ticket-route')).toHaveAttribute('dir', 'rtl');
     expect(screen.getByTestId('ticket-origin')).toHaveClass('order-3');
     expect(screen.getByTestId('ticket-destination')).toHaveClass('order-1');
+    expect(screen.getByTestId('ticket-route-airplane')).toHaveAttribute('data-direction', 'left');
 
     view.unmount();
     vi.restoreAllMocks();
@@ -89,6 +99,7 @@ describe('TicketPage', () => {
     expect(screen.getByTestId('ticket-route')).toHaveAttribute('dir', 'ltr');
     expect(screen.getByTestId('ticket-origin')).toHaveClass('order-1');
     expect(screen.getByTestId('ticket-destination')).toHaveClass('order-3');
+    expect(screen.getByTestId('ticket-route-airplane')).toHaveAttribute('data-direction', 'right');
   });
 
   it('uses the Persian route placement for Arabic tickets', async () => {
@@ -98,6 +109,30 @@ describe('TicketPage', () => {
     expect(await screen.findByTestId('ticket-route')).toHaveAttribute('dir', 'rtl');
     expect(screen.getByTestId('ticket-origin')).toHaveClass('order-3');
     expect(screen.getByTestId('ticket-destination')).toHaveClass('order-1');
+  });
+
+  it('renders one complete persisted e-ticket for every passenger', async () => {
+    vi.spyOn(publicSiteApi, 'fetchBookingByPnr').mockResolvedValue({
+      ...TICKETED,
+      passengers: [
+        TICKETED.passengers[0],
+        {
+          ...TICKETED.passengers[0],
+          id: 'p2',
+          fullName: 'مریم رضایی',
+          seatCode: '2B',
+          ticketNo: '7800000000002',
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findAllByTestId('passenger-ticket')).toHaveLength(2);
+    expect(screen.getByText('7800000000001')).toBeInTheDocument();
+    expect(screen.getByText('7800000000002')).toBeInTheDocument();
+    expect(screen.getAllByTestId('ticket-barcode')).toHaveLength(2);
+    expect(screen.getByText('علی رضایی')).toBeInTheDocument();
+    expect(screen.getByText('مریم رضایی')).toBeInTheDocument();
   });
 
   it('blocks the boarding-pass view for unpaid HELD bookings', async () => {

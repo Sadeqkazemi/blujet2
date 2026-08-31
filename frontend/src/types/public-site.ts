@@ -96,6 +96,7 @@ export type BookingStatus =
   'DRAFT' | 'HELD' | 'PAID' | 'TICKETED' | 'CANCELLED' | 'EXPIRED' | 'REFUNDED';
 
 export interface BookingPassengerView {
+  id?: string;
   fullName: string;
   seatCode: string | null;
   extraSeatCode: string | null;
@@ -106,6 +107,8 @@ export interface BookingPassengerView {
   fareIrr: string;
   taxIrr: string;
   gender?: 'male' | 'female' | null;
+  ticketNo?: string | null;
+  ticketIssuedAt?: string | null;
 }
 
 export interface BookingDetail {

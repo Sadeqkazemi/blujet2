@@ -13,6 +13,7 @@ function mockLocale(locale: 'fa' | 'en' | 'ar') {
 const REPORT: AgencySalesReport = {
   tickets: [
     {
+      passengerId: 'passenger-1', ticketNo: '7800000000001', ticketIssuedAt: '2026-08-01T05:01:00.000Z',
       pnr: 'BJAG001', status: 'TICKETED', cabin: 'ECONOMY', fareClassCode: 'Y',
       flightNo: 'EP-821', route: 'THR → DXB', departureAt: '2026-08-01T05:00:00.000Z',
       priceIrr: '190000000', passengerCount: 1,
@@ -80,6 +81,7 @@ describe('AgencySalesPage RTRD redesign', () => {
     await user.click(await screen.findByRole('tab', { name: 'PSR' }));
 
     expect(screen.getByText('BJAG001')).toBeInTheDocument();
+    expect(screen.getByText('7800000000001')).toBeInTheDocument();
     expect(screen.getByText('BJAG002')).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText('جستجو در گزارش…'), 'BJAG002');
     expect(screen.queryByText('BJAG001')).not.toBeInTheDocument();
