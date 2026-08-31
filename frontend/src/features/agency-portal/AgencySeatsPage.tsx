@@ -272,23 +272,23 @@ export default function AgencySeatsPage() {
       );
     });
   }, [preferredWeekdays, requestFlight, requestGroup, termMonths]);
-  const requestAvailable = requestOccurrences.length
-    ? Math.min(
-        ...requestOccurrences.map(
-          (occurrence) => occurrence.availableToRequest,
-        ),
-      )
-    : 0;
   const orderSeatCount =
     seatInquiryState === "confirmed" && seatInquiry
       ? seatInquiry.suggestedSeats
       : requestedSeats;
   const selectableOccurrences = useMemo(
     () =>
-      requestOccurrences.filter(
-        (occurrence) => occurrence.availableToRequest >= orderSeatCount,
-      ),
-    [orderSeatCount, requestOccurrences],
+      requestOccurrences.filter((occurrence) => {
+        const isInquiredOccurrence =
+          seatInquiry?.flightInstanceId === occurrence.flightInstanceId &&
+          seatInquiry.cabin === occurrence.cabin &&
+          seatInquiry.fareClassCode === occurrence.fareClassCode;
+        const availableSeats = isInquiredOccurrence
+          ? seatInquiry.availableToRequest
+          : occurrence.availableToRequest;
+        return availableSeats >= orderSeatCount;
+      }),
+    [orderSeatCount, requestOccurrences, seatInquiry],
   );
   const activeWeekdays = useMemo(
     () =>
@@ -347,11 +347,10 @@ export default function AgencySeatsPage() {
     setSelectedOccurrenceIds([]);
     setSelectedMonthKeys([]);
 
-    if (
-      !requestFlight ||
-      requestedSeats < 1 ||
-      requestAvailable < 1
-    ) {
+    // The catalogue value is only a cached preview. Always let the
+    // reservation inquiry endpoint make the authoritative capacity decision,
+    // even when the preview currently reports zero available seats.
+    if (!requestFlight || requestedSeats < 1) {
       setSeatInquiryLoading(false);
       return;
     }
@@ -388,7 +387,6 @@ export default function AgencySeatsPage() {
   }, [
     requestFlightId,
     requestedSeats,
-    requestAvailable,
     seatInquiryNonce,
     requestFlight,
     t.errorFallback,
@@ -909,7 +907,6 @@ export default function AgencySeatsPage() {
                     <button
                       type="button"
                       disabled={
-                        requestAvailable < 1 ||
                         requestedSeats < 1 ||
                         seatInquiryLoading
                       }
@@ -1263,7 +1260,6 @@ export default function AgencySeatsPage() {
                     busy ||
                     selectedOccurrences.length === 0 ||
                     orderSeatCount < 1 ||
-                    requestAvailable < 1 ||
                     (payMethod === "CREDIT" && !hasEnoughCredit)
                   }
                   onClick={() => void submitSeatRequest()}

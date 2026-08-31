@@ -309,6 +309,61 @@ describe("AgencySeatsPage", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("asks the reservation service even when the catalogue preview is zero", async () => {
+    const user = userEvent.setup();
+    const option: AgencySeatRequestOption = {
+      flightInstanceId: "fi-zero-preview",
+      flightNo: "KL2550",
+      originCode: "IKA",
+      destCode: "FRA",
+      departureAt: "2026-09-02T05:00:00.000Z",
+      aircraftType: "MD-80",
+      cabin: "BUSINESS",
+      fareClassCode: "C",
+      capacity: 20,
+      agencySeatsReleased: 0,
+      agencyAllocated: 0,
+      ownAllocated: 0,
+      availableToRequest: 0,
+      pricePerSeatIrr: "80000000",
+      specialOffer: false,
+      definitionStatus: "PUBLISHED",
+    };
+    vi.mocked(portalApi.fetchSeatRequestOptions).mockResolvedValue([option]);
+    vi.spyOn(portalApi, "fetchAllotments").mockResolvedValue([]);
+    const inquiry = vi.mocked(portalApi.inquireAgencySeats);
+
+    render(<AgencySeatsPage />);
+    await user.selectOptions(
+      await screen.findByTestId("agency-request-origin"),
+      "IKA",
+    );
+    await user.selectOptions(
+      screen.getByTestId("agency-request-destination"),
+      "FRA",
+    );
+    await user.click(
+      screen.getByTestId("agency-request-route-fi-zero-preview"),
+    );
+    await user.type(screen.getByTestId("agency-request-seat-count"), "2");
+
+    await waitFor(() => {
+      expect(inquiry).toHaveBeenLastCalledWith({
+        flightInstanceId: "fi-zero-preview",
+        cabin: "BUSINESS",
+        fareClassCode: "C",
+        seats: 2,
+      });
+    });
+    expect(
+      await screen.findByTestId("agency-seat-inquiry-result"),
+    ).toHaveTextContent("۲ صندلی موجود است");
+    await user.click(screen.getByTestId("agency-seat-inquiry-confirm"));
+    expect(
+      screen.getByTestId("agency-flight-date-fi-zero-preview"),
+    ).toBeEnabled();
+  });
+
   it("keeps each route in its own card and opens inquiry controls inside only the selected card", async () => {
     const option: AgencySeatRequestOption = {
       flightInstanceId: "fi-economy",
