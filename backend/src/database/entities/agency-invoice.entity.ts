@@ -12,10 +12,12 @@ import {
 import { AgencyInvoiceStatus } from '../enums';
 import { bigintTransformer } from '../transformers/bigint.transformer';
 import { AgencyProfile } from './agency-profile.entity';
+import { Booking } from './booking.entity';
 import { User } from './user.entity';
 
 @Index('agency_invoices_agencyId_status_idx', ['agencyId', 'status'])
 @Index('agency_invoices_invoiceNo_key', ['invoiceNo'], { unique: true })
+@Index('agency_invoices_bookingId_key', ['bookingId'], { unique: true })
 @Entity('agency_invoices')
 export class AgencyInvoice {
   @PrimaryColumn({
@@ -31,6 +33,16 @@ export class AgencyInvoice {
 
   @Column({ type: 'text' })
   agencyId!: string;
+
+  @Column({ type: 'text', nullable: true })
+  bookingId!: string | null;
+
+  @ManyToOne(() => Booking, { onDelete: 'SET NULL', onUpdate: 'CASCADE' })
+  @JoinColumn({
+    name: 'bookingId',
+    foreignKeyConstraintName: 'agency_invoices_bookingId_fkey',
+  })
+  booking!: Booking | null;
 
   @ManyToOne(() => AgencyProfile, { onDelete: 'RESTRICT', onUpdate: 'CASCADE' })
   @JoinColumn({

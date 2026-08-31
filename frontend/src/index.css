@@ -166,6 +166,16 @@ body {
   color: var(--color-panel-muted) !important;
 }
 
+/* Legacy dark pages used pale blue/purple accents as body copy. They wash
+   out on white after the surface is converted, so use accessible light-mode
+   accents while retaining semantic colour. */
+.management-panel-light :is(
+  [class*="text-[#93c5fd]"], [class*="text-[#8fb4f5]"],
+  [class*="text-[#7da7ff]"], [class*="text-[#c4b5fd]"]
+) {
+  color: #1d4ed8 !important;
+}
+
 /* In light mode, legacy pages can still carry `text-white` from their former
    dark layout. Convert only non-interactive copy and numeric values. Buttons,
    links, badges and elements with their own coloured/gradient background keep
@@ -210,6 +220,27 @@ body {
   --color-panel-accent: #60a5fa;
   --color-panel-link: #60a5fa;
   color-scheme: dark;
+}
+
+/* The inverse compatibility layer prevents older light-only cards and dark
+   text from leaving white islands or invisible copy in a dark staff panel. */
+.management-panel-dark :is(
+  [class~="bg-white"], [class*="bg-[#fff]"], [class*="bg-[#fafbfd]"],
+  [class*="bg-[#f8fafc]"], [class*="bg-[#f7faff]"], [class*="bg-[#eef4fb]"],
+  [class*="bg-[#f4f7fb]"]
+) {
+  background-color: var(--color-panel-surface) !important;
+  border-color: var(--color-panel-border) !important;
+  color: var(--color-panel-ink) !important;
+}
+
+.management-panel-dark :is(
+  [class*="text-[#0d2640]"], [class*="text-[#16202e]"],
+  [class*="text-[#16233a]"], [class*="text-[#1a2d42]"],
+  [class*="text-[#3b4554]"], [class*="text-[#536274]"],
+  [class*="text-[#687587]"]
+) {
+  color: var(--color-panel-ink) !important;
 }
 
 /* Shared card recipe used by every staff role.  The one-pixel outline and

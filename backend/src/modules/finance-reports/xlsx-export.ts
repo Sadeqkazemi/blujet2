@@ -154,7 +154,10 @@ function sheetXml(spec: SheetSpec) {
   const tabColor = spec.tabColor
     ? `<sheetPr><tabColor rgb="FF${spec.tabColor.replace('#', '')}"/><pageSetUpPr fitToPage="1"/></sheetPr>`
     : '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>';
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${colName(maxColumns - 1)}${maxRows}"/>${tabColor}<sheetViews><sheetView rightToLeft="1" showGridLines="0" workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${colsXml}</cols><sheetData>${rowsXml}</sheetData>${merges}${autoFilter}<pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  // OOXML sequence is strict: autoFilter precedes mergeCells. Excel repairs
+  // workbooks that reverse these elements even though generic ZIP/XML checks
+  // still pass.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${colName(maxColumns - 1)}${maxRows}"/>${tabColor}<sheetViews><sheetView rightToLeft="1" showGridLines="0" workbookViewId="0">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="20"/><cols>${colsXml}</cols><sheetData>${rowsXml}</sheetData>${autoFilter}${merges}<pageMargins left="0.3" right="0.3" top="0.5" bottom="0.5" header="0.2" footer="0.2"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
 }
 
 function stylesXml() {

@@ -160,13 +160,41 @@ describe('FinanceReportsService', () => {
     expect(qb.andWhere).toHaveBeenCalledWith('b.cabin = :cabin', {
       cabin: 'BUSINESS',
     });
-    expect(qb.andWhere).toHaveBeenCalledWith('b.channel = :channel', {
-      channel: 'AGENCY',
-    });
+    expect(qb.andWhere).toHaveBeenCalledWith('b."agencyId" IS NOT NULL');
     expect(qb.andWhere).toHaveBeenCalledWith(
       'b."flightInstanceId" = :flightInstanceId',
       { flightInstanceId: '11111111-1111-4111-8111-111111111111' },
     );
+  });
+
+  it('attributes public-inventory purchases with an agency owner to agency finance', async () => {
+    const qb: Record<string, jest.Mock> = {};
+    for (const method of [
+      'select',
+      'addSelect',
+      'from',
+      'innerJoin',
+      'leftJoin',
+      'where',
+      'andWhere',
+      'setParameters',
+      'groupBy',
+      'addGroupBy',
+      'orderBy',
+    ]) {
+      qb[method] = jest.fn().mockReturnValue(qb);
+    }
+    qb.getRawMany = jest.fn().mockResolvedValue([]);
+    const service = new FinanceReportsService({
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+    } as unknown as DataSource);
+
+    await service.report({
+      scope: FinanceReportScope.AGENCIES,
+      period: FinanceReportPeriod.MONTH,
+    });
+
+    expect(qb.where).toHaveBeenCalledWith('b."agencyId" IS NOT NULL');
   });
 
   it('treats priceIrr as the all-in booking total without adding tax and extras twice', async () => {
@@ -284,6 +312,17 @@ describe('FinanceReportsService', () => {
     const workbook = (excel.body as Buffer).toString('utf8');
     expect(workbook).toContain('xl/worksheets/sheet8.xml');
     expect(workbook).toContain('BJTEST');
+    for (let sheet = 1; sheet <= 8; sheet += 1) {
+      const xmlStart = workbook.indexOf(
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet`,
+        workbook.indexOf(`xl/worksheets/sheet${sheet}.xml`),
+      );
+      const xmlEnd = workbook.indexOf('</worksheet>', xmlStart);
+      const worksheet = workbook.slice(xmlStart, xmlEnd);
+      const filter = worksheet.indexOf('<autoFilter');
+      const merges = worksheet.indexOf('<mergeCells');
+      if (filter >= 0 && merges >= 0) expect(filter).toBeLessThan(merges);
+    }
   });
 
   it('does not apply the on-screen preview cap to operational exports', async () => {

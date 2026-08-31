@@ -109,7 +109,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
 
   const displayName = agencyName || user?.fullName || '—';
   const initials = agencyInitials(displayName);
-  const logoTextColor = isMobile ? '#fff' : '#16202e';
+  const logoTextColor = isMobile ? '#fff' : 'var(--portal-ink)';
   const logoSquareBg = isMobile ? '#fff' : '#1668c4';
   const logoIconColor = isMobile ? '#1668c4' : '#fff';
 
@@ -130,15 +130,15 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
 
   const langDropdown = (
     <>
-      <div onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120 }} />
+      <button type="button" aria-label="Close language menu" onClick={() => setLangOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 120, border: 0, background: 'transparent' }} />
       <div
         style={{
           position: 'absolute',
           top: 44,
           [isRTL ? 'left' : 'right']: 0,
           width: 150,
-          background: '#fff',
-          border: '1px solid #e6eaf0',
+          background: 'var(--portal-surface)',
+          border: '1px solid var(--portal-border)',
           borderRadius: 14,
           boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
           zIndex: 130,
@@ -147,8 +147,10 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
         }}
       >
         {LANG_OPTIONS.map((opt) => (
-          <div
+          <button
+            type="button"
             key={opt.value}
+            data-testid={`agency-lang-option-${opt.value}`}
             onClick={() => {
               setLocale(opt.value);
               setLangOpen(false);
@@ -162,13 +164,17 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
               borderRadius: 9,
               fontSize: 12.5,
               fontWeight: 600,
-              color: '#16202e',
+              color: 'var(--portal-ink)',
               cursor: 'pointer',
+              border: 0,
+              background: locale === opt.value ? 'var(--portal-surface-2)' : 'transparent',
+              width: '100%',
+              fontFamily: 'inherit',
             }}
           >
             {opt.label}
             {locale === opt.value && <span style={{ color: '#1668c4', fontWeight: 900 }}>✓</span>}
-          </div>
+          </button>
         ))}
       </div>
     </>
@@ -184,15 +190,15 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
           [align]: 0,
           width,
           maxWidth: '80vw',
-          background: '#fff',
-          border: '1px solid #e6eaf0',
+          background: 'var(--portal-surface)',
+          border: '1px solid var(--portal-border)',
           borderRadius: 16,
           boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
           zIndex: 130,
           overflow: 'hidden',
         }}
       >
-        <div style={{ padding: '18px 17px 12px', color: '#16202e' }}>
+        <div style={{ padding: '18px 17px 12px', color: 'var(--portal-ink)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               style={{
@@ -212,14 +218,14 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             </div>
             <div style={{ lineHeight: 1.5 }}>
               <div style={{ fontSize: 13.5, fontWeight: 800 }}>{displayName}</div>
-              <div dir="ltr" style={{ fontSize: 10.5, color: '#8a96a6', fontWeight: 700 }}>{licenseNo || '—'}</div>
+              <div dir="ltr" style={{ fontSize: 10.5, color: 'var(--portal-muted)', fontWeight: 700 }}>{licenseNo || '—'}</div>
             </div>
           </div>
         </div>
-        <div style={{ margin: '0 17px 12px', borderRadius: 12, background: '#f6f8fb', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ margin: '0 17px 12px', borderRadius: 12, background: 'var(--portal-surface-2)', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div>
-            <div style={{ fontSize: 10.5, color: '#8a96a6' }}>{locale === 'fa' ? 'اعتبار قابل استفاده' : locale === 'ar' ? 'الرصيد المتاح' : 'Available credit'}</div>
-            <b className="font-num" style={{ display: 'block', marginTop: 4, fontSize: 14, color: '#16202e' }}>{remainingIrr == null ? '—' : localeMoney(remainingIrr, locale)}</b>
+            <div style={{ fontSize: 10.5, color: 'var(--portal-muted)' }}>{locale === 'fa' ? 'اعتبار قابل استفاده' : locale === 'ar' ? 'الرصيد المتاح' : 'Available credit'}</div>
+            <b className="font-num" style={{ display: 'block', marginTop: 4, fontSize: 14, color: 'var(--portal-ink)' }}>{remainingIrr == null ? '—' : localeMoney(remainingIrr, locale)}</b>
           </div>
           <span aria-hidden style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--portal-surface)', border: '1px solid var(--portal-border)', display: 'grid', placeItems: 'center', color: 'var(--portal-accent)' }}>
             <AgencyNavIcon name="credit" size={18} />
@@ -229,7 +235,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
           <Link
             to="/agency"
             onClick={() => setUserMenuOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: 'var(--portal-ink)', textDecoration: 'none', fontWeight: 600 }}
           >
             <span style={{ color: '#1668c4' }}>👤</span>
             {at.agencyPanel}
@@ -237,16 +243,16 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
           <Link
             to="/agency/sales"
             onClick={() => setUserMenuOpen(false)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: 'var(--portal-ink)', textDecoration: 'none', fontWeight: 600 }}
           >
             <span style={{ color: '#1668c4' }}>🧳</span>
             {locale === 'fa' ? 'پروازهای خریداری‌شده' : locale === 'ar' ? 'الرحلات المشتراة' : 'Purchased flights'}
           </Link>
-          <Link to="/agency/webservice" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}>
+          <Link to="/agency/webservice" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: 'var(--portal-ink)', textDecoration: 'none', fontWeight: 600 }}>
             <span style={{ color: '#1668c4' }}>&lt;/&gt;</span>
             {locale === 'fa' ? 'وب‌سرویس' : locale === 'ar' ? 'خدمة الويب' : 'Web service'}
           </Link>
-          <Link to="/agency/profile" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: '#16202e', textDecoration: 'none', fontWeight: 600 }}>
+          <Link to="/agency/profile" onClick={() => setUserMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 11px', borderRadius: 9, fontSize: 11.5, color: 'var(--portal-ink)', textDecoration: 'none', fontWeight: 600 }}>
             <span style={{ color: '#1668c4' }}>▯</span>
             {locale === 'fa' ? 'مدارک و پروفایل' : locale === 'ar' ? 'المستندات والملف الشخصي' : 'Documents & profile'}
           </Link>
@@ -271,8 +277,8 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
       <header data-testid="agency-portal-header" style={{ gridColumn: '1 / -1', position: 'sticky', top: 0, zIndex: 150 }}>
         <div
           style={{
-            background: isMobile ? '#1668c4' : '#fff',
-            borderBottom: isMobile ? 'none' : '1px solid #e6eaf0',
+            background: isMobile ? '#1668c4' : 'var(--portal-surface)',
+            borderBottom: isMobile ? 'none' : '1px solid var(--portal-border)',
             boxShadow: '0 2px 12px -8px rgba(13,38,102,.25)',
           }}
         >
@@ -326,9 +332,9 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             </Link>
 
             {!isMobile && (
-              <nav style={{ display: 'flex', gap: 30, fontSize: 15.5, color: '#3b4554', fontWeight: 600, height: '100%', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <nav style={{ display: 'flex', gap: 30, fontSize: 15.5, color: 'var(--portal-ink)', fontWeight: 600, height: '100%', alignItems: 'center', whiteSpace: 'nowrap' }}>
                 {navLinks.slice(0, 2).map((link) => (
-                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: '#3b4554' }}>
+                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: 'var(--portal-ink)' }}>
                     {link.label}
                   </Link>
                 ))}
@@ -341,7 +347,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                     style={{
                       border: 0,
                       background: 'transparent',
-                      color: servicesActive ? '#1668c4' : '#3b4554',
+                      color: servicesActive ? 'var(--portal-accent)' : 'var(--portal-ink)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 5,
@@ -369,8 +375,8 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                           [isRTL ? 'right' : 'left']: 0,
                           marginTop: 10,
                           width: 230,
-                          background: '#fff',
-                          border: '1px solid #eef1f5',
+                          background: 'var(--portal-surface)',
+                          border: '1px solid var(--portal-border)',
                           borderRadius: 14,
                           boxShadow: '0 18px 40px -14px rgba(13,38,102,.25)',
                           padding: 10,
@@ -394,11 +400,11 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                                 borderRadius: 10,
                                 fontSize: 12.5,
                                 fontWeight: active ? 700 : 600,
-                                color: active ? '#1668c4' : '#16202e',
+                                color: active ? 'var(--portal-accent)' : 'var(--portal-ink)',
                               }}
                             >
                               <span>{item.label}</span>
-                              <span style={{ width: 36, height: 36, borderRadius: '50%', background: '#f2f4f7', color: '#3b4554', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                              <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--portal-surface-2)', color: 'var(--portal-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
                                 <ServiceMenuIcon kind={item.icon} />
                               </span>
                             </Link>
@@ -409,7 +415,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                   )}
                 </div>
                 {navLinks.slice(2).map((link) => (
-                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: '#3b4554' }}>
+                  <Link key={link.to} to={link.to} style={{ textDecoration: 'none', color: 'var(--portal-ink)' }}>
                     {link.label}
                   </Link>
                 ))}
@@ -419,24 +425,29 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             {!isMobile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ position: 'relative' }}>
-                  <span
+                  <button
+                    type="button"
+                    data-testid="agency-lang-toggle"
+                    aria-haspopup="menu"
+                    aria-expanded={langOpen}
                     onClick={() => setLangOpen((v) => !v)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: 6,
                       cursor: 'pointer',
-                      color: '#5a6678',
-                      border: '1.5px solid #e2e7ee',
+                      color: 'var(--portal-muted)',
+                      border: '1.5px solid var(--portal-border)',
                       borderRadius: 20,
                       padding: '6px 12px',
                       fontSize: 12.5,
                       fontWeight: 700,
+                      background: 'transparent',
                     }}
                   >
                     <GlobeIcon />
                     {locale.toUpperCase()}
-                  </span>
+                  </button>
                   {langOpen && langDropdown}
                 </div>
                 <div style={{ position: 'relative' }}>
@@ -447,11 +458,11 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                       width: 42,
                       height: 42,
                       borderRadius: '50%',
-                      background: '#f3f5f8',
+                      background: 'var(--portal-surface-2)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      color: '#5a6678',
+                      color: 'var(--portal-muted)',
                       fontSize: 15.5,
                       position: 'relative',
                       cursor: 'pointer',
@@ -476,15 +487,15 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                           top: 52,
                           [isRTL ? 'left' : 'right']: 0,
                           width: 340,
-                          background: '#fff',
-                          border: '1px solid #e6eaf0',
+                          background: 'var(--portal-surface)',
+                          border: '1px solid var(--portal-border)',
                           borderRadius: 14,
                           boxShadow: '0 20px 50px -16px rgba(13,38,64,.35)',
                           zIndex: 130,
                           overflow: 'hidden',
                           padding: 8,
                           textAlign: isRTL ? 'right' : 'left',
-                          color: '#8a96a6',
+                          color: 'var(--portal-muted)',
                           fontSize: 11.5,
                         }}
                       >
@@ -497,13 +508,13 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                             key={row.id}
                             type="button"
                             onClick={() => void openAgencyNotification(row)}
-                            style={{ width: '100%', border: 0, borderBottom: '1px solid #eef1f5', background: row.readAt ? '#fff' : '#f4f8ff', padding: '11px 10px', textAlign: 'inherit', cursor: 'pointer', display: 'flex', gap: 9 }}
+                            style={{ width: '100%', border: 0, borderBottom: '1px solid var(--portal-border)', background: row.readAt ? 'var(--portal-surface)' : 'var(--portal-surface-2)', padding: '11px 10px', textAlign: 'inherit', cursor: 'pointer', display: 'flex', gap: 9 }}
                           >
                             <span aria-hidden>{notificationCategoryIcon(row.category)}</span>
                             <span style={{ minWidth: 0 }}>
-                              <strong style={{ display: 'block', color: '#16202e', fontSize: 11.5 }}>{row.title}</strong>
-                              <span style={{ display: 'block', marginTop: 3, color: '#66758a', fontSize: 10, lineHeight: 1.6 }}>{row.body}</span>
-                              <span style={{ display: 'block', marginTop: 4, color: '#9aa4b2', fontSize: 9 }}>{formatNotificationTime(row.createdAt, locale)}</span>
+                              <strong style={{ display: 'block', color: 'var(--portal-ink)', fontSize: 11.5 }}>{row.title}</strong>
+                              <span style={{ display: 'block', marginTop: 3, color: 'var(--portal-muted)', fontSize: 10, lineHeight: 1.6 }}>{row.body}</span>
+                              <span style={{ display: 'block', marginTop: 4, color: 'var(--portal-muted)', fontSize: 9 }}>{formatNotificationTime(row.createdAt, locale)}</span>
                             </span>
                           </button>
                         ))}
@@ -519,8 +530,8 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                       display: 'flex',
                       alignItems: 'center',
                       gap: 8,
-                      background: '#fff',
-                      border: '1px solid #e6eaf0',
+                      background: 'var(--portal-surface)',
+                      border: '1px solid var(--portal-border)',
                       padding: '4px 10px 4px 7px',
                       borderRadius: 30,
                       cursor: 'pointer',
@@ -543,7 +554,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                       {initials}
                     </div>
                     <div style={{ lineHeight: 1.35, textAlign: isRTL ? 'right' : 'left' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#16202e' }}>{displayName}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--portal-ink)' }}>{displayName}</div>
                       <div style={{ fontSize: 10, color: '#caa53a', fontWeight: 700 }}>{at.b2bPartner}</div>
                     </div>
                     <span style={{ fontSize: 8, color: '#9aa4b2', marginRight: 2 }}>▼</span>
@@ -556,9 +567,9 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
             {isMobile && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ position: 'relative' }}>
-                  <span onClick={() => setLangOpen((v) => !v)} style={{ width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
+                  <button type="button" data-testid="agency-lang-toggle-mobile" aria-haspopup="menu" aria-expanded={langOpen} onClick={() => setLangOpen((v) => !v)} style={{ width: 36, height: 36, border: 0, background: 'transparent', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', cursor: 'pointer' }}>
                     <GlobeIcon size={19} />
-                  </span>
+                  </button>
                   {langOpen && langDropdown}
                 </div>
                 <div style={{ position: 'relative' }}>
@@ -578,9 +589,9 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
       </header>
 
       {isMobile && mobileMenuOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: '#fff', zIndex: 210, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--portal-surface)', color: 'var(--portal-ink)', zIndex: 210, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', padding: '26px 20px 18px' }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: '#16202e' }}>{at.menuTitle}</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--portal-ink)' }}>{at.menuTitle}</span>
             <span
               onClick={() => setMobileMenuOpen(false)}
               style={{
@@ -593,7 +604,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 24,
-                color: '#16202e',
+                color: 'var(--portal-ink)',
                 cursor: 'pointer',
               }}
             >
@@ -692,7 +703,7 @@ export default function AgencyPortalHeader({ isMobile, activeKey, agencyName, li
                 style={{
                   padding: '20px 0',
                   textDecoration: 'none',
-                  color: '#16202e',
+                  color: 'var(--portal-ink)',
                   fontSize: 17,
                   fontWeight: 700,
                   borderTop: '1px solid #eef1f5',

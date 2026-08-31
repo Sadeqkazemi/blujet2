@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { dataSourceOptions } from '../src/database/data-source.options';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
+import { AgencyInvoice } from '../src/database/entities/agency-invoice.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
@@ -454,9 +455,9 @@ describe('Booking engine (e2e)', () => {
     expect(payRes.status).toBe(201);
     expect(payRes.body.data.booking.status).toBe('TICKETED');
     expect(payRes.body.data.booking.passengers).toHaveLength(2);
-    const ticketNumbers = payRes.body.data.booking.passengers.map(
-      (passenger: { ticketNo: string }) => passenger.ticketNo,
-    );
+    const ticketNumbers = (
+      payRes.body.data.booking.passengers as Array<{ ticketNo: string }>
+    ).map((passenger: { ticketNo: string }) => passenger.ticketNo);
     expect(ticketNumbers).toHaveLength(2);
     expect(new Set(ticketNumbers).size).toBe(2);
     expect(ticketNumbers).toEqual([
@@ -505,6 +506,15 @@ describe('Booking engine (e2e)', () => {
     expect(ledgerRows[0].agencyId).toBe(userId);
     expect(ledgerRows[0].signedAmountIrr).toBe(paidFare);
 
+    const paidInvoices = await dataSource
+      .getRepository(AgencyInvoice)
+      .findBy({ agencyId: userId, bookingId, status: 'PAID' });
+    expect(paidInvoices).toHaveLength(1);
+    expect(paidInvoices[0]).toMatchObject({
+      amountIrr: paidFare,
+      invoiceNo: `SALE-${storedBooking.pnr}`,
+    });
+
     const storedPassengers = await dataSource
       .getRepository(Passenger)
       .findBy({ bookingId });
@@ -525,6 +535,21 @@ describe('Booking engine (e2e)', () => {
     expect(
       saleTickets.map((row: { ticketNo: string }) => row.ticketNo),
     ).toEqual(expect.arrayContaining(ticketNumbers));
+
+    const invoices = await request(app.getHttpServer())
+      .get('/agency-portal/invoices')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(invoices.status).toBe(200);
+    expect(invoices.body.data as unknown[]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bookingId,
+          invoiceNo: `SALE-${storedBooking.pnr}`,
+          status: 'PAID',
+          amountIrr: paidFare.toString(),
+        }),
+      ]),
+    );
   });
 
   it('prices selected travel costs from server configuration and stores an immutable snapshot', async () => {

@@ -455,11 +455,15 @@ export class FinanceReportsService {
       .from('bookings', 'b')
       .innerJoin('flight_instances', 'fi', 'fi.id = b."flightInstanceId"')
       .leftJoin('agency_profiles', 'ap', 'ap."userId" = b."agencyId"')
-      .leftJoin('users', 'u', 'u.id = ap."userId"')
-      .where('b.channel = :channel', { channel })
-      .andWhere('b.status IN (:...statuses)', {
-        statuses: PAID_BOOKING_STATUSES,
-      })
+      .leftJoin('users', 'u', 'u.id = ap."userId"');
+    if (query.scope === FinanceReportScope.AGENCIES) {
+      qb.where('b."agencyId" IS NOT NULL');
+    } else {
+      qb.where('b.channel = :channel', { channel });
+    }
+    qb.andWhere('b.status IN (:...statuses)', {
+      statuses: PAID_BOOKING_STATUSES,
+    })
       .andWhere('b."deletedAt" IS NULL')
       .setParameters({
         fallbackId: channel,
@@ -550,7 +554,7 @@ export class FinanceReportsService {
         'agencyCount',
       )
       .addSelect(
-        `(SELECT COUNT(*) FROM passengers p INNER JOIN bookings b ON b.id = p."bookingId" WHERE b."flightInstanceId" = fi.id AND b.status IN ('PAID','TICKETED') AND b.channel = 'AGENCY' AND b."deletedAt" IS NULL AND p."deletedAt" IS NULL AND p."occupiesSeat" = true)`,
+        `(SELECT COUNT(*) FROM passengers p INNER JOIN bookings b ON b.id = p."bookingId" WHERE b."flightInstanceId" = fi.id AND b.status IN ('PAID','TICKETED') AND b."agencyId" IS NOT NULL AND b."deletedAt" IS NULL AND p."deletedAt" IS NULL AND p."occupiesSeat" = true)`,
         'agencySeats',
       )
       .from('flight_instances', 'fi')
@@ -709,7 +713,10 @@ export class FinanceReportsService {
       .addSelect('b.pnr', 'pnr')
       .addSelect('b."createdAt"', 'bookedAt')
       .addSelect('b.status', 'bookingStatus')
-      .addSelect('b.channel', 'channel')
+      .addSelect(
+        `CASE WHEN b."agencyId" IS NOT NULL THEN 'AGENCY' ELSE b.channel::text END`,
+        'channel',
+      )
       .addSelect('fi.id', 'flightInstanceId')
       .addSelect('f."flightNo"', 'flightNo')
       .addSelect('r."originCode"', 'originCode')
@@ -775,8 +782,15 @@ export class FinanceReportsService {
         destCode: query.destCode.trim().toUpperCase(),
       });
     if (query.cabin) qb.andWhere('b.cabin = :cabin', { cabin: query.cabin });
-    if (query.channel)
+    if (query.channel === 'AGENCY') {
+      qb.andWhere('b."agencyId" IS NOT NULL');
+    } else if (query.channel === 'SYSTEM') {
+      qb.andWhere('b."agencyId" IS NULL AND b.channel = :channel', {
+        channel: query.channel,
+      });
+    } else if (query.channel) {
       qb.andWhere('b.channel = :channel', { channel: query.channel });
+    }
     if (query.agencyId)
       qb.andWhere('b."agencyId" = :agencyId', { agencyId: query.agencyId });
     if (query.paymentStatus) {
