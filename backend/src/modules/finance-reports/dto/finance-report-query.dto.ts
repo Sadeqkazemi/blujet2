@@ -85,6 +85,14 @@ export class FinanceFlightSearchQueryDto {
   @IsOptional()
   @IsDateString()
   to?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 20, default: 12 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  limit?: number;
 }
 
 const BOOKING_STATUSES = [

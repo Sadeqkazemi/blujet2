@@ -1249,22 +1249,21 @@ function FinanceAnalyticView() {
     }
 
     let cancelled = false;
-    Promise.all([
+    Promise.allSettled([
       fetchSalesChart(chart.query),
       fetchKpis(chart.query),
       fetchCompletedFlightsSummary(chart.query),
       fetchRevenueMix(chart.query),
     ])
-      .then(([chartData, kpiData, flightsData, mixData]) => {
+      .then(([chartResult, kpiResult, flightsResult, mixResult]) => {
         if (cancelled) return;
-        setPeriods(chartData);
-        setKpis(kpiData);
-        setFlights(flightsData);
-        setMix(mixData);
-        setError(null);
-      })
-      .catch(() => {
-        if (!cancelled) setError('خطا در دریافت اطلاعات مالی.');
+        setPeriods(chartResult.status === 'fulfilled' ? chartResult.value : []);
+        setKpis(kpiResult.status === 'fulfilled' ? kpiResult.value : null);
+        setFlights(flightsResult.status === 'fulfilled' ? flightsResult.value : null);
+        setMix(mixResult.status === 'fulfilled' ? mixResult.value : null);
+        const partialFailure = [chartResult, kpiResult, flightsResult, mixResult]
+          .some((result) => result.status === 'rejected');
+        setError(partialFailure ? 'بخشی از اطلاعات مالی در دسترس نیست؛ سایر گزارش‌ها نمایش داده شده‌اند.' : null);
       });
     return () => {
       cancelled = true;
@@ -1281,26 +1280,27 @@ function FinanceAnalyticView() {
     }
 
     let cancelled = false;
-    Promise.all([
+    Promise.allSettled([
       fetchFlightSales(),
       fetchKpis({ granularity: 'year' }),
       fetchRevenueMix({ granularity: 'year' }),
       fetchCompletedFlightsSummary({ granularity: 'year' }),
     ])
-      .then(([sales, kpiData, mixData, yearFlights]) => {
+      .then(([salesResult, kpiResult, mixResult, flightsResult]) => {
         if (cancelled) return;
         // One card per flight number (not per departure date).
-        const aggregated = aggregateFlightSalesByFlightNo(sales.rows);
+        const aggregated = salesResult.status === 'fulfilled'
+          ? aggregateFlightSalesByFlightNo(salesResult.value.rows)
+          : [];
         setFlightRows(aggregated);
-        setKpis(kpiData);
-        setMix(mixData);
-        setFlights(yearFlights);
+        setKpis(kpiResult.status === 'fulfilled' ? kpiResult.value : null);
+        setMix(mixResult.status === 'fulfilled' ? mixResult.value : null);
+        setFlights(flightsResult.status === 'fulfilled' ? flightsResult.value : null);
         // No default selection — cards appear only after search.
         setSelectedFlightNo(null);
-        setError(null);
-      })
-      .catch(() => {
-        if (!cancelled) setError('خطا در دریافت اطلاعات مالی.');
+        const partialFailure = [salesResult, kpiResult, mixResult, flightsResult]
+          .some((result) => result.status === 'rejected');
+        setError(partialFailure ? 'بخشی از اطلاعات مالی در دسترس نیست؛ سایر گزارش‌ها نمایش داده شده‌اند.' : null);
       });
     return () => {
       cancelled = true;
@@ -1327,8 +1327,9 @@ function FinanceAnalyticView() {
     });
   }, [isFlightMode, flightRows, flightSearch]);
 
-  if (error) return <p className="text-sm text-[#f87171]">{error}</p>;
-  if (!flights || !mix) return <p className="text-sm text-[#6b7b94]">در حال بارگذاری…</p>;
+  const hasLoadedSection = periods.length > 0 || flightRows.length > 0 || kpis != null || flights != null || mix != null;
+  if (!hasLoadedSection && !error) return <p className="text-sm text-panel-muted">در حال بارگذاری…</p>;
+  const safeFlights = flights ?? { flightCount: 0, totalSeats: 0, soldSeats: 0, unsoldSeats: 0 };
 
   const selectedFlight =
     selectedFlightNo != null
@@ -1354,6 +1355,11 @@ function FinanceAnalyticView() {
 
   return (
     <div className="flex flex-col gap-[15px]">
+      {error && (
+        <div role="alert" className="finance-partial-alert rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-xs">
+          {error}
+        </div>
+      )}
       <div className="rounded-[14px] border border-panel-border bg-panel-surface p-[15px] shadow-sm">
         <div className="mb-3.5 flex flex-wrap items-start justify-between gap-2.5">
           <div>
@@ -1420,7 +1426,7 @@ function FinanceAnalyticView() {
               systemIrr={barSums.system}
               charterIrr={barSums.charter}
               agencyIrr={barSums.agency}
-              flights={flights}
+              flights={safeFlights}
             />
             <SalesBarChart
               periods={periods}
@@ -1489,13 +1495,17 @@ function FinanceAnalyticView() {
         </div>
       )}
 
-      <FlightsStrip flights={isFlightMode && flightSeats ? flightSeats : flights} />
+      <FlightsStrip flights={isFlightMode && flightSeats ? flightSeats : safeFlights} />
       <FinanceCompetitorAnalysis
         suggestions={priceSuggestions}
         state={finAiState}
         onAnalyze={() => void analyzeFinancePrices()}
       />
-      <RevenueMixCard mix={mix} theme="dark" />
+      {mix ? <RevenueMixCard mix={mix} theme="dark" /> : (
+        <div className="rounded-[14px] border border-panel-border bg-panel-surface p-6 text-center text-xs text-panel-muted">
+          تفکیک کانال‌های درآمد در حال حاضر در دسترس نیست.
+        </div>
+      )}
     </div>
   );
 }

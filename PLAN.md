@@ -3870,6 +3870,18 @@ contracts and retires the production mock adapters.
 - [ ] Complete visual browser verification when localhost browser access is available.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
 
+## Panel theme, finance resilience, report search, and UAT wallets (2026-08-30)
+
+- [x] Remove forced light chrome and white chart surfaces from the commercial flight-detail modal while preserving light-mode token rendering.
+- [x] Show one compact active flight per row.
+- [x] Normalize remaining agency/customer header ink and profile surfaces across light/dark themes.
+- [x] Fix Jalali calendar weekday alignment and replace eager finance-flight catalog loading with explicit, bounded, paginated search.
+- [x] Keep management finance visible during partial API failures and show an honest partial-data alert.
+- [x] Fix browser download lifetime for CSV/XLSX/PDF and independently import/inspect the eight-sheet finance workbook.
+- [x] Add an exact, guarded, audited, backed-up one-time UAT wallet reconciliation to 100 million toman for the reserved customer and agency identities.
+- [x] Pass focused frontend/backend tests, both production builds, and diff validation.
+- [ ] Merge and UAT deploy through GitHub Actions; verify protected pages after deployment.
+
 # Channel inventory, message attachments, and aircraft alignment (2026-08-27)
 
 - [x] Connect public result inventory and checkout enforcement to the exact
