@@ -504,6 +504,24 @@ describe("AgencySeatsPage", () => {
     expect(screen.getByTestId("agency-request-origin")).not.toBeDisabled();
   });
 
+  it("recovers active flights after a transient refresh failure without reloading the portal", async () => {
+    const user = userEvent.setup();
+    const allotments = vi
+      .spyOn(portalApi, "fetchAllotments")
+      .mockRejectedValueOnce(new Error("temporary gateway error"))
+      .mockResolvedValue(ROWS);
+
+    render(<AgencySeatsPage />);
+
+    expect(await screen.findByText("خطا در دریافت سهمیه‌های صندلی.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "تلاش دوباره" }));
+    await user.click(await screen.findByRole("button", { name: /پروازهای فعال/ }));
+
+    expect(await screen.findByTestId("alloc-card")).toBeInTheDocument();
+    expect(allotments).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("خطا در دریافت سهمیه‌های صندلی.")).not.toBeInTheDocument();
+  });
+
   it("keeps a published route visible while commercial allocation is still zero", async () => {
     const user = userEvent.setup();
     const option: AgencySeatRequestOption = {

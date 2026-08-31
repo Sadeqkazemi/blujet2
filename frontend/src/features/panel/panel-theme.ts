@@ -1,19 +1,19 @@
 /** Shared Tailwind class strings for management panel dark theme. */
 
-export const panelCard = 'rounded-[14px] border border-panel-border bg-panel-card';
+export const panelCard = 'panel-surface-card rounded-[14px] border border-panel-border bg-panel-card';
 export const panelCardPadded = `${panelCard} p-5`;
 export const panelElevated = 'rounded-xl border border-panel-border-2 bg-panel-elevated';
 export const panelElevatedPadded = `${panelElevated} p-3`;
 
-export const panelTitle = 'text-sm font-bold text-white';
+export const panelTitle = 'text-sm font-bold text-panel-ink';
 export const panelSubtitle = 'mt-0.5 text-[11px] text-panel-muted';
 export const panelMuted = 'text-panel-muted';
 export const panelMuted2 = 'text-panel-muted-2';
 export const panelText = 'text-panel-text';
 export const panelLink = 'text-panel-link font-bold';
-export const panelValue = 'font-num text-[22.5px] font-black text-white';
-export const panelValueSm = 'font-num text-lg font-black text-white';
-export const panelValueMd = 'font-num text-base font-black text-white';
+export const panelValue = 'font-num text-[22.5px] font-black text-panel-ink';
+export const panelValueSm = 'font-num text-lg font-black text-panel-ink';
+export const panelValueMd = 'font-num text-base font-black text-panel-ink';
 
 export const panelBtnPrimary =
   'rounded-lg bg-panel-accent px-4 py-2 text-xs font-bold text-white transition hover:bg-panel-accent/90';

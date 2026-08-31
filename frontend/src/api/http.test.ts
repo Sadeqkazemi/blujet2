@@ -75,6 +75,20 @@ describe('apiGet ACCESS_REVOKED vs ordinary auth failure', () => {
     });
   }
 
+  it('always bypasses the browser cache for live authenticated GET data', async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse(200, { success: true, data: [{ id: 'active-allotment' }] }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiGet('/agency-portal/allotments');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/agency-portal/allotments',
+      expect.objectContaining({ method: 'GET', cache: 'no-store' }),
+    );
+  });
+
   it('emits ACCESS_REVOKED when refresh returns code ACCESS_REVOKED (session preserved before clear)', async () => {
     const revoked = vi.fn();
     const off = onAccessRevoked(revoked);

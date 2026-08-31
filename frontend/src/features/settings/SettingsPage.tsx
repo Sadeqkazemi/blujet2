@@ -91,7 +91,7 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
       aria-label={label}
       onClick={onToggle}
       className={`relative h-[25px] w-11 flex-none rounded-full transition ${
-        on ? 'bg-[#3b82f6]' : 'bg-[#28344c]'
+        on ? 'bg-panel-accent' : 'bg-panel-border-2'
       }`}
     >
       <span
@@ -103,10 +103,10 @@ function Toggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; la
   );
 }
 
-const cardClass = 'rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[15px]';
-const labelClass = 'mb-1.5 block text-[11.5px] text-[#6b7b94]';
+const cardClass = 'panel-surface-card rounded-[16px] border border-panel-border bg-panel-surface p-5';
+const labelClass = 'mb-1.5 block text-[11.5px] font-bold text-panel-muted';
 const inputClass =
-  'w-full rounded-[9px] border border-[#28344c] bg-[#0f1623] px-3.5 py-2.5 text-sm text-[#e7ecf3] outline-none focus:border-[#3b82f6]';
+  'w-full rounded-[10px] border border-panel-border-2 bg-panel-surface-2 px-3.5 py-2.5 text-sm text-panel-ink outline-none transition focus:border-panel-accent focus:ring-2 focus:ring-panel-accent/10';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -218,15 +218,22 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <h1 className="mb-1 text-[20.5px] font-black text-white">تنظیمات سامانه</h1>
-      <p className="mb-6 text-[12.5px] text-[#6b7b94]">
-        {isSiteAdmin
-          ? 'مدیریت لینک‌های اجتماعی، تماس پشتیبانی و دانلود اپلیکیشن در سایت'
-          : isIt
-            ? 'سرویس‌های عملیاتی سایت، شبکه‌های اجتماعی و تماس پشتیبانی'
-            : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
-      </p>
+    <div className="mx-auto w-full max-w-[1240px] p-5 md:p-8">
+      <header className="panel-surface-card mb-6 flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-panel-border bg-panel-surface px-5 py-4">
+        <div>
+          <h1 className="mb-1 text-[20.5px] font-black text-panel-ink">تنظیمات سامانه</h1>
+          <p className="m-0 text-[12.5px] text-panel-muted">
+            {isSiteAdmin
+              ? 'مدیریت لینک‌های اجتماعی، تماس پشتیبانی و دانلود اپلیکیشن در سایت'
+              : isIt
+                ? 'سرویس‌های عملیاتی سایت، شبکه‌های اجتماعی و تماس پشتیبانی'
+                : 'پیکربندی سراسری — هر تغییر در دفتر رویدادها ثبت می‌شود'}
+          </p>
+        </div>
+        <span className="rounded-full border border-panel-border bg-panel-surface-2 px-3 py-1.5 text-[11px] font-bold text-panel-muted">
+          تغییرات پس از ذخیره در دفتر رویداد ثبت می‌شوند
+        </span>
+      </header>
 
       {notice && (
         <p className="mb-4 rounded-lg bg-[rgba(16,185,129,.14)] p-3 text-xs font-bold text-[#34d399]">
@@ -235,7 +242,7 @@ export default function SettingsPage() {
       )}
 
       {isIt && (
-        <section className={`${cardClass} mb-[18px] max-w-[760px]`}>
+        <section className={`${cardClass} mb-[18px]`}>
           <div className="mb-[18px] flex items-start justify-between gap-[11px]">
             <div>
               <h2 className="text-[14.5px] font-extrabold text-white">لوگوی سایت</h2>
@@ -269,7 +276,7 @@ export default function SettingsPage() {
         </section>
       )}
 
-      <div className={`grid grid-cols-1 gap-4 ${isIt ? 'max-w-[760px]' : 'lg:grid-cols-2'}`}>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {canEditBrandContent && (
           <div className={cardClass}>
             <div className="mb-4 text-sm font-bold text-white">اطلاعات شرکت</div>
@@ -525,7 +532,7 @@ export default function SettingsPage() {
       <button
         disabled={saving}
         onClick={() => void onSave()}
-        className="mt-6 rounded-[9px] bg-[#3b82f6] px-6 py-2.5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
+        className="sticky bottom-4 mt-6 rounded-[10px] bg-panel-accent px-7 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 disabled:opacity-60"
       >
         {saving ? 'در حال ذخیره…' : 'ذخیره تنظیمات'}
       </button>
