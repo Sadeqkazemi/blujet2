@@ -221,7 +221,7 @@ describe('Commercial manager overhaul (e2e)', () => {
   });
 
   describe('seat requests', () => {
-    it('keeps agency inventory closed until its independent release is saved', async () => {
+    it('lists sellable flights while keeping agency request capacity closed until its independent release is saved', async () => {
       const agency = await createFreshAgency();
       const instance = await futureInstance();
       await dataSource.getRepository(FareRule).update(
@@ -245,12 +245,18 @@ describe('Commercial manager overhaul (e2e)', () => {
           agencySeatsReleased: number;
           availableToRequest: number;
           pricePerSeatIrr: string;
+          sellableSeats: number;
         }>
       ).find(
         (row) =>
           row.flightInstanceId === instance.id && row.fareClassCode === 'Y',
       );
-      expect(closedOption).toBeUndefined();
+      expect(closedOption).toMatchObject({
+        flightInstanceId: instance.id,
+        agencySeatsReleased: 0,
+        availableToRequest: 0,
+      });
+      expect(closedOption?.sellableSeats).toBeGreaterThan(0);
 
       await request(app.getHttpServer())
         .post('/agency-portal/seat-requests')
@@ -262,7 +268,7 @@ describe('Commercial manager overhaul (e2e)', () => {
           seats: 4,
           payMethod: 'INVOICE',
         })
-        .expect(404);
+        .expect(400);
 
       const rule = await dataSource.getRepository(FareRule).findOneByOrFail({
         flightInstanceId: instance.id,
