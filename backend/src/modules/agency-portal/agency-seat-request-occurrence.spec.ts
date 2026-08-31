@@ -138,4 +138,72 @@ describe('agency seat request option source', () => {
     const calls = find.mock.calls as Array<[Record<string, unknown>]>;
     expect(calls[0]?.[0]).not.toHaveProperty('take');
   });
+
+  it('keeps a live sellable fare class visible before dedicated agency release', async () => {
+    const instance = {
+      id: 'fi-live',
+      status: FlightInstanceStatus.SCHEDULED,
+      definitionStatus: FlightDefinitionStatus.PUBLISHED,
+      approvedSnapshot: { flightNo: 'KL2550' },
+      agencySaleEnabled: true,
+      departureAt: new Date('2099-09-03T05:00:00.000Z'),
+      saleStartsAt: null,
+      saleEndsAt: null,
+      aircraftTypeOverride: null,
+      flight: {
+        flightNo: 'KL2550',
+        aircraftType: 'MD-80',
+        route: { originCode: 'IKA', destCode: 'FRA' },
+      },
+    };
+    const fareRule = {
+      flightInstanceId: instance.id,
+      cabin: 'BUSINESS',
+      classCode: 'C',
+      seatsAllocated: 20,
+      agencySeatsReleased: 0,
+      agencyReleasePriceIrr: null,
+      sitePriceIrr: 80_000_000n,
+      priceIrr: 75_000_000n,
+      agencySpecialOffer: null,
+    };
+    const fareQb = {
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([fareRule]),
+    };
+    const allotmentQb = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      addGroupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([]),
+    };
+    const service = Object.create(
+      AgencyPortalService.prototype,
+    ) as AgencyPortalService;
+    Object.assign(service, {
+      isUatSandboxAgencyActor: jest.fn().mockResolvedValue(true),
+      flightInstanceRepo: { find: jest.fn().mockResolvedValue([instance]) },
+      fareRuleRepo: { createQueryBuilder: jest.fn().mockReturnValue(fareQb) },
+      allotmentRepo: {
+        createQueryBuilder: jest.fn().mockReturnValue(allotmentQb),
+      },
+      search: {
+        cabinAvailability: jest.fn().mockResolvedValue({ seatsLeft: 10 }),
+      },
+    });
+
+    const rows = await service.seatRequestOptions({ id: 'agency-1' } as never);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      flightNo: 'KL2550',
+      cabin: 'BUSINESS',
+      availableToRequest: 0,
+    });
+  });
 });

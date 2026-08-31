@@ -220,6 +220,38 @@ describe('ExtrasStep — design parity', () => {
     expect(screen.getByTestId('checkout-seat-12D')).toBeEnabled();
   });
 
+  it.each([
+    ['BUSINESS', '8A'],
+    ['FIRST', '4A'],
+  ] as const)(
+    'keeps a purchased %s cabin seat selectable even when business access is otherwise locked',
+    async (bookedCabin, seatCode) => {
+      const user = userEvent.setup();
+      const onToggleSeat = vi.fn();
+      render(
+        <ExtrasStep
+          locale="fa"
+          extras={testExtras()}
+          onToggleExtra={vi.fn()}
+          onExtraQuantityChange={vi.fn()}
+          passengerCount={1}
+          seats={SEATS}
+          selectedSeats={[]}
+          onToggleSeat={onToggleSeat}
+          businessLocked
+          bookedCabin={bookedCabin}
+          aircraftType="MD-80"
+          clubBalance={15_000}
+        />,
+      );
+
+      await user.click(screen.getByTestId('checkout-seat-toggle'));
+      expect(screen.getByTestId(`checkout-seat-${seatCode}`)).toBeEnabled();
+      await user.click(screen.getByTestId(`checkout-seat-${seatCode}`));
+      expect(onToggleSeat).toHaveBeenCalledWith(seatCode);
+    },
+  );
+
   it('uses MD-80 PDF chart when API still returns legacy A320 lettering', async () => {
     const user = userEvent.setup();
     const legacyA320: SeatMapCell[] = [

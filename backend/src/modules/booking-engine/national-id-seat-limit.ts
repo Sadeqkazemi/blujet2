@@ -9,13 +9,13 @@ import {
 import { Passenger } from '../../database/entities/passenger.entity';
 import type { BookingPassengerDto } from './dto/create-booking.dto';
 
-/** Max seats one national ID may occupy on the same flight (identical passenger). */
-export const MAX_SEATS_PER_NATIONAL_ID = 2;
+/** One identity may create only one passenger/ticket on the same flight. */
+export const MAX_SEATS_PER_NATIONAL_ID = 1;
 
 /**
- * Count seat-occupying passengers in a request by nationalIdHash.
- * Infants (no seat) are ignored. Invalid NIDs are skipped here — checksum
- * validation runs separately.
+ * Count passenger identities in a request by nationalIdHash. EXST is attached
+ * to its owner and never increments this count. Invalid NIDs are skipped here
+ * because checksum validation runs separately.
  */
 export function countOccupyingNationalIdHashes(
   passengers: ReadonlyArray<
@@ -27,16 +27,12 @@ export function countOccupyingNationalIdHashes(
 ): Map<string, number> {
   const counts = new Map<string, number>();
   for (const passenger of passengers) {
-    if (passenger.passengerType === 'INFANT') continue;
     const raw = passenger.nationalId?.trim();
     if (!raw) continue;
     const nationalId = normalizeNationalId(raw);
     if (!isValidIranianNationalId(nationalId)) continue;
     const hash = hashPii(nationalId);
-    counts.set(
-      hash,
-      (counts.get(hash) ?? 0) + 1 + (passenger.extraSeatRequested ? 1 : 0),
-    );
+    counts.set(hash, (counts.get(hash) ?? 0) + 1);
   }
   return counts;
 }
@@ -53,15 +49,15 @@ export function assertInRequestNationalIdSeatLimit(
     if (count > MAX_SEATS_PER_NATIONAL_ID) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
-        message: `با یک کد ملی حداکثر ${MAX_SEATS_PER_NATIONAL_ID} صندلی قابل خرید است.`,
+        message: 'هر کد ملی فقط برای یک مسافر در هر پرواز قابل ثبت است.',
       });
     }
   }
 }
 
 /**
- * Enforce max seats per national ID on a flight instance: in-request count
- * plus existing active booking passengers with the same hash.
+ * Enforce one passenger/ticket per national ID on a flight instance:
+ * in-request rows plus existing active booking passengers with the same hash.
  * Call inside the booking transaction after the flight row is locked.
  */
 export async function assertNationalIdSeatLimitForFlight(
@@ -84,17 +80,13 @@ export async function assertNationalIdSeatLimitForFlight(
     .createQueryBuilder(Passenger, 'p')
     .innerJoin('p.booking', 'b')
     .select('p.nationalIdHash', 'hash')
-    .addSelect(
-      'SUM(CASE WHEN p."extraSeatCode" IS NULL THEN 1 ELSE 2 END)',
-      'cnt',
-    )
+    .addSelect('COUNT(p.id)', 'cnt')
     .where('b.flightInstanceId = :flightInstanceId', { flightInstanceId })
     .andWhere(
       `(b.status IN ('DRAFT', 'PAID', 'TICKETED') OR (b.status = 'HELD' AND b.holdExpiresAt > :now))`,
       { now: new Date() },
     )
     .andWhere('p.deletedAt IS NULL')
-    .andWhere('p.occupiesSeat = true')
     .andWhere('p.nationalIdHash IN (:...hashes)', { hashes })
     .groupBy('p.nationalIdHash')
     .getRawMany<{ hash: string; cnt: string }>();
@@ -108,7 +100,7 @@ export async function assertNationalIdSeatLimitForFlight(
     if (existing + requested > MAX_SEATS_PER_NATIONAL_ID) {
       throw new BadRequestException({
         code: ErrorCode.VALIDATION_FAILED,
-        message: `با یک کد ملی حداکثر ${MAX_SEATS_PER_NATIONAL_ID} صندلی در این پرواز قابل خرید است.`,
+        message: 'این کد ملی قبلاً برای مسافر دیگری در همین پرواز ثبت شده است.',
       });
     }
   }

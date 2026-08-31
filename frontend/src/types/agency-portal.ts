@@ -65,6 +65,9 @@ export interface AgencyCreditRequest {
 }
 
 export interface AgencySalesTicket {
+  passengerId?: string;
+  ticketNo?: string | null;
+  ticketIssuedAt?: string | null;
   pnr: string;
   status: string;
   cabin?: string;
@@ -162,6 +165,7 @@ export interface AgencySeatRequestOption {
   agencyAllocated: number;
   ownAllocated: number;
   availableToRequest: number;
+  sellableSeats?: number;
   pricePerSeatIrr: string | null;
   specialOffer: boolean;
   definitionStatus: "DRAFT" | "PENDING_REVISION" | "PUBLISHED" | "REJECTED";

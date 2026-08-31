@@ -4122,6 +4122,22 @@ only when the active agency credit line covers the server-computed total.
   `id`, `type`, `signedAmountIrr`, `bookingId`, optional `pnr`, and `createdAt`.
   Both balance and history are derived from immutable `wallet_entries` rows.
 
+### Purchase integrity and persisted e-tickets (2026-08-31)
+
+- `POST /bookings` rejects duplicate passenger identities on the same flight,
+  including identities already present in an active booking. An adjacent EXST
+  remains part of the same passenger row.
+- `POST /bookings/:id/pay` issues one persisted e-ticket per passenger in the
+  same transaction as wallet debit, SALE ledger creation, booking transition,
+  and the payment idempotency claim.
+- Every booking detail response exposes `passengers[].ticketNo` and
+  `passengers[].ticketIssuedAt` after ticketing.
+- Purchases performed by an authenticated agency account are attributed to the
+  agency channel and appear in its wallet, sales, and finance projections.
+- `GET /agency-portal/seat-request-options` includes every live sellable
+  cabin/fare class; a missing dedicated agency release makes the requestable
+  quantity zero but does not hide the active flight.
+
 ## Internal cartable support assignment and agency bulletins (2026-08-28)
 
 ### Support-ticket boundary

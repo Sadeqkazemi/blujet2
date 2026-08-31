@@ -1,9 +1,12 @@
 import { INestApplication } from '@nestjs/common';
+import * as argon2 from 'argon2';
+import * as crypto from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { dataSourceOptions } from '../src/database/data-source.options';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
+import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
 import { Booking } from '../src/database/entities/booking.entity';
 import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
@@ -14,6 +17,7 @@ import { Route } from '../src/database/entities/route.entity';
 import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
 import { AncillaryService } from '../src/database/entities/ancillary-service.entity';
 import { WalletEntry } from '../src/database/entities/wallet-entry.entity';
+import { User } from '../src/database/entities/user.entity';
 import { loginAsCustomer } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 
@@ -123,6 +127,43 @@ describe('Booking engine (e2e)', () => {
     );
   }
 
+  async function createAndLoginAgency() {
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const phone = `+9891${crypto.randomInt(10_000_000, 100_000_000)}`;
+    const password = 'AgencyBooking@123';
+    const userRepo = dataSource.getRepository(User);
+    const user = await userRepo.save(
+      userRepo.create({
+        role: 'AGENCY',
+        phone,
+        fullName: `آژانس خرید ${suffix}`,
+        passwordHash: await argon2.hash(password),
+        isActive: true,
+        updatedAt: new Date(),
+      }),
+    );
+    await dataSource.getRepository(AgencyProfile).save(
+      dataSource.getRepository(AgencyProfile).create({
+        userId: user.id,
+        licenseNo: `BOOK-${suffix}`,
+        managerName: 'مدیر خرید تست',
+        phone,
+        email: `${suffix}@booking.test`,
+        city: 'تهران',
+        address: 'آدرس تست خرید',
+        tier: 'NORMAL',
+      }),
+    );
+    const login = await request(app.getHttpServer())
+      .post('/auth/agency/login')
+      .send({ phone, password });
+    expect(login.status).toBe(200);
+    return {
+      userId: user.id,
+      accessToken: login.body.data.accessToken as string,
+    };
+  }
+
   it('search returns only the exact requested cabin with its price and seatsLeft', async () => {
     const instance = await freshInstance();
     const date = instance.departureAt.toISOString().slice(0, 10);
@@ -199,6 +240,65 @@ describe('Booking engine (e2e)', () => {
     expect(
       res.body.data.passengers.map((row: { seatCode: string }) => row.seatCode),
     ).toEqual(['2A', '2B']);
+  });
+
+  it('rejects two passenger tickets with the same national ID in one booking', async () => {
+    const instance = await freshInstance();
+    const { accessToken } = await loginAsCustomer(app, '09130000222');
+
+    const res = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          {
+            fullName: 'هویت تکراری اول',
+            nationalId: '0012345679',
+            seatCode: '2A',
+          },
+          {
+            fullName: 'هویت تکراری دوم',
+            nationalId: '0012345679',
+            seatCode: '2B',
+          },
+        ],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('هر کد ملی فقط برای یک مسافر');
+  });
+
+  it('rejects the same national ID in a second active booking for the same flight', async () => {
+    const instance = await freshInstance();
+    const firstBuyer = await loginAsCustomer(app, '09130000223');
+    const secondBuyer = await loginAsCustomer(app, '09130000224');
+    const nationalId = '0012345679';
+
+    const first = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${firstBuyer.accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [{ fullName: 'دارنده هویت', nationalId, seatCode: '2A' }],
+      });
+    expect(first.status).toBe(201);
+
+    const second = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${secondBuyer.accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          { fullName: 'خرید تکراری هویت', nationalId, seatCode: '2B' },
+        ],
+      });
+
+    expect(second.status).toBe(400);
+    expect(second.body.error.message).toContain('قبلاً برای مسافر دیگری');
   });
 
   it('rejects booking creation without login', async () => {
@@ -307,6 +407,124 @@ describe('Booking engine (e2e)', () => {
       .getRepository(LedgerEntry)
       .findOneBy({ bookingId, type: 'SALE' });
     expect(ledger?.signedAmountIrr).toBe(paidFare);
+  });
+
+  it('an agency wallet purchase of two passengers creates two tickets and every customer, finance, and agency projection atomically', async () => {
+    const instance = await freshInstance();
+    const { accessToken, userId } = await createAndLoginAgency();
+    const walletRepo = dataSource.getRepository(WalletEntry);
+    const openingBalance = 2_000_000_000n;
+    await walletRepo.save(
+      walletRepo.create({
+        userId,
+        type: 'TOPUP',
+        signedAmountIrr: openingBalance,
+        bookingId: null,
+      }),
+    );
+
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          {
+            fullName: 'مسافر اول آژانس',
+            nationalId: '0012345687',
+            seatCode: '2A',
+          },
+          {
+            fullName: 'مسافر دوم آژانس',
+            nationalId: '0012345695',
+            seatCode: '2B',
+          },
+        ],
+      });
+    expect(createRes.status).toBe(201);
+    const bookingId = createRes.body.data.id as string;
+
+    const payRes = await request(app.getHttpServer())
+      .post(`/bookings/${bookingId}/pay`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .set('Idempotency-Key', `agency-wallet-${bookingId}`)
+      .send({ paymentMethod: 'WALLET' });
+
+    expect(payRes.status).toBe(201);
+    expect(payRes.body.data.booking.status).toBe('TICKETED');
+    expect(payRes.body.data.booking.passengers).toHaveLength(2);
+    const ticketNumbers = payRes.body.data.booking.passengers.map(
+      (passenger: { ticketNo: string }) => passenger.ticketNo,
+    );
+    expect(ticketNumbers).toHaveLength(2);
+    expect(new Set(ticketNumbers).size).toBe(2);
+    expect(ticketNumbers).toEqual([
+      expect.stringMatching(/^780\d{10}$/),
+      expect.stringMatching(/^780\d{10}$/),
+    ]);
+
+    const paidFare = BigInt(String(payRes.body.data.booking.priceIrr));
+    expect(BigInt(String(payRes.body.data.walletBalanceIrr))).toBe(
+      openingBalance - paidFare,
+    );
+    const walletView = await request(app.getHttpServer())
+      .get('/my/wallet')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(walletView.status).toBe(200);
+    expect(BigInt(String(walletView.body.data.balanceIrr))).toBe(
+      openingBalance - paidFare,
+    );
+    expect(walletView.body.data.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'PURCHASE',
+          bookingId,
+          signedAmountIrr: (-paidFare).toString(),
+        }),
+      ]),
+    );
+
+    const storedBooking = await dataSource
+      .getRepository(Booking)
+      .findOneByOrFail({ id: bookingId });
+    expect(storedBooking.agencyId).toBe(userId);
+    const purchases = await walletRepo.findBy({
+      userId,
+      bookingId,
+      type: 'PURCHASE',
+    });
+    expect(purchases).toHaveLength(1);
+    expect(purchases[0].signedAmountIrr).toBe(-paidFare);
+
+    const ledgerRows = await dataSource.getRepository(LedgerEntry).findBy({
+      bookingId,
+      type: 'SALE',
+    });
+    expect(ledgerRows).toHaveLength(1);
+    expect(ledgerRows[0].agencyId).toBe(userId);
+    expect(ledgerRows[0].signedAmountIrr).toBe(paidFare);
+
+    const storedPassengers = await dataSource
+      .getRepository(Passenger)
+      .findBy({ bookingId });
+    expect(storedPassengers).toHaveLength(2);
+    expect(storedPassengers.every((row) => Boolean(row.ticketIssuedAt))).toBe(
+      true,
+    );
+    expect(new Set(storedPassengers.map((row) => row.ticketNo)).size).toBe(2);
+
+    const agencySales = await request(app.getHttpServer())
+      .get('/agency-portal/sales')
+      .set('Authorization', `Bearer ${accessToken}`);
+    expect(agencySales.status).toBe(200);
+    const saleTickets = agencySales.body.data.tickets.filter(
+      (row: { pnr: string }) => row.pnr === storedBooking.pnr,
+    );
+    expect(saleTickets).toHaveLength(2);
+    expect(
+      saleTickets.map((row: { ticketNo: string }) => row.ticketNo),
+    ).toEqual(expect.arrayContaining(ticketNumbers));
   });
 
   it('prices selected travel costs from server configuration and stores an immutable snapshot', async () => {
@@ -574,6 +792,68 @@ describe('Booking engine (e2e)', () => {
       .getRepository(PaymentReconciliation)
       .countBy({ bookingId });
     expect(reconCount).toBe(1);
+  });
+
+  it('two concurrent wallet payment calls create one debit, one SALE, and one ticket per passenger', async () => {
+    const instance = await freshInstance();
+    const { accessToken, userId } = await loginAsCustomer(app, '09130000983');
+    const walletRepo = dataSource.getRepository(WalletEntry);
+    await walletRepo.save(
+      walletRepo.create({
+        userId: userId!,
+        type: 'TOPUP',
+        signedAmountIrr: 2_000_000_000n,
+        bookingId: null,
+      }),
+    );
+    const createRes = await request(app.getHttpServer())
+      .post('/bookings')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({
+        flightInstanceId: instance.id,
+        cabin: 'ECONOMY',
+        passengers: [
+          { fullName: 'همزمان اول', nationalId: '0012345709', seatCode: '2A' },
+          { fullName: 'همزمان دوم', nationalId: '0012345717', seatCode: '2B' },
+        ],
+      });
+    expect(createRes.status).toBe(201);
+    const bookingId = createRes.body.data.id as string;
+    const key = `concurrent-wallet-${bookingId}`;
+
+    const [first, second] = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/bookings/${bookingId}/pay`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Idempotency-Key', key)
+        .send({ paymentMethod: 'WALLET' }),
+      request(app.getHttpServer())
+        .post(`/bookings/${bookingId}/pay`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .set('Idempotency-Key', key)
+        .send({ paymentMethod: 'WALLET' }),
+    ]);
+    expect([first.status, second.status]).toEqual([201, 201]);
+
+    expect(
+      await walletRepo.countBy({
+        userId: userId!,
+        bookingId,
+        type: 'PURCHASE',
+      }),
+    ).toBe(1);
+    expect(
+      await dataSource.getRepository(LedgerEntry).countBy({
+        bookingId,
+        type: 'SALE',
+      }),
+    ).toBe(1);
+    const tickets = await dataSource.getRepository(Passenger).findBy({
+      bookingId,
+    });
+    expect(tickets).toHaveLength(2);
+    expect(tickets.every((row) => Boolean(row.ticketNo))).toBe(true);
+    expect(new Set(tickets.map((row) => row.ticketNo)).size).toBe(2);
   });
 
   // ── Mandatory concurrency test (CLAUDE.md) ───────────────────────────

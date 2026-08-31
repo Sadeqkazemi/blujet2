@@ -52,7 +52,7 @@ const STR: Record<
 > = {
   fa: {
     infoBanner:
-      "در تب پروازهای فعال فقط پروازهایی نمایش داده می‌شوند که درخواست صندلی آن‌ها تأیید و پرداخت شده و سهمیه فروش به آژانس تخصیص یافته است. سایر پروازها از مسیرهای موجود قابل درخواست‌اند.",
+      "در تب پروازهای فعال همه پروازهای منتشرشده‌ای که صندلی قابل فروش دارند نمایش داده می‌شوند. سهمیه‌های تأیید و پرداخت‌شده مستقیماً قابل فروش‌اند و برای سایر ردیف‌ها می‌توانید درخواست تخصیص صندلی ثبت کنید.",
     errorFallback: "خطا در دریافت سهمیه‌های صندلی.",
     empty: "در حال حاضر سهمیه پرداخت‌شده و فعال برای فروش وجود ندارد.",
     activeBadge: "فعال",
@@ -71,7 +71,7 @@ const STR: Record<
   },
   en: {
     infoBanner:
-      "Active Flights contains only paid, approved seat requests with an allotment assigned to this agency. Request other flights from Available Routes.",
+      "Active Flights shows every published flight with sellable inventory. Paid approved allotments can be sold immediately; use the allocation request action for the other rows.",
     errorFallback: "Error loading seat allotments.",
     empty: "There are currently no paid active allotments available for sale.",
     activeBadge: "Active",
@@ -90,7 +90,7 @@ const STR: Record<
   },
   ar: {
     infoBanner:
-      "تعرض الرحلات النشطة فقط الطلبات المعتمدة والمدفوعة التي خُصصت مقاعدها لهذه الوكالة. اطلب الرحلات الأخرى من المسارات المتاحة.",
+      "تعرض الرحلات النشطة كل رحلة منشورة فيها مقاعد قابلة للبيع. يمكن بيع الحصص المعتمدة والمدفوعة مباشرة، وللصفوف الأخرى يمكن إرسال طلب تخصيص مقاعد.",
     errorFallback: "خطأ في تحميل حصص المقاعد.",
     empty: "لا توجد حاليًا حصص مدفوعة ونشطة متاحة للبيع.",
     activeBadge: "نشط",
@@ -403,11 +403,21 @@ export default function AgencySeatsPage() {
     (row) => row.invoice && row.invoice.status !== "PAID",
   );
   const activeAllotments = (rows ?? []).filter((row) => row.active);
-  // A published occurrence is only requestable. It becomes an agency
-  // "active flight" after commercial/finance approval creates the agency's
-  // own allotment. Never present the public catalogue as purchased capacity.
+  const activeCatalogueOptions = (requestOptions ?? []).filter(
+    (option) =>
+      !activeAllotments.some(
+        (allotment) =>
+          allotment.flightInstanceId === option.flightInstanceId &&
+          (!allotment.cabin || allotment.cabin === option.cabin) &&
+          (!allotment.fareClassCode ||
+            allotment.fareClassCode === option.fareClassCode),
+      ),
+  );
   const activeFlightCount = new Set(
-    activeAllotments.map((row) => row.flightInstanceId),
+    [
+      ...activeAllotments.map((row) => row.flightInstanceId),
+      ...activeCatalogueOptions.map((row) => row.flightInstanceId),
+    ],
   ).size;
 
   function openSeatRequest(option: AgencySeatRequestOption) {
@@ -1586,6 +1596,65 @@ export default function AgencySeatsPage() {
               </div>
             );
           })}
+          {activeCatalogueOptions.map((option) => (
+            <div
+              key={optionKey(option)}
+              data-testid={`active-flight-card-${option.flightInstanceId}-${option.cabin}-${option.fareClassCode}`}
+              className="portal-surface-card rounded-2xl p-5"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="portal-surface-subtle flex h-10 w-10 items-center justify-center rounded-xl text-base text-[var(--portal-accent)]">✈</span>
+                  <div>
+                    <div className="text-sm font-black portal-copy">
+                      {airportCityLabel(option.originCode, locale)} →{" "}
+                      {airportCityLabel(option.destCode, locale)}
+                    </div>
+                    <div className="mt-0.5 text-[11px] portal-copy-muted">
+                      <span dir="ltr">{option.flightNo}</span> ·{" "}
+                      {formatLocaleDateTime(option.departureAt, locale)}
+                    </div>
+                  </div>
+                </div>
+                <span className="rounded-full bg-[#34d39924] px-3 py-1 text-[10.5px] font-extrabold text-[#1f9b68]">{t.activeBadge}</span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="portal-surface-subtle rounded-xl p-3 text-center">
+                  <div className="mb-1 text-[10.5px] portal-copy-muted">
+                    {locale === "en" ? "Cabin" : locale === "ar" ? "الدرجة" : "کلاس"}
+                  </div>
+                  <div className="text-sm font-black portal-copy">
+                    {publicCabinLabel(option.cabin, locale)} · {option.fareClassCode}
+                  </div>
+                </div>
+                <div className="portal-surface-subtle rounded-xl p-3 text-center">
+                  <div className="mb-1 text-[10.5px] portal-copy-muted">
+                    {locale === "en" ? "Sellable seats" : locale === "ar" ? "المقاعد القابلة للبيع" : "صندلی قابل فروش"}
+                  </div>
+                  <div className="text-lg font-black text-[#1f8a5b]">
+                    {localeDigits(option.sellableSeats ?? option.availableToRequest, locale)}
+                  </div>
+                </div>
+                <div className="portal-surface-subtle rounded-xl p-3 text-center">
+                  <div className="mb-1 text-[10.5px] portal-copy-muted">
+                    {locale === "en" ? "Aircraft" : locale === "ar" ? "الطائرة" : "هواپیما"}
+                  </div>
+                  <div className="text-sm font-black portal-copy">{option.aircraftType}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => openSeatRequest(option)}
+                className="mt-4 w-full rounded-xl border border-[#1668c4] bg-white px-4 py-3 text-xs font-black text-[#1668c4]"
+              >
+                {locale === "en"
+                  ? "Request seat allocation"
+                  : locale === "ar"
+                    ? "طلب تخصيص المقاعد"
+                    : "درخواست تخصیص صندلی"}
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>

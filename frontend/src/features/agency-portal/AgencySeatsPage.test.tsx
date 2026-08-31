@@ -585,7 +585,7 @@ describe("AgencySeatsPage", () => {
     expect(screen.getByText("۸")).toBeInTheDocument();
   });
 
-  it("does not list a merely published/requestable flight as active before payment and allotment", async () => {
+  it("lists every published sellable cabin as active before an agency allotment exists", async () => {
     const user = userEvent.setup();
     const option: AgencySeatRequestOption = {
       flightInstanceId: "fi-active-without-allotment",
@@ -601,6 +601,7 @@ describe("AgencySeatsPage", () => {
       agencyAllocated: 10,
       ownAllocated: 0,
       availableToRequest: 30,
+      sellableSeats: 24,
       pricePerSeatIrr: "30000000",
       specialOffer: false,
       definitionStatus: "PUBLISHED",
@@ -622,18 +623,22 @@ describe("AgencySeatsPage", () => {
     const activeTab = await screen.findByRole("button", {
       name: /پروازهای فعال/,
     });
-    expect(activeTab).toHaveTextContent("۰");
+    expect(activeTab).toHaveTextContent("۱");
     await user.click(activeTab);
     expect(
-      screen.queryByTestId(
+      await screen.findByTestId(
         "active-flight-card-fi-active-without-allotment-ECONOMY-Y",
       ),
-    ).not.toBeInTheDocument();
+    ).toBeInTheDocument();
     expect(
-      await screen.findByText(
-        "در حال حاضر سهمیه پرداخت‌شده و فعال برای فروش وجود ندارد.",
+      screen.getByTestId(
+        "active-flight-card-fi-active-without-allotment-BUSINESS-J",
       ),
     ).toBeInTheDocument();
+    expect(screen.getAllByText("۲۴").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: "درخواست تخصیص صندلی" }),
+    ).toHaveLength(2);
   });
 
   it("keeps an existing allotment card without duplicating the matching catalogue class", async () => {
@@ -699,7 +704,9 @@ describe("AgencySeatsPage", () => {
     );
     expect(await screen.findByText("Allocated")).toBeInTheDocument();
     expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText(/only paid, approved seat requests/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/every published flight with sellable inventory/),
+    ).toBeInTheDocument();
   });
 
   it("renders translated labels in Arabic", async () => {

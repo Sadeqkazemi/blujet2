@@ -28,6 +28,7 @@ import { AgencyAllotment } from '../../database/entities/agency-allotment.entity
 import { FareRule } from '../../database/entities/fare-rule.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
+import { AgencyProfile } from '../../database/entities/agency-profile.entity';
 import { AuditService } from '../audit/audit.service';
 import { AncillaryServicesService } from '../ancillary-services/ancillary-services.service';
 import { ErrorCode } from '../../common/errors';
@@ -153,6 +154,10 @@ function allocateAdjacentExtraSeats(
 
 function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+function generateTicketNo(): string {
+  return `780${String(crypto.randomInt(0, 10_000_000_000)).padStart(10, '0')}`;
 }
 
 type BookingWithRelations = Omit<Booking, 'generateId' | 'defaultTaxIrr'> & {
@@ -341,6 +346,7 @@ export class BookingService {
       arrivalAt: b.flightInstance.arrivalAt,
       isPriceLocked: !!b.priceLock,
       passengers: b.passengers.map((p) => ({
+        id: p.id,
         fullName: p.fullName,
         seatCode: p.seatCode,
         extraSeatCode: p.extraSeatCode,
@@ -351,6 +357,8 @@ export class BookingService {
         fareIrr: p.fareIrr,
         taxIrr: p.taxIrr,
         gender: p.gender,
+        ticketNo: p.ticketNo,
+        ticketIssuedAt: p.ticketIssuedAt,
       })),
     };
   }
@@ -589,6 +597,13 @@ export class BookingService {
       .select(['u.id', 'u.phone'])
       .where('u.id = :id', { id: user.id })
       .getOneOrFail();
+    const purchasingAgencyId =
+      user.role === 'AGENCY' &&
+      (await this.bookingRepo.manager.exists(AgencyProfile, {
+        where: { userId: user.id },
+      }))
+        ? user.id
+        : null;
 
     // Row lock on the flight instance serializes concurrent booking-creation
     // attempts for the same flight — CLAUDE.md: "Prevent double-booking with
@@ -746,6 +761,7 @@ export class BookingService {
           pnr: generatePnr(),
           flightInstanceId: instance.id,
           channel: 'SYSTEM',
+          agencyId: purchasingAgencyId,
           status: 'HELD',
           cabin: dto.cabin,
           fareClassCode: fareClass?.classCode ?? null,
@@ -1247,6 +1263,8 @@ export class BookingService {
                 mobileEnc: passenger.mobile
                   ? encryptPii(passenger.mobile)
                   : null,
+                ticketNo: generateTicketNo(),
+                ticketIssuedAt: new Date(),
               });
             },
           ),
@@ -1451,6 +1469,63 @@ export class BookingService {
     }
 
     const paid = await this.bookingRepo.manager.transaction(async (tx) => {
+      await tx.findOneOrFail(Booking, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const lockedRaw = await this.bookingWithFlightQuery(tx)
+        .where('b.id = :id', { id })
+        .getOneOrFail();
+      const lockedBooking = await this.loadBookingRelations(lockedRaw, tx);
+
+      if (idempotencyKey) {
+        const claimed = await tx.findOneBy(PayIdempotencyRecord, {
+          idempotencyKey,
+        });
+        if (claimed) {
+          if (claimed.bookingId !== id || claimed.userId !== user.id) {
+            throw new ConflictException({
+              code: ErrorCode.CONFLICT,
+              message: 'کلید یکتایی پرداخت برای رزرو دیگری استفاده شده است.',
+            });
+          }
+          return {
+            booking: lockedBooking,
+            discountIrr: 0n,
+            walletEntryId: null,
+            ledgerEntryId: null,
+          };
+        }
+      }
+
+      if (
+        lockedBooking.status === 'TICKETED' ||
+        lockedBooking.status === 'PAID'
+      ) {
+        return {
+          booking: lockedBooking,
+          discountIrr: 0n,
+          walletEntryId: null,
+          ledgerEntryId: null,
+        };
+      }
+      if (lockedBooking.status !== 'HELD') {
+        throw new ConflictException({
+          code: ErrorCode.CONFLICT,
+          message: 'این رزرو قابل پرداخت نیست.',
+        });
+      }
+
+      if (idempotencyKey) {
+        await tx.save(
+          tx.create(PayIdempotencyRecord, {
+            idempotencyKey,
+            bookingId: id,
+            userId: user.id,
+          }),
+        );
+      }
+
       let finalPriceIrr = currentPriceIrr;
       let discountIrr: Irr = 0n;
       let walletEntryId: string | null = null;
@@ -1544,6 +1619,18 @@ export class BookingService {
         });
       }
 
+      const issuedAt = new Date();
+      const passengerTickets = await tx.find(Passenger, {
+        where: { bookingId: id },
+        order: { id: 'ASC' },
+      });
+      for (const passenger of passengerTickets) {
+        if (passenger.ticketNo) continue;
+        passenger.ticketNo = generateTicketNo();
+        passenger.ticketIssuedAt = issuedAt;
+      }
+      await tx.save(passengerTickets);
+
       if (isLocked) {
         await tx.update(
           PriceLock,
@@ -1566,6 +1653,7 @@ export class BookingService {
           type: 'SALE',
           signedAmountIrr: finalPriceIrr,
           createdById: user.id,
+          agencyId: booking.agencyId,
         }),
       );
 
@@ -1593,18 +1681,6 @@ export class BookingService {
         ledgerEntryId: ledgerEntry.id,
       };
     });
-
-    if (idempotencyKey) {
-      await this.payIdempotencyRepo
-        .save(
-          this.payIdempotencyRepo.create({
-            idempotencyKey,
-            bookingId: id,
-            userId: user.id,
-          }),
-        )
-        .catch(() => undefined);
-    }
 
     await this.audit.record({
       actorId: user.id,

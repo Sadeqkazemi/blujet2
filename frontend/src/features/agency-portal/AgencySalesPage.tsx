@@ -385,8 +385,8 @@ export default function AgencySalesPage() {
                 <thead className="bg-[#f1f5f8] text-[#53677e]"><tr>{[t.type, t.pnr, t.ticketNo, t.fare, t.tax, t.crcn, t.commissionPct, t.commission, t.refundable, t.routeType, t.route, t.rbd, t.date, t.status].map((heading) => <th key={heading} className="whitespace-nowrap px-3 py-3 text-start">{heading}</th>)}</tr></thead>
                 <tbody>
                   {pageRows.map((ticket) => (
-                    <tr key={ticket.pnr} className="border-t border-[#e7ecf2] odd:bg-white even:bg-[#fafbfd]">
-                      <td className="px-3 py-3 font-bold">{ticket.status === 'REFUNDED' ? t.refund : t.sale}</td><td className="px-3 py-3" dir="ltr">{ticket.pnr}</td><td className="px-3 py-3">—</td>
+                    <tr key={ticket.passengerId ?? ticket.ticketNo ?? ticket.pnr} className="border-t border-[#e7ecf2] odd:bg-white even:bg-[#fafbfd]">
+                      <td className="px-3 py-3 font-bold">{ticket.status === 'REFUNDED' ? t.refund : t.sale}</td><td className="px-3 py-3" dir="ltr">{ticket.pnr}</td><td className="px-3 py-3" dir="ltr">{ticket.ticketNo ?? '—'}</td>
                       <td className="px-3 py-3 font-bold">{money(ticket.priceIrr)}</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td><td className="px-3 py-3">—</td>
                       <td className="px-3 py-3">{ticket.status === 'REFUNDED' ? money(ticket.priceIrr) : '—'}</td><td className="px-3 py-3">{routeType(ticket)}</td><td className="px-3 py-3" dir="ltr">{ticket.route}</td>
                       <td className="px-3 py-3" dir="ltr">{ticket.fareClassCode || '—'}</td><td className="px-3 py-3">{formatLocaleDate(ticket.departureAt, locale)}</td><td className="px-3 py-3">{STATUS[ticket.status]?.[locale] ?? ticket.status}</td>
