@@ -105,16 +105,20 @@ describe('Agency Portal (e2e)', () => {
       .andWhere(
         `(instance."definitionStatus" IN ('PUBLISHED', 'APPROVED') OR instance."approvedSnapshot" IS NOT NULL)`,
       )
-      .andWhere(
-        `COALESCE((instance."commercialPanelSettings"->>'siteVisible')::boolean, false) = true`,
-      )
       .getMany();
 
     for (const instance of instances) {
       await dataSource
         .createQueryBuilder()
         .update(FlightInstance)
-        .set({ saleStartsAt: null, saleEndsAt: null })
+        .set({
+          saleStartsAt: null,
+          saleEndsAt: null,
+          publicSaleEnabled: true,
+          agencySaleEnabled: true,
+          commercialPanelSettings: () =>
+            `jsonb_set(COALESCE("commercialPanelSettings", '{}'::jsonb), '{siteVisible}', 'true'::jsonb, true)`,
+        })
         .where('id = :id', { id: instance.id })
         .execute();
       const seatMap = await request(app.getHttpServer()).get(
