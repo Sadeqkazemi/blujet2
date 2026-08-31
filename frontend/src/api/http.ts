@@ -133,7 +133,16 @@ async function doFetch(path: string, init: RequestInit): Promise<Response> {
     headers.set('Content-Type', 'application/json');
   }
 
-  return fetchWithTimeout(path, { ...init, headers, credentials: 'include' });
+  return fetchWithTimeout(path, {
+    ...init,
+    headers,
+    credentials: 'include',
+    // Authenticated dashboards are live operational views.  Letting the
+    // browser or an intermediary reuse a cached GET made active allotments
+    // appear to disappear after a hard refresh until another mutation was
+    // made.  Every GET must therefore revalidate against the API.
+    cache: init.method === 'GET' ? 'no-store' : init.cache,
+  });
 }
 
 /** All frontend HTTP calls go through here — components never call fetch directly. */

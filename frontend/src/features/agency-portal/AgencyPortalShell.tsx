@@ -130,8 +130,8 @@ export default function AgencyPortalShell() {
         >
           {showPageMeta ? (
             <div>
-              <h1 style={{ fontSize: 20, fontWeight: 900, color: '#0d2640', margin: 0 }}>{pageMeta.title[locale]}</h1>
-              <div style={{ fontSize: 11.5, color: '#7a8696', marginTop: 3 }}>{pageMeta.subtitle[locale]}</div>
+              <h1 style={{ fontSize: 20, fontWeight: 900, color: 'var(--portal-ink)', margin: 0 }}>{pageMeta.title[locale]}</h1>
+              <div style={{ fontSize: 11.5, color: 'var(--portal-muted)', marginTop: 3 }}>{pageMeta.subtitle[locale]}</div>
             </div>
           ) : <span />}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -174,12 +174,12 @@ export default function AgencyPortalShell() {
                 width: 42,
                 height: 42,
                 borderRadius: 10,
-                background: '#fff',
-                border: '1px solid #e6ecf3',
+                background: 'var(--portal-surface)',
+                border: '1px solid var(--portal-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#5a6678',
+                color: 'var(--portal-muted)',
                 textDecoration: 'none',
               }}
               aria-label={locale === 'fa' ? 'اعلان‌ها' : locale === 'ar' ? 'الإشعارات' : 'Notifications'}

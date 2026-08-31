@@ -4,7 +4,7 @@
 // design-reference-v2/پنل آژانس.dc.html's own isEN vocabulary for this
 // exact tab (seatsInfoBanner, allocatedLabel, soldLabel, remainingLabel);
 // AR has no counterpart there and is hand-translated.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createAllotmentBooking,
   fetchAllotments,
@@ -144,6 +144,7 @@ export default function AgencySeatsPage() {
   );
   const [selectedMonthKeys, setSelectedMonthKeys] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [allotmentsLoading, setAllotmentsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [seatMap, setSeatMap] = useState<SeatMapResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -156,19 +157,30 @@ export default function AgencySeatsPage() {
     seatCode: "",
   });
 
+  const loadAllotments = useCallback(async () => {
+    setAllotmentsLoading(true);
+    try {
+      const nextRows = await fetchAllotments();
+      setRows(nextRows);
+      setError(null);
+    } catch {
+      // Preserve already-rendered flights on a transient refresh/network
+      // failure.  Replacing them with [] made the UI claim that purchased
+      // capacity had disappeared even though only the request had failed.
+      setError(t.errorFallback);
+    } finally {
+      setAllotmentsLoading(false);
+    }
+  }, [t.errorFallback]);
+
   async function reload() {
-    setRows(await fetchAllotments());
+    await loadAllotments();
   }
 
   useEffect(() => {
     // Route choices and existing allotments are independent resources. A
     // failure in the history endpoint must not blank the commercial routes.
-    void fetchAllotments()
-      .then(setRows)
-      .catch(() => {
-        setRows([]);
-        setError(t.errorFallback);
-      });
+    void loadAllotments();
     void fetchSeatRequestOptions()
       .then(setRequestOptions)
       .catch(() => {
@@ -181,8 +193,13 @@ export default function AgencySeatsPage() {
     void fetchCredit()
       .then(setAgencyCredit)
       .catch(() => setAgencyCredit(null));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadAllotments, t.errorFallback]);
+
+  useEffect(() => {
+    const refreshLiveAllotments = () => void loadAllotments();
+    window.addEventListener("pageshow", refreshLiveAllotments);
+    return () => window.removeEventListener("pageshow", refreshLiveAllotments);
+  }, [loadAllotments]);
 
   const origins = Array.from(
     new Set((requestOptions ?? []).map((row) => row.originCode)),
@@ -495,10 +512,10 @@ export default function AgencySeatsPage() {
 
   return (
     <div>
-      <div className="mb-4 rounded-xl border border-[#d6e4f8] bg-[#eef6ff] p-4 text-xs leading-6 text-[#3f546b]">
+      <div className="portal-surface-subtle mb-4 rounded-xl p-4 text-xs leading-6 portal-copy-muted">
         ⓘ {t.infoBanner}
       </div>
-      <div className="mb-4 flex gap-2 overflow-x-auto rounded-2xl border border-[#edf0f5] bg-white p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-5 md:overflow-visible">
+      <div className="portal-surface-card mb-4 flex gap-2 overflow-x-auto rounded-2xl p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-5 md:overflow-visible">
         {(
           [
             [
@@ -1267,7 +1284,21 @@ export default function AgencySeatsPage() {
         </section>
       )}
 
-      {error && <p className="mb-4 text-xs text-danger">{error}</p>}
+      {error && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-300/40 bg-red-500/10 p-3 text-xs text-red-500">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void loadAllotments()}
+            disabled={allotmentsLoading}
+            className="rounded-lg border border-current px-3 py-1.5 font-black disabled:opacity-50"
+          >
+            {allotmentsLoading
+              ? locale === "fa" ? "در حال تلاش…" : "Retrying…"
+              : locale === "fa" ? "تلاش دوباره" : "Retry"}
+          </button>
+        </div>
+      )}
       {notice && (
         <p className="mb-4 rounded-xl bg-[#e8f5ee] p-3 text-xs font-bold text-[#1f8a5b]">
           {notice}
@@ -1278,7 +1309,7 @@ export default function AgencySeatsPage() {
         rows &&
         requestOptions &&
         activeFlightCount === 0 && (
-          <p className="rounded-2xl border border-[#edf0f5] bg-white py-12 text-center text-xs text-muted">
+          <p className="portal-surface-card rounded-2xl py-12 text-center text-xs portal-copy-muted">
             {t.empty}
           </p>
         )}
@@ -1354,18 +1385,18 @@ export default function AgencySeatsPage() {
               <div
                 key={f.id}
                 data-testid="alloc-card"
-                className="rounded-2xl border border-[#e8eef6] bg-white p-5 shadow-sm"
+                className="portal-surface-card rounded-2xl p-5"
               >
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f2f7fd] text-base">
+                    <span className="portal-surface-subtle flex h-10 w-10 items-center justify-center rounded-xl text-base text-[var(--portal-accent)]">
                       ✈
                     </span>
                     <div>
-                      <div className="text-sm font-black text-[#0d2640]">
+                      <div className="text-sm font-black portal-copy">
                         {f.route}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-[#8a96a6]">
+                      <div className="mt-0.5 text-[11px] portal-copy-muted">
                         <span dir="ltr">{f.flightNo}</span> ·{" "}
                         {formatLocaleDateTime(f.departureAt, locale)}
                       </div>
@@ -1374,7 +1405,7 @@ export default function AgencySeatsPage() {
                   <span
                     className={`rounded-full px-3 py-1 text-[10.5px] font-extrabold ${
                       f.active
-                        ? "bg-[#e8f5ee] text-[#1f8a5b]"
+                        ? "bg-[#34d39924] text-[#1f9b68]"
                         : "bg-surface text-muted"
                     }`}
                   >
@@ -1395,9 +1426,9 @@ export default function AgencySeatsPage() {
                   ).map(([label, val, color]) => (
                     <div
                       key={label}
-                      className="rounded-xl border border-[#eef1f5] bg-[#fafbfd] p-3 text-center"
+                      className="portal-surface-subtle rounded-xl p-3 text-center"
                     >
-                      <div className="mb-1 text-[10.5px] text-[#8a96a6]">
+                      <div className="mb-1 text-[10.5px] portal-copy-muted">
                         {label}
                       </div>
                       <div className="text-lg font-black" style={{ color }}>

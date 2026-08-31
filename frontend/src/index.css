@@ -212,6 +212,22 @@ body {
   color-scheme: dark;
 }
 
+/* Shared card recipe used by every staff role.  The one-pixel outline and
+   theme-aware outer shadow keep adjacent cards distinct without introducing
+   a dark block in light mode or a glowing white block in dark mode. */
+.panel-surface-card {
+  color: var(--color-panel-ink);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / .05),
+    0 8px 24px rgb(15 23 42 / .045);
+}
+
+.management-panel-dark .panel-surface-card {
+  box-shadow:
+    0 1px 1px rgb(0 0 0 / .24),
+    0 10px 28px rgb(0 0 0 / .18);
+}
+
 .management-panel-dark :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
   background-color: var(--color-panel-surface-2);
   border-color: var(--color-panel-border-2);
@@ -264,6 +280,7 @@ body {
   --portal-muted: #66768b;
   --portal-border: #dfe7f0;
   --portal-accent: #1668c4;
+  --portal-shadow: 0 1px 2px rgb(15 23 42 / .05), 0 8px 24px rgb(15 23 42 / .045);
 }
 
 .portal-panel-theme--dark {
@@ -274,12 +291,75 @@ body {
   --portal-muted: #a8b5c8;
   --portal-border: #2b3a54;
   --portal-accent: #60a5fa;
+  --portal-shadow: 0 1px 1px rgb(0 0 0 / .24), 0 10px 28px rgb(0 0 0 / .18);
   color-scheme: dark;
+}
+
+/* Portal equivalent of PanelCard.  New agency/customer surfaces should use
+   this class instead of embedding literal white/navy colours. */
+.portal-surface-card {
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  color: var(--portal-ink);
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-surface-subtle {
+  background: var(--portal-surface-2);
+  border: 1px solid var(--portal-border);
+  color: var(--portal-ink);
+}
+
+.portal-copy { color: var(--portal-ink); }
+.portal-copy-muted { color: var(--portal-muted); }
+
+/* Light portal compatibility for legacy agency pages that were authored as
+   permanently-dark mockups.  This is intentionally scoped to the portal
+   shell so public pages and coloured action buttons are unaffected. */
+.portal-panel-theme:not(.portal-panel-theme--dark) :is(
+  [class*="bg-[#070b14]"], [class*="bg-[#0b1220]"],
+  [class*="bg-[#0f1623]"], [class*="bg-[#0f1726]"],
+  [class*="bg-[#101827]"], [class*="bg-[#121c2e]"],
+  [class*="bg-[#131d2d]"], [class*="bg-[#141d2e]"],
+  [class*="bg-[#151e31]"], [class*="bg-[#161f31]"],
+  [class*="bg-[#172339]"], [class*="bg-[#18223a]"],
+  [class*="bg-[#1c2940]"], [class*="bg-[#1d2a40]"],
+  [class*="bg-[#1d2a44]"]
+) {
+  background-color: var(--portal-surface) !important;
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme:not(.portal-panel-theme--dark) :is(
+  [class*="border-[#1f2a3d]"], [class*="border-[#22304a]"],
+  [class*="border-[#28344c]"], [class*="border-[#2a3550]"],
+  [class*="border-[#2f3f5c]"]
+) {
+  border-color: var(--portal-border) !important;
+}
+
+.portal-panel-theme:not(.portal-panel-theme--dark) :is(
+  [class*="text-white"], [class*="text-[#e7ecf3]"],
+  [class*="text-[#f2f5f9]"], [class*="text-[#cdd6e3]"],
+  [class*="text-[#cdd7e5]"]
+):not([class*="bg-[#1668c4]"]):not([class*="bg-[#3b82f6]"]):not([class*="bg-[#16a34a]"]) {
+  color: var(--portal-ink) !important;
+}
+
+.portal-panel-theme:not(.portal-panel-theme--dark) :is(
+  [class*="text-[#6b7b94]"], [class*="text-[#7a8696]"],
+  [class*="text-[#7d8ba0]"], [class*="text-[#8a97ab]"],
+  [class*="text-[#9fb0c7]"]
+) {
+  color: var(--portal-muted) !important;
 }
 
 .portal-panel-theme--dark :is(
   [class*="bg-white"], [class*="bg-[#fff]"], [class*="bg-[#fafbfd]"],
-  [class*="bg-[#fbfcfe]"], [class*="bg-[#f8fafc]"], [class*="bg-[#f7faff]"]
+  [class*="bg-[#fbfcfe]"], [class*="bg-[#f8fafc]"], [class*="bg-[#f7faff]"],
+  [class*="bg-[#eef4fb]"], [class*="bg-[#eef5fd]"], [class*="bg-[#eef6ff]"],
+  [class*="bg-[#f1f5fa]"], [class*="bg-[#f4f6f9]"], [class*="bg-[#f7f9fc]"],
+  [class*="bg-[#f8fbff]"]
 ) {
   background-color: var(--portal-surface) !important;
   color: var(--portal-ink) !important;
@@ -287,7 +367,8 @@ body {
 
 .portal-panel-theme--dark :is(
   [class*="text-[#0d2640]"], [class*="text-[#16202e]"],
-  [class*="text-[#163552]"], [class*="text-[#19334e]"], [class*="text-[#30465d]"]
+  [class*="text-[#163552]"], [class*="text-[#19334e]"], [class*="text-[#30465d]"],
+  [class*="text-[#3f546b]"], [class*="text-[#5d6c80]"], [class*="text-[#687587]"]
 ) {
   color: var(--portal-ink) !important;
 }

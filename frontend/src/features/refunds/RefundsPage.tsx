@@ -163,19 +163,15 @@ export default function RefundsPage() {
     <div className="flex flex-col gap-[15px] px-[21px] pb-[34px] pt-[18px]">
       {isSiteAdmin && (
         <div>
-          <h1 className="m-0 text-[20.5px] font-black text-white">استرداد بلیط</h1>
-          <p className="mt-1 text-[11.5px] text-[#6b7b94]">
+          <h1 className="m-0 text-[20.5px] font-black text-panel-ink">استرداد بلیط</h1>
+          <p className="mt-1 text-[11.5px] text-panel-muted">
             بررسی درخواست‌های استرداد و ارجاع به مدیر مالی یا کارمند مالی
           </p>
         </div>
       )}
 
       <div
-        className={`flex flex-wrap items-center gap-3.5 rounded-2xl border p-4 ${
-          isSiteAdmin
-            ? 'border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44]'
-            : 'border-[#2a3550] bg-gradient-to-br from-[#172339] to-[#1d2a44]'
-        }`}
+        className="panel-surface-card flex flex-wrap items-center gap-3.5 rounded-2xl border border-panel-border bg-panel-surface p-4"
       >
         <span
           className={`flex h-[52px] w-[52px] flex-none items-center justify-center rounded-[14px] ${
@@ -188,8 +184,8 @@ export default function RefundsPage() {
           </svg>
         </span>
         <div className="leading-snug">
-          <h2 className="m-0 text-[17px] font-black text-white">استرداد بلیط</h2>
-          <p className="mt-0.5 text-[11.5px] text-[#9fb0c7]">
+          <h2 className="m-0 text-[17px] font-black text-panel-ink">استرداد بلیط</h2>
+          <p className="mt-0.5 text-[11.5px] text-panel-muted">
             {isSiteAdmin
               ? 'درخواست‌های ثبت‌شده توسط مشتریان — بررسی و ارجاع به مدیر مالی یا کارمند مالی'
               : 'درخواست‌های استرداد ارجاع‌شده از ادمین سایت — بررسی، تأیید، پرداخت و بستن پرونده'}
@@ -217,36 +213,36 @@ export default function RefundsPage() {
         <div className="grid grid-cols-3 gap-[13px]">
           {isSiteAdmin ? (
             <>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">در انتظار بررسی</div>
                 <div className="font-num text-xl font-black text-[#f59e0b]">
                   {faDigits(kpis.awaitingAdmin)}
                 </div>
               </div>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">ارجاع‌شده به مالی</div>
                 <div className="font-num text-xl font-black text-[#a855f7]">
                   {faDigits(kpis.payoutQueue)}
                 </div>
               </div>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">پرداخت‌شده</div>
                 <div className="font-num text-xl font-black text-[#34d399]">{faDigits(kpis.paid)}</div>
               </div>
             </>
           ) : (
             <>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">در صف پرداخت</div>
                 <div className="font-num text-xl font-black text-[#a855f7]">
                   {faDigits(kpis.payoutQueue)}
                 </div>
               </div>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">پرداخت‌شده</div>
                 <div className="font-num text-xl font-black text-[#34d399]">{faDigits(kpis.paid)}</div>
               </div>
-              <div className="rounded-[14px] border border-[#1f2a3d] bg-[#141d2e] p-[13px]">
+              <div className="panel-surface-card rounded-[14px] border border-panel-border bg-panel-surface p-[13px]">
                 <div className="mb-1.5 text-[11px] text-[#6b7b94]">در انتظار بررسی ادمین</div>
                 <div className="font-num text-xl font-black text-[#f59e0b]">
                   {faDigits(kpis.awaitingAdmin)}
@@ -257,10 +253,10 @@ export default function RefundsPage() {
         </div>
       )}
 
-      <section className="rounded-2xl border border-[#1f2a3d] bg-[#141d2e] p-4">
+      <section className="panel-surface-card rounded-2xl border border-panel-border bg-panel-surface p-4">
         <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2.5">
           <div>
-            <h2 className="m-0 text-[15px] font-extrabold text-white">
+            <h2 className="m-0 text-[15px] font-extrabold text-panel-ink">
               {isSiteAdmin ? 'درخواست‌های استرداد بلیط' : 'فهرست درخواست‌های استرداد'}
             </h2>
             <p className="mt-1 text-[11.5px] text-[#6b7b94]">
@@ -284,7 +280,7 @@ export default function RefundsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="جستجو بر اساس نام مسافر، PNR، شماره پرواز یا مسیر…"
-            className="h-[46px] w-full rounded-xl border border-[#28344c] bg-[#18223a] px-4 text-xs text-[#e7ecf3] outline-none transition placeholder:text-[#6b7b94] focus:border-[#3b82f6]"
+            className="h-[46px] w-full rounded-xl border border-panel-border-2 bg-panel-surface-2 px-4 text-xs text-panel-ink outline-none transition placeholder:text-panel-muted focus:border-panel-accent"
           />
         </div>
 
@@ -412,7 +408,7 @@ export default function RefundsPage() {
 
       {detail && (
         <Modal
-          variant="dark"
+          variant="panel"
           title={`درخواست استرداد · بلیط ${detail.booking.pnr}`}
           onClose={() => setDetail(null)}
         >
