@@ -11,17 +11,17 @@ import {
   uatWalletAdjustmentIrr,
 } from './uat-wallet-reconciliation.contract';
 
-const CONFIRMATION = 'RECONCILE_UAT_WALLETS_TO_100M_TOMAN_V1';
+const CONFIRMATION = 'RECONCILE_UAT_WALLETS_TO_100M_TOMAN_V2';
 const TARGETS = [
   {
     username: 'uat.customer',
     role: 'USER',
-    entryId: 'uat-customer-wallet-reconcile-100m-v1',
+    entryId: 'uat-customer-wallet-reconcile-100m-v2',
   },
   {
     username: 'uat.agency',
     role: 'AGENCY',
-    entryId: 'uat-agency-wallet-reconcile-100m-v1',
+    entryId: 'uat-agency-wallet-reconcile-100m-v2',
   },
 ] as const;
 
@@ -130,7 +130,7 @@ async function main() {
           entityType: 'WalletEntry',
           entityId: actor.id,
           metadata: {
-            source: 'uat-wallet-reconcile-100m-v1',
+            source: 'uat-wallet-reconcile-100m-v2',
             targetIrr: UAT_WALLET_TARGET_IRR.toString(),
             updates,
           },

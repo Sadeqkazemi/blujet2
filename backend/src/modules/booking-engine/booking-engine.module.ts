@@ -25,6 +25,7 @@ import { RefundRequest } from '../../database/entities/refund-request.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { AgencyAllotment } from '../../database/entities/agency-allotment.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
+import { AgencyInvoice } from '../../database/entities/agency-invoice.entity';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
@@ -78,6 +79,7 @@ import {
       RefreshToken,
       AgencyAllotment,
       AgencyCreditLine,
+      AgencyInvoice,
       TravelExtraSetting,
     ]),
     AuditModule,

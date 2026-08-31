@@ -266,19 +266,15 @@ export default function JalaliDatePicker({
       : label);
 
   const dark = theme === "dark";
-  const valueColor = embedded
+  const valueColor = dark
     ? value
-      ? "#16202e"
-      : "#aeb6c2"
-    : dark
-      ? value
-        ? "#e7ecf3"
-        : "#9fb0c7"
-      : value
-        ? "#0d2640"
-        : "#aeb6c2";
+      ? "#f1f5fb"
+      : "#a8b5c8"
+    : value
+      ? "#16233a"
+      : "#65758b";
   const inlineTrigger = compact || singleLine || embedded;
-  const mutedColor = dark ? "#6b7b94" : "#9aa4b2";
+  const mutedColor = dark ? "#a8b5c8" : "#65758b";
   const popupBg = dark ? "#141d2e" : "#fff";
   const popupBorder = dark ? "#2a3550" : "#e6eaf0";
   const priceCalendarMargin = 12;
@@ -750,7 +746,7 @@ export default function JalaliDatePicker({
                   style={{
                     textAlign: "center",
                     fontSize: 10,
-                    color: dark ? "#6b7b94" : "#9aa4b2",
+                    color: dark ? "#a8b5c8" : "#65758b",
                     fontWeight: 700,
                   }}
                 >
@@ -795,7 +791,7 @@ export default function JalaliDatePicker({
                       color: c.disabled
                         ? dark
                           ? "#3a4558"
-                          : "#ccd3dd"
+                          : "#8a98aa"
                         : isSelected
                           ? "#fff"
                           : dark

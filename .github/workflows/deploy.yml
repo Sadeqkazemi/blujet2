@@ -392,18 +392,18 @@ jobs:
               # Owner-approved one-time exact reconciliation: both reserved
               # UAT wallets must finish at 100,000,000 toman. A backup and
               # root-only audit record protect this financial mutation.
-              wallet_reconcile_sentinel=/root/.blujet-uat-wallet-reconcile-100m-v1-complete
+              wallet_reconcile_sentinel=/root/.blujet-uat-wallet-reconcile-100m-v2-complete
               if [ ! -f "$wallet_reconcile_sentinel" ]; then
                 umask 077
                 wallet_backup="/root/blujet-uat-before-wallet-reconcile-$(date -u +%Y%m%dT%H%M%SZ).dump"
-                wallet_audit=/root/blujet-uat-wallet-reconcile-100m-v1.json
+                wallet_audit=/root/blujet-uat-wallet-reconcile-100m-v2.json
                 docker compose -f docker-compose.prod.yml exec -T db \
                   pg_dump -U blujet -d blujet --format=custom > "$wallet_backup"
                 chmod 600 "$wallet_backup"
                 docker compose -f docker-compose.prod.yml exec -T \
                   -e NODE_ENV=production \
                   -e AUTH_SANDBOX_ENABLED=true \
-                  -e UAT_WALLET_RECONCILE_CONFIRM=RECONCILE_UAT_WALLETS_TO_100M_TOMAN_V1 \
+                  -e UAT_WALLET_RECONCILE_CONFIRM=RECONCILE_UAT_WALLETS_TO_100M_TOMAN_V2 \
                   backend node dist/database/reconcile-uat-wallet-balances.js --execute \
                   > "$wallet_audit"
                 chmod 600 "$wallet_audit"

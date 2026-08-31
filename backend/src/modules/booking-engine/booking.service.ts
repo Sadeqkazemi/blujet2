@@ -29,6 +29,7 @@ import { FareRule } from '../../database/entities/fare-rule.entity';
 import { AgencyCreditLine } from '../../database/entities/agency-credit-line.entity';
 import { TravelExtraSetting } from '../../database/entities/travel-extra-setting.entity';
 import { AgencyProfile } from '../../database/entities/agency-profile.entity';
+import { AgencyInvoice } from '../../database/entities/agency-invoice.entity';
 import { AuditService } from '../audit/audit.service';
 import { AncillaryServicesService } from '../ancillary-services/ancillary-services.service';
 import { ErrorCode } from '../../common/errors';
@@ -1667,6 +1668,27 @@ export class BookingService {
           agencyId: booking.agencyId,
         }),
       );
+
+      // Public-inventory purchases made by an authenticated agency are still
+      // agency-owned financial sales. Materialize the paid invoice in the
+      // same transaction as wallet debit, ticket issuance and SALE ledger so
+      // every projection either sees the complete purchase or none of it.
+      if (lockedBooking.agencyId) {
+        const paidAt = new Date();
+        await tx.save(
+          tx.create(AgencyInvoice, {
+            agencyId: lockedBooking.agencyId,
+            bookingId: id,
+            invoiceNo: `SALE-${lockedBooking.pnr}`,
+            issuedById: user.id,
+            dueAt: paidAt,
+            amountIrr: finalPriceIrr,
+            descriptionFa: `فاکتور فروش بلیط ${lockedBooking.pnr}`,
+            status: 'PAID',
+            paidAt,
+          }),
+        );
+      }
 
       // Real money spent (gateway/wallet) earns points; redeeming points to
       // pay never earns points back (no redeem-to-earn loophole).
