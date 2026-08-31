@@ -1,7 +1,6 @@
 import {
   assertInRequestNationalIdSeatLimit,
   countOccupyingNationalIdHashes,
-  MAX_SEATS_PER_NATIONAL_ID,
 } from './national-id-seat-limit';
 import { hashPii, normalizeNationalId } from '../../common/pii-crypto';
 
