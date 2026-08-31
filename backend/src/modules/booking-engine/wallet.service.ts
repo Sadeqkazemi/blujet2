@@ -90,6 +90,21 @@ export class WalletService {
     };
   }
 
+  /**
+   * Takes the single per-customer lock used by every wallet debit.
+   *
+   * Callers that need to write other rows referencing the user before the
+   * debit must take this lock first. Otherwise two transactions can each
+   * hold an FK key-share lock and then deadlock while upgrading to FOR UPDATE.
+   */
+  async lockForDebit(manager: EntityManager, userId: string): Promise<void> {
+    await manager
+      .createQueryBuilder(User, 'user')
+      .setLock('pessimistic_write')
+      .where('user.id = :userId', { userId })
+      .getOneOrFail();
+  }
+
   /** Debits the wallet inside an existing transaction — throws if the
    * balance (computed from committed rows only) can't cover the charge. */
   async charge(
@@ -97,15 +112,14 @@ export class WalletService {
     userId: string,
     amountIrr: Irr,
     bookingId: string | null,
+    accountAlreadyLocked = false,
   ) {
     // Wallet balances are ledger-derived, so serialize all debits on the
     // owning user row before reading SUM(entries). This prevents two bookings
     // from both spending the same committed balance concurrently.
-    await manager
-      .createQueryBuilder(User, 'user')
-      .setLock('pessimistic_write')
-      .where('user.id = :userId', { userId })
-      .getOneOrFail();
+    if (!accountAlreadyLocked) {
+      await this.lockForDebit(manager, userId);
+    }
     const balance = await this.sumBalance(manager, userId);
     if (balance < amountIrr) {
       throw new ConflictException({
