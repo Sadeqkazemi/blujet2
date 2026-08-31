@@ -279,7 +279,10 @@ export class BookingService {
     manager: EntityManager = this.bookingRepo.manager,
   ): Promise<BookingWithRelations> {
     const [passengers, priceLock] = await Promise.all([
-      manager.find(Passenger, { where: { bookingId: booking.id } }),
+      manager.find(Passenger, {
+        where: { bookingId: booking.id },
+        order: { seatCode: 'ASC', id: 'ASC' },
+      }),
       manager.findOneBy(PriceLock, { bookingId: booking.id }),
     ]);
     return { ...booking, passengers, priceLock };
@@ -1478,6 +1481,13 @@ export class BookingService {
         .getOneOrFail();
       const lockedBooking = await this.loadBookingRelations(lockedRaw, tx);
 
+      // Acquire the wallet lock before inserting idempotency/promo rows that
+      // reference this user. This establishes one lock order for concurrent
+      // purchases and avoids PostgreSQL FK-lock upgrade deadlocks.
+      if (paymentMethod === 'WALLET') {
+        await this.wallet.lockForDebit(tx, user.id);
+      }
+
       if (idempotencyKey) {
         const claimed = await tx.findOneBy(PayIdempotencyRecord, {
           idempotencyKey,
@@ -1549,6 +1559,7 @@ export class BookingService {
           user.id,
           finalPriceIrr,
           id,
+          true,
         );
         walletEntryId = walletEntry.id;
       } else if (paymentMethod === 'POINTS') {
