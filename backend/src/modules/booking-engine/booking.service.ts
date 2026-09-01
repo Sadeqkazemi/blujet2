@@ -17,7 +17,6 @@ import {
 } from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
-import { TicketDocument } from '../../database/entities/ticket-document.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { AircraftSeatMap } from '../../database/entities/aircraft-seat-map.entity';
 import { User } from '../../database/entities/user.entity';
@@ -73,7 +72,6 @@ import { ticketedNotificationInput } from '../notifications/customer-notificatio
 import { assertNationalIdSeatLimitForFlight } from './national-id-seat-limit';
 import { applyPromoCode } from './promo.service';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { TicketingService } from '../ticketing/ticketing.service';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 import type { CreateAllotmentBookingDto } from '../agency-portal/dto/create-allotment-booking.dto';
 import {
@@ -159,12 +157,12 @@ function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
-type PassengerWithTicketDocument = Passenger & {
-  ticketDocument: TicketDocument | null;
-};
+function generateTicketNo(): string {
+  return `780${String(crypto.randomInt(0, 10_000_000_000)).padStart(10, '0')}`;
+}
 
 type BookingWithRelations = Omit<Booking, 'generateId' | 'defaultTaxIrr'> & {
-  passengers: PassengerWithTicketDocument[];
+  passengers: Passenger[];
   priceLock: PriceLock | null;
 };
 
@@ -201,7 +199,6 @@ export class BookingService {
     private readonly clubPoints: ClubPointsService,
     private readonly customerReferrals: CustomerReferralsService,
     private readonly notifications: NotificationsService,
-    private readonly ticketing: TicketingService,
     @Inject(PAYMENT_GATEWAY)
     private readonly gateway: PaymentGateway,
   ) {}
@@ -282,22 +279,13 @@ export class BookingService {
     booking: Booking,
     manager: EntityManager = this.bookingRepo.manager,
   ): Promise<BookingWithRelations> {
-    const [plainPassengers, priceLock] = await Promise.all([
+    const [passengers, priceLock] = await Promise.all([
       manager.find(Passenger, {
         where: { bookingId: booking.id },
         order: { seatCode: 'ASC', id: 'ASC' },
       }),
       manager.findOneBy(PriceLock, { bookingId: booking.id }),
     ]);
-    const documents = await this.ticketing.documentsForPassengers(
-      manager,
-      plainPassengers.map((passenger) => passenger.id),
-    );
-    const passengers = plainPassengers.map((passenger) =>
-      Object.assign(passenger, {
-        ticketDocument: documents.get(passenger.id) ?? null,
-      }),
-    );
     return { ...booking, passengers, priceLock };
   }
 
@@ -375,32 +363,6 @@ export class BookingService {
         gender: p.gender,
         ticketNo: p.ticketNo,
         ticketIssuedAt: p.ticketIssuedAt,
-        ticketDocument: p.ticketDocument
-          ? {
-              id: p.ticketDocument.id,
-              documentNo: p.ticketDocument.documentNo,
-              status: p.ticketDocument.status,
-              issuedAt: p.ticketDocument.issuedAt,
-              originalIssueAt: p.ticketDocument.originalIssueAt,
-              currency: p.ticketDocument.currency,
-              totalFareIrr: p.ticketDocument.totalFareIrr,
-              totalTaxIrr: p.ticketDocument.totalTaxIrr,
-              coupons: p.ticketDocument.coupons.map((coupon) => ({
-                id: coupon.id,
-                sequenceNo: coupon.sequenceNo,
-                status: coupon.status,
-                flightInstanceId: coupon.flightInstanceId,
-                flightNo: coupon.flightNo,
-                originCode: coupon.originCode,
-                destCode: coupon.destCode,
-                departureAt: coupon.departureAt,
-                cabin: coupon.cabin,
-                fareClassCode: coupon.fareClassCode,
-                fareIrr: coupon.fareIrr,
-                taxIrr: coupon.taxIrr,
-              })),
-            }
-          : null,
       })),
     };
   }
@@ -1305,11 +1267,12 @@ export class BookingService {
                 mobileEnc: passenger.mobile
                   ? encryptPii(passenger.mobile)
                   : null,
+                ticketNo: generateTicketNo(),
+                ticketIssuedAt: new Date(),
               });
             },
           ),
         );
-        await this.ticketing.issueBooking(tx, created.id);
         await tx.save(
           tx.create(LedgerEntry, {
             bookingId: created.id,
@@ -1668,7 +1631,17 @@ export class BookingService {
         });
       }
 
-      await this.ticketing.issueBooking(tx, id);
+      const issuedAt = new Date();
+      const passengerTickets = await tx.find(Passenger, {
+        where: { bookingId: id },
+        order: { id: 'ASC' },
+      });
+      for (const passenger of passengerTickets) {
+        if (passenger.ticketNo) continue;
+        passenger.ticketNo = generateTicketNo();
+        passenger.ticketIssuedAt = issuedAt;
+      }
+      await tx.save(passengerTickets);
 
       if (isLocked) {
         await tx.update(

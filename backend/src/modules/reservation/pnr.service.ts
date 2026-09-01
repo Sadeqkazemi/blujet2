@@ -17,7 +17,6 @@ import {
 } from 'typeorm';
 import { Booking } from '../../database/entities/booking.entity';
 import { Passenger } from '../../database/entities/passenger.entity';
-import { TicketDocument } from '../../database/entities/ticket-document.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Flight } from '../../database/entities/flight.entity';
 import { Airport } from '../../database/entities/airport.entity';
@@ -42,7 +41,6 @@ import { SearchService } from '../booking-engine/search.service';
 import { ZERO_IRR, pctOfIrr, subIrr } from '../../common/money';
 import type { Irr } from '../../common/money';
 import type { AuthenticatedUser } from '../../common/types/authenticated-user';
-import { TicketingService } from '../ticketing/ticketing.service';
 import type {
   FinalizeLockDto,
   IssuePnrDto,
@@ -60,12 +58,8 @@ function generatePnr(): string {
   return `BJ${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 }
 
-type PassengerWithTicketDocument = Passenger & {
-  ticketDocument: TicketDocument | null;
-};
-
 type BookingDetail = Omit<Booking, 'generateId' | 'defaultTaxIrr'> & {
-  passengers: PassengerWithTicketDocument[];
+  passengers: Passenger[];
 };
 
 @Injectable()
@@ -97,7 +91,6 @@ export class PnrService {
     private readonly dataSource: DataSource,
     private readonly audit: AuditService,
     private readonly searchService: SearchService,
-    private readonly ticketing: TicketingService,
   ) {}
 
   private async findSoldConflict(
@@ -155,18 +148,9 @@ export class PnrService {
         message: 'رزرو با این کد PNR یافت نشد.',
       });
     }
-    const plainPassengers = await this.passengerRepo.find({
+    const passengers = await this.passengerRepo.find({
       where: { bookingId: booking.id },
     });
-    const documents = await this.ticketing.documentsForPassengers(
-      this.passengerRepo.manager,
-      plainPassengers.map((passenger) => passenger.id),
-    );
-    const passengers = plainPassengers.map((passenger) =>
-      Object.assign(passenger, {
-        ticketDocument: documents.get(passenger.id) ?? null,
-      }),
-    );
     return { ...booking, passengers };
   }
 
@@ -251,21 +235,8 @@ export class PnrService {
       arrivalAt: b.flightInstance.arrivalAt,
       flightInstanceId: b.flightInstanceId,
       passenger: passenger
-        ? {
-            fullName: passenger.fullName,
-            seatCode: passenger.seatCode,
-            ticketNo: passenger.ticketNo,
-            ticketDocument: passenger.ticketDocument,
-          }
+        ? { fullName: passenger.fullName, seatCode: passenger.seatCode }
         : null,
-      passengers: b.passengers.map((row) => ({
-        id: row.id,
-        fullName: row.fullName,
-        seatCode: row.seatCode,
-        ticketNo: row.ticketNo,
-        ticketIssuedAt: row.ticketIssuedAt,
-        ticketDocument: row.ticketDocument,
-      })),
     };
   }
 
@@ -591,11 +562,8 @@ export class PnrService {
           mobileEnc: dto.passengerMobile
             ? encryptPii(dto.passengerMobile)
             : null,
-          fareIrr: priceIrr,
-          taxIrr: ZERO_IRR,
         }),
       );
-      await this.ticketing.issueBooking(tx, created.id);
       await tx.save(
         tx.create(LedgerEntry, {
           bookingId: created.id,
@@ -715,11 +683,8 @@ export class PnrService {
           mobileEnc: dto.passengerMobile
             ? encryptPii(dto.passengerMobile)
             : null,
-          fareIrr: priceIrr,
-          taxIrr: ZERO_IRR,
         }),
       );
-      await this.ticketing.issueBooking(tx, created.id);
       await tx.save(
         tx.create(LedgerEntry, {
           bookingId: created.id,

@@ -9,8 +9,6 @@ import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { Passenger } from '../src/database/entities/passenger.entity';
-import { TicketDocument } from '../src/database/entities/ticket-document.entity';
-import { FlightCoupon } from '../src/database/entities/flight-coupon.entity';
 import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
 import { SeatLock } from '../src/database/entities/seat-lock.entity';
 import { loginAs } from './helpers/login.helper';
@@ -343,19 +341,6 @@ describe('Reservation (e2e)', () => {
     expect(issued.status).toBe(201);
     expect(issued.body.data.status).toBe('TICKETED');
     expect(issued.body.data.passenger.seatCode).toBe('7A');
-    expect(issued.body.data.passenger.ticketNo).toMatch(/^780\d{10}$/);
-    expect(issued.body.data.passenger.ticketDocument).toMatchObject({
-      documentNo: issued.body.data.passenger.ticketNo,
-      status: 'ISSUED',
-      coupons: [
-        expect.objectContaining({
-          status: 'OPEN',
-          flightInstanceId: instance.id,
-          originCode: expect.any(String),
-          destCode: expect.any(String),
-        }),
-      ],
-    });
 
     const booking = await dataSource
       .getRepository(Booking)
@@ -363,18 +348,6 @@ describe('Reservation (e2e)', () => {
       .where('b.pnr = :pnr', { pnr: issued.body.data.pnr })
       .getOneOrFail();
     expect(booking.status).toBe('TICKETED');
-    const passenger = await dataSource
-      .getRepository(Passenger)
-      .findOneByOrFail({ bookingId: booking.id });
-    const document = await dataSource
-      .getRepository(TicketDocument)
-      .findOneByOrFail({ passengerId: passenger.id });
-    expect(document.documentNo).toBe(passenger.ticketNo);
-    expect(
-      await dataSource
-        .getRepository(FlightCoupon)
-        .countBy({ ticketDocumentId: document.id }),
-    ).toBe(1);
     const ledger = await dataSource
       .getRepository(LedgerEntry)
       .findOneBy({ bookingId: booking.id, type: 'SALE' });

@@ -39,7 +39,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
 import { AuthModule } from '../auth/auth.module';
 import { SmsModule } from '../sms/sms.module';
-import { TicketingModule } from '../ticketing/ticketing.module';
 
 @Module({
   imports: [
@@ -77,7 +76,6 @@ import { TicketingModule } from '../ticketing/ticketing.module';
     AiModule,
     AuthModule,
     SmsModule,
-    TicketingModule,
   ],
   controllers: [FlightsController],
   providers: [

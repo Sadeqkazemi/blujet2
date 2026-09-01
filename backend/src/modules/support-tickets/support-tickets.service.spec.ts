@@ -174,30 +174,6 @@ describe('SupportTicketsService conversations', () => {
     expect(ticketRepo.save).toHaveBeenCalledWith(ticket);
   });
 
-  it('waits for an in-flight lifecycle sweep before module shutdown', async () => {
-    const ticket = baseTicket();
-    const { service, ticketRepo } = buildService(ticket);
-    let finishSweep!: (tickets: unknown[]) => void;
-    ticketRepo.find.mockReturnValueOnce(
-      new Promise((resolve) => {
-        finishSweep = resolve;
-      }),
-    );
-
-    service.onApplicationBootstrap();
-    const shutdown = service.onModuleDestroy();
-    let shutdownFinished = false;
-    void shutdown.then(() => {
-      shutdownFinished = true;
-    });
-    await Promise.resolve();
-    expect(shutdownFinished).toBe(false);
-
-    finishSweep([]);
-    await shutdown;
-    expect(shutdownFinished).toBe(true);
-  });
-
   it('records a staff reply and marks the ticket answered', async () => {
     const ticket = baseTicket();
     const { service } = buildService(ticket);

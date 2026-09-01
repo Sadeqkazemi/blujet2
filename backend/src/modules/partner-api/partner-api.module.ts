@@ -6,7 +6,6 @@ import { AgencyPortalModule } from '../agency-portal/agency-portal.module';
 import { BookingEngineModule } from '../booking-engine/booking-engine.module';
 import { PartnerApiController } from './partner-api.controller';
 import { PartnerApiKeyGuard } from './partner-api-key.guard';
-import { DistributionService } from './distribution.service';
 
 @Module({
   imports: [
@@ -16,6 +15,6 @@ import { DistributionService } from './distribution.service';
     BookingEngineModule,
   ],
   controllers: [PartnerApiController],
-  providers: [PartnerApiKeyGuard, DistributionService],
+  providers: [PartnerApiKeyGuard],
 })
 export class PartnerApiModule {}
