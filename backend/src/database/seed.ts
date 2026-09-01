@@ -110,6 +110,7 @@ import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
 import type { JsonValue } from './json-types';
 import { ANCILLARY_BUILT_IN_SERVICES } from '../modules/ancillary-services/ancillary-services.catalog';
+import { standardClassCode } from '../modules/flights/aircraft-class-code';
 
 const dataSource = new DataSource(dataSourceOptions);
 
@@ -182,6 +183,7 @@ async function seedAircraftCatalog(
         aircraftDefinitionId: aircraft.id,
         cabinType,
         capacity,
+        defaultClassCode: standardClassCode(cabinType),
         createdAt: now,
         updatedAt: now,
       }),
