@@ -52,6 +52,7 @@ import type { Irr } from '../../common/money';
 import { RedisService } from '../../redis/redis.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SmsService } from '../sms/sms.service';
+import { TicketingService } from '../ticketing/ticketing.service';
 import {
   BookingStatus,
   BookingChannel,
@@ -201,6 +202,7 @@ export class FlightsService {
     private readonly redis: RedisService,
     private readonly notifications: NotificationsService,
     private readonly sms: SmsService,
+    private readonly ticketing: TicketingService,
   ) {}
 
   private async emitWeakSalesAlerts(
@@ -3081,6 +3083,7 @@ export class FlightsService {
       }
       booking.status = BookingStatus.REFUNDED;
       await manager.save(booking);
+      await this.ticketing.refundBooking(manager, booking.id);
       await manager.save(
         manager.create(LedgerEntry, {
           bookingId: booking.id,

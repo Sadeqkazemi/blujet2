@@ -2467,6 +2467,78 @@ async function main() {
     }
   }
 
+  // Keep development/E2E seed data on the same PSS accountable-document
+  // contract as runtime issuance. This is idempotent and only fills ticketed
+  // passengers that predate or bypass the application service in fixtures.
+  await dataSource.query(`
+    UPDATE passengers p
+    SET "ticketNo" = '780' || lpad(nextval('ticket_document_number_seq')::text, 10, '0'),
+        "ticketIssuedAt" = COALESCE(p."ticketIssuedAt", b."createdAt")
+    FROM bookings b
+    WHERE b.id = p."bookingId"
+      AND b.status IN ('TICKETED', 'FLOWN', 'NO_SHOW', 'REFUNDED')
+      AND p."deletedAt" IS NULL
+      AND p."ticketNo" IS NULL
+  `);
+  await dataSource.query(`
+    INSERT INTO "ticket_documents" (
+      "id", "documentNo", "passengerId", "bookingId", "status",
+      "issuedAt", "originalIssueAt", "currency", "totalFareIrr", "totalTaxIrr"
+    )
+    SELECT
+      'td-seed-' || p.id,
+      p."ticketNo",
+      p.id,
+      p."bookingId",
+      CASE WHEN b.status = 'REFUNDED' THEN 'REFUNDED' ELSE 'ISSUED' END::"public"."TicketDocumentStatus",
+      COALESCE(p."ticketIssuedAt", b."createdAt"),
+      COALESCE(p."ticketIssuedAt", b."createdAt"),
+      'IRR',
+      p."fareIrr",
+      p."taxIrr"
+    FROM passengers p
+    INNER JOIN bookings b ON b.id = p."bookingId"
+    WHERE p."ticketNo" IS NOT NULL
+    ON CONFLICT ("passengerId") DO NOTHING
+  `);
+  await dataSource.query(`
+    INSERT INTO "flight_coupons" (
+      "id", "ticketDocumentId", "flightInstanceId", "sequenceNo", "status",
+      "flightNo", "originCode", "destCode", "departureAt", "cabin",
+      "fareClassCode", "fareIrr", "taxIrr"
+    )
+    SELECT
+      'fc-seed-' || p.id,
+      td.id,
+      b."flightInstanceId",
+      1,
+      CASE
+        WHEN b.status = 'REFUNDED' THEN 'REFUNDED'
+        WHEN b.status IN ('FLOWN', 'NO_SHOW') THEN 'FLOWN'
+        ELSE 'OPEN'
+      END::"public"."FlightCouponStatus",
+      f."flightNo",
+      r."originCode",
+      r."destCode",
+      fi."departureAt",
+      b.cabin,
+      b."fareClassCode",
+      p."fareIrr",
+      p."taxIrr"
+    FROM "ticket_documents" td
+    INNER JOIN passengers p ON p.id = td."passengerId"
+    INNER JOIN bookings b ON b.id = td."bookingId"
+    INNER JOIN flight_instances fi ON fi.id = b."flightInstanceId"
+    INNER JOIN flights f ON f.id = fi."flightId"
+    INNER JOIN routes r ON r.id = f."routeId"
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM "flight_coupons" existing_coupon
+      WHERE existing_coupon."ticketDocumentId" = td.id
+    )
+    ON CONFLICT ("ticketDocumentId", "flightInstanceId") DO NOTHING
+  `);
+
   console.log('Seed complete.');
   console.log(`Staff dev password (all roles): ${STAFF_PASSWORD}`);
 }

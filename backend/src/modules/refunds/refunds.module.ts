@@ -15,6 +15,7 @@ import { AuditModule } from '../audit/audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { BookingEngineModule } from '../booking-engine/booking-engine.module';
+import { TicketingModule } from '../ticketing/ticketing.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
     AuthModule,
     NotificationsModule,
     BookingEngineModule,
+    TicketingModule,
   ],
   controllers: [RefundsController, RefundsCustomerController],
   providers: [RefundsService],
