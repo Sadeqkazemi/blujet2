@@ -3,7 +3,6 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { FareRule } from '../src/database/entities/fare-rule.entity';
-import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { createTestApp } from './helpers/app.helper';
 import { loginAs } from './helpers/login.helper';
 
@@ -21,9 +20,10 @@ describe('RMS boundary (e2e)', () => {
   it('exposes real controls and an advisory-only recommendation to commercial', async () => {
     const commercial = await loginAs(app, 'comm');
     const auth = { Authorization: `Bearer ${commercial.accessToken}` };
-    const instance = await dataSource
-      .getRepository(FlightInstance)
-      .createQueryBuilder('instance')
+    const persistedRule = await dataSource
+      .getRepository(FareRule)
+      .createQueryBuilder('rule')
+      .innerJoinAndSelect('rule.flightInstance', 'instance')
       .where('instance.status = :status', { status: 'SCHEDULED' })
       .andWhere('instance.definitionStatus IN (:...statuses)', {
         statuses: ['PUBLISHED', 'PENDING_REVISION'],
@@ -31,6 +31,7 @@ describe('RMS boundary (e2e)', () => {
       .andWhere('instance.departureAt > :now', { now: new Date() })
       .orderBy('instance.departureAt', 'ASC')
       .getOneOrFail();
+    const instance = persistedRule.flightInstance;
 
     const portfolio = await request(app.getHttpServer())
       .get('/rms/portfolio')
