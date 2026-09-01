@@ -19,6 +19,7 @@ import { PnrService } from './pnr.service';
 import { AuditModule } from '../audit/audit.module';
 import { PanelsModule } from '../panels/panels.module';
 import { BookingEngineModule } from '../booking-engine/booking-engine.module';
+import { TicketingModule } from '../ticketing/ticketing.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { BookingEngineModule } from '../booking-engine/booking-engine.module';
     AuditModule,
     PanelsModule,
     BookingEngineModule,
+    TicketingModule,
   ],
   controllers: [SeatmapController, PnrController],
   providers: [SeatmapService, PnrService],

@@ -93,6 +93,10 @@ import { TwoFactorChallenge } from './entities/two-factor-challenge.entity';
 import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
 import { TravelExtraSetting } from './entities/travel-extra-setting.entity';
+import { TicketDocument } from './entities/ticket-document.entity';
+import { FlightCoupon } from './entities/flight-coupon.entity';
+import { DcsPassengerOperation } from './entities/dcs-passenger-operation.entity';
+import { BaggageItem } from './entities/baggage-item.entity';
 
 /**
  * All 77 entities, mirroring prisma/schema.prisma's 77 models exactly (see
@@ -133,6 +137,7 @@ export const dataSourceOptions: DataSourceOptions = {
     AncillaryService,
     AuditLog,
     BackupRecord,
+    BaggageItem,
     BlogPost,
     Booking,
     CabinFare,
@@ -148,9 +153,11 @@ export const dataSourceOptions: DataSourceOptions = {
     CustomerIdentityVerification,
     CustomerReferral,
     EmployeePermission,
+    DcsPassengerOperation,
     ExternalServiceConfig,
     FarePricingProposal,
     FareRule,
+    FlightCoupon,
     Flight,
     FlightChargeRule,
     FlightInstance,
@@ -200,6 +207,7 @@ export const dataSourceOptions: DataSourceOptions = {
     SurveyResponse,
     SurveySettings,
     SystemSetting,
+    TicketDocument,
     TwoFactorChallenge,
     User,
     WalletEntry,

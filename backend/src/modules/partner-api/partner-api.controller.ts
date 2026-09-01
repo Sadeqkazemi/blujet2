@@ -17,6 +17,9 @@ import { BookingService } from '../booking-engine/booking.service';
 import { SearchService } from '../booking-engine/search.service';
 import { CurrentPartner, PartnerScopes } from './partner-api.decorators';
 import {
+  DistributionAirShoppingDto,
+  DistributionOfferPriceDto,
+  DistributionOrderCreateDto,
   PartnerBookDto,
   PartnerBookingReferenceDto,
   PartnerFlightSearchDto,
@@ -25,6 +28,7 @@ import {
   PartnerApiKeyGuard,
   type PartnerApiContext,
 } from './partner-api-key.guard';
+import { DistributionService } from './distribution.service';
 
 const SEARCH_SCOPES = [
   AgencyApiScope.SEARCH_ONLY,
@@ -44,7 +48,83 @@ export class PartnerApiController {
     private readonly search: SearchService,
     private readonly bookings: BookingService,
     private readonly portal: AgencyPortalService,
+    private readonly distribution: DistributionService,
   ) {}
+
+  @Get('distribution/capabilities')
+  @PartnerScopes(...SEARCH_SCOPES)
+  @ApiOperation({ summary: 'قابلیت‌های Direct Connect و مرز گواهی GDS' })
+  capabilities() {
+    return { success: true, data: this.distribution.capabilities() };
+  }
+
+  @Post('distribution/air-shopping')
+  @PartnerScopes(...SEARCH_SCOPES)
+  @ApiOperation({ summary: 'ساخت پیشنهاد امضاشده از سهمیه زنده آژانس' })
+  async airShopping(
+    @CurrentPartner() partner: PartnerApiContext,
+    @Body() dto: DistributionAirShoppingDto,
+  ) {
+    return {
+      success: true,
+      data: await this.distribution.airShopping(partner.actor, dto),
+    };
+  }
+
+  @Post('distribution/offer-price')
+  @PartnerScopes(...SEARCH_SCOPES)
+  @ApiOperation({ summary: 'بازاعتبارسنجی موجودی و قیمت پیشنهاد' })
+  async offerPrice(
+    @CurrentPartner() partner: PartnerApiContext,
+    @Body() dto: DistributionOfferPriceDto,
+  ) {
+    return {
+      success: true,
+      data: await this.distribution.offerPrice(partner.actor, dto.offerId),
+    };
+  }
+
+  @Post('distribution/orders')
+  @PartnerScopes(...BOOK_SCOPES)
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'ایجاد Order/PNR و صدور ETKT از پیشنهاد معتبر' })
+  async createDistributionOrder(
+    @CurrentPartner() partner: PartnerApiContext,
+    @Body() dto: DistributionOrderCreateDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    if (!idempotencyKey?.trim()) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'هدر Idempotency-Key برای ایجاد سفارش الزامی است.',
+      });
+    }
+    return {
+      success: true,
+      data: await this.distribution.createOrder(
+        partner.actor,
+        dto,
+        idempotencyKey.trim(),
+      ),
+    };
+  }
+
+  @Get('distribution/orders/:bookingReference')
+  @PartnerScopes(...BOOK_SCOPES)
+  @ApiOperation({ summary: 'بازیابی Order/PNR و اسناد ETKT/کوپن‌ها' })
+  async distributionOrder(
+    @CurrentPartner() partner: PartnerApiContext,
+    @Param('bookingReference') bookingReference: string,
+  ) {
+    return {
+      success: true,
+      data: await this.bookings.getAgencyBooking(
+        bookingReference,
+        partner.actor,
+      ),
+    };
+  }
 
   @Post('accounting/getAuthorizeToken')
   @PartnerScopes(...SEARCH_SCOPES)

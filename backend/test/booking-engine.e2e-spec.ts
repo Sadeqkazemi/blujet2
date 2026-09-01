@@ -3,7 +3,7 @@ import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { dataSourceOptions } from '../src/database/data-source.options';
 import { AircraftSeatMap } from '../src/database/entities/aircraft-seat-map.entity';
 import { AgencyProfile } from '../src/database/entities/agency-profile.entity';
@@ -13,6 +13,8 @@ import { Flight } from '../src/database/entities/flight.entity';
 import { FlightInstance } from '../src/database/entities/flight-instance.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { Passenger } from '../src/database/entities/passenger.entity';
+import { TicketDocument } from '../src/database/entities/ticket-document.entity';
+import { FlightCoupon } from '../src/database/entities/flight-coupon.entity';
 import { PaymentReconciliation } from '../src/database/entities/payment-reconciliation.entity';
 import { Route } from '../src/database/entities/route.entity';
 import { TravelExtraSetting } from '../src/database/entities/travel-extra-setting.entity';
@@ -464,6 +466,28 @@ describe('Booking engine (e2e)', () => {
       expect.stringMatching(/^780\d{10}$/),
       expect.stringMatching(/^780\d{10}$/),
     ]);
+    expect(
+      payRes.body.data.booking.passengers.map(
+        (passenger: {
+          ticketDocument: {
+            status: string;
+            coupons: Array<{ status: string; flightInstanceId: string }>;
+          };
+        }) => passenger.ticketDocument,
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'ISSUED',
+          coupons: [
+            expect.objectContaining({
+              status: 'OPEN',
+              flightInstanceId: instance.id,
+            }),
+          ],
+        }),
+      ]),
+    );
 
     const paidFare = BigInt(String(payRes.body.data.booking.priceIrr));
     expect(BigInt(String(payRes.body.data.walletBalanceIrr))).toBe(
@@ -523,6 +547,23 @@ describe('Booking engine (e2e)', () => {
       true,
     );
     expect(new Set(storedPassengers.map((row) => row.ticketNo)).size).toBe(2);
+    const documents = await dataSource
+      .getRepository(TicketDocument)
+      .findBy({ bookingId });
+    expect(documents).toHaveLength(2);
+    expect(new Set(documents.map((row) => row.documentNo))).toEqual(
+      new Set(ticketNumbers),
+    );
+    const coupons = await dataSource.getRepository(FlightCoupon).findBy({
+      ticketDocumentId: In(documents.map((document) => document.id)),
+    });
+    expect(coupons).toHaveLength(2);
+    expect(
+      coupons.every(
+        (coupon) =>
+          coupon.status === 'OPEN' && coupon.flightInstanceId === instance.id,
+      ),
+    ).toBe(true);
 
     const agencySales = await request(app.getHttpServer())
       .get('/agency-portal/sales')
@@ -879,6 +920,15 @@ describe('Booking engine (e2e)', () => {
     expect(tickets).toHaveLength(2);
     expect(tickets.every((row) => Boolean(row.ticketNo))).toBe(true);
     expect(new Set(tickets.map((row) => row.ticketNo)).size).toBe(2);
+    const documents = await dataSource
+      .getRepository(TicketDocument)
+      .findBy({ bookingId });
+    expect(documents).toHaveLength(2);
+    expect(
+      await dataSource.getRepository(FlightCoupon).countBy({
+        ticketDocumentId: In(documents.map((document) => document.id)),
+      }),
+    ).toBe(2);
   });
 
   // ── Mandatory concurrency test (CLAUDE.md) ───────────────────────────

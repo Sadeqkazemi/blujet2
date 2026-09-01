@@ -668,3 +668,33 @@ export const NotificationCategory = {
 } as const;
 export type NotificationCategory =
   (typeof NotificationCategory)[keyof typeof NotificationCategory];
+
+export const TicketDocumentStatus = {
+  ISSUED: 'ISSUED',
+  VOID: 'VOID',
+  REFUNDED: 'REFUNDED',
+  EXCHANGED: 'EXCHANGED',
+} as const;
+export type TicketDocumentStatus =
+  (typeof TicketDocumentStatus)[keyof typeof TicketDocumentStatus];
+
+export const FlightCouponStatus = {
+  OPEN: 'OPEN',
+  CHECKED_IN: 'CHECKED_IN',
+  BOARDED: 'BOARDED',
+  FLOWN: 'FLOWN',
+  REFUNDED: 'REFUNDED',
+  VOID: 'VOID',
+  EXCHANGED: 'EXCHANGED',
+} as const;
+export type FlightCouponStatus =
+  (typeof FlightCouponStatus)[keyof typeof FlightCouponStatus];
+
+export const BaggageStatus = {
+  ACCEPTED: 'ACCEPTED',
+  LOADED: 'LOADED',
+  OFFLOADED: 'OFFLOADED',
+  DELIVERED: 'DELIVERED',
+} as const;
+export type BaggageStatus =
+  (typeof BaggageStatus)[keyof typeof BaggageStatus];

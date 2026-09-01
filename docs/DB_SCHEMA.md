@@ -3140,3 +3140,43 @@ No schema migration is required.
   `agency_invoices`, `ledger_entries`, and `agency_credit_requests`. These
   source rows remain authoritative and no mutable reporting/event duplicate is
   introduced.
+## PSS accountable documents (2026-09-01)
+
+- `TicketDocument { id, documentNo UNIQUE, passengerId UNIQUE→Passenger,
+  bookingId→Booking, status, issuedAt, originalIssueAt, currency,
+  totalFareIrr, totalTaxIrr, createdAt, updatedAt }` is the authoritative
+  electronic-ticket document. `Passenger.ticketNo` remains a compatibility
+  mirror during the PSS migration and must equal `documentNo`.
+- `FlightCoupon { id, ticketDocumentId→TicketDocument, flightInstanceId
+  →FlightInstance, sequenceNo, status, flightNo, originCode, destCode,
+  departureAt, cabin, fareClassCode, fareIrr, taxIrr, createdAt, updatedAt }`
+  stores the immutable issued-segment snapshot. `(ticketDocumentId,
+  sequenceNo)` and `(ticketDocumentId, flightInstanceId)` are unique.
+- Foreign-key cascades apply only to the existing explicit hard-delete/GDPR
+  cleanup path; ordinary booking, passenger, refund, void and exchange flows
+  never delete accountable documents.
+- Document status is constrained to `ISSUED | VOID | REFUNDED | EXCHANGED`.
+  Coupon status is constrained to `OPEN | CHECKED_IN | BOARDED | FLOWN |
+  REFUNDED | VOID | EXCHANGED`. Operational DCS commands own check-in and
+  boarding transitions; refunds/exchanges are new audited transitions rather
+  than edits or deletion of accountable history.
+- Both rows are created inside the same transaction that transitions a booking
+  to `TICKETED`. Existing issued passenger rows are backfilled using their
+  stable `Passenger.ticketNo` values.
+
+## DCS airport operations (2026-09-01)
+
+- `DcsPassengerOperation { id, flightCouponId UNIQUE→FlightCoupon,
+  boardingPassNo UNIQUE, seatCode, gate?, checkedInAt, checkedInById→User,
+  boardedAt?, boardedById?→User, createdAt, updatedAt }` records operational
+  actions without duplicating the PSS document/coupon or passenger identity.
+- `BaggageItem { id, flightCouponId→FlightCoupon, tagNo UNIQUE, weightGrams,
+  status, acceptedAt, acceptedById→User, createdAt, updatedAt }`; status is
+  constrained to `ACCEPTED | LOADED | OFFLOADED | DELIVERED` and weight is a
+  positive integer. Totals are always SQL aggregates.
+- Check-in and boarding status remains authoritative on `FlightCoupon.status`.
+  The DCS operation row stores the actors/times/boarding-pass metadata. Both
+  rows change within one transaction under a coupon row lock.
+- Certified aircraft CG/%MAC is intentionally configuration-gated until an
+  approved per-aircraft weight profile (datum, arms, MAC and envelope) exists;
+  no default or AI-generated safety limit is stored.

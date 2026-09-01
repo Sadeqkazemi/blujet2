@@ -45,6 +45,7 @@ import { AiModule } from '../ai/ai.module';
 import { CustomerReferralsModule } from '../customer-referrals/customer-referrals.module';
 import { AncillaryServicesModule } from '../ancillary-services/ancillary-services.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { TicketingModule } from '../ticketing/ticketing.module';
 import {
   PAYMENT_GATEWAY,
   SandboxPaymentGateway,
@@ -87,6 +88,7 @@ import {
     AncillaryServicesModule,
     AiModule,
     NotificationsModule,
+    TicketingModule,
   ],
   controllers: [
     SearchController,

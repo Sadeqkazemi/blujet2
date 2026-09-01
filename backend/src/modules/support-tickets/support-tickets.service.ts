@@ -53,6 +53,8 @@ export class SupportTicketsService
 {
   private readonly logger = new Logger(SupportTicketsService.name);
   private lifecycleTimer: ReturnType<typeof setInterval> | null = null;
+  private lifecycleSweep: Promise<void> | null = null;
+  private shuttingDown = false;
 
   constructor(
     @InjectRepository(SupportTicket)
@@ -66,20 +68,31 @@ export class SupportTicketsService
   ) {}
 
   onApplicationBootstrap() {
-    void this.autoCloseAnsweredTickets().catch((error: unknown) => {
-      this.logger.error('Support ticket lifecycle sweep failed', error);
-    });
+    this.startLifecycleSweep();
     this.lifecycleTimer = setInterval(() => {
-      void this.autoCloseAnsweredTickets().catch((error: unknown) => {
-        this.logger.error('Support ticket lifecycle sweep failed', error);
-      });
+      this.startLifecycleSweep();
     }, SUPPORT_LIFECYCLE_SWEEP_MS);
     this.lifecycleTimer.unref?.();
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
+    this.shuttingDown = true;
     if (this.lifecycleTimer) clearInterval(this.lifecycleTimer);
     this.lifecycleTimer = null;
+    await this.lifecycleSweep;
+  }
+
+  private startLifecycleSweep() {
+    if (this.shuttingDown || this.lifecycleSweep) return;
+    const sweep = this.autoCloseAnsweredTickets()
+      .catch((error: unknown) => {
+        this.logger.error('Support ticket lifecycle sweep failed', error);
+      })
+      .then(() => undefined);
+    const trackedSweep = sweep.finally(() => {
+      if (this.lifecycleSweep === trackedSweep) this.lifecycleSweep = null;
+    });
+    this.lifecycleSweep = trackedSweep;
   }
 
   async autoCloseAnsweredTickets(now = new Date()) {
