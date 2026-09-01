@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   BeforeInsert,
   Column,
+  Check,
   CreateDateColumn,
   Entity,
   Index,
@@ -20,6 +21,14 @@ import { User } from './user.entity';
 
 @Unique('flight_schedule_templates_idempotencyKey_key', ['idempotencyKey'])
 @Index('flight_schedule_templates_status_idx', ['status'])
+@Check(
+  'flight_schedule_templates_distanceKm_check',
+  '"distanceKm" IS NULL OR "distanceKm" > 0',
+)
+@Check(
+  'flight_schedule_templates_distanceSource_check',
+  `"distanceSource" IS NULL OR "distanceSource" IN ('AI', 'MANUAL')`,
+)
 @Entity('flight_schedule_templates')
 export class FlightScheduleTemplate {
   @PrimaryColumn({
@@ -78,6 +87,12 @@ export class FlightScheduleTemplate {
   @Column({ type: 'int' })
   durationMinutes!: number;
 
+  @Column({ type: 'int', nullable: true })
+  distanceKm!: number | null;
+
+  @Column({ type: 'text', nullable: true })
+  distanceSource!: 'AI' | 'MANUAL' | null;
+
   @Column({ type: 'date' })
   startDate!: string;
 
@@ -94,7 +109,7 @@ export class FlightScheduleTemplate {
   @Column({ type: 'bigint', transformer: bigintTransformer })
   legalCeilingIrr!: bigint;
 
-  /** Snapshot of cabin capacities at create time: [{cabin,seats}]. */
+  /** Route snapshot: [{cabin,seats,basePriceIrr,defaultClassCode}]. */
   @Column({ type: 'jsonb' })
   cabinCapacities!: JsonValue;
 

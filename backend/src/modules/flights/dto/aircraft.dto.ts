@@ -6,6 +6,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Matches,
   Max,
   Min,
   ValidateNested,
@@ -26,6 +27,15 @@ export class AircraftCabinCapacityDto {
   @Min(1)
   @Max(1000)
   capacity!: number;
+
+  @ApiPropertyOptional({
+    example: 'Y',
+    description:
+      'کلاس نرخی استاندارد این کابین؛ در صورت حذف، مقدار استاندارد اعمال می‌شود',
+  })
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9]{1,3}$/)
+  defaultClassCode?: string;
 }
 
 /** Create/update payload — same row/column band shape as the legacy

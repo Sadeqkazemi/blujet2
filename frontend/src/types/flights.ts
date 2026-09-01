@@ -19,6 +19,8 @@ export interface ScheduleGroup {
 export interface CabinCapacity {
   cabin: CabinKind;
   seats: number;
+  basePriceIrr?: string;
+  defaultClassCode?: string;
 }
 
 export interface ChargeRule {
@@ -354,7 +356,6 @@ export interface CreateFareRulePayload {
   validUntil?: string;
   allowedChannels?: ("SYSTEM" | "CHARTER" | "AGENCY")[];
 }
-
 export interface CreateFlightDefinitionPayload {
   originCode: string;
   destCode: string;

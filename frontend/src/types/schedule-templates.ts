@@ -8,6 +8,8 @@ export interface ScheduleTemplatePayload {
   cabinCapacities: CabinCapacity[];
   departureTime: string;
   durationMinutes: number;
+  distanceKm?: number;
+  distanceSource?: 'AI' | 'MANUAL';
   startDate: string;
   endDate: string;
   weekdays: number[];
@@ -19,6 +21,8 @@ export interface ScheduleTemplatePreview {
   occurrenceCount: number;
   capacity: number;
   cabinCapacities: CabinCapacity[];
+  distanceKm?: number | null;
+  distanceSource?: 'AI' | 'MANUAL' | null;
   dates: { localDate: string; departureAt: string; arrivalAt: string }[];
 }
 
@@ -34,6 +38,13 @@ export interface ScheduleTemplateRow extends ScheduleTemplatePayload {
   createdAt: string;
   updatedAt: string;
   deactivatedAt: string | null;
+}
+
+export interface RouteDistanceSuggestion {
+  distanceKm: number;
+  confidence: number;
+  source: 'ANTHROPIC';
+  generatedAt: string;
 }
 
 export interface ResolvedScheduleTemplate extends ScheduleTemplateRow {

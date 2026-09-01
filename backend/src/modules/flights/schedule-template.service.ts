@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
@@ -14,6 +16,7 @@ import { Flight } from '../../database/entities/flight.entity';
 import { Route } from '../../database/entities/route.entity';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { FlightScheduleTemplate } from '../../database/entities/flight-schedule-template.entity';
+import { FareRule } from '../../database/entities/fare-rule.entity';
 import { Booking } from '../../database/entities/booking.entity';
 import { CharterCommitment } from '../../database/entities/charter-commitment.entity';
 import { AgencySeatCommitment } from '../../database/entities/agency-seat-commitment.entity';
@@ -21,6 +24,7 @@ import { AgencyAllotment } from '../../database/entities/agency-allotment.entity
 import { SeatLock } from '../../database/entities/seat-lock.entity';
 import { PriceLock } from '../../database/entities/price-lock.entity';
 import {
+  CabinClass,
   CommitmentStatus,
   FlightDefinitionStatus,
   FlightInstanceStatus,
@@ -40,8 +44,15 @@ import {
 } from './schedule-template.dates';
 import type {
   CreateScheduleTemplateDto,
+  RouteDistanceSuggestionDto,
   ScheduleTemplatePreviewDto,
 } from './dto/schedule-template.dto';
+import {
+  ROUTE_DISTANCE_PROVIDER,
+  type RouteDistanceProvider,
+} from '../ai/route-distance.provider';
+import { standardClassCode } from './aircraft-class-code';
+import { buildInitialFareRuleRows } from './schedule-template-fare-rules';
 
 type ResolvedCtx = Awaited<
   ReturnType<ScheduleTemplateService['resolveContext']>
@@ -62,6 +73,9 @@ export class ScheduleTemplateService {
     @InjectRepository(FlightInstance)
     private readonly instanceRepo: Repository<FlightInstance>,
     private readonly audit: AuditService,
+    @Optional()
+    @Inject(ROUTE_DISTANCE_PROVIDER)
+    private readonly routeDistanceProvider?: RouteDistanceProvider,
   ) {}
 
   private parseIrr(value: string, field: string): bigint {
@@ -132,7 +146,11 @@ export class ScheduleTemplateService {
     );
     const requestedCabins =
       dto.cabinCapacities ??
-      cabins.map((c) => ({ cabin: c.cabinType, seats: c.capacity }));
+      cabins.map((c) => ({
+        cabin: c.cabinType,
+        seats: c.capacity,
+        basePriceIrr: dto.agencyPriceIrr,
+      }));
     const requestedTotal = requestedCabins.reduce(
       (sum, row) => sum + Number(row.seats ?? 0),
       0,
@@ -157,6 +175,36 @@ export class ScheduleTemplateService {
       }
     }
     const capacity = cabinCapacities.reduce((s, c) => s + c.seats, 0);
+    const cabinDefinitions = cabinCapacities.map((row) => {
+      const requested = requestedCabins.find(
+        (candidate) => candidate.cabin === row.cabin,
+      );
+      const basePriceIrr = this.parseIrr(
+        requested?.basePriceIrr ?? dto.agencyPriceIrr,
+        `basePriceIrr.${row.cabin}`,
+      );
+      if (basePriceIrr < 1n) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `قیمت پایه کابین ${row.cabin} باید بیشتر از صفر باشد.`,
+        });
+      }
+      if (basePriceIrr > legal) {
+        throw new BadRequestException({
+          code: ErrorCode.VALIDATION_FAILED,
+          message: `قیمت پایه کابین ${row.cabin} نمی‌تواند از سقف قانونی بیشتر باشد.`,
+        });
+      }
+      const aircraftCabin = cabins.find(
+        (candidate) => candidate.cabinType === row.cabin,
+      );
+      return {
+        ...row,
+        basePriceIrr,
+        defaultClassCode:
+          aircraftCabin?.defaultClassCode ?? standardClassCode(row.cabin),
+      };
+    });
 
     const dates = enumerateMatchingDates(
       dto.startDate,
@@ -180,6 +228,7 @@ export class ScheduleTemplateService {
       dest,
       aircraft,
       cabinCapacities,
+      cabinDefinitions,
       capacity,
       agency,
       legal,
@@ -192,13 +241,44 @@ export class ScheduleTemplateService {
     return {
       occurrenceCount: ctx.occurrences.length,
       capacity: ctx.capacity,
-      cabinCapacities: ctx.cabinCapacities,
+      cabinCapacities: ctx.cabinDefinitions.map((row) => ({
+        cabin: row.cabin,
+        seats: row.seats,
+        basePriceIrr: row.basePriceIrr.toString(),
+        defaultClassCode: row.defaultClassCode,
+      })),
+      distanceKm: dto.distanceKm ?? null,
+      distanceSource: dto.distanceSource ?? null,
       dates: ctx.occurrences.map((o) => ({
         localDate: o.dateOnly,
         departureAt: o.departureAt.toISOString(),
         arrivalAt: o.arrivalAt.toISOString(),
       })),
     };
+  }
+
+  async suggestDistance(dto: RouteDistanceSuggestionDto) {
+    if (dto.originAirportId === dto.destinationAirportId) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'مبدأ و مقصد نمی‌توانند یکسان باشند.',
+      });
+    }
+    const [origin, destination] = await Promise.all([
+      this.airportRepo.findOne({
+        where: { id: dto.originAirportId, active: true },
+      }),
+      this.airportRepo.findOne({
+        where: { id: dto.destinationAirportId, active: true },
+      }),
+    ]);
+    if (!origin || !destination) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: 'فرودگاه انتخاب‌شده معتبر نیست.',
+      });
+    }
+    return this.routeDistanceProvider?.suggest(origin, destination) ?? null;
   }
 
   private asDateOnly(value: string | Date): string {
@@ -224,13 +304,25 @@ export class ScheduleTemplateService {
       t.aircraftDefinitionId === dto.aircraftDefinitionId &&
       t.departureTime === dto.departureTime &&
       t.durationMinutes === dto.durationMinutes &&
+      t.distanceKm === (dto.distanceKm ?? null) &&
+      t.distanceSource === (dto.distanceSource ?? null) &&
       this.asDateOnly(t.startDate) === dto.startDate &&
       this.asDateOnly(t.endDate) === dto.endDate &&
       weekdaysA === weekdaysB &&
       t.agencyPriceIrr === ctx.agency &&
       t.legalCeilingIrr === ctx.legal &&
       JSON.stringify(serializeCabinCapacities(t.cabinCapacities)) ===
-        JSON.stringify(ctx.cabinCapacities)
+        JSON.stringify(ctx.cabinCapacities) &&
+      this.serializeCabinDefinitions(t).length ===
+        ctx.cabinDefinitions.length &&
+      this.serializeCabinDefinitions(t).every((row, index) => {
+        const expected = ctx.cabinDefinitions[index];
+        return (
+          expected != null &&
+          row.basePriceIrr === expected.basePriceIrr.toString() &&
+          row.defaultClassCode === expected.defaultClassCode
+        );
+      })
     );
   }
 
@@ -337,8 +429,15 @@ export class ScheduleTemplateService {
             originCode: ctx.origin.code,
             destCode: ctx.dest.code,
             durationMin: dto.durationMinutes,
+            distanceKm: dto.distanceKm ?? null,
+            distanceSource: dto.distanceSource ?? null,
           }),
         );
+      } else if (dto.distanceKm != null) {
+        route.distanceKm = dto.distanceKm;
+        route.distanceSource = dto.distanceSource ?? 'MANUAL';
+        route.durationMin = dto.durationMinutes;
+        route = await manager.save(route);
       }
 
       let flight = await manager.findOne(Flight, {
@@ -367,12 +466,19 @@ export class ScheduleTemplateService {
           aircraftDefinitionId: ctx.aircraft.id,
           departureTime: dto.departureTime,
           durationMinutes: dto.durationMinutes,
+          distanceKm: dto.distanceKm ?? null,
+          distanceSource: dto.distanceSource ?? null,
           startDate: dto.startDate,
           endDate: dto.endDate,
           weekdays: dto.weekdays,
           agencyPriceIrr: ctx.agency,
           legalCeilingIrr: ctx.legal,
-          cabinCapacities: ctx.cabinCapacities,
+          cabinCapacities: ctx.cabinDefinitions.map((row) => ({
+            cabin: row.cabin,
+            seats: row.seats,
+            basePriceIrr: row.basePriceIrr.toString(),
+            defaultClassCode: row.defaultClassCode,
+          })),
           status: FlightScheduleTemplateStatus.ACTIVE,
           idempotencyKey: dto.idempotencyKey,
           createdByUserId: actor.id,
@@ -392,8 +498,17 @@ export class ScheduleTemplateService {
         definitionStatus: FlightDefinitionStatus.DRAFT,
         publicSaleEnabled: false,
         durationMinutes: dto.durationMinutes,
-        basePriceIrr: ctx.agency,
-        cabinCapacities: ctx.cabinCapacities,
+        basePriceIrr: ctx.cabinDefinitions.reduce(
+          (minimum, row) =>
+            row.basePriceIrr < minimum ? row.basePriceIrr : minimum,
+          ctx.cabinDefinitions[0].basePriceIrr,
+        ),
+        cabinCapacities: ctx.cabinDefinitions.map((row) => ({
+          cabin: row.cabin,
+          seats: row.seats,
+          basePriceIrr: row.basePriceIrr.toString(),
+          defaultClassCode: row.defaultClassCode,
+        })),
         aircraftDefinitionId: ctx.aircraft.id,
         aircraftTypeOverride: ctx.aircraft.code,
       }));
@@ -406,6 +521,18 @@ export class ScheduleTemplateService {
         .insert()
         .into(FlightInstance)
         .values(insertRows)
+        .execute();
+
+      const fareRules = buildInitialFareRuleRows(
+        rows.map((instance) => instance.id),
+        ctx.cabinDefinitions,
+        randomUUID,
+      );
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(FareRule)
+        .values(fareRules)
         .execute();
 
       const inserted = await manager.count(FlightInstance, {
@@ -669,21 +796,7 @@ export class ScheduleTemplateService {
   }
 
   private serialize(t: FlightScheduleTemplate) {
-    const cabinCapacities = Array.isArray(t.cabinCapacities)
-      ? t.cabinCapacities.flatMap((value) => {
-          if (
-            value == null ||
-            typeof value !== 'object' ||
-            Array.isArray(value)
-          ) {
-            return [];
-          }
-          const cabin = value.cabin;
-          const seats = value.seats;
-          if (typeof cabin !== 'string' || typeof seats !== 'number') return [];
-          return [{ cabin, seats }];
-        })
-      : [];
+    const cabinCapacities = this.serializeCabinDefinitions(t);
     return {
       id: t.id,
       originAirportId: t.originAirportId,
@@ -695,6 +808,8 @@ export class ScheduleTemplateService {
       aircraftCode: t.aircraftDefinition?.code,
       departureTime: t.departureTime,
       durationMinutes: t.durationMinutes,
+      distanceKm: t.distanceKm,
+      distanceSource: t.distanceSource,
       startDate: t.startDate,
       endDate: t.endDate,
       weekdays: t.weekdays,
@@ -709,5 +824,31 @@ export class ScheduleTemplateService {
       updatedAt: t.updatedAt.toISOString(),
       deactivatedAt: t.deactivatedAt?.toISOString() ?? null,
     };
+  }
+
+  private serializeCabinDefinitions(t: FlightScheduleTemplate) {
+    return Array.isArray(t.cabinCapacities)
+      ? t.cabinCapacities.flatMap((value) => {
+          if (
+            value == null ||
+            typeof value !== 'object' ||
+            Array.isArray(value)
+          ) {
+            return [];
+          }
+          const cabin = value.cabin;
+          const seats = value.seats;
+          if (typeof cabin !== 'string' || typeof seats !== 'number') return [];
+          const basePriceIrr =
+            typeof value.basePriceIrr === 'string'
+              ? value.basePriceIrr
+              : t.agencyPriceIrr.toString();
+          const defaultClassCode =
+            typeof value.defaultClassCode === 'string'
+              ? value.defaultClassCode
+              : standardClassCode(cabin as CabinClass);
+          return [{ cabin, seats, basePriceIrr, defaultClassCode }];
+        })
+      : [];
   }
 }

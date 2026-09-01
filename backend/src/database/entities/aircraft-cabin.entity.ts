@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   BeforeInsert,
+  Check,
   Column,
   Entity,
   Index,
@@ -19,6 +20,15 @@ import { AircraftDefinition } from './aircraft-definition.entity';
   'aircraft_cabins_aircraftDefinitionId_cabinType_key',
   ['aircraftDefinitionId', 'cabinType'],
   { unique: true },
+)
+@Index(
+  'aircraft_cabins_aircraftDefinitionId_defaultClassCode_key',
+  ['aircraftDefinitionId', 'defaultClassCode'],
+  { unique: true },
+)
+@Check(
+  'aircraft_cabins_defaultClassCode_check',
+  `"defaultClassCode" ~ '^[A-Z0-9]{1,3}$'`,
 )
 @Entity('aircraft_cabins')
 export class AircraftCabin {
@@ -51,6 +61,10 @@ export class AircraftCabin {
 
   @Column({ type: 'int' })
   capacity!: number;
+
+  /** Standard fare bucket created for this cabin when a route is materialised. */
+  @Column({ type: 'text' })
+  defaultClassCode!: string;
 
   @Column({ type: 'timestamp', precision: 3 })
   createdAt!: Date;

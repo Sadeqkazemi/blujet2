@@ -110,6 +110,7 @@ import { User } from './entities/user.entity';
 import { WalletEntry } from './entities/wallet-entry.entity';
 import type { JsonValue } from './json-types';
 import { ANCILLARY_BUILT_IN_SERVICES } from '../modules/ancillary-services/ancillary-services.catalog';
+import { standardClassCode } from '../modules/flights/aircraft-class-code';
 
 const dataSource = new DataSource(dataSourceOptions);
 
@@ -182,6 +183,7 @@ async function seedAircraftCatalog(
         aircraftDefinitionId: aircraft.id,
         cabinType,
         capacity,
+        defaultClassCode: standardClassCode(cabinType),
         createdAt: now,
         updatedAt: now,
       }),
@@ -453,6 +455,13 @@ async function main() {
       const departureAt = new Date(now);
       departureAt.setMonth(departureAt.getMonth() - monthsAgo);
       departureAt.setDate(5 + day * 6);
+      // A ticket sale cannot occur in the future merely because its flight
+      // departs later in the current month. Keep the demo ledger historical
+      // and deterministic so the newest real transaction is visible first.
+      const saleOccurredAt =
+        departureAt.getTime() <= now.getTime()
+          ? departureAt
+          : new Date(now.getTime() - (day + 1) * 60_000);
 
       const instance = await flightInstanceRepo.save(
         flightInstanceRepo.create({
@@ -485,7 +494,7 @@ async function main() {
               channel,
               status: BookingStatus.TICKETED,
               priceIrr: BigInt(priceIrr * 10),
-              createdAt: departureAt,
+              createdAt: saleOccurredAt,
             }),
           );
 
@@ -494,7 +503,7 @@ async function main() {
               bookingId: booking.id,
               type: LedgerEntryType.SALE,
               signedAmountIrr: BigInt(priceIrr * 10),
-              occurredAt: departureAt,
+              occurredAt: saleOccurredAt,
             }),
           );
         }

@@ -9,6 +9,7 @@ import { ApiRequestError } from '../../api/envelope';
 import { faDigits } from '../../lib/fa-format';
 import {
   AIRCRAFT_CABIN_OPTIONS,
+  STANDARD_AIRCRAFT_CLASS_CODE,
   type AircraftCabinType,
   type UpsertAircraftDefinitionPayload,
 } from '../../types/aircraft';
@@ -41,6 +42,9 @@ export default function AircraftFormPage() {
     COMFORT: '',
     ECONOMY: '',
   });
+  const [cabinClassCodes, setCabinClassCodes] = useState<
+    Record<AircraftCabinType, string>
+  >(STANDARD_AIRCRAFT_CLASS_CODE);
   const [excluded, setExcluded] = useState<string[]>([]);
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
@@ -75,6 +79,20 @@ export default function AircraftFormPage() {
           COMFORT: String(def.cabins.find((c) => c.cabinType === 'COMFORT')?.capacity ?? ''),
           ECONOMY: String(def.cabins.find((c) => c.cabinType === 'ECONOMY')?.capacity ?? ''),
         });
+        setCabinClassCodes({
+          FIRST:
+            def.cabins.find((c) => c.cabinType === 'FIRST')?.defaultClassCode ??
+            STANDARD_AIRCRAFT_CLASS_CODE.FIRST,
+          BUSINESS:
+            def.cabins.find((c) => c.cabinType === 'BUSINESS')?.defaultClassCode ??
+            STANDARD_AIRCRAFT_CLASS_CODE.BUSINESS,
+          COMFORT:
+            def.cabins.find((c) => c.cabinType === 'COMFORT')?.defaultClassCode ??
+            STANDARD_AIRCRAFT_CLASS_CODE.COMFORT,
+          ECONOMY:
+            def.cabins.find((c) => c.cabinType === 'ECONOMY')?.defaultClassCode ??
+            STANDARD_AIRCRAFT_CLASS_CODE.ECONOMY,
+        });
         setExcluded([...(def.seatMap?.excludedSeatCodes ?? [])]);
       })
       .catch((e) =>
@@ -102,7 +120,17 @@ export default function AircraftFormPage() {
     }
     const configuredCabins = AIRCRAFT_CABIN_OPTIONS.flatMap(({ value }) => {
       const cabinCapacity = Number(cabinCapacities[value]) || 0;
-      return cabinCapacity > 0 ? [{ cabinType: value, capacity: cabinCapacity }] : [];
+      return cabinCapacity > 0
+        ? [
+            {
+              cabinType: value,
+              capacity: cabinCapacity,
+              defaultClassCode:
+                cabinClassCodes[value].trim().toUpperCase() ||
+                STANDARD_AIRCRAFT_CLASS_CODE[value],
+            },
+          ]
+        : [];
     });
     const configuredTotal = configuredCabins.reduce((sum, cabin) => sum + cabin.capacity, 0);
     if (configuredCabins.length === 0) {
@@ -303,6 +331,26 @@ export default function AircraftFormPage() {
               <span className="mt-1 block text-[10px] text-[#6b7b94]">
                 ظرفیت فیزیکی نقشه: {faDigits(physicalByCabin[cabin.value])}
               </span>
+              <span className="mt-3 block text-[10px] font-bold text-[#9fb0c7]">
+                کلاس استاندارد کابین
+              </span>
+              <input
+                data-testid={`aircraft-cabin-class-${cabin.value}`}
+                dir="ltr"
+                maxLength={3}
+                aria-label={`کلاس استاندارد ${cabin.label}`}
+                value={cabinClassCodes[cabin.value]}
+                onChange={(event) =>
+                  setCabinClassCodes((current) => ({
+                    ...current,
+                    [cabin.value]: event.target.value
+                      .replace(/[^A-Za-z0-9]/g, '')
+                      .toUpperCase()
+                      .slice(0, 3),
+                  }))
+                }
+                className={`${inputClass} mt-1 text-left uppercase`}
+              />
             </label>
           ))}
         </div>

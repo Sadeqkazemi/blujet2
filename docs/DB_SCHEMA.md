@@ -3020,6 +3020,26 @@ value only through the allowlisted rules projection.
   Only selected cabins appear; each selected quantity is positive and bounded
   by the linked `AircraftDefinition -> AircraftCabin` capacity.
 
+## Route cabin pricing and smart distance (2026-09-01)
+
+- `aircraft_cabins.defaultClassCode text NOT NULL` stores the single standard
+  fare-class code used when a route materializes its initial fare rules. The
+  migration backfills `F/C/W/Y` for FIRST/BUSINESS/COMFORT/ECONOMY and a
+  per-aircraft unique index prevents one class code from naming two cabins.
+- `flight_schedule_templates.cabinCapacities` remains the immutable seasonal
+  snapshot and each new row has
+  `{ cabin, seats, basePriceIrr, defaultClassCode }`. Legacy rows without the
+  new fields remain readable and fall back to the template-wide
+  `agencyPriceIrr` and standard `F/C/W/Y` mapping for historical display.
+- `routes.distanceKm integer NULL` stores the accepted airport-to-airport
+  distance and `routes.distanceSource text NULL` is `AI` or `MANUAL`.
+  `flight_schedule_templates` carries the same two nullable fields as an
+  immutable seasonal snapshot. The route is the canonical persisted owner so
+  every dated occurrence shares the same accepted distance.
+- Initial `fare_rules` are created transactionally for every materialized
+  occurrence/cabin using the per-cabin base price and aircraft default class.
+  Both site and agency release counts remain zero until commercial release.
+
 ## Passenger adjacent extra seat (2026-08-24)
 
 - `Passenger.extraSeatCode text NULL` stores the adjacent EXST assigned to the
