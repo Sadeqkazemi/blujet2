@@ -1,14 +1,8 @@
 import type { DataSource } from 'typeorm';
-import { In, LessThanOrEqual } from 'typeorm';
+import { LessThanOrEqual } from 'typeorm';
 import { FlightInstance } from '../../database/entities/flight-instance.entity';
 import { Booking } from '../../database/entities/booking.entity';
-import { FlightCoupon } from '../../database/entities/flight-coupon.entity';
-import { TicketDocument } from '../../database/entities/ticket-document.entity';
-import {
-  FlightInstanceStatus,
-  BookingStatus,
-  FlightCouponStatus,
-} from '../../database/enums';
+import { FlightInstanceStatus, BookingStatus } from '../../database/enums';
 
 /** Lazily flips SCHEDULED instances past their departureAt to DEPARTED —
  * no cron job. Nothing previously wrote this transition (only
@@ -51,26 +45,5 @@ export async function materializeFlownBookings(
     .set({ status: BookingStatus.FLOWN })
     .where('id IN (:...ids)', { ids: eligible.map((b) => b.id) })
     .andWhere('status = :status', { status: BookingStatus.TICKETED })
-    .execute();
-  const documents = await dataSource.getRepository(TicketDocument).find({
-    where: { bookingId: In(eligible.map((booking) => booking.id)) },
-    select: { id: true },
-  });
-  if (documents.length === 0) return;
-  await dataSource
-    .getRepository(FlightCoupon)
-    .createQueryBuilder()
-    .update(FlightCoupon)
-    .set({ status: FlightCouponStatus.FLOWN })
-    .where('"ticketDocumentId" IN (:...documentIds)', {
-      documentIds: documents.map((document) => document.id),
-    })
-    .andWhere('status IN (:...statuses)', {
-      statuses: [
-        FlightCouponStatus.OPEN,
-        FlightCouponStatus.CHECKED_IN,
-        FlightCouponStatus.BOARDED,
-      ],
-    })
     .execute();
 }

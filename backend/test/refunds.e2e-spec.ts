@@ -10,14 +10,10 @@ import { RefundRequest } from '../src/database/entities/refund-request.entity';
 import { LedgerEntry } from '../src/database/entities/ledger-entry.entity';
 import { User } from '../src/database/entities/user.entity';
 import { AuditLog } from '../src/database/entities/audit-log.entity';
-import { Passenger } from '../src/database/entities/passenger.entity';
-import { TicketDocument } from '../src/database/entities/ticket-document.entity';
-import { FlightCoupon } from '../src/database/entities/flight-coupon.entity';
 import { encryptPii } from '../src/common/pii-crypto';
 import { loginAs, stepUpFor } from './helpers/login.helper';
 import { createTestApp } from './helpers/app.helper';
 import type { RefundStatus } from '../src/database/enums';
-import { TicketingService } from '../src/modules/ticketing/ticketing.service';
 
 describe('Refunds (e2e)', () => {
   let app: INestApplication<App>;
@@ -61,19 +57,6 @@ describe('Refunds (e2e)', () => {
         priceIrr: BigInt(totalPaidIrr),
       }),
     );
-    const passengerRepo = dataSource.getRepository(Passenger);
-    const passenger = await passengerRepo.save(
-      passengerRepo.create({
-        bookingId: booking.id,
-        fullName: `مسافر ${crypto.randomUUID().slice(0, 4)}`,
-        seatCode: '1A',
-        fareIrr: BigInt(totalPaidIrr),
-        taxIrr: 0n,
-      }),
-    );
-    await dataSource.transaction((manager) =>
-      app.get(TicketingService).issueBooking(manager, booking.id),
-    );
     const penaltyAmountIrr = Math.round(totalPaidIrr * 0.3);
     const refundRepo = dataSource.getRepository(RefundRequest);
     const req = await refundRepo.save(
@@ -91,7 +74,7 @@ describe('Refunds (e2e)', () => {
         history: [{ step: 'submitted', labelFa: 'ثبت درخواست', at: 'اکنون' }],
       }),
     );
-    return { booking, passenger, req };
+    return { booking, req };
   }
 
   it('GET /refunds returns the cards + reconciling KPI counts; PII never in the list', async () => {
@@ -181,7 +164,7 @@ describe('Refunds (e2e)', () => {
   });
 
   it('pay is transactional: ledger REFUND row + booking REFUNDED + PAID with processedBy; audited', async () => {
-    const { booking, passenger, req } = await createRequest('FINANCE');
+    const { booking, req } = await createRequest('FINANCE');
     const { accessToken } = await loginAs(app, 'finance');
     const stepUp = await stepUpFor(
       app,
@@ -211,14 +194,6 @@ describe('Refunds (e2e)', () => {
       .where('b.id = :id', { id: booking.id })
       .getOneOrFail();
     expect(updatedBooking.status).toBe('REFUNDED');
-    const document = await dataSource
-      .getRepository(TicketDocument)
-      .findOneByOrFail({ passengerId: passenger.id });
-    expect(document.status).toBe('REFUNDED');
-    const coupon = await dataSource
-      .getRepository(FlightCoupon)
-      .findOneByOrFail({ ticketDocumentId: document.id });
-    expect(coupon.status).toBe('REFUNDED');
 
     const audit = await dataSource
       .getRepository(AuditLog)

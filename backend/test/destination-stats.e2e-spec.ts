@@ -1,22 +1,38 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { Logger } from 'nestjs-pino';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { createTestApp } from './helpers/app.helper';
+import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 
 describe('Destination stats (e2e)', () => {
-  let app: INestApplication<App> | undefined;
+  let app: INestApplication;
 
   beforeEach(async () => {
-    app = await createTestApp();
+    const moduleFixture = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+    app = moduleFixture.createNestApplication({ bufferLogs: true });
+    const logger = app.get(Logger);
+    app.useLogger(logger);
+    app.use(cookieParser());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
+    app.useGlobalFilters(new AllExceptionsFilter(logger));
+    await app.init();
   });
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await app.close();
   });
 
   it('returns non-hardcoded counts (zeros allowed)', async () => {
-    if (!app) throw new Error('Test application was not initialized.');
     const res = await request(app.getHttpServer()).get(
       '/site-content/destination-stats',
     );

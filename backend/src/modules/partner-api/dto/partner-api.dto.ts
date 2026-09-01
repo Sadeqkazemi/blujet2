@@ -5,12 +5,8 @@ import {
   IsArray,
   IsDateString,
   IsIn,
-  IsInt,
-  IsOptional,
   IsString,
   Length,
-  Max,
-  Min,
   ValidateNested,
 } from 'class-validator';
 import { CabinClass } from '../../../database/enums';
@@ -55,29 +51,4 @@ export class PartnerBookingReferenceDto {
   @ApiProperty({ description: 'شناسه رزرو یا PNR' })
   @IsString()
   bookingReference: string;
-}
-
-export class DistributionAirShoppingDto extends PartnerFlightSearchDto {
-  @ApiProperty({ enum: CABIN_CLASSES, required: false })
-  @IsOptional()
-  @IsIn(CABIN_CLASSES)
-  cabin?: CabinClass;
-
-  @ApiProperty({ example: 1, minimum: 1, maximum: 9 })
-  @IsInt()
-  @Min(1)
-  @Max(9)
-  passengerCount!: number;
-}
-
-export class DistributionOfferPriceDto {
-  @ApiProperty({ description: 'شناسه امضاشده پیشنهاد' })
-  @IsString()
-  offerId!: string;
-}
-
-export class DistributionOrderCreateDto extends PartnerBookDto {
-  @ApiProperty({ description: 'شناسه امضاشده و معتبر پیشنهاد' })
-  @IsString()
-  offerId!: string;
 }
