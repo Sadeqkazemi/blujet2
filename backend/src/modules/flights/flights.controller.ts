@@ -48,6 +48,7 @@ import {
   CreateScheduleTemplateDto,
   ListScheduleTemplatesQueryDto,
   ResolveScheduleTemplateQueryDto,
+  RouteDistanceSuggestionDto,
   ScheduleTemplatePreviewDto,
 } from './dto/schedule-template.dto';
 import { PatchCommercialPanelSettingsDto } from './dto/commercial-panel-settings.dto';
@@ -887,6 +888,16 @@ export class FlightsController {
   })
   async previewScheduleTemplate(@Body() dto: ScheduleTemplatePreviewDto) {
     const data = await this.scheduleTemplates.preview(dto);
+    return { success: true, data };
+  }
+
+  @Post('routes/distance-suggestion')
+  @HttpCode(200)
+  @Roles('SENIOR_MANAGER', 'COMMERCIAL_MANAGER', 'EMPLOYEE')
+  @RequiresPermission('fl_manage', 'rt_create')
+  @ApiOperation({ summary: 'پیشنهاد هوشمند و غیرالزام‌آور مسافت مسیر' })
+  async suggestRouteDistance(@Body() dto: RouteDistanceSuggestionDto) {
+    const data = await this.scheduleTemplates.suggestDistance(dto);
     return { success: true, data };
   }
 

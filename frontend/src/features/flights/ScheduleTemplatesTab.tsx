@@ -13,6 +13,7 @@ import {
   fetchAirports,
   fetchScheduleTemplates,
   previewScheduleTemplate,
+  suggestRouteDistance,
 } from "../../api/flights";
 import ConfirmActionDialog from "../../components/ConfirmActionDialog";
 import JalaliDatePicker from "../../components/JalaliDatePicker";
@@ -55,6 +56,8 @@ const INITIAL = {
   weekdays: [] as number[],
   agencyPriceToman: "",
   legalCeilingToman: "",
+  distanceKm: "",
+  distanceSource: "MANUAL" as "AI" | "MANUAL",
 };
 
 const INPUT_CLASS =
@@ -71,7 +74,8 @@ type ScheduleField =
   | "endDate"
   | "weekdays"
   | "agencyPriceToman"
-  | "legalCeilingToman";
+  | "legalCeilingToman"
+  | "distanceKm";
 
 const FIELD_LABELS: Record<ScheduleField, string> = {
   originAirportId: "مبدأ",
@@ -85,6 +89,7 @@ const FIELD_LABELS: Record<ScheduleField, string> = {
   weekdays: "روزهای پرواز",
   agencyPriceToman: "قیمت آژانس",
   legalCeilingToman: "قیمت قانونی",
+  distanceKm: "مسافت مسیر",
 };
 
 export default function ScheduleTemplatesTab() {
@@ -112,6 +117,8 @@ export default function ScheduleTemplatesTab() {
     Record<string, ScheduleTemplatePreview>
   >({});
   const [previewBusyId, setPreviewBusyId] = useState<string | null>(null);
+  const [distanceBusy, setDistanceBusy] = useState(false);
+  const [distanceNotice, setDistanceNotice] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
 
   const selectedAircraft = aircraft.find(
@@ -128,6 +135,9 @@ export default function ScheduleTemplatesTab() {
       if (!maximum) return `کابین ${row.cabin} در هواپیمای انتخابی وجود ندارد.`;
       if (seats < 1 || seats > maximum) {
         return `ظرفیت فعال ${row.cabin} باید بین ۱ تا ${faDigits(maximum)} باشد.`;
+      }
+      if (!parseTomanToRialString(row.basePriceToman ?? "")) {
+        return `قیمت پایه کابین ${row.cabin} را وارد کنید.`;
       }
     }
     return null;
@@ -175,6 +185,7 @@ export default function ScheduleTemplatesTab() {
       form.weekdays.length === 0 ||
       !agencyPriceIrr ||
       !legalCeilingIrr ||
+      !form.distanceKm ||
       routeCabinError ||
       routeCabins.length === 0 ||
       Number(form.durationMinutes) <= 0
@@ -188,9 +199,12 @@ export default function ScheduleTemplatesTab() {
       cabinCapacities: routeCabins.map((row) => ({
         cabin: row.cabin,
         seats: Number(latinDigits(row.seats)),
+        basePriceIrr: parseTomanToRialString(row.basePriceToman ?? "")!,
       })),
       departureTime: form.departureTime,
       durationMinutes: Number(form.durationMinutes),
+      distanceKm: Number(latinDigits(form.distanceKm)),
+      distanceSource: form.distanceSource,
       startDate: toIsoDateOnly(dayjs(form.startDate)),
       endDate: toIsoDateOnly(dayjs(form.endDate)),
       weekdays: form.weekdays,
@@ -215,7 +229,16 @@ export default function ScheduleTemplatesTab() {
     field: K,
     value: (typeof INITIAL)[K],
   ) {
-    setForm((current) => ({ ...current, [field]: value }));
+    const airportChanged =
+      field === "originAirportId" || field === "destinationAirportId";
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(airportChanged
+        ? { distanceKm: "", distanceSource: "MANUAL" as const }
+        : {}),
+    }));
+    if (airportChanged) setDistanceNotice(null);
     if (field in FIELD_LABELS) {
       setInvalidFields((current) => {
         const next = new Set(current);
@@ -255,6 +278,9 @@ export default function ScheduleTemplatesTab() {
     if (!parseTomanToRialString(form.legalCeilingToman)) {
       invalid.push("legalCeilingToman");
     }
+    if (!form.distanceKm || Number(latinDigits(form.distanceKm)) <= 0) {
+      invalid.push("distanceKm");
+    }
     return [...new Set(invalid)];
   }
 
@@ -279,6 +305,7 @@ export default function ScheduleTemplatesTab() {
       fields.push("originAirportId", "destinationAirportId");
     }
     if (/هواپیما/.test(message)) fields.push("aircraftDefinitionId");
+    if (/قیمت پایه/.test(message)) setError(message);
     if (/قیمت آژانس/.test(message)) fields.push("agencyPriceToman");
     if (/سقف قانونی/.test(message)) fields.push("legalCeilingToman");
     if (/بازه تاریخ|تاریخ/.test(message)) fields.push("startDate", "endDate");
@@ -295,6 +322,48 @@ export default function ScheduleTemplatesTab() {
         ? form.weekdays.filter((x) => x !== day)
         : [...form.weekdays, day],
     );
+  }
+
+  async function requestDistanceSuggestion() {
+    if (!form.originAirportId || !form.destinationAirportId) {
+      setInvalidFields(new Set(["originAirportId", "destinationAirportId"]));
+      setError("ابتدا مبدأ و مقصد را انتخاب کنید.");
+      return;
+    }
+    setDistanceBusy(true);
+    setError(null);
+    setDistanceNotice(null);
+    try {
+      const suggestion = await suggestRouteDistance(
+        form.originAirportId,
+        form.destinationAirportId,
+      );
+      if (!suggestion) {
+        setDistanceNotice("پیشنهاد هوشمند در دسترس نیست؛ مسافت را دستی وارد کنید.");
+        return;
+      }
+      setForm((current) => ({
+        ...current,
+        distanceKm: String(suggestion.distanceKm),
+        distanceSource: "AI",
+      }));
+      setInvalidFields((current) => {
+        const next = new Set(current);
+        next.delete("distanceKm");
+        return next;
+      });
+      setDistanceNotice(
+        `پیشنهاد هوشمند با اطمینان ${faDigits(Math.round(suggestion.confidence * 100))}٪ اعمال شد؛ پیش از ثبت قابل ویرایش است.`,
+      );
+    } catch (cause) {
+      setDistanceNotice(
+        cause instanceof Error
+          ? cause.message
+          : "پیشنهاد هوشمند در دسترس نیست؛ مسافت را دستی وارد کنید.",
+      );
+    } finally {
+      setDistanceBusy(false);
+    }
   }
 
   async function runPreview() {
@@ -493,6 +562,48 @@ export default function ScheduleTemplatesTab() {
               ))}
             </select>
           </label>
+          <div className="rounded-xl border border-panel-border bg-panel-surface-2 p-3 md:col-span-2">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="min-w-0 flex-1 text-xs font-bold text-panel-muted">
+                مسافت مبدأ تا مقصد (کیلومتر) *
+                <input
+                  inputMode="numeric"
+                  dir="ltr"
+                  aria-label="مسافت مسیر به کیلومتر"
+                  value={form.distanceKm}
+                  onChange={(event) => {
+                    setDistanceNotice(null);
+                    setForm((current) => ({
+                      ...current,
+                      distanceKm: latinDigits(event.target.value).replace(/\D/g, "").slice(0, 5),
+                      distanceSource: "MANUAL",
+                    }));
+                    setInvalidFields((current) => {
+                      const next = new Set(current);
+                      next.delete("distanceKm");
+                      return next;
+                    });
+                  }}
+                  className={fieldClass("distanceKm")}
+                  aria-invalid={invalidFields.has("distanceKm")}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void requestDistanceSuggestion()}
+                disabled={distanceBusy}
+                className="h-11 rounded-lg border border-accent px-4 text-xs font-black text-accent disabled:opacity-50"
+              >
+                {distanceBusy ? "در حال محاسبه…" : "پیشنهاد هوشمند مسافت"}
+              </button>
+            </div>
+            <p className="mt-2 text-[11px] text-panel-muted" role="status">
+              {distanceNotice ??
+                (form.distanceSource === "AI"
+                  ? "منبع: پیشنهاد هوشمند؛ مقدار را پیش از ثبت بررسی کنید."
+                  : "مسافت را دستی وارد کنید یا از پیشنهاد هوشمند استفاده کنید.")}
+            </p>
+          </div>
           <label className="text-xs font-bold text-panel-muted">
             شماره پرواز (پایه) *
             <input
@@ -519,6 +630,7 @@ export default function ScheduleTemplatesTab() {
                     key: `route-${cabin.cabinType}`,
                     cabin: cabin.cabinType,
                     seats: String(cabin.capacity),
+                    basePriceToman: "",
                   })),
                 );
               }}
@@ -540,6 +652,7 @@ export default function ScheduleTemplatesTab() {
                 onChange={setRouteCabins}
                 availableCabins={selectedAircraft.cabins}
                 error={routeCabinError}
+                showBasePrice
               />
             </div>
           )}
@@ -638,7 +751,7 @@ export default function ScheduleTemplatesTab() {
             </div>
           </div>
           <label className="text-xs font-bold text-panel-muted">
-            قیمت هر صندلی برای آژانس‌ها (تومان) *
+            قیمت پایه عمومی آژانس‌ها (تومان) *
             <input
               aria-label="قیمت آژانس (تومان)"
               inputMode="numeric"

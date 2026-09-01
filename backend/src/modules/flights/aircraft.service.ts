@@ -21,6 +21,10 @@ import {
 } from '../reservation/seat-layout';
 import type { UpsertAircraftDto } from './dto/aircraft.dto';
 import { resolveAircraftCabinCapacities } from './aircraft-capacity.util';
+import {
+  findDuplicateClassCode,
+  standardClassCode,
+} from './aircraft-class-code';
 
 @Injectable()
 export class AircraftService {
@@ -105,6 +109,7 @@ export class AircraftService {
       cabins: (cabinsByAircraft.get(a.id) ?? []).map((c) => ({
         cabinType: c.cabinType,
         capacity: c.capacity,
+        defaultClassCode: c.defaultClassCode,
       })),
     }));
   }
@@ -144,6 +149,7 @@ export class AircraftService {
       cabins: cabins.map((c) => ({
         cabinType: c.cabinType,
         capacity: c.capacity,
+        defaultClassCode: c.defaultClassCode,
       })),
       seats: seats.map((s) => ({
         row: s.row,
@@ -241,6 +247,24 @@ export class AircraftService {
       cabinCounts,
       dto.totalCapacity,
     );
+    const defaultClassCodes = new Map(
+      configuredCabins.map(({ cabinType }) => [
+        cabinType,
+        dto.cabinCapacities
+          ?.find((row) => row.cabinType === cabinType)
+          ?.defaultClassCode?.trim()
+          .toUpperCase() ?? standardClassCode(cabinType),
+      ]),
+    );
+    const duplicateClassCode = findDuplicateClassCode(
+      defaultClassCodes.values(),
+    );
+    if (duplicateClassCode) {
+      throw new BadRequestException({
+        code: ErrorCode.VALIDATION_FAILED,
+        message: `کلاس نرخی ${duplicateClassCode} برای بیش از یک کابین تعریف شده است.`,
+      });
+    }
     // enumerateSeats() already guarantees unique seatCode-per-cabin-band
     // combination within one call, but a seat could theoretically collide
     // across two overlapping bands (bad input) — check explicitly so the
@@ -307,6 +331,7 @@ export class AircraftService {
             aircraftDefinitionId: aircraft.id,
             cabinType,
             capacity,
+            defaultClassCode: defaultClassCodes.get(cabinType),
             createdAt: now,
             updatedAt: now,
           }),

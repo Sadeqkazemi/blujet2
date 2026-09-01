@@ -10,6 +10,7 @@ export type AircraftSeatSide = 'LEFT' | 'RIGHT';
 export interface AircraftCabinCapacity {
   cabinType: AircraftCabinType;
   capacity: number;
+  defaultClassCode?: string;
 }
 
 export interface AircraftSeat {
@@ -97,6 +98,13 @@ export const AIRCRAFT_CABIN_OPTIONS: {
   { value: 'COMFORT', label: 'کامفورت' },
   { value: 'ECONOMY', label: 'اکونومی' },
 ];
+
+export const STANDARD_AIRCRAFT_CLASS_CODE: Record<AircraftCabinType, string> = {
+  FIRST: 'F',
+  BUSINESS: 'C',
+  COMFORT: 'W',
+  ECONOMY: 'Y',
+};
 
 /** Map the physical aircraft cabin to the same cabin used by fares and inventory. */
 export function toFlightCabinKind(

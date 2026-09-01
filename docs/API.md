@@ -3768,6 +3768,31 @@ DISBURSED→disbursed, CANCELLED→cancelled, FAILED→failed, else→unknown.
 - The server classifies age at `FlightInstance.departureAt`: infant `<2`, child `2..11`, adult `>=12`. A type mismatch and more lap infants than adults return `VALIDATION_FAILED`.
 - Public SYSTEM fares use adult 100%, child 50%, infant 10%; CHARTER child fares use 100%. Payment re-price repeats the same passenger-aware calculation.
 
+## Route cabin pricing and smart distance (2026-09-01)
+
+- Aircraft cabin payloads and responses include `defaultClassCode` (1–3 Latin
+  letters/numbers). When omitted on create/update, the backend applies the
+  standard mapping `FIRST=F`, `BUSINESS=C`, `COMFORT=W`, `ECONOMY=Y`.
+- `POST /flights/schedule-templates/preview` and
+  `POST /flights/schedule-templates` accept every `cabinCapacities[]` row as
+  `{ cabin, seats, basePriceIrr }`. The current panel always supplies each
+  positive IRR price; an older client that omits it inherits
+  `agencyPriceIrr`. Each resolved cabin price must not exceed
+  `legalCeilingIrr`.
+- `POST /flights/routes/distance-suggestion` accepts
+  `{ originAirportId, destinationAirportId }` and returns an advisory
+  `{ distanceKm, source, confidence, generatedAt }`, or `data: null` when the
+  configured AI provider is unavailable. The endpoint never writes route data.
+- Route preview/create additionally accepts `distanceKm` (positive integer)
+  and `distanceSource: AI|MANUAL`. The selected value is persisted on both the
+  canonical `Route` and the seasonal-template snapshot; AI output is never
+  applied without the operator submitting the route form.
+- Materialization creates one unreleased `FareRule` per occurrence/cabin using
+  the aircraft cabin's `defaultClassCode` and that cabin's base price. Existing
+  publication and channel-release gates remain authoritative. Template and
+  occurrence snapshots return the resolved `defaultClassCode` beside each
+  cabin for auditability.
+
 ## Manager panel permission restrictions
 
 - `POST /admins` accepts `permissions` as an optional list of manager-panel permission keys.

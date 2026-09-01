@@ -58,6 +58,43 @@ describe("ScheduleTemplatesTab", () => {
     expect(
       screen.getByTestId("available-cabin-BUSINESS").querySelector('input[inputmode="numeric"]'),
     ).toHaveValue("12");
+    expect(screen.getByLabelText(/قیمت پایه.*بیز/)).toBeInTheDocument();
+  });
+
+  it("applies an advisory route distance and keeps it editable", async () => {
+    vi.spyOn(flightsApi, "fetchAirports").mockResolvedValue([
+      { id: "ika", code: "IKA", cityFa: "تهران", tz: "Asia/Tehran" },
+      { id: "mct", code: "MCT", cityFa: "مسقط", tz: "Asia/Muscat" },
+    ]);
+    vi.spyOn(aircraftApi, "fetchAircraftDefinitions").mockResolvedValue([]);
+    vi.spyOn(flightsApi, "fetchScheduleTemplates").mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+    });
+    const suggest = vi.spyOn(flightsApi, "suggestRouteDistance").mockResolvedValue({
+      distanceKm: 1492,
+      confidence: 0.94,
+      source: "ANTHROPIC",
+      generatedAt: "2026-09-01T00:00:00.000Z",
+    });
+    const user = userEvent.setup();
+
+    render(<ScheduleTemplatesTab />);
+    await user.click(await screen.findByRole("button", { name: "افزودن مسیر جدید" }));
+    await user.selectOptions(screen.getByLabelText("مبدأ *"), "ika");
+    await user.selectOptions(screen.getByLabelText("مقصد *"), "mct");
+    await user.click(screen.getByRole("button", { name: "پیشنهاد هوشمند مسافت" }));
+
+    expect(suggest).toHaveBeenCalledWith("ika", "mct");
+    expect(await screen.findByLabelText("مسافت مسیر به کیلومتر")).toHaveValue("1492");
+    await user.clear(screen.getByLabelText("مسافت مسیر به کیلومتر"));
+    await user.type(screen.getByLabelText("مسافت مسیر به کیلومتر"), "1500");
+    expect(screen.getByLabelText("مسافت مسیر به کیلومتر")).toHaveValue("1500");
+
+    await user.selectOptions(screen.getByLabelText("مبدأ *"), "mct");
+    expect(screen.getByLabelText("مسافت مسیر به کیلومتر")).toHaveValue("");
   });
 
   it("loads route templates from real APIs and renders an empty state without filler rows", async () => {

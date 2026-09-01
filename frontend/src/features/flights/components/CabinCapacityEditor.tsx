@@ -6,6 +6,8 @@ import {
 } from "../../../lib/flight-definition";
 import { faDigits, latinDigits } from "../../../lib/fa-format";
 import type { AircraftCabinCapacity } from "../../../types/aircraft";
+import { normalizeTomanInput } from "../../../lib/money-input";
+import { tomanInputWords } from "../../../lib/persian-number-words";
 
 const selectClass =
   "w-full box-border h-11 rounded-[10px] border border-[#28344c] bg-[#0f1726] px-3 text-[13px] text-[#e7ecf3] outline-none";
@@ -16,6 +18,7 @@ export interface CabinCapacityRow {
   key: string;
   cabin: CabinKind;
   seats: string;
+  basePriceToman?: string;
 }
 
 export default function CabinCapacityEditor({
@@ -24,6 +27,7 @@ export default function CabinCapacityEditor({
   error,
   readOnly = false,
   availableCabins,
+  showBasePrice = false,
 }: {
   rows: CabinCapacityRow[];
   onChange: (rows: CabinCapacityRow[]) => void;
@@ -31,6 +35,7 @@ export default function CabinCapacityEditor({
   readOnly?: boolean;
   /** Authoritative per-cabin maxima from the selected aircraft. */
   availableCabins?: AircraftCabinCapacity[];
+  showBasePrice?: boolean;
 }) {
   const used = new Set(rows.map((r) => r.cabin));
   const total = sumCabinSeats(
@@ -55,7 +60,15 @@ export default function CabinCapacityEditor({
       onChange(rows.filter((row) => row.cabin !== cabin));
       return;
     }
-    onChange([...rows, { key: `cab-${cabin}`, cabin, seats: String(maximum) }]);
+    onChange([
+      ...rows,
+      {
+        key: `cab-${cabin}`,
+        cabin,
+        seats: String(maximum),
+        basePriceToman: "",
+      },
+    ]);
   }
 
   return (
@@ -124,24 +137,47 @@ export default function CabinCapacityEditor({
                   </span>
                 </label>
                 {row ? (
-                  <label className="mt-3 block text-[10.5px] text-[#9fb0c7]">
-                    تعداد صندلی فعال در این پرواز
-                    <input
-                      dir="ltr"
-                      inputMode="numeric"
-                      min={1}
-                      max={available.capacity}
-                      aria-label={`تعداد صندلی ${cabinLabel(cabin)}`}
-                      value={row.seats}
-                      readOnly={readOnly}
-                      onChange={(event) =>
-                        update(row.key, {
-                          seats: latinDigits(event.target.value).replace(/\D/g, "").slice(0, 4),
-                        })
-                      }
-                      className={`${inputClass} mt-1 text-left font-num read-only:cursor-not-allowed read-only:opacity-60`}
-                    />
-                  </label>
+                  <div className={`mt-3 grid gap-2 ${showBasePrice ? "sm:grid-cols-2" : ""}`}>
+                    <label className="block text-[10.5px] text-[#9fb0c7]">
+                      تعداد صندلی فعال در این پرواز
+                      <input
+                        dir="ltr"
+                        inputMode="numeric"
+                        min={1}
+                        max={available.capacity}
+                        aria-label={`تعداد صندلی ${cabinLabel(cabin)}`}
+                        value={row.seats}
+                        readOnly={readOnly}
+                        onChange={(event) =>
+                          update(row.key, {
+                            seats: latinDigits(event.target.value).replace(/\D/g, "").slice(0, 4),
+                          })
+                        }
+                        className={`${inputClass} mt-1 text-left font-num read-only:cursor-not-allowed read-only:opacity-60`}
+                      />
+                    </label>
+                    {showBasePrice ? (
+                      <label className="block text-[10.5px] text-[#9fb0c7]">
+                        قیمت پایه کابین (تومان)
+                        <input
+                          dir="rtl"
+                          inputMode="numeric"
+                          aria-label={`قیمت پایه ${cabinLabel(cabin)}`}
+                          value={row.basePriceToman ?? ""}
+                          readOnly={readOnly}
+                          onChange={(event) =>
+                            update(row.key, {
+                              basePriceToman: normalizeTomanInput(event.target.value),
+                            })
+                          }
+                          className={`${inputClass} mt-1 font-num read-only:cursor-not-allowed read-only:opacity-60`}
+                        />
+                        <span className="mt-1 block min-h-4 text-[9.5px] text-[#8fb8ff]">
+                          {tomanInputWords(row.basePriceToman ?? "")}
+                        </span>
+                      </label>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             );

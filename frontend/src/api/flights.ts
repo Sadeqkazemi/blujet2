@@ -322,6 +322,13 @@ export function previewScheduleTemplate(
   );
 }
 
+export function suggestRouteDistance(originAirportId: string, destinationAirportId: string) {
+  return apiPost<import('../types/schedule-templates').RouteDistanceSuggestion | null>(
+    '/flights/routes/distance-suggestion',
+    { originAirportId, destinationAirportId },
+  );
+}
+
 export function createScheduleTemplate(
   payload: import('../types/schedule-templates').ScheduleTemplatePayload & { idempotencyKey: string },
 ) {

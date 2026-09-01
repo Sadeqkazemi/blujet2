@@ -239,6 +239,10 @@ describe('AircraftFormPage', () => {
     expect(screen.getByTestId('aircraft-cabin-capacity-BUSINESS')).toBeInTheDocument();
     expect(screen.getByTestId('aircraft-cabin-capacity-COMFORT')).toBeInTheDocument();
     expect(screen.getByTestId('aircraft-cabin-capacity-ECONOMY')).toBeInTheDocument();
+    expect(screen.getByTestId('aircraft-cabin-class-FIRST')).toHaveValue('F');
+    expect(screen.getByTestId('aircraft-cabin-class-BUSINESS')).toHaveValue('C');
+    expect(screen.getByTestId('aircraft-cabin-class-COMFORT')).toHaveValue('W');
+    expect(screen.getByTestId('aircraft-cabin-class-ECONOMY')).toHaveValue('Y');
   });
 
   it('validates cabin seat sum before submit', async () => {
@@ -301,8 +305,8 @@ describe('AircraftFormPage', () => {
     });
     expect(updateSpy.mock.calls[0]?.[1]).toMatchObject({
       cabinCapacities: [
-        { cabinType: 'BUSINESS', capacity: 3 },
-        { cabinType: 'ECONOMY', capacity: 6 },
+        { cabinType: 'BUSINESS', capacity: 3, defaultClassCode: 'C' },
+        { cabinType: 'ECONOMY', capacity: 6, defaultClassCode: 'Y' },
       ],
     });
   });

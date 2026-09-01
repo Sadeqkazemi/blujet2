@@ -3870,6 +3870,16 @@ contracts and retires the production mock adapters.
 - [ ] Complete visual browser verification when localhost browser access is available.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
 
+## Route cabin pricing, standard classes, and smart distance (2026-09-01)
+
+- [x] Persist one standard default fare-class code per aircraft cabin.
+- [x] Require and persist one base price per enabled cabin in seasonal routes.
+- [x] Materialize initial per-cabin fare rules without opening sales channels.
+- [x] Add advisory AI distance suggestion with explicit operator acceptance and
+  manual fallback.
+- [x] Pass focused backend/frontend tests, builds, lint, and diff validation.
+- [ ] Merge and deploy only after explicit user approval.
+
 ## Panel theme, finance resilience, report search, and UAT wallets (2026-08-30)
 
 - [x] Remove forced light chrome and white chart surfaces from the commercial flight-detail modal while preserving light-mode token rendering.

@@ -5,6 +5,7 @@ import {
   ArrayUnique,
   IsArray,
   IsInt,
+  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -15,6 +16,29 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CabinCapacityDto } from './flight-definition.dto';
+
+export class ScheduleCabinCapacityDto extends CabinCapacityDto {
+  @ApiPropertyOptional({
+    example: '38000000',
+    description:
+      'قیمت پایه این کابین به ریال؛ برای کلاینت‌های قدیمی از قیمت مسیر ارث می‌برد',
+  })
+  @IsOptional()
+  @Matches(/^\d+$/)
+  basePriceIrr?: string;
+}
+
+export class RouteDistanceSuggestionDto {
+  @ApiProperty({ example: 'uuid-origin-airport' })
+  @IsString()
+  @MinLength(1)
+  originAirportId!: string;
+
+  @ApiProperty({ example: 'uuid-destination-airport' })
+  @IsString()
+  @MinLength(1)
+  destinationAirportId!: string;
+}
 
 export class ScheduleTemplatePreviewDto {
   @ApiProperty({ example: 'uuid-origin-airport' })
@@ -37,15 +61,28 @@ export class ScheduleTemplatePreviewDto {
   aircraftDefinitionId!: string;
 
   @ApiPropertyOptional({
-    type: [CabinCapacityDto],
+    type: [ScheduleCabinCapacityDto],
     description: 'کابین‌های فعال و ظرفیت هرکدام در این مسیر/برنامه پروازی',
   })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => CabinCapacityDto)
-  cabinCapacities?: CabinCapacityDto[];
+  @Type(() => ScheduleCabinCapacityDto)
+  cabinCapacities?: ScheduleCabinCapacityDto[];
+
+  @ApiPropertyOptional({ example: 684 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(20_000)
+  distanceKm?: number;
+
+  @ApiPropertyOptional({ enum: ['AI', 'MANUAL'] })
+  @IsOptional()
+  @IsIn(['AI', 'MANUAL'])
+  distanceSource?: 'AI' | 'MANUAL';
 
   @ApiProperty({
     example: '07:30',
