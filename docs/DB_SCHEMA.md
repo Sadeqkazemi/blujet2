@@ -3140,3 +3140,81 @@ No schema migration is required.
   `agency_invoices`, `ledger_entries`, and `agency_credit_requests`. These
   source rows remain authoritative and no mutable reporting/event duplicate is
   introduced.
+
+## Approved central PSS/CRS schema
+
+These tables live in the dedicated PSS PostgreSQL database. Reliability tables
+are implemented in Slice 0; reservation, inventory and accountable-document
+tables remain approved contracts for later slices. The website database may
+retain read-only projections after cutover but cannot authorize inventory or
+document changes.
+
+### Reservations and itineraries
+
+- `pss_orders`: `id`, unique `pnr`, lifecycle status, owner/channel/seller,
+  contact reference, currency, totals, hold expiry, payment reference,
+  source idempotency key, timestamps and optimistic version.
+- `pss_order_segments`: `id`, `orderId`, ordered `sequence`,
+  `flightInstanceId`, origin/destination, operating/marketing carrier,
+  flight/departure/arrival snapshots, cabin, fare class and segment status.
+  Unique `(orderId, sequence)`; one order may have many segments.
+- `pss_travellers`: encrypted identity/contact data, hashed lookup fields,
+  passenger type, birth date and audit timestamps.
+- `pss_order_travellers`: many-to-many order/traveller relation with pricing,
+  baggage, seat and special-service snapshots.
+- `pss_traveller_segments`: unique `(orderTravellerId, orderSegmentId)` with
+  seat assignment and per-segment service state.
+
+### Authoritative inventory
+
+- `pss_inventory_buckets`: unique
+  `(flightInstanceId, cabin, fareClassCode, channelScope)`, authorized capacity,
+  sale window, version and status.
+- `pss_inventory_transactions`: immutable `HOLD | RELEASE | SELL | REFUND |
+  BLOCK | UNBLOCK | ADJUST` rows with quantity, order/segment reference,
+  command idempotency key, actor and timestamp.
+- Availability is derived transactionally from capacity and immutable rows;
+  Redis and website projections are never authoritative.
+- All multi-segment holds lock bucket rows in stable key order to prevent
+  deadlocks and partial itineraries.
+
+### Accountable documents
+
+- `pss_document_stocks`: document type `ETICKET | EMD`, airline numeric code,
+  inclusive serial range, next serial, status, source authority and audit data.
+  Range overlap is forbidden; allocation uses a pessimistic row lock.
+- `pss_ticket_documents`: unique accountable number, validating carrier,
+  `orderTravellerId`, issue/payment references, original/replacement document,
+  lifecycle `ISSUED | VOID | REFUNDED | EXCHANGED`, immutable issue snapshot.
+- `pss_flight_coupons`: unique `(ticketDocumentId, couponNumber)` and unique
+  active `(ticketDocumentId, orderSegmentId)`; lifecycle `OPEN | CHECKED_IN |
+  BOARDED | FLOWN | VOID | REFUNDED | EXCHANGED`, segment/fare/tax/baggage
+  snapshots and DCS references.
+- `pss_emd_documents`: unique accountable number, EMD type `A | S`, reason
+  code/sub-code, traveller, service, amount/currency, payment and replacement
+  references, lifecycle `ISSUED | USED | VOID | REFUNDED | EXCHANGED`.
+- `pss_emd_coupons`: ordered coupons associated with an order segment and,
+  where required, a flight coupon; consumption and refund history is retained.
+
+### Reliability and integration
+
+- `pss_idempotency_records`: unique `(caller, operation, key)`, request digest,
+  response reference and completion state. Reuse with a different digest fails.
+- `pss_outbox_events`: immutable aggregate event, payload version, attempts,
+  available/published timestamps and dead-letter state. Inserted in the same
+  transaction as the business change.
+- `pss_nira_submissions`: flight, message kind, payload digest, vendor
+  correlation, attempts, acknowledgement, reconciliation/dead-letter state and
+  audit timestamps. Raw PII payload retention follows the approved policy.
+- `pss_partner_messages`: seller/partner, NDC version/message id, request digest,
+  response reference, status and timestamps for replay protection and audit.
+
+### Migration and compatibility
+
+- Existing `bookings` become one-segment `pss_orders`; existing passengers map
+  to order travellers and traveller segments.
+- Existing random ticket numbers are not silently accepted as accountable
+  stock. Backfill classifies each row as verified, quarantined or exception and
+  requires an owner-approved reconciliation decision.
+- Cutover uses shadow reads and reconciliation first, then a single writer flag.
+  Dual writes to website and PSS inventory are forbidden.

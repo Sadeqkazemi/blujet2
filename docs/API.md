@@ -4218,3 +4218,88 @@ the browser.
 - `GET /search/price-calendar` and `POST /search/advisory` accept the same cabin and compute alternatives only for that cabin; their cache keys include the cabin.
 - Public travel-extra, ancillary-service, and seat-service responses expose localized `titleFa`, `titleAr`, `titleEn`, `descriptionFa`, `descriptionAr`, and `descriptionEn` values when applicable, so checkout does not display Persian fallback content in Arabic/English.
 - Booking creation accepts only explicitly selected extras and priced seat selections. The booking snapshot persists localized extra labels; payment and invoice views render those persisted selected rows rather than reconstructing or charging the full service catalog.
+
+## Approved central PSS/CRS contract
+
+This contract is implemented incrementally. Slice 0 provides the independent
+service shell and capability endpoint; reservation, inventory and document
+endpoints remain disabled until their acceptance slices pass. It replaces
+direct website ownership of inventory and reservation writes only after a
+reconciled, feature-flagged cutover. All paths below are internal-only unless
+explicitly labelled as a partner NDC facade. Every command requires
+`Idempotency-Key` and propagates `X-Request-Id`; service-to-service
+authentication is mandatory.
+
+### Service control API (Slice 0 implemented)
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| GET | `/health/live` | Internal-network liveness without business or secret data. |
+| GET | `/health/ready` | Internal-network readiness with independent PSS database check. |
+| GET | `/internal/v1/capabilities` | Authenticated truthful rollout flags; `salesEnabled` remains false before cutover. |
+| POST | `/internal/v1/reconciliation/shadow` | Compares a website source-of-truth count snapshot with PSS shadow tables; returns per-metric deltas and always keeps cutover false when schema/data differ. |
+
+The shadow request contains non-negative integer counts for `orders`,
+`travellers`, `heldOrders`, `ticketedOrders` and `inventoryTransactions` plus
+`capturedAt`. It contains no passenger PII. The response includes the PSS
+snapshot, missing-table names, per-metric deltas and `cutoverReady`; missing
+tables are discrepancies, never implicit zero agreement.
+
+### Internal offer and availability API
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| POST | `/internal/v1/offers/search` | Returns priced, expiring offers for ordered one-or-more-segment itineraries from authoritative inventory. |
+| POST | `/internal/v1/offers/:offerId/reprice` | Revalidates fare, tax, currency and every segment's inventory version immediately before hold/payment. |
+| GET | `/internal/v1/flights/:flightInstanceId/seatmap` | Returns PSS-authoritative held/sold/blocked seat state. |
+
+An offer contains `offerId`, `expiresAt`, `currency`, ordered `segments`,
+traveller pricing, fare/tax/ancillary breakdown, baggage terms and an opaque
+integrity token. An offer is never itself inventory authorization.
+
+### Internal reservation/order API
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| POST | `/internal/v1/orders` | Atomically holds every segment and creates one PNR. |
+| GET | `/internal/v1/orders/:reference` | Retrieves by internal id or PNR, including travellers, segments, documents, coupons and servicing history. |
+| POST | `/internal/v1/orders/:id/payment-confirmations` | Records a verified external payment reference and fulfils/tickets exactly once. |
+| POST | `/internal/v1/orders/:id/cancel` | Cancels an eligible unticketed order and releases all held inventory. |
+| POST | `/internal/v1/orders/:id/void` | Voids eligible accountable documents within the configured window. |
+| POST | `/internal/v1/orders/:id/refunds/quote` | Quotes full or selected-traveller/segment/document refund without mutation. |
+| POST | `/internal/v1/orders/:id/refunds` | Applies an approved quote, coupon states and balanced financial reversal exactly once. |
+| POST | `/internal/v1/orders/:id/exchanges/quote` | Prices replacement itinerary and residual/add-collect amount. |
+| POST | `/internal/v1/orders/:id/exchanges` | Issues replacement documents and marks prior documents/coupons exchanged atomically. |
+
+Existing `/bookings`, `/manage-booking`, `/reservation` and agency endpoints
+remain compatibility facades and must delegate to this API after cutover.
+
+### Accountable document API
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| POST | `/internal/v1/document-stocks` | Loads an approved ticket or EMD stock block; privileged and audited. |
+| GET | `/internal/v1/document-stocks` | Returns remaining/consumed/quarantined stock without exposing secrets. |
+| GET | `/internal/v1/tickets/:documentNumber` | Returns immutable ticket plus ordered flight coupons. |
+| POST | `/internal/v1/emd` | Issues an EMD for an eligible paid ancillary from accountable stock. |
+| GET | `/internal/v1/emd/:documentNumber` | Returns EMD document, coupons, associations and lifecycle. |
+
+Production ticket/EMD issuance fails closed when no valid stock block exists.
+
+### Nira integration API
+
+| Method | Path | Behaviour |
+| --- | --- | --- |
+| POST | `/internal/v1/nira/flights/:id/submissions` | Creates a PNL/ADL/manifest submission from PSS coupon state. |
+| GET | `/internal/v1/nira/submissions/:id` | Returns correlation, attempt, acknowledgement and reconciliation status. |
+| POST | `/internal/v1/nira/submissions/:id/replay` | Privileged audited replay of retryable/dead-letter submissions. |
+
+Exact payload and acknowledgement DTOs remain blocked until the airline
+provides the vendor contract and sandbox.
+
+### NDC 24.1 partner facade
+
+Planned message families are `AirShopping`, `OfferPrice`, `OrderCreate`,
+`OrderRetrieve`, `OrderChange` and `OrderCancel`. The facade maps messages to
+the internal APIs above and owns no inventory or order state. It must not be
+described as certified before named-partner conformance succeeds.

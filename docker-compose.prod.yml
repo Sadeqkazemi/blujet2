@@ -28,6 +28,44 @@ services:
     expose:
       - '6379'
 
+  pss-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: blujet_pss
+      POSTGRES_PASSWORD: ${PSS_POSTGRES_PASSWORD}
+      POSTGRES_DB: blujet_pss
+    volumes:
+      - pss_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U blujet_pss -d blujet_pss']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    expose:
+      - '5432'
+
+  pss-service:
+    build: ./pss-service
+    restart: unless-stopped
+    depends_on:
+      pss-db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      PSS_DATABASE_URL: postgresql://blujet_pss:${PSS_POSTGRES_PASSWORD}@pss-db:5432/blujet_pss?schema=public
+      PSS_INTERNAL_TOKEN: ${PSS_INTERNAL_TOKEN}
+      SENTRY_DSN: ${PSS_SENTRY_DSN:-}
+    expose:
+      - '3100'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('http').get('http://localhost:3100/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   ml-service:
     build: ./ml-service
     restart: unless-stopped
@@ -46,6 +84,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      pss-service:
         condition: service_healthy
     environment:
       NODE_ENV: production
@@ -70,6 +110,12 @@ services:
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       HTTPS_ENABLED: ${HTTPS_ENABLED:-false}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY}
+      # The client is wired now, but authoritative sales remain on the
+      # existing booking engine until the later owner-approved cutover slice.
+      PSS_INTEGRATION_ENABLED: ${PSS_INTEGRATION_ENABLED:-false}
+      PSS_SERVICE_URL: http://pss-service:3100
+      PSS_INTERNAL_TOKEN: ${PSS_INTERNAL_TOKEN}
+      PSS_REQUEST_TIMEOUT_MS: ${PSS_REQUEST_TIMEOUT_MS:-3000}
       SEED_ON_START: ${SEED_ON_START:-false}
       FINANCE_HOLO_VERIFY_URL: ${FINANCE_HOLO_VERIFY_URL:-}
       FINANCE_HOLO_SYNC_URL: ${FINANCE_HOLO_SYNC_URL:-}
@@ -135,5 +181,6 @@ services:
 
 volumes:
   db_data:
+  pss_db_data:
   backend_uploads:
   backend_backups:
