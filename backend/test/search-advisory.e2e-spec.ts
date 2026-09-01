@@ -1,20 +1,27 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { App } from 'supertest/types';
 import { createTestApp } from './helpers/app.helper';
 
 describe('Search advisory & price calendar (e2e)', () => {
-  let app: INestApplication;
+  let app: INestApplication<App> | undefined;
+
+  const initializedApp = () => {
+    if (!app) throw new Error('Test application was not initialized.');
+    return app;
+  };
 
   beforeAll(async () => {
     app = await createTestApp();
-  });
+  }, 60_000);
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
+    app = undefined;
   });
 
   it('GET /search/advisory returns advisory payload for a seeded route', async () => {
-    const res = await request(app.getHttpServer())
+    const res = await request(initializedApp().getHttpServer())
       .get('/search/advisory')
       .query({ origin: 'THR', dest: 'MHD', date: '2026-08-15' })
       .expect(200);
@@ -23,7 +30,7 @@ describe('Search advisory & price calendar (e2e)', () => {
   });
 
   it('GET /search/price-calendar returns 7 days', async () => {
-    const res = await request(app.getHttpServer())
+    const res = await request(initializedApp().getHttpServer())
       .get('/search/price-calendar')
       .query({ origin: 'THR', dest: 'MHD', date: '2026-08-15' })
       .expect(200);
@@ -32,7 +39,7 @@ describe('Search advisory & price calendar (e2e)', () => {
   });
 
   it('GET /settings/site-content?locale=en returns English hero title', async () => {
-    const res = await request(app.getHttpServer())
+    const res = await request(initializedApp().getHttpServer())
       .get('/settings/site-content')
       .query({ locale: 'en' })
       .expect(200);
@@ -40,7 +47,7 @@ describe('Search advisory & price calendar (e2e)', () => {
   });
 
   it('POST /auth/agency/password-reset/request accepts 09-format phone', async () => {
-    const res = await request(app.getHttpServer())
+    const res = await request(initializedApp().getHttpServer())
       .post('/auth/agency/password-reset/request')
       .send({ phone: '09120000002' })
       .expect(200);

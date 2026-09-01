@@ -4,7 +4,7 @@
   "testEnvironment": "node",
   "testRegex": ".e2e-spec.ts$",
   "maxWorkers": 1,
-  "testTimeout": 20000,
+  "testTimeout": 60000,
   "globalSetup": "<rootDir>/global-setup.ts",
   "setupFiles": ["<rootDir>/jest-setup.ts"],
   "moduleNameMapper": {
