@@ -296,6 +296,11 @@ describe('Seasonal schedule templates (e2e)', () => {
       });
     expect(rollbackOccurrences.length).toBeGreaterThan(0);
     const rollbackOccurrence = rollbackOccurrences[0];
+    const initialFareRules = await dataSource.getRepository(FareRule).find({
+      where: { flightInstanceId: rollbackOccurrence.id },
+      order: { id: 'ASC' },
+    });
+    expect(initialFareRules).toHaveLength(3);
 
     const forbidden = await request(app.getHttpServer())
       .put(`/flights/${rollbackOccurrence.id}/complete-and-submit`)
@@ -337,11 +342,13 @@ describe('Seasonal schedule templates (e2e)', () => {
         fareRules: [command.fareRules[0], command.fareRules[0]],
       });
     expect(invalid.status).toBe(400);
-    expect(
-      await dataSource.getRepository(FareRule).count({
+    const fareRulesAfterRollback = await dataSource
+      .getRepository(FareRule)
+      .find({
         where: { flightInstanceId: rollbackOccurrence.id },
-      }),
-    ).toBe(0);
+        order: { id: 'ASC' },
+      });
+    expect(fareRulesAfterRollback).toEqual(initialFareRules);
     const afterRollback = await dataSource
       .getRepository(FlightInstance)
       .findOneByOrFail({ id: rollbackOccurrence.id });
