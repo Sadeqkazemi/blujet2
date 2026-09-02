@@ -52,6 +52,30 @@ jobs:
             fi
             git fetch --no-tags origin "$DEPLOY_SHA"
             git checkout --detach "$DEPLOY_SHA"
+            # Central PSS secrets live only on the UAT host. Bootstrap them
+            # once when an older host has no values yet; never print or copy
+            # them into Actions, the repository, or container logs.
+            umask 077
+            touch .env
+            chmod 600 .env
+            ensure_server_secret() {
+              secret_name="$1"
+              current_value="$(awk -v key="$secret_name" '
+                index($0, key "=") == 1 {
+                  value = substr($0, length(key) + 2)
+                }
+                END { print value }
+              ' .env)"
+              if [ "${#current_value}" -lt 32 ]; then
+                generated_value="$(openssl rand -hex 32)"
+                printf '\n%s=%s\n' "$secret_name" "$generated_value" >> .env
+                unset generated_value
+              fi
+              unset current_value
+            }
+            ensure_server_secret PSS_POSTGRES_PASSWORD
+            ensure_server_secret PSS_INTERNAL_TOKEN
+            unset -f ensure_server_secret
             # This host is the owner-approved UAT sandbox. Keep the backend
             # mock OTP and the matching frontend notice in sync for every
             # compose build/recreation without writing secrets to the repo.
