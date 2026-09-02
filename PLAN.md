@@ -3870,6 +3870,17 @@ contracts and retires the production mock adapters.
 - [ ] Complete visual browser verification when localhost browser access is available.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
 
+## Central PSS/CRS extraction — Slice 0 (2026-09-01)
+
+- [x] Record the owner-approved API, schema, migration and airline-document decisions.
+- [x] Add an independently deployable NestJS PSS service with a separate PostgreSQL database, validated configuration, internal authentication, request correlation, structured logging, liveness/readiness and internal OpenAPI.
+- [x] Add transactional idempotency and outbox persistence with unit and real-Postgres E2E coverage in CI.
+- [x] Add a fail-closed, explicitly gated `PssClient` adapter to the existing website backend without switching the current sales writer.
+- [x] Add local/production Compose topology and a dedicated CI job.
+- [x] Add fail-closed shadow reconciliation across website and PSS counts.
+- [ ] Run the CI-wired `pg_dump` restore proof and review its artifact before any writer cutover (local sandbox cannot execute the installed PostgreSQL binaries).
+- [ ] Commit, push, merge or deploy only after the phase review and explicit owner approval.
+
 ## Route cabin pricing, standard classes, and smart distance (2026-09-01)
 
 - [x] Persist one standard default fare-class code per aircraft cabin.

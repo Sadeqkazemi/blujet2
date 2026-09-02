@@ -99,6 +99,21 @@ class EnvironmentVariables {
   @IsOptional()
   @IsIn(['true', 'false'])
   HTTPS_ENABLED?: string;
+
+  /** Central PSS is introduced behind an explicit cutover switch. */
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  PSS_INTEGRATION_ENABLED?: string;
+
+  @IsOptional()
+  PSS_SERVICE_URL?: string;
+
+  @IsOptional()
+  PSS_INTERNAL_TOKEN?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  PSS_REQUEST_TIMEOUT_MS?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -112,6 +127,17 @@ export function validateEnv(config: Record<string, unknown>) {
       `Invalid environment configuration:\n${errors
         .map((e) => Object.values(e.constraints ?? {}).join(', '))
         .join('\n')}`,
+    );
+  }
+
+  if (
+    validated.PSS_INTEGRATION_ENABLED === 'true' &&
+    (!validated.PSS_SERVICE_URL ||
+      !validated.PSS_INTERNAL_TOKEN ||
+      validated.PSS_INTERNAL_TOKEN.length < 32)
+  ) {
+    throw new Error(
+      'Invalid environment configuration:\nPSS_SERVICE_URL and a PSS_INTERNAL_TOKEN of at least 32 characters are required when PSS_INTEGRATION_ENABLED=true',
     );
   }
 

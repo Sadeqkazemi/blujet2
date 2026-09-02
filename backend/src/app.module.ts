@@ -68,6 +68,7 @@ import { PartnerApiModule } from './modules/partner-api/partner-api.module';
 import { FinanceReportsModule } from './modules/finance-reports/finance-reports.module';
 import { FinancialIntegrationsModule } from './modules/financial-integrations/financial-integrations.module';
 import { AgencyBulletinsModule } from './modules/agency-bulletins/agency-bulletins.module';
+import { PssModule } from './modules/pss/pss.module';
 
 @Module({
   imports: [
@@ -190,6 +191,7 @@ import { AgencyBulletinsModule } from './modules/agency-bulletins/agency-bulleti
     FinanceReportsModule,
     FinancialIntegrationsModule,
     AgencyBulletinsModule,
+    PssModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

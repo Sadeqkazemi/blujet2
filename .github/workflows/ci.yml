@@ -13,6 +13,44 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pss-service:
+    name: Central PSS service
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: blujet_pss
+          POSTGRES_PASSWORD: blujet_pss
+          POSTGRES_DB: blujet_pss_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U blujet_pss -d blujet_pss_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: pss-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pss-service/package-lock.json
+      - run: npm ci
+      - run: cp .env.test .env
+      - run: npm run migration:run
+      - run: sh scripts/verify-backup-restore.sh
+      - run: npm run lint:check
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:e2e
+
   backend:
     name: Backend
     runs-on: ubuntu-24.04-arm

@@ -271,3 +271,39 @@ SMS vendor; the Vite flag is build-time and displays the matching hint and
 first-login controls. Remove both flags (or set them to `false`) before a real
 production launch, then rebuild the frontend image. Ordinary production is
 fail-closed by default.
+
+# Central PSS service (pre-cutover)
+
+The central PSS is an internal-only service with its own PostgreSQL database.
+Before starting the production Compose stack, set independent, random values
+for `PSS_POSTGRES_PASSWORD` and `PSS_INTERNAL_TOKEN` (minimum 32 characters).
+The token must match between `backend` and `pss-service` and must never be
+printed or sent to a browser.
+
+```bash
+docker compose -f docker-compose.prod.yml logs --tail=200 pss-service pss-db
+docker compose -f docker-compose.prod.yml exec -T pss-service \
+  node -e "require('http').get('http://localhost:3100/health/ready',r=>{process.stdout.write(String(r.statusCode));process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+```
+
+`/health/live` verifies the process and `/health/ready` verifies the independent
+database. The service is not published on a host port. Its internal capability
+response must continue to report `salesEnabled: false` until the documented
+writer-cutover phase is approved and complete. `PSS_INTEGRATION_ENABLED` stays
+`false` during Slice 0; enabling it does not itself migrate inventory or sales.
+
+Run PSS migrations through its own container and data source only:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T pss-service \
+  npm run migration:run:prod
+```
+
+PSS backup/restore and rollback proof remains a mandatory unchecked acceptance
+item before any authoritative writer cutover. Do not reuse the website database
+backup as a substitute for the separate `pss-db` backup.
+
+Every pull request runs `pss-service/scripts/verify-backup-restore.sh` after PSS
+migrations. It creates a custom-format `pg_dump`, restores it into a temporary
+database in the isolated CI PostgreSQL container, verifies both reliability
+tables and migration history, then removes the temporary database and dump.
