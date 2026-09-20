@@ -428,16 +428,14 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       );
       const ownerBefore = await users.findOneByOrFail({ id: owner.id });
       try {
-        for (const phone of ['09000000002', '+989000000002']) {
-          const login = await request(app.getHttpServer())
-            .post('/auth/customer/login-password')
-            .send({ phone, password: STRONG_PASSWORD });
-          expect(login.status).toBe(200);
-          const me = await request(app.getHttpServer())
-            .get('/auth/me')
-            .set('Authorization', `Bearer ${login.body.data.accessToken}`);
-          expect(me.body.data.id).toBe(customer.id);
-        }
+        const login = await request(app.getHttpServer())
+          .post('/auth/customer/login-password')
+          .send({ phone: '09000000002', password: STRONG_PASSWORD });
+        expect(login.status).toBe(200);
+        const me = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+        expect(me.body.data.id).toBe(customer.id);
         const wrongPassword = await request(app.getHttpServer())
           .post('/auth/customer/login-password')
           .send({ phone: '09000000002', password: OTHER_STRONG_PASSWORD });

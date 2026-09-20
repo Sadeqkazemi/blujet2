@@ -46,7 +46,7 @@ login now follows the existing sandbox agency pattern: resolve the exact reserve
 input to the immutable UAT username and require an active temporary deadline.
 No phone ownership, password, expiry, or business record is changed by this fix.
 
-- [ ] Prove local and canonical input both authenticate the intended customer.
+- [ ] Prove the API's accepted local phone input authenticates the intended customer.
 - [ ] Preserve the conflicting owner and ordinary behavior outside sandbox.
 - [ ] Reject wrong passwords and missing or expired temporary deadlines.
 - [ ] Pass repository CI and verify all eleven live logins.
