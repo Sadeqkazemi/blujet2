@@ -4021,6 +4021,9 @@ contracts and retires the production mock adapters.
   backend production build, focused lint and CLI dry run.
 - [x] Add post-renewal HTTP login/identity/logout verification for all eleven
   accounts, reporting only safe status and expiry metadata.
-- [ ] Pass complete repository CI, including real PostgreSQL concurrency tests.
+- [x] Pass complete repository CI, including real PostgreSQL concurrency tests.
 - [x] Owner approved PR #273 merge and execution on 2026-09-20.
 - [ ] Deploy and verify live access.
+
+- [x] Granted all eleven accounts until 2026-09-27T15:39:22.024Z; owner confirmed shared password recovery.
+- [ ] Reconcile the shared password without changing expiry and verify all eleven logins.

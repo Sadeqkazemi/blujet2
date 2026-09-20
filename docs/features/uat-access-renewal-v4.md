@@ -22,3 +22,17 @@ The existing password, role, phone and business records are preserved.
       never log credentials (`verify-temporary-panel-access-v4.spec.ts`).
 - [ ] Verify focused tests, backend build/lint and repository CI before merge.
 - [ ] Deploy and verify the eleven live account deadlines and panel access.
+
+## Shared-password recovery after the live renewal
+
+The grant completed on September 20 at 15:39:22 UTC, with all eleven deadlines
+set to September 27 at 15:39:22 UTC. Four logins passed before the customer
+login returned 401. The owner confirmed every reserved account must use the
+existing shared password. Reuse the guarded rotation command once, preserving
+all deadlines and business records. Continue verification across every account
+and report only password-match/phone-lookup booleans when login fails.
+
+- [ ] Reconcile only active reserved accounts using the existing shared secret.
+- [ ] Keep the v4 grant deadline unchanged and prevent repeat rotation by sentinel.
+- [ ] Diagnose failed logins without revealing password/hash/phone-owner data.
+- [ ] Verify all eleven live accounts after recovery.
