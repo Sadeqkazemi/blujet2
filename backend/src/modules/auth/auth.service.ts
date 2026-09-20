@@ -373,9 +373,21 @@ export class AuthService {
     refreshToken: string;
     user: AuthUserView;
   }> {
-    const user = await this.userRepo.findOneBy({
-      phone: normalizeIranPhone(phone),
-    });
+    const normalizedPhone = normalizeIranPhone(phone);
+    const sandboxCustomer = isSandboxAuthEnabled()
+      ? TEMPORARY_PHONE_LOGIN_ACCOUNTS.find(
+          (account) =>
+            account.role === 'USER' &&
+            normalizeIranPhone(account.phone) === normalizedPhone,
+        )
+      : undefined;
+    // Match the agency sandbox resolver without reassigning a historical
+    // phone owner's account or data. The temporary deadline remains required.
+    const user = await this.userRepo.findOneBy(
+      sandboxCustomer
+        ? { username: sandboxCustomer.username }
+        : { phone: normalizedPhone },
+    );
     if (!user || user.role !== 'USER' || !user.passwordHash) {
       throw new UnauthorizedException({
         code: ErrorCode.UNAUTHORIZED,
@@ -398,7 +410,7 @@ export class AuthService {
     // UAT shared-password temp customer account. Only ever set by
     // the UAT bootstrap script, so real customers never hit this.
     const temporaryAccessState = getTemporaryPanelAccessState(user);
-    if (temporaryAccessState !== 'NONE') {
+    if (sandboxCustomer || temporaryAccessState !== 'NONE') {
       if (!isSandboxAuthEnabled()) {
         throw new ForbiddenException({
           code: 'SANDBOX_AUTH_DISABLED',

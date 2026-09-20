@@ -407,6 +407,90 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
       expect(customerLogin.body.data.accessToken).toBeDefined();
     });
 
+    it('resolves the reserved customer in sandbox while preserving the canonical phone owner', async () => {
+      const users = dataSource.getRepository(User);
+      await users.update(
+        { username: 'uat.customer' },
+        { phone: '09000000002' },
+      );
+      const customer = await users.findOneByOrFail({
+        username: 'uat.customer',
+      });
+      const owner = await users.save(
+        users.create({
+          role: Role.USER,
+          phone: '+989000000002',
+          username: 'customer-phone-conflict-test',
+          passwordHash: await argon2.hash(OTHER_STRONG_PASSWORD),
+          fullName: 'Existing customer phone owner',
+          updatedAt: new Date(),
+        }),
+      );
+      const ownerBefore = await users.findOneByOrFail({ id: owner.id });
+      try {
+        for (const phone of ['09000000002', '+989000000002']) {
+          const login = await request(app.getHttpServer())
+            .post('/auth/customer/login-password')
+            .send({ phone, password: STRONG_PASSWORD });
+          expect(login.status).toBe(200);
+          const me = await request(app.getHttpServer())
+            .get('/auth/me')
+            .set('Authorization', `Bearer ${login.body.data.accessToken}`);
+          expect(me.body.data.id).toBe(customer.id);
+        }
+        const wrongPassword = await request(app.getHttpServer())
+          .post('/auth/customer/login-password')
+          .send({ phone: '09000000002', password: OTHER_STRONG_PASSWORD });
+        expect(wrongPassword.status).toBe(401);
+        expect(await users.findOneByOrFail({ id: owner.id })).toEqual(
+          ownerBefore,
+        );
+        const after = await users.findOneByOrFail({ id: customer.id });
+        expect(after.phone).toBe(customer.phone);
+        expect(after.passwordHash).toBe(customer.passwordHash);
+        expect(after.temporaryPasswordOnlyUntil).toEqual(
+          customer.temporaryPasswordOnlyUntil,
+        );
+
+        process.env.AUTH_SANDBOX_ENABLED = 'false';
+        const ordinaryLogin = await request(app.getHttpServer())
+          .post('/auth/customer/login-password')
+          .send({ phone: '09000000002', password: OTHER_STRONG_PASSWORD });
+        expect(ordinaryLogin.status).toBe(200);
+        const ordinaryMe = await request(app.getHttpServer())
+          .get('/auth/me')
+          .set(
+            'Authorization',
+            `Bearer ${ordinaryLogin.body.data.accessToken}`,
+          );
+        expect(ordinaryMe.body.data.id).toBe(owner.id);
+      } finally {
+        await dataSource
+          .getRepository(RefreshToken)
+          .delete({ userId: owner.id });
+        await dataSource.getRepository(AuditLog).delete({ actorId: owner.id });
+        await users.delete(owner.id);
+      }
+    });
+
+    it.each(['missing', 'expired'])(
+      'rejects a reserved customer with a %s temporary deadline',
+      async (deadline) => {
+        await dataSource.getRepository(User).update(
+          { username: 'uat.customer' },
+          {
+            temporaryPasswordOnlyUntil:
+              deadline === 'missing' ? null : new Date(Date.now() - 1000),
+          },
+        );
+        const login = await request(app.getHttpServer())
+          .post('/auth/customer/login-password')
+          .send({ phone: '09000000002', password: STRONG_PASSWORD });
+        expect(login.status).toBe(403);
+        expect(login.body.error.code).toBe('TEMPORARY_ACCESS_EXPIRED');
+      },
+    );
+
     it('refuses a canonical phone conflict before changing either temporary account', async () => {
       const userRepository = dataSource.getRepository(User);
       await userRepository.update(
