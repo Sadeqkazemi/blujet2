@@ -171,6 +171,29 @@ mobile, or email is rejected and never resets that account.
 
 ## Temporary password-only panel UAT access
 
+### September 20, 2026 renewal (v4)
+
+The owner approved a fresh seven days for all eleven reserved identities.
+Deployment runs `accounts:extend:temporary:v4:prod -- --execute` with
+`TEMP_PANEL_EXTENSION_CONFIRM=EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V4`.
+Production and sandbox mode must both already be enabled. Execution is
+permitted September 20–21 UTC only; every granted deadline is exactly seven
+days later, and the runtime exception ends September 28 UTC. Old account
+creation dates and credentials are retained. This does not renew other users.
+
+The transaction locks the identities, verifies trusted UAT provenance and
+expected roles, reactivates them with password-only access, revokes refresh
+sessions and records a security audit per account. Existing phones and
+passwords are preserved. Repeat execution returns `already_applied` without
+changing deadlines, even after the approval window closes. An incomplete
+prior grant or ineligible account fails the entire transaction.
+
+Root-only evidence: `/root/blujet-uat-temporary-access-extension-v4.json`.
+Host sentinel: `/root/.blujet-uat-temporary-access-extension-v4-complete`.
+After deployment, inspect its eleven deadlines and sign in to all nine staff
+roles plus agency and customer using the existing credentials. A successful
+deployment alone does not prove every panel login works.
+
 This owner-approved exception is used only while Kavenegar delivery is being
 repaired. The first successful deployment writes the seven generated
 credentials to `/root/blujet-temporary-panel-credentials.json` with mode

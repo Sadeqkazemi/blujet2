@@ -4,6 +4,23 @@ import type { Role } from './enums';
 
 export const TEMPORARY_PANEL_INITIAL_ACCESS_MS = 7 * 24 * 60 * 60 * 1000;
 export const TEMPORARY_PANEL_EXTENSION_MS = 7 * 24 * 60 * 60 * 1000;
+const V4_APPROVAL_START = Date.parse('2026-09-20T00:00:00.000Z');
+const V4_APPROVAL_END = Date.parse('2026-09-22T00:00:00.000Z');
+
+/** This dated owner grant must never become a rolling renewal mechanism. */
+export function createTemporaryPanelV4Expiry(now = new Date()): Date {
+  const time = now.getTime();
+  if (
+    !Number.isFinite(time) ||
+    time < V4_APPROVAL_START ||
+    time >= V4_APPROVAL_END
+  ) {
+    throw new Error(
+      'Extension v4 refused: outside the approved renewal window.',
+    );
+  }
+  return new Date(time + TEMPORARY_PANEL_EXTENSION_MS);
+}
 /** Owner-approved UAT ceiling after extension v3. This is deliberately wider
  * than the requested deadline so accounts created on different rollout dates
  * can all receive the same controlled seven-day continuation. Ordinary
@@ -113,12 +130,18 @@ export function getTemporaryPanelAccessState(
 ): TemporaryPanelAccessState {
   const deadline = user.temporaryPasswordOnlyUntil;
   if (deadline === null) return 'NONE';
+  const v4Deadline =
+    isSandboxAuthEnabled() &&
+    user.createdAt.getTime() <= V4_APPROVAL_START &&
+    deadline.getTime() >= V4_APPROVAL_START + TEMPORARY_PANEL_EXTENSION_MS &&
+    deadline.getTime() < V4_APPROVAL_END + TEMPORARY_PANEL_EXTENSION_MS;
   if (
     user.username === null ||
     !isTemporaryPanelUsername(user.username) ||
     user.twoFactorEnabled ||
-    deadline.getTime() >
-      user.createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS
+    (deadline.getTime() >
+      user.createdAt.getTime() + TEMPORARY_PANEL_ACCESS_MAX_MS &&
+      !v4Deadline)
   ) {
     return 'INVALID';
   }

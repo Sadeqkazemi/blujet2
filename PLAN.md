@@ -4009,3 +4009,14 @@ contracts and retires the production mock adapters.
 - [x] Rename the pricing rejection submission to «ثبت درخواست» without changing its audited decision semantics.
 - [x] Pass 944 frontend tests, 341 backend unit tests, 36 cartable E2E tests, both production builds, lint checks, diff validation, and local responsive browser QA.
 - [ ] Commit/push, merge, and deploy only after explicit user approval.
+# UAT sandbox access renewal v4 (2026-09-20)
+
+- [x] Prepare one fresh seven-day renewal for the eleven reserved identities;
+  preserve passwords, roles, phones, creation dates and business data.
+- [x] Require production/sandbox/v4 confirmation and the dated approval window;
+  serialize grants with row locks and audit-backed idempotency.
+- [x] Add backend unit and database integration regression coverage, a separate
+  deployment sentinel, and root-only audit evidence.
+- [x] Pass 28 focused tests, backend production build, focused lint and CLI dry run.
+- [ ] Pass complete repository CI, including real PostgreSQL concurrency tests.
+- [ ] Obtain approval to merge the reviewed change, deploy and verify live access.
