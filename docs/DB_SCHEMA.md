@@ -3218,3 +3218,13 @@ document changes.
   requires an owner-approved reconciliation decision.
 - Cutover uses shadow reads and reconciliation first, then a single writer flag.
   Dual writes to website and PSS inventory are forbidden.
+# UAT access renewal v4 (2026-09-20)
+
+No schema change. The existing `User.temporaryPasswordOnlyUntil` receives
+execution time plus seven days for the eleven verified reserved UAT identities.
+The historical age ceiling remains 35 days; the September 20–21 renewal has a
+sandbox-only absolute deadline ceiling of September 28 UTC, 2026.
+`AuditLog.metadata.source = temporary-panel-access-extension-v4` is the
+transactional one-time grant marker. Ordered pessimistic user locks serialize
+retries, and refresh tokens are revoked in the same transaction. Passwords,
+phones, account creation timestamps, roles and business data are preserved.

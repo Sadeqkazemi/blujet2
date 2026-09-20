@@ -24,6 +24,7 @@ import {
   Role,
 } from '../src/database/enums';
 import { getSandboxOtpCode } from '../src/common/sandbox-auth';
+import { extendTemporaryPanelAccessV4 } from '../src/database/extend-temporary-panel-access-v4';
 import { normalizeIranPhone } from '../src/common/normalize-iran-phone';
 import {
   TEMPORARY_PANEL_ACCOUNTS,
@@ -1063,5 +1064,148 @@ describe('UAT shared panel password — bootstrap & rotation (e2e, Phase: shared
     delete process.env.AUTH_SANDBOX_OTP;
     delete process.env.DEV_FIXED_OTP_CODE;
     expect(getSandboxOtpCode()).toBe('123456');
+  });
+
+  describe('September v4 renewal', () => {
+    const renewalTime = new Date('2026-09-20T14:00:00.000Z');
+    let savedEnv: NodeJS.ProcessEnv;
+
+    beforeEach(async () => {
+      expect(bootstrap().status).toBe(0);
+      await dataSource.getRepository(User).update(
+        { username: In(ALL_USERNAMES) },
+        {
+          createdAt: new Date('2026-08-05T00:00:00.000Z'),
+          temporaryPasswordOnlyUntil: new Date('2026-09-04T00:00:00.000Z'),
+          isActive: false,
+          twoFactorEnabled: true,
+          twoFactorSecret: 'synthetic-test-secret',
+        },
+      );
+      savedEnv = { ...process.env };
+      process.env.NODE_ENV = 'production';
+      process.env.AUTH_SANDBOX_ENABLED = 'true';
+      process.env.TEMP_PANEL_EXTENSION_CONFIRM =
+        'EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V4';
+    });
+    afterEach(() => {
+      process.env = savedEnv;
+    });
+
+    it('renews all eleven atomically, preserves credentials and phones, revokes sessions and deduplicates concurrent retries', async () => {
+      const users = dataSource.getRepository(User);
+      const before = await users.find({
+        where: { username: In(ALL_USERNAMES) },
+        order: { username: 'ASC' },
+      });
+      const sessions = dataSource.getRepository(RefreshToken);
+      await sessions.save(
+        before.map((user) =>
+          sessions.create({
+            userId: user.id,
+            tokenHash: `v4-test-${user.id}`,
+            expiresAt: new Date('2026-10-01T00:00:00.000Z'),
+            revokedAt: null,
+          }),
+        ),
+      );
+      const result = await Promise.all([
+        extendTemporaryPanelAccessV4(dataSource, renewalTime),
+        extendTemporaryPanelAccessV4(dataSource, renewalTime),
+      ]);
+      expect(result.map(({ status }) => status).sort()).toEqual([
+        'already_applied',
+        'extended',
+      ]);
+      const after = await users.find({
+        where: { username: In(ALL_USERNAMES) },
+        order: { username: 'ASC' },
+      });
+      for (let i = 0; i < after.length; i++) {
+        expect(after[i]).toMatchObject({
+          passwordHash: before[i].passwordHash,
+          phone: before[i].phone,
+          role: before[i].role,
+          createdAt: before[i].createdAt,
+          isActive: true,
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          temporaryPasswordOnlyUntil: new Date('2026-09-27T14:00:00.000Z'),
+        });
+      }
+      expect(
+        await sessions.countBy({
+          userId: In(before.map(({ id }) => id)),
+          revokedAt: IsNull(),
+        }),
+      ).toBe(0);
+      const grants = await dataSource
+        .getRepository(AuditLog)
+        .createQueryBuilder('audit')
+        .where("audit.metadata ->> 'source' = :source", {
+          source: 'temporary-panel-access-extension-v4',
+        })
+        .getMany();
+      expect(grants).toHaveLength(11);
+      expect(JSON.stringify(grants)).not.toContain(STRONG_PASSWORD);
+      expect(
+        await extendTemporaryPanelAccessV4(
+          dataSource,
+          new Date('2026-10-01T00:00:00.000Z'),
+        ),
+      ).toMatchObject({ status: 'already_applied' });
+      expect(
+        await users.find({
+          where: { username: In(ALL_USERNAMES) },
+          order: { username: 'ASC' },
+        }),
+      ).toEqual(after);
+    });
+
+    it('leaves every account unchanged when one account has no trusted provenance', async () => {
+      const users = dataSource.getRepository(User);
+      const before = await users.find({
+        where: { username: In(ALL_USERNAMES) },
+        order: { username: 'ASC' },
+      });
+      await dataSource
+        .getRepository(AuditLog)
+        .delete({ entityId: before[before.length - 1].id });
+      await expect(
+        extendTemporaryPanelAccessV4(dataSource, renewalTime),
+      ).rejects.toThrow('ineligible');
+      expect(
+        await users.find({
+          where: { username: In(ALL_USERNAMES) },
+          order: { username: 'ASC' },
+        }),
+      ).toEqual(before);
+    });
+
+    it('refuses a partial historical grant without extending any account', async () => {
+      const user = await dataSource
+        .getRepository(User)
+        .findOneByOrFail({ username: 'uat.it' });
+      const audits = dataSource.getRepository(AuditLog);
+      await audits.save(
+        audits.create({
+          actorId: user.id,
+          actorRole: user.role,
+          category: 'SECURITY',
+          action: 'Test partial grant',
+          detail: 'Synthetic test fixture',
+          entityType: 'User',
+          entityId: user.id,
+          metadata: { source: 'temporary-panel-access-extension-v4' },
+        }),
+      );
+      await expect(
+        extendTemporaryPanelAccessV4(dataSource, renewalTime),
+      ).rejects.toThrow('inconsistent prior grant');
+      expect(
+        (await dataSource.getRepository(User).findOneByOrFail({ id: user.id }))
+          .temporaryPasswordOnlyUntil,
+      ).toEqual(user.temporaryPasswordOnlyUntil);
+    });
   });
 });

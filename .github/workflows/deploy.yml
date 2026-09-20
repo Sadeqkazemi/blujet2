@@ -434,4 +434,24 @@ jobs:
                 touch "$wallet_reconcile_sentinel"
                 chmod 600 "$wallet_reconcile_sentinel"
               fi
+              # September 20 owner-approved renewal: audit-backed idempotency
+              # prevents a second grant even if this host sentinel is lost.
+              access_extension_v4_sentinel=/root/.blujet-uat-temporary-access-extension-v4-complete
+              if [ ! -f "$access_extension_v4_sentinel" ]; then
+                umask 077
+                access_extension_v4_audit=/root/blujet-uat-temporary-access-extension-v4.json
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e NODE_ENV=production \
+                  -e TEMP_PANEL_EXTENSION_CONFIRM=EXTEND_TEMPORARY_PANEL_ACCESS_7_DAYS_V4 \
+                  backend node dist/database/extend-temporary-panel-access-v4.js --execute \
+                  > "$access_extension_v4_audit"
+                chmod 600 "$access_extension_v4_audit"
+                # Verify each real login + authenticated identity. Only role,
+                # expiry and success are logged; verification sessions logout.
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                  backend node dist/database/verify-temporary-panel-access-v4.js
+                touch "$access_extension_v4_sentinel"
+                chmod 600 "$access_extension_v4_sentinel"
+              fi
               docker image prune -f

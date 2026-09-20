@@ -4303,3 +4303,14 @@ Planned message families are `AirShopping`, `OfferPrice`, `OrderCreate`,
 `OrderRetrieve`, `OrderChange` and `OrderCancel`. The facade maps messages to
 the internal APIs above and owns no inventory or order state. It must not be
 described as certified before named-partner conformance succeeds.
+# UAT access renewal v4 (2026-09-20)
+
+The owner-approved operational command `accounts:extend:temporary:v4:prod`
+renews all eleven exact reserved UAT identities for seven days from execution.
+It requires production mode, sandbox mode and the v4 confirmation, locks the
+accounts, verifies roles/passwords/audit provenance, restores active
+password-only access and revokes refresh sessions in one transaction.
+Existing credentials, phones, roles and business records are preserved.
+Audit-based idempotency prevents repeated grants even without a host sentinel.
+The command may grant only on September 20–21 UTC, 2026; the sandbox-only
+runtime ceiling exception ends September 28 UTC. No HTTP contract changes.
