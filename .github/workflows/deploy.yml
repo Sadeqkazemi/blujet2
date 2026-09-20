@@ -37,6 +37,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           envs: UAT_PANEL_SHARED_PASSWORD,DEPLOY_SHA
+          command_timeout: 25m
           script: |
             set -e
             cd /opt/app
@@ -446,6 +447,20 @@ jobs:
                   backend node dist/database/extend-temporary-panel-access-v4.js --execute \
                   > "$access_extension_v4_audit"
                 chmod 600 "$access_extension_v4_audit"
+                # Owner confirmed every reserved identity must use the
+                # configured shared credential. Preserve all granted deadlines.
+                shared_password_reconciliation_v4_sentinel=/root/.blujet-uat-shared-password-reconciliation-v4-complete
+                if [ ! -f "$shared_password_reconciliation_v4_sentinel" ]; then
+                  shared_password_reconciliation_v4_audit=/root/blujet-uat-shared-password-reconciliation-v4.json
+                  docker compose -f docker-compose.prod.yml exec -T \
+                    -e TEMP_PANEL_ROTATE_CONFIRM=ROTATE_TEMPORARY_PANEL_PASSWORDS_SHARED_V1 \
+                    -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                    backend node dist/database/rotate-temporary-panel-passwords.js --execute \
+                    > "$shared_password_reconciliation_v4_audit"
+                  chmod 600 "$shared_password_reconciliation_v4_audit"
+                  touch "$shared_password_reconciliation_v4_sentinel"
+                  chmod 600 "$shared_password_reconciliation_v4_sentinel"
+                fi
                 # Verify each real login + authenticated identity. Only role,
                 # expiry and success are logged; verification sessions logout.
                 docker compose -f docker-compose.prod.yml exec -T \

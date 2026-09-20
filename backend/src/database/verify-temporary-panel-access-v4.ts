@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import { setTimeout } from 'node:timers/promises';
+import * as argon2 from 'argon2';
 import { DataSource, In } from 'typeorm';
+import type { Repository } from 'typeorm';
+import { normalizeIranPhone } from '../common/normalize-iran-phone';
 import { resolveUatSharedPassword } from '../common/uat-shared-password';
 import { User } from './entities/user.entity';
 import {
@@ -13,6 +16,27 @@ import {
 interface AuthResponse {
   success?: boolean;
   data?: { accessToken?: string; id?: string; role?: string };
+}
+
+export async function diagnoseTemporaryPanelLogin(
+  user: User,
+  password: string,
+  users: Repository<User>,
+) {
+  const phoneLogin = user.role === 'USER' || user.role === 'AGENCY';
+  const normalizedPhone = user.phone ? normalizeIranPhone(user.phone) : null;
+  const phoneOwner =
+    phoneLogin && normalizedPhone
+      ? await users.findOneBy({ phone: normalizedPhone })
+      : null;
+  return {
+    username: user.username,
+    passwordMatches:
+      Boolean(user.passwordHash) &&
+      (await argon2.verify(user.passwordHash!, password)),
+    phoneIsCanonical: !phoneLogin || user.phone === normalizedPhone,
+    phoneLookupMatches: !phoneLogin || phoneOwner?.id === user.id,
+  };
 }
 
 async function logoutVerificationSession(
@@ -116,6 +140,7 @@ async function main(): Promise<void> {
     });
     if (users.length !== accounts.length)
       throw new Error('Verification failed: reserved UAT accounts missing.');
+    let failures = 0;
     for (const [index, user] of users.entries()) {
       if (
         !user.isActive ||
@@ -128,13 +153,34 @@ async function main(): Promise<void> {
       }
       // Respect the existing five-login-per-minute limit; do not bypass it.
       if (index > 0) await setTimeout(13_000);
-      process.stdout.write(
-        `${JSON.stringify(await verifyTemporaryPanelLogin(user, password))}\n`,
-      );
+      try {
+        process.stdout.write(
+          `${JSON.stringify(await verifyTemporaryPanelLogin(user, password))}\n`,
+        );
+      } catch (error: unknown) {
+        failures++;
+        process.stdout.write(
+          `${JSON.stringify({
+            loginVerified: false,
+            ...(await diagnoseTemporaryPanelLogin(
+              user,
+              password,
+              source.getRepository(User),
+            )),
+          })}\n`,
+        );
+        process.stderr.write(
+          `${error instanceof Error ? error.message : 'UAT login verification failed.'}\n`,
+        );
+      }
     }
     process.stdout.write(
-      `${JSON.stringify({ verifiedAccounts: users.length })}\n`,
+      `${JSON.stringify({ verifiedAccounts: users.length - failures, failedAccounts: failures })}\n`,
     );
+    if (failures > 0)
+      throw new Error(
+        `UAT verification failed for ${failures} reserved account(s).`,
+      );
   } finally {
     await source.destroy();
   }

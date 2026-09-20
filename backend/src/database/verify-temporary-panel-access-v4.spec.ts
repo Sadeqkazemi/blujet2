@@ -1,5 +1,10 @@
 import { User } from './entities/user.entity';
-import { verifyTemporaryPanelLogin } from './verify-temporary-panel-access-v4';
+import * as argon2 from 'argon2';
+import type { Repository } from 'typeorm';
+import {
+  diagnoseTemporaryPanelLogin,
+  verifyTemporaryPanelLogin,
+} from './verify-temporary-panel-access-v4';
 
 describe('live UAT access verification', () => {
   const password = 'synthetic-secret-not-for-output';
@@ -12,6 +17,47 @@ describe('live UAT access verification', () => {
     temporaryPasswordOnlyUntil: new Date('2026-09-27T14:00:00Z'),
   });
   afterEach(() => jest.restoreAllMocks());
+
+  it('distinguishes a phone collision from password drift without disclosing account data', async () => {
+    const passwordHash = await argon2.hash(password);
+    const customer = Object.assign(new User(), user, {
+      role: 'USER',
+      phone: '09000000002',
+      passwordHash,
+    });
+    const findOneBy = jest.fn().mockResolvedValue({ id: 'other-private-id' });
+    const result = await diagnoseTemporaryPanelLogin(customer, password, {
+      findOneBy,
+    } as unknown as Repository<User>);
+    expect(result).toEqual({
+      username: customer.username,
+      passwordMatches: true,
+      phoneIsCanonical: false,
+      phoneLookupMatches: false,
+    });
+    expect(findOneBy).toHaveBeenCalledWith({ phone: '+989000000002' });
+    expect(JSON.stringify(result)).not.toContain('private');
+    expect(JSON.stringify(result)).not.toContain(password);
+  });
+
+  it('identifies password drift when the canonical phone belongs to the correct user', async () => {
+    const passwordHash = await argon2.hash('different-synthetic-password');
+    const customer = Object.assign(new User(), user, {
+      role: 'USER',
+      phone: '+989000000002',
+      passwordHash,
+    });
+    const findOneBy = jest.fn().mockResolvedValue({ id: customer.id });
+    expect(
+      await diagnoseTemporaryPanelLogin(customer, password, {
+        findOneBy,
+      } as unknown as Repository<User>),
+    ).toMatchObject({
+      passwordMatches: false,
+      phoneIsCanonical: true,
+      phoneLookupMatches: true,
+    });
+  });
 
   it.each([
     ['IT_MANAGER', 'staff/login'],

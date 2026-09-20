@@ -198,6 +198,17 @@ success. Failure leaves the grant audit intact and the sentinel absent, so
 a retry verifies the existing grant without adding more time. Check all
 eleven `loginVerified` rows in the deployment log before reporting success.
 
+The September 20 live grant succeeded, but customer login returned 401. The
+owner confirmed all reserved accounts must share the existing protected
+credential. Recovery uses the existing guarded password rotation once after
+the v4 grant, preserves expiry, and records its output in
+`/root/blujet-uat-shared-password-reconciliation-v4.json`. Its independent
+`.blujet-uat-shared-password-reconciliation-v4-complete` sentinel prevents
+repeated rotation. Verification continues through all eleven accounts and
+logs only safe password-match and canonical-phone-lookup flags on failures.
+Cold image builds exceeded the prior ten-minute SSH command limit; the command
+limit is now 25 minutes within the unchanged 30-minute deployment job limit.
+
 This owner-approved exception is used only while Kavenegar delivery is being
 repaired. The first successful deployment writes the seven generated
 credentials to `/root/blujet-temporary-panel-credentials.json` with mode
