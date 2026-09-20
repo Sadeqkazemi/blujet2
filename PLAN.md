@@ -4027,3 +4027,6 @@ contracts and retires the production mock adapters.
 
 - [x] Granted all eleven accounts until 2026-09-27T15:39:22.024Z; owner confirmed shared password recovery.
 - [ ] Reconcile the shared password without changing expiry and verify all eleven logins.
+- [x] Reconcile all eleven shared passwords; live verification confirms ten successful logins and the remaining customer's canonical-phone lookup mismatch.
+- [x] Apply the existing sandbox agency identity resolution pattern to the reserved customer; preserve phone ownership and enforce temporary expiry.
+- [ ] Pass customer conflict/deadline integration regressions and confirm all eleven live logins.

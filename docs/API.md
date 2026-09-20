@@ -1619,6 +1619,11 @@ always meant to be customer-only.
   password set via the reset flow would have nowhere to actually be used.
   Wrong password and "phone was never given a password" both 401 with
   the identical generic message — no account-existence oracle.
+  In an explicitly enabled sandbox, the reserved customer test number
+  `09000000002` resolves only to `uat.customer`, matching the existing agency
+  test-login behavior. A valid shared password and active temporary deadline
+  remain mandatory; a missing or expired deadline fails closed. Ordinary
+  numbers and environments continue to use canonical phone ownership.
 - Frontend: `CustomerLoginPage.tsx`'s login tab gained a small "ورود با
   رمز عبور" toggle (phone+password fields, same visual language as the
   existing OTP form) plus a link to `/forgot-password`. The design's own

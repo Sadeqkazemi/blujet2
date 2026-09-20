@@ -36,3 +36,17 @@ and report only password-match/phone-lookup booleans when login fails.
 - [ ] Keep the v4 grant deadline unchanged and prevent repeat rotation by sentinel.
 - [ ] Diagnose failed logins without revealing password/hash/phone-owner data.
 - [ ] Verify all eleven live accounts after recovery.
+
+## Reserved customer phone lookup recovery
+
+Live verification after shared-password reconciliation confirmed ten successful
+logins. The remaining customer had a matching password but a noncanonical phone
+and a canonical lookup that did not resolve to its UAT identity. Customer password
+login now follows the existing sandbox agency pattern: resolve the exact reserved
+input to the immutable UAT username and require an active temporary deadline.
+No phone ownership, password, expiry, or business record is changed by this fix.
+
+- [ ] Prove the API's accepted local phone input authenticates the intended customer.
+- [ ] Preserve the conflicting owner and ordinary behavior outside sandbox.
+- [ ] Reject wrong passwords and missing or expired temporary deadlines.
+- [ ] Pass repository CI and verify all eleven live logins.
