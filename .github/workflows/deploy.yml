@@ -446,6 +446,11 @@ jobs:
                   backend node dist/database/extend-temporary-panel-access-v4.js --execute \
                   > "$access_extension_v4_audit"
                 chmod 600 "$access_extension_v4_audit"
+                # Verify each real login + authenticated identity. Only role,
+                # expiry and success are logged; verification sessions logout.
+                docker compose -f docker-compose.prod.yml exec -T \
+                  -e UAT_PANEL_SHARED_PASSWORD="$UAT_PANEL_SHARED_PASSWORD" \
+                  backend node dist/database/verify-temporary-panel-access-v4.js
                 touch "$access_extension_v4_sentinel"
                 chmod 600 "$access_extension_v4_sentinel"
               fi

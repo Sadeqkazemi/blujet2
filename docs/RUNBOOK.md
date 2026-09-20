@@ -190,9 +190,13 @@ prior grant or ineligible account fails the entire transaction.
 
 Root-only evidence: `/root/blujet-uat-temporary-access-extension-v4.json`.
 Host sentinel: `/root/.blujet-uat-temporary-access-extension-v4-complete`.
-After deployment, inspect its eleven deadlines and sign in to all nine staff
-roles plus agency and customer using the existing credentials. A successful
-deployment alone does not prove every panel login works.
+Before setting the sentinel, deployment verifies each account through its
+real local HTTP login surface, calls authenticated `/auth/me` and logs out
+the verification session. It uses the existing protected shared-password
+secret, respects login rate limits and emits only username, role, expiry and
+success. Failure leaves the grant audit intact and the sentinel absent, so
+a retry verifies the existing grant without adding more time. Check all
+eleven `loginVerified` rows in the deployment log before reporting success.
 
 This owner-approved exception is used only while Kavenegar delivery is being
 repaired. The first successful deployment writes the seven generated

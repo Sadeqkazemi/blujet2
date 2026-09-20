@@ -4017,6 +4017,10 @@ contracts and retires the production mock adapters.
   serialize grants with row locks and audit-backed idempotency.
 - [x] Add backend unit and database integration regression coverage, a separate
   deployment sentinel, and root-only audit evidence.
-- [x] Pass 28 focused tests, backend production build, focused lint and CLI dry run.
+- [x] Pass all 383 backend unit tests plus five added login-verification tests,
+  backend production build, focused lint and CLI dry run.
+- [x] Add post-renewal HTTP login/identity/logout verification for all eleven
+  accounts, reporting only safe status and expiry metadata.
 - [ ] Pass complete repository CI, including real PostgreSQL concurrency tests.
-- [ ] Obtain approval to merge the reviewed change, deploy and verify live access.
+- [x] Owner approved PR #273 merge and execution on 2026-09-20.
+- [ ] Deploy and verify live access.
