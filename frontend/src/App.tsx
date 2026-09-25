@@ -99,6 +99,9 @@ import SiteRulesPage from './features/site-content/SiteRulesPage';
 import SandboxImpersonationBanner from './components/SandboxImpersonationBanner';
 import FlightCancellationsPage from './features/flights/FlightCancellationsPage';
 import SiteAdminAgencyBulletinsPage from './features/agency-bulletins/SiteAdminAgencyBulletinsPage';
+import MobileCustomerShell from './features/mobile-customer/MobileCustomerShell';
+import MobileHomePage from './features/mobile-customer/MobileHomePage';
+import MobilePlaceholderPage from './features/mobile-customer/MobilePlaceholderPage';
 
 export default function App() {
   return (
@@ -109,6 +112,16 @@ export default function App() {
         <AccessRevokedListener />
         <SandboxImpersonationBanner />
         <Routes>
+          <Route path="/app" element={<MobileCustomerShell />}>
+            <Route index element={<MobileHomePage />} />
+            <Route path="book" element={<MobilePlaceholderPage />} />
+            <Route path="trips" element={<MobilePlaceholderPage />} />
+            <Route path="rewards" element={<MobilePlaceholderPage />} />
+            <Route path="more" element={<MobilePlaceholderPage />} />
+            <Route path="check-in" element={<MobilePlaceholderPage />} />
+            <Route path="flight-status" element={<MobilePlaceholderPage />} />
+            <Route path="support" element={<MobilePlaceholderPage />} />
+          </Route>
           <Route path="/" element={<HomeSearchPage />} />
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/book/:flightInstanceId" element={<BookPage />} />
